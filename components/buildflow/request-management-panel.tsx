@@ -7,7 +7,7 @@ import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { deleteRequestClientDocumentAction, previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
+import { addRequestAttachmentsAction, deleteRequestClientDocumentAction, prepareRequestAttachmentUploadAction, previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type ExistingRequestUploadInput, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
 import { saveRequestSupplierProgressNoteAction } from "@/app/owner/materials/requests/supplier-progress-actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
@@ -18,11 +18,13 @@ import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
+import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
 import { requestPaymentGuidanceForMethod, type RequestPaymentMethod } from "@/lib/request-client-payment"
 import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
+import { createClient } from "@/lib/supabase/client"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
@@ -56,6 +58,7 @@ export type RequestClientDocumentSnapshot = {
     terms?: string
     paymentRequest?: { methods?: RequestPaymentMethod[]; method?: RequestPaymentMethod; amountDue: number; methodInstructions?: Partial<Record<RequestPaymentMethod, string>>; instructions?: string; securePaymentUrl?: string }
     paymentLink?: string
+    attachments?: RequestClientDocumentAttachment[]
   }
 }
 
@@ -160,6 +163,7 @@ export function RequestManagementPanel({
   initialClientDocuments,
   initialSupplierRecommendations,
   clientEmails,
+  requestAttachments,
 }: {
   requestId: string
   requestTitle: string
@@ -181,6 +185,7 @@ export function RequestManagementPanel({
   initialClientDocuments: RequestClientDocumentSnapshot[]
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean; contactStatus: RequestSupplierContactStatus; note: string }>
   clientEmails: RelatedEmailItem[]
+  requestAttachments: RequestClientDocumentAttachment[]
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
@@ -231,6 +236,8 @@ export function RequestManagementPanel({
   const [paymentInstructions, setPaymentInstructions] = useState<Partial<Record<RequestPaymentMethod, string>>>({})
   const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
+  const [documentAttachments, setDocumentAttachments] = useState<RequestClientDocumentAttachment[]>([])
+  const [attachmentUploadPending, setAttachmentUploadPending] = useState(false)
   const [deletedDocumentTokens, setDeletedDocumentTokens] = useState<string[]>([])
   const [deletingDocument, setDeletingDocument] = useState("")
   const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
@@ -384,6 +391,7 @@ export function RequestManagementPanel({
     setPaymentAmountDue(savedPayment?.amountDue ? String(savedPayment.amountDue) : legacyPaymentLink ? savedDocumentTotal(saved.documentData).toFixed(2) : "")
     setPaymentInstructions(savedPayment?.methodInstructions || (savedPayment?.instructions ? { [savedPaymentMethods[0]]: savedPayment.instructions } : {}))
     setHostedPaymentUrl(savedPayment?.securePaymentUrl || legacyPaymentLink || AVANTIA_PAYMENT_LINK)
+    setDocumentAttachments(saved?.documentData.attachments || [])
     setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice. Reply with any questions." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
     setContactOpen(false)
     setQuoteOpen(true)
@@ -619,6 +627,39 @@ export function RequestManagementPanel({
         methodInstructions: paymentInstructions,
         ...(paymentMethods.includes("credit_card") && hostedPaymentUrl.trim() ? { securePaymentUrl: hostedPaymentUrl.trim() } : {}),
       } : undefined,
+      attachmentIds: documentAttachments.map((entry) => entry.id),
+    }
+  }
+
+  async function addDocumentAttachments(files: File[]) {
+    if (!files.length || attachmentUploadPending) return
+    const alreadySelected = new Set(documentAttachments.map((entry) => entry.id))
+    if (files.length + alreadySelected.size > 10) return setQuoteFeedback("Attach up to 10 files to one document.")
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"])
+    const invalid = files.find((file) => !allowed.has(file.type) || file.size <= 0 || file.size > 25 * 1024 * 1024)
+    if (invalid) return setQuoteFeedback(`${invalid.name} is not supported. Use PDF, JPG, PNG, WebP, DOCX, or XLSX under 25 MB.`)
+    const selectedTotal = documentAttachments.reduce((sum, entry) => sum + entry.fileSize, 0) + files.reduce((sum, file) => sum + file.size, 0)
+    if (selectedTotal > 25 * 1024 * 1024) return setQuoteFeedback("Keep all attachments for this document at 25 MB or less.")
+    setAttachmentUploadPending(true)
+    setQuoteFeedback("")
+    try {
+      const uploads: ExistingRequestUploadInput[] = []
+      for (const file of files) {
+        const prepared = await prepareRequestAttachmentUploadAction({ requestId, filename: file.name, type: file.type, size: file.size })
+        if (!prepared.ok) throw new Error(prepared.error)
+        const { storagePath, token } = prepared.data
+        const { error } = await createClient().storage.from("project-uploads").uploadToSignedUrl(storagePath, token, file, { contentType: file.type, upsert: false })
+        if (error) throw new Error(`Could not upload ${file.name}. Please try again.`)
+        uploads.push({ storagePath, filename: file.name, type: file.type, size: file.size })
+      }
+      const result = await addRequestAttachmentsAction({ requestId, attachments: uploads, organize: false })
+      if (!result.ok) throw new Error(result.error)
+      setDocumentAttachments((current) => [...current, ...result.attachments.filter((entry) => !alreadySelected.has(entry.id))])
+      setQuoteFeedback(`${result.attachments.length} file${result.attachments.length === 1 ? "" : "s"} added. Save the document to include them on the client link.`)
+    } catch (cause) {
+      setQuoteFeedback(cause instanceof Error ? cause.message : "The files could not be attached. Please try again.")
+    } finally {
+      setAttachmentUploadPending(false)
     }
   }
 
@@ -1012,6 +1053,20 @@ export function RequestManagementPanel({
               <table className="w-full min-w-[48rem] text-left text-xs"><thead className="bg-slate-950 text-white"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Quantity</th><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Unit price</th><th className="px-3 py-2 text-right">Total</th><th className="w-10" /></tr></thead><tbody>{quoteLines.map((line, index) => <tr key={line.key} className="border-b border-slate-200 last:border-b-0"><td className="px-3 py-2 font-bold">{index + 1}</td><td className="p-1.5"><input value={line.description} onChange={(event) => updateQuoteLine(line.key, { description: event.target.value })} className="h-9 w-full min-w-56 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(event) => updateQuoteLine(line.key, { quantity: Number(event.target.value) })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input value={line.unit} onChange={(event) => updateQuoteLine(line.key, { unit: event.target.value })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(event) => updateQuoteLine(line.key, { unitPrice: Number(event.target.value) })} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="px-3 py-2 text-right font-bold tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</td><td><button type="button" onClick={() => setQuoteLines((current) => current.filter((item) => item.key !== line.key))} className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:text-rose-700" aria-label={`Remove item ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table>
             </div>
             <button type="button" onClick={() => setQuoteLines((current) => [...current, { key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])} className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold"><Plus className="h-3.5 w-3.5" />Add item</button>
+
+            {documentType === "estimate" ? <section className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" aria-label="Estimate attachments">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><h3 className="text-sm font-bold text-slate-950">Photos &amp; documents for client</h3><p className="mt-0.5 text-xs text-slate-600">Selected files stay with this saved estimate version and appear together on its live link.</p></div>
+                <label className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-[#0066cc] ${attachmentUploadPending ? "cursor-wait opacity-60" : "cursor-pointer"}`}><Paperclip className="h-4 w-4" />{attachmentUploadPending ? "Uploading…" : "Add photos or documents"}<input type="file" multiple accept="image/jpeg,image/png,image/webp,.pdf,.docx,.xlsx" disabled={attachmentUploadPending || pending} className="sr-only" onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void addDocumentAttachments(files) }} /></label>
+              </div>
+              {[...new Map([...requestAttachments, ...documentAttachments].map((entry) => [entry.id, entry])).values()].length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[...new Map([...requestAttachments, ...documentAttachments].map((entry) => [entry.id, entry])).values()].map((entry) => {
+                  const selected = documentAttachments.some((candidate) => candidate.id === entry.id)
+                  return <label key={entry.id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${selected ? "border-sky-300 bg-white text-slate-950" : "border-slate-200 bg-slate-100 text-slate-700"}`}><input type="checkbox" checked={selected} onChange={(event) => setDocumentAttachments((current) => event.target.checked ? [...current.filter((candidate) => candidate.id !== entry.id), entry] : current.filter((candidate) => candidate.id !== entry.id))} className="h-4 w-4 accent-[#0071e3]" /><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{entry.fileName}</span><span className="shrink-0 text-[10px] text-slate-500">{Math.max(1, Math.round(entry.fileSize / 1024))} KB</span></label>
+                })}
+              </div> : <p className="mt-3 text-xs text-slate-500">No request files yet. Add several photos or documents at once.</p>}
+              <p className="mt-2 text-[11px] font-medium text-slate-500">PDF, JPG, PNG, WebP, DOCX, or XLSX · up to 10 files · 25 MB total</p>
+            </section> : null}
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
               <div className="grid gap-3">

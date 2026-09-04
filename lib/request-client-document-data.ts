@@ -24,6 +24,13 @@ export type ParsedRequestClientDocument = RequestClientQuotePdfInput & {
   clientEmail?: string
 }
 
+export type RequestClientDocumentAttachment = {
+  id: string
+  fileName: string
+  fileType: string
+  fileSize: number
+}
+
 export function parseRequestClientDocument(row: StoredRequestClientDocument): ParsedRequestClientDocument | null {
   if (!row.document_data || typeof row.document_data !== "object" || Array.isArray(row.document_data)) return null
   const value = row.document_data as Record<string, unknown>
@@ -40,6 +47,16 @@ export function parseRequestClientDocument(row: StoredRequestClientDocument): Pa
   const clientEmail = typeof value.clientEmail === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.clientEmail.trim())
     ? value.clientEmail.trim().toLowerCase().slice(0, 320)
     : undefined
+  const attachments = Array.isArray(value.attachments) ? value.attachments.flatMap((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return []
+    const attachment = raw as Record<string, unknown>
+    const id = String(attachment.id || "")
+    const fileName = String(attachment.fileName || "").trim().slice(0, 180)
+    const fileType = String(attachment.fileType || "").trim().toLowerCase()
+    const fileSize = Number(attachment.fileSize)
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !fileName || !fileType || !Number.isSafeInteger(fileSize) || fileSize <= 0) return []
+    return [{ id, fileName, fileType, fileSize }]
+  }).slice(0, 10) : []
   return {
     documentType: row.document_type,
     quoteNumber: row.document_number,
@@ -57,5 +74,6 @@ export function parseRequestClientDocument(row: StoredRequestClientDocument): Pa
     terms: String(value.terms || ""),
     paymentRequest: parseStoredRequestClientPayment(value.paymentRequest),
     paymentLink: parseHostedPaymentUrl(value.paymentLink),
+    attachments,
   }
 }

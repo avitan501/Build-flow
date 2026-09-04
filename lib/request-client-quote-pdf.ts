@@ -34,6 +34,7 @@ export type RequestClientQuotePdfInput = {
   paymentRequest?: RequestClientPaymentRequest
   /** Legacy documents created before explicit payment requests. */
   paymentLink?: string
+  attachments?: Array<{ id: string; fileName: string; fileType: string; fileSize: number }>
 }
 
 const navy = rgb(0.02, 0.06, 0.14)
@@ -191,6 +192,15 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   } else if (input.paymentLink) {
     page.drawText("Secure payment", { x: 392, y: termsY, size: 8.5, font: bold, color: blue })
     wrap(regular, input.paymentLink, 7.2, 172).slice(0, 4).forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 13 - index * 10, size: 7.2, font: regular, color: slate }))
+  }
+
+  if (input.attachments?.length) {
+    page = addPage()
+    page.drawText("ATTACHMENTS INCLUDED WITH THIS DOCUMENT", { x: 40, y: 670, size: 11, font: bold, color: blue })
+    page.drawText("Open the live client link to view or download these files.", { x: 40, y: 650, size: 8.5, font: regular, color: slate })
+    input.attachments.forEach((attachment, index) => {
+      page.drawText(`${index + 1}. ${clean(attachment.fileName).slice(0, 90)}`, { x: 48, y: 620 - index * 22, size: 9, font: regular, color: navy })
+    })
   }
 
   pdf.setTitle(`Avantia Build ${documentLabel} ${input.quoteNumber}`)

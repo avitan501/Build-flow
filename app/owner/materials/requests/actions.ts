@@ -11,6 +11,7 @@ import { scheduleClientMaterialListOrganization } from "@/lib/material-request-o
 import { buildProjectUploadStoragePath } from "@/lib/projects"
 import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyRequestAttachmentStorage } from "@/lib/request-attachment-upload"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
+import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
@@ -29,7 +30,7 @@ export type PrepareRequestAttachmentUploadResult =
   | { ok: true; data: { storagePath: string; token: string } }
   | { ok: false; code: "invalid_origin" | "invalid_file" | "request_not_found" | "prepare_failed"; error: string }
 export type AddRequestAttachmentsResult =
-  | { ok: true; organizationStatus: string }
+  | { ok: true; organizationStatus: string; attachments: RequestClientDocumentAttachment[] }
   | { ok: false; code: "invalid_request" | "invalid_files" | "request_not_found" | "storage_failed"; error: string }
 
 export type RequestSupplierPlanInput = {
@@ -130,7 +131,7 @@ export async function updateRequestSupplierContactStatusAction(input: { requestI
   return { ok: true as const }
 }
 
-export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[] }): Promise<AddRequestAttachmentsResult> {
+export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[]; organize?: boolean }): Promise<AddRequestAttachmentsResult> {
   const requestId = String(input.requestId || "").trim()
   const attachments = Array.isArray(input.attachments) ? input.attachments : []
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, code: "invalid_request", error: "Request not found." }
@@ -142,6 +143,7 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
   if (invalid) return { ok: false, code: "invalid_files", error: "One of the selected files is invalid. Remove it and try again." }
 
   const storedPaths: string[] = []
+  const storedAttachments: RequestClientDocumentAttachment[] = []
   try {
     const { supabase } = await requireStaffProfile("customers")
     const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
@@ -160,8 +162,9 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
       )
       if (!verified.ok) throw new Error("attachment_verification_failed")
       storedPaths.push(attachment.storagePath)
-      const { error: recordError } = await supabase.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: attachment.storagePath, file_type: attachment.type, file_size: attachment.size })
-      if (recordError) throw new Error("attachment_record_failed")
+      const { data: record, error: recordError } = await supabase.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: attachment.storagePath, file_type: attachment.type, file_size: attachment.size }).select("id,file_name,file_type,file_size").single<{ id: string; file_name: string; file_type: string; file_size: number }>()
+      if (recordError || !record) throw new Error("attachment_record_failed")
+      storedAttachments.push({ id: record.id, fileName: record.file_name, fileType: record.file_type, fileSize: record.file_size })
     }
   } catch (cause) {
     try {
@@ -176,18 +179,20 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
   }
 
   let organizationStatus = "not_scheduled"
-  try {
-    const organization = await scheduleClientMaterialListOrganization({ requestId, force: true })
-    organizationStatus = organization.status
-  } catch (cause) {
-    console.error("Existing request attachment organization scheduling failed", cause)
+  if (input.organize !== false) {
+    try {
+      const organization = await scheduleClientMaterialListOrganization({ requestId, force: true })
+      organizationStatus = organization.status
+    } catch (cause) {
+      console.error("Existing request attachment organization scheduling failed", cause)
+    }
   }
   try {
     revalidatePath(`/owner/materials/requests/${requestId}`)
   } catch (cause) {
     console.error("Existing request attachment revalidation failed", cause)
   }
-  return { ok: true, organizationStatus }
+  return { ok: true, organizationStatus, attachments: storedAttachments }
 }
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
@@ -281,6 +286,7 @@ export type RequestClientQuoteInput = {
   taxableDelivery?: boolean
   terms: string
   paymentRequest?: RequestClientPaymentRequest
+  attachmentIds?: string[]
 }
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -816,6 +822,17 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,title,owner_id,project_id,projects(address)").eq("id", requestId).maybeSingle<{ id: string; title: string; owner_id: string; project_id: string; projects: { address: string | null } | null }>()
   if (requestError || !request) return { ok: false as const, error: "Request not found." }
   const { data: client } = await supabase.from("profiles").select("full_name,email").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null }>()
+  const attachmentIds = [...new Set((Array.isArray(input.attachmentIds) ? input.attachmentIds : []).map((id) => String(id || "").trim()))]
+  if (attachmentIds.length > 10 || attachmentIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose up to 10 valid attachments." }
+  let documentAttachments: RequestClientDocumentAttachment[] = []
+  if (attachmentIds.length) {
+    const { data, error } = await supabase.from("quote_request_attachments").select("id,file_name,file_type,file_size").eq("request_id", request.id).in("id", attachmentIds).returns<Array<{ id: string; file_name: string; file_type: string | null; file_size: number | null }>>()
+    if (error || !data || data.length !== attachmentIds.length) return { ok: false as const, error: "One or more attachments do not belong to this request. Refresh and try again." }
+    const byId = new Map(data.map((row) => [row.id, row]))
+    documentAttachments = attachmentIds.map((id) => byId.get(id)!).map((row) => ({ id: row.id, fileName: String(row.file_name || "").trim().slice(0, 180), fileType: String(row.file_type || "").toLowerCase(), fileSize: Number(row.file_size) }))
+    const invalidAttachment = documentAttachments.find((attachment) => validateRequestAttachmentFile({ filename: attachment.fileName, type: attachment.fileType, size: attachment.fileSize }))
+    if (invalidAttachment || documentAttachments.reduce((sum, attachment) => sum + attachment.fileSize, 0) > 25 * 1024 * 1024) return { ok: false as const, error: "Attachments must be supported files totaling 25 MB or less." }
+  }
 
   const pdfInput = {
     documentType,
@@ -833,6 +850,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     taxableDelivery: input.taxableDelivery !== false,
     terms: includeRequiredProposalTerms(String(input.terms || "").trim().slice(0, 4000)),
     paymentRequest: paymentRequest?.ok ? paymentRequest.value : undefined,
+    attachments: documentAttachments,
   }
   const pdf = await generateRequestClientQuotePdf(pdfInput)
   return { ok: true as const, supabase, user, request, client, pdf, quoteNumber, lines, pdfInput }

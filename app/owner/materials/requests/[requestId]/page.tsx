@@ -54,6 +54,7 @@ type Attachment = {
   file_name: string;
   file_path: string;
   file_type: string | null;
+  file_size: number | null;
 };
 type RequestItem = {
   id: string;
@@ -148,7 +149,7 @@ export default async function OwnerMaterialRequestPage({
       .returns<MaterialQuestionnaireResponse[]>(),
     supabase
       .from("quote_request_attachments")
-      .select("id,material_response_id,file_name,file_path,file_type")
+      .select("id,material_response_id,file_name,file_path,file_type,file_size")
       .eq("request_id", requestId)
       .returns<Attachment[]>(),
     supabase
@@ -717,6 +718,7 @@ export default async function OwnerMaterialRequestPage({
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, version: entry.version, updatedAt: entry.updated_at }))}
+            requestAttachments={(attachments ?? []).flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
           />

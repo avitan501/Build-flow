@@ -3,6 +3,8 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ])
 
 const EXPECTED_MIME_BY_EXTENSION: Record<string, string> = {
@@ -11,6 +13,8 @@ const EXPECTED_MIME_BY_EXTENSION: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 
 export const REQUEST_ATTACHMENT_MAX_FILES = 10
@@ -38,7 +42,7 @@ export function validateRequestAttachmentFile(input: RequestAttachmentFileInput)
   const size = Number(input.size)
   if (!filename || filename.length > 220 || !Number.isSafeInteger(size) || size <= 0) return "Choose a valid file."
   if (size > REQUEST_ATTACHMENT_MAX_FILE_SIZE) return "Keep each file under 25 MB."
-  if (!ALLOWED_MIME_TYPES.has(type)) return "Add a PDF, JPG, PNG, or WebP file."
+  if (!ALLOWED_MIME_TYPES.has(type)) return "Add a PDF, JPG, PNG, WebP, DOCX, or XLSX file."
   const extension = filename.split(".").pop()?.toLowerCase() || ""
   if (EXPECTED_MIME_BY_EXTENSION[extension] !== type) return "The file name and file type do not match."
   return null
