@@ -40,7 +40,7 @@ export type PrepareQuoAttachmentResult =
 export type SendAuraVideoResult =
   { ok: true; title: string } | { ok: false; error: string };
 
-type BrokerResult = { ok?: boolean; error?: string; id?: string };
+type BrokerResult = { ok?: boolean; error?: string; id?: string; duplicate?: boolean };
 export type TwoChatVoiceTokenResult =
   | { ok: true; token: string; from: string; expiresAt: string | null }
   | { ok: false; error: string };
@@ -276,6 +276,58 @@ export async function sendAuraMessageAction(input: {
         channel === "whatsapp"
           ? whatsappSendError(error)
           : `${channelName} could not send this message.`,
+    };
+  }
+}
+
+export async function sendAuraWelcomePackageAction(input: {
+  channel: "sms" | "whatsapp";
+  recipient: string;
+  recipientLabel?: string;
+  messages: [string, string];
+  idempotencyKey: string;
+}): Promise<SendAuraMessageResult> {
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.customers)
+    return { ok: false, error: "Customer communication access is required." };
+  const phone = normalizeAuraPhone(input.recipient);
+  const messages = input.messages.map((message) => message.trim()) as [string, string];
+  if (!phone || messages.some((message) => !message || message.length > 1_600))
+    return { ok: false, error: "Review both Welcome Package messages." };
+  const startedAt = Date.now();
+  try {
+    const result = await invokeMessagingBroker(supabase, {
+      action: "send_welcome_package",
+      channel: input.channel,
+      to: phone,
+      messages,
+      idempotencyKey: input.idempotencyKey,
+    });
+    if (!result.id) throw new Error("Welcome Package was not queued.");
+    if (!result.duplicate)
+      await recordAuraCommunicationActivity(supabase, user.id, {
+        channel: input.channel,
+        recipient: phone,
+        label: input.recipientLabel || phone,
+        outcome: "sent",
+        startedAt,
+        subject: "Welcome Package · 2 messages",
+      });
+    revalidatePath("/admin/communications");
+    revalidatePath("/admin/users");
+    return { ok: true, externalId: result.id, occurredAt: new Date().toISOString() };
+  } catch (error) {
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: input.channel,
+      recipient: phone,
+      label: input.recipientLabel || phone,
+      outcome: "failed",
+      startedAt,
+      subject: "Welcome Package · 2 messages",
+    });
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Welcome Package could not be queued.",
     };
   }
 }

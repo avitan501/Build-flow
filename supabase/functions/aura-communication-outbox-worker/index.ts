@@ -91,10 +91,16 @@ async function claimNext(): Promise<OutboxRow | null> {
     `;
     return await transaction<OutboxRow[]>`
       with candidate as (
-        select id from public.aura_message_outbox
-        where status in ('pending', 'retry_wait')
-          and available_at <= now() and attempt_count < 10
-        order by created_at
+        select candidate_outbox.id from public.aura_message_outbox as candidate_outbox
+        where candidate_outbox.status in ('pending', 'retry_wait')
+          and candidate_outbox.available_at <= now() and candidate_outbox.attempt_count < 10
+          and not exists (
+            select 1 from public.aura_message_outbox as prior
+            where prior.package_key = candidate_outbox.package_key
+              and prior.package_index < candidate_outbox.package_index
+              and prior.status not in ('accepted', 'sent', 'delivered', 'read')
+          )
+        order by candidate_outbox.created_at, candidate_outbox.package_index nulls first, candidate_outbox.id
         limit 1
         for update skip locked
       )

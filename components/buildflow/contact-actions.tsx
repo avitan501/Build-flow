@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction, sendAuraWelcomePackageAction } from "@/app/owner/aura/actions"
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
@@ -26,9 +26,16 @@ function firstName(name: string) {
   return name.trim().split(/\s+/)[0] || "there"
 }
 
+function welcomePackageMessages(name: string) {
+  return [
+    `Hi ${firstName(name)}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery. See how it works: https://build.avantiap.com`,
+    "Send me whatever you have—a material list, photo, plan, or another supplier’s quote. We’ll work from there.",
+  ] as const
+}
+
 function templateMessage(template: TemplateKey, name: string, senderName: string) {
   const greeting = `Hi ${firstName(name)}`
-  if (template === "welcome") return `${greeting}, Carlos from Avantia Build. Send us any material list, quote, photo, plan, or hard-to-find item. We’ll check pricing, availability, and delivery for you. See how it works: https://build.avantiap.com`
+  if (template === "welcome") return welcomePackageMessages(name)[0]
   if (template === "friendly_follow_up") return `${greeting}, this is ${senderName} from Avantia Build.\n\nI am checking in to see whether you need pricing or materials for a current or upcoming project. You can send us a material list, plan, photo, or supplier quote.\n\nIs there anything you need help sourcing this week?\n\nReply STOP if you no longer want to receive messages.`
   if (template === "request_material_list") return `${greeting}, please send us the material list, plans, photos, quantities, and delivery address for your project.\n\nWe will organize the request and check available pricing. You can reply directly or upload it here:\nhttps://build.avantiap.com/request-quote`
   if (template === "quote_follow_up") return `${greeting}, I am following up regarding your Avantia Build estimate.\n\nPlease let us know if you approve it, have questions, or want us to review any changes before proceeding.`
@@ -51,6 +58,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   const [template, setTemplate] = useState<TemplateKey>("welcome")
   const [isWelcomePackage, setIsWelcomePackage] = useState(false)
   const [message, setMessage] = useState("")
+  const [welcomeFollowUp, setWelcomeFollowUp] = useState("")
   const [subject, setSubject] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState("")
@@ -64,6 +72,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   function resetComposer() {
     setChannel(null)
     setMessage("")
+    setWelcomeFollowUp("")
     setSubject("")
     setAttachment(null)
     setFeedback("")
@@ -84,7 +93,9 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setChannel(initialChannel)
     setTemplate("welcome")
     setIsWelcomePackage(true)
-    setMessage(templateMessage("welcome", name, senderName))
+    const welcome = welcomePackageMessages(name)
+    setMessage(welcome[0])
+    setWelcomeFollowUp(welcome[1])
     setSubject("Welcome to Avantia Build")
   }
 
@@ -92,6 +103,8 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setTemplate(value)
     setIsWelcomePackage(value === "welcome")
     setMessage(templateMessage(value, name, senderName))
+    setWelcomeFollowUp(value === "welcome" ? welcomePackageMessages(name)[1] : "")
+    if (value === "welcome" && channel === "email" && normalizedPhone) setChannel("sms")
     if (value === "welcome") setSubject("Welcome to Avantia Build")
     else if (value === "quote_follow_up") setSubject("Your Avantia Build estimate")
     else if (value === "order_follow_up") setSubject("Your Avantia Build order")
@@ -126,7 +139,9 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
       const welcomeIdempotencyKey = isWelcomePackage && channel !== "email" && normalizedPhone
         ? `welcome/${normalizedPhone.replace(/\D/g, "")}`
         : undefined
-      const result = await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message, idempotencyKey: welcomeIdempotencyKey })
+      const result = isWelcomePackage && channel !== "email"
+        ? await sendAuraWelcomePackageAction({ channel, recipient, recipientLabel: name, messages: [message, welcomeFollowUp], idempotencyKey: welcomeIdempotencyKey! })
+        : await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message, idempotencyKey: welcomeIdempotencyKey })
       if (!result.ok) { setFeedback(result.error); return }
       resetComposer()
       router.refresh()
@@ -168,14 +183,15 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase text-[#0066cc]">{channel === "sms" ? "Q U O text" : channel === "email" ? "Email" : "WhatsApp"}</p><h2 id="contact-compose-title" className="mt-0.5 font-semibold">{name}</h2></div><button type="button" onClick={close} aria-label="Close" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200"><X className="h-4 w-4" /></button></header>
         <div className="grid gap-3 p-4">
           <label className="grid gap-1 text-xs font-semibold">Template<select value={template} onChange={(event) => chooseTemplate(event.target.value as TemplateKey)} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">{(Object.keys(templateLabels) as TemplateKey[]).map((key) => <option key={key} value={key}>{templateLabels[key]}</option>)}</select></label>
-          <fieldset><legend className="text-xs font-semibold">Channel</legend><div className="mt-1 grid grid-cols-3 gap-1">{([['sms', 'Text', Smartphone], ['whatsapp', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={value === "email" ? !email : !normalizedPhone} onClick={() => setChannel(value)} className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold disabled:opacity-30 ${channel === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div></fieldset>
+          <fieldset><legend className="text-xs font-semibold">Channel</legend><div className="mt-1 grid grid-cols-3 gap-1">{([['sms', 'Text', Smartphone], ['whatsapp', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={value === "email" ? !email || isWelcomePackage : !normalizedPhone} onClick={() => setChannel(value)} className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold disabled:opacity-30 ${channel === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div></fieldset>
           {channel === "email" ? <label className="grid gap-1 text-xs font-semibold">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
-          <label className="grid gap-1 text-xs font-semibold">Exact message preview<textarea autoFocus value={message} onChange={(event) => { setMessage(event.target.value); setTemplate("custom") }} maxLength={1600} rows={7} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label>
+          <label className="grid gap-1 text-xs font-semibold">{isWelcomePackage ? "Message 1 of 2" : "Exact message preview"}<textarea autoFocus value={message} onChange={(event) => { setMessage(event.target.value); setTemplate("custom") }} maxLength={1600} rows={isWelcomePackage ? 5 : 7} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label>
+          {isWelcomePackage ? <label className="grid gap-1 text-xs font-semibold">Message 2 of 2<textarea value={welcomeFollowUp} onChange={(event) => { setWelcomeFollowUp(event.target.value); setTemplate("custom") }} maxLength={1600} rows={4} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label> : null}
           {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Paperclip className="h-4 w-4" />{attachment ? attachment.name : "Add attachment"}<input type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
           {channel === "sms" && attachment ? <p className="text-xs text-slate-500">The Q U O app opens with the file ready. Review it and press Send. Maximum 5 MB.</p> : null}
           {feedback ? <p role="alert" className="text-sm font-semibold text-rose-700">{feedback}</p> : null}
         </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && attachment ? "Open Q U O with file" : "Send"}</button></footer>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim() || (isWelcomePackage && !welcomeFollowUp.trim())} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && attachment ? "Open Q U O with file" : isWelcomePackage ? "Send 2 messages" : "Send"}</button></footer>
       </section>
     </div>, document.body) : null}
 

@@ -7490,6 +7490,52 @@ async function enqueueManagerMessage(
   return queued;
 }
 
+async function enqueueManagerWelcomePackage(
+  managerId: string,
+  channelValue: unknown,
+  destinationValue: unknown,
+  messagesValue: unknown,
+  idempotencyValue: unknown,
+) {
+  const channel = channelValue === "whatsapp" ? "whatsapp" : channelValue === "sms" ? "sms" : null;
+  const destination = normalizePhone(destinationValue);
+  const messages = Array.isArray(messagesValue)
+    ? messagesValue.map((message) => typeof message === "string" ? message.trim() : "")
+    : [];
+  if (!channel || !destination || messages.length !== 2 || messages.some((message) => !message || message.length > 1_600))
+    throw new Error("Review both Welcome Package messages.");
+  const packageKey = `welcome/${destination.replace(/\D/g, "")}`;
+  if (idempotencyValue !== packageKey)
+    throw new Error("Refresh this lead before sending the Welcome Package.");
+  if (channel === "sms") {
+    await sql`
+      update public.aura_contacts set sms_ai_mode = 'off', updated_at = now()
+      where normalized_phone = ${destination}
+    `;
+    await sql`
+      update public.aura_sms_unanswered_followups
+      set status = 'cancelled', cancel_reason = 'manager took over conversation', updated_at = now()
+      where counterparty_phone = ${destination} and status in ('pending', 'processing')
+    `;
+  }
+  const rows = await sql<{ result: { outboxId: string; duplicate: boolean; partCount: number } }[]>`
+    select public.enqueue_aura_message_package_outbox(
+      ${packageKey}, ${channel}, ${destination}, ${sql.json(messages)}, ${managerId}::uuid
+    ) as result
+  `;
+  const queued = rows[0]?.result;
+  if (!queued?.outboxId) throw new Error("Welcome Package could not be queued.");
+  EdgeRuntime.waitUntil(
+    dispatchCommunicationOutboxWorker().catch((error) =>
+      console.error(
+        "welcome_package_outbox_dispatch_failed",
+        error instanceof Error ? error.message : "unknown error",
+      )
+    ),
+  );
+  return queued;
+}
+
 function openAiOutputText(payload: Record<string, unknown>) {
   if (typeof payload.output_text === "string")
     return payload.output_text.trim();
@@ -10524,6 +10570,16 @@ Deno.serve(async (req: Request) => {
         ),
       ]);
       return json({ ok: true, smsReceive: true });
+    }
+    if (input.action === "send_welcome_package") {
+      const queued = await enqueueManagerWelcomePackage(
+        manager.user.id,
+        input.channel,
+        input.to,
+        input.messages,
+        input.idempotencyKey,
+      );
+      return json({ ok: true, id: queued.outboxId, queued: true, duplicate: queued.duplicate, partCount: queued.partCount });
     }
     if (input.action === "send_whatsapp") {
       if (!input.mediaUrl) {
