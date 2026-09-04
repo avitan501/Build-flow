@@ -55,6 +55,15 @@ test("live estimate and PDF expose the selected attachment bundle", async () => 
   expect(pdf).toContain("Open the live client link to view or download these files.")
 })
 
+test("client document stays readable in narrow message and mobile browsers", async () => {
+  const page = await readFile(path.join(root, "app/client-document/[token]/page.tsx"), "utf8")
+  expect(page).toContain('className="grid gap-3 md:hidden"')
+  expect(page).toContain('className="hidden overflow-hidden rounded-xl border border-slate-200 md:block"')
+  expect(page).toContain("break-words text-sm font-bold")
+  expect(page).not.toContain('min-w-[38rem]')
+  expect(page).not.toContain('overflow-x-auto')
+})
+
 test("request file validation supports only the documented safe bundle types", async () => {
   const upload = await readFile(path.join(root, "lib/request-attachment-upload.ts"), "utf8")
   expect(upload).toContain('docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"')

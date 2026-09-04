@@ -52,19 +52,30 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
     }
     : undefined
 
-  return <main className="min-h-screen bg-slate-100 px-3 py-6 text-slate-950 sm:px-6">
-    <article className="mx-auto max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-wrap items-start justify-between gap-5 border-b border-slate-200 px-5 py-6 sm:px-8">
-        <Image src="/images/avantia/avantia-build-lockup-share.png" alt="Avantia Build" width={210} height={70} className="h-auto w-44" priority />
-        <div className="text-right"><p className="text-xs font-black uppercase tracking-[.18em] text-[#0066cc]">{label}</p><h1 className="mt-1 text-xl font-black">{row.document_number}</h1><p className="mt-1 text-xs text-slate-500">Version {row.version} · Updated {formatSiteDateTime(row.updated_at)}</p></div>
+  return <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(145deg,#eef5fb_0%,#f8fafc_45%,#f3f4f6_100%)] px-3 py-4 text-slate-950 sm:px-6 sm:py-8">
+    <article className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_60px_rgba(15,23,42,.10)]">
+      <header className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8 sm:py-7">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <Image src="/images/avantia/avantia-build-lockup-share.png" alt="Avantia Build" width={210} height={70} className="h-auto w-36 sm:w-44" priority />
+          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#0066cc]">{label}</span>
+        </div>
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-xs font-bold text-slate-500">Document</p><h1 className="mt-1 break-all text-xl font-black tracking-tight sm:text-2xl">{row.document_number}</h1></div>
+          <p className="text-xs leading-5 text-slate-500">Version {row.version}<br />Updated {formatSiteDateTime(row.updated_at)}</p>
+        </div>
       </header>
       <section className="grid gap-4 border-b border-slate-200 px-5 py-5 text-sm sm:grid-cols-2 sm:px-8">
         <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Prepared for</p><p className="mt-1 font-bold">{document.clientName}</p><p className="whitespace-pre-wrap text-slate-600">{document.clientAddress}</p></div>
         <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Ship to</p><p className="mt-1 whitespace-pre-wrap font-semibold">{document.shipTo || "Not provided"}</p></div>
       </section>
-      <section className="overflow-x-auto px-5 py-5 sm:px-8">
-        <table className="w-full min-w-[38rem] text-left text-sm"><thead className="bg-[#071426] text-white"><tr><th className="px-3 py-3">Description</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Price</th><th className="px-3 py-3 text-right">Total</th></tr></thead><tbody>{document.lines.map((line, index) => <tr key={`${line.description}-${index}`} className="border-b border-slate-200"><td className="px-3 py-3 font-semibold">{line.description}</td><td className="px-3 py-3">{line.quantity}</td><td className="px-3 py-3">{line.unit}</td><td className="px-3 py-3 text-right tabular-nums">{money.format(line.unitPrice)}</td><td className="px-3 py-3 text-right font-bold tabular-nums">{money.format(line.quantity * line.unitPrice)}</td></tr>)}</tbody></table>
-        <div className="ml-auto mt-5 grid max-w-sm gap-2 text-sm"><div className="flex justify-between"><span>Materials</span><strong>{money.format(subtotal)}</strong></div><div className="flex justify-between"><span>Delivery</span><strong>{money.format(document.deliveryCharge)}</strong></div><div className="flex justify-between"><span>Sales tax ({document.salesTaxRate}%)</span><strong>{money.format(tax)}</strong></div><div className="flex justify-between border-t border-slate-300 pt-3 text-lg"><span>{row.document_type === "invoice" ? "Amount due" : row.document_type === "receipt" ? "Amount paid" : "Estimate total"}</span><strong>{money.format(total)}</strong></div></div>
+      <section className="px-5 py-5 sm:px-8 sm:py-7">
+        <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-black">Materials</h2><span className="text-xs font-semibold text-slate-500">{document.lines.length} item{document.lines.length === 1 ? "" : "s"}</span></div>
+        <div className="grid gap-3 md:hidden">{document.lines.map((line, index) => <article key={`${line.description}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <p className="break-words text-sm font-bold leading-5">{line.description}</p>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-200 pt-3 text-xs"><span className="text-slate-500">Quantity</span><strong className="text-right">{line.quantity} {line.unit}</strong><span className="text-slate-500">Unit price</span><strong className="text-right tabular-nums">{money.format(line.unitPrice)}</strong><span className="font-semibold text-slate-700">Line total</span><strong className="text-right tabular-nums">{money.format(line.quantity * line.unitPrice)}</strong></div>
+        </article>)}</div>
+        <div className="hidden overflow-hidden rounded-xl border border-slate-200 md:block"><table className="w-full table-fixed text-left text-sm"><thead className="bg-[#071426] text-white"><tr><th className="w-[46%] px-4 py-3">Description</th><th className="px-3 py-3">Qty</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Price</th><th className="px-4 py-3 text-right">Total</th></tr></thead><tbody>{document.lines.map((line, index) => <tr key={`${line.description}-${index}`} className="border-b border-slate-200 last:border-0"><td className="break-words px-4 py-3 font-semibold">{line.description}</td><td className="px-3 py-3">{line.quantity}</td><td className="px-3 py-3">{line.unit}</td><td className="px-3 py-3 text-right tabular-nums">{money.format(line.unitPrice)}</td><td className="px-4 py-3 text-right font-bold tabular-nums">{money.format(line.quantity * line.unitPrice)}</td></tr>)}</tbody></table></div>
+        <div className="ml-auto mt-5 grid max-w-sm gap-2 rounded-xl bg-slate-50 p-4 text-sm"><div className="flex justify-between gap-4"><span className="text-slate-600">Materials</span><strong className="tabular-nums">{money.format(subtotal)}</strong></div><div className="flex justify-between gap-4"><span className="text-slate-600">Delivery</span><strong className="tabular-nums">{money.format(document.deliveryCharge)}</strong></div><div className="flex justify-between gap-4"><span className="text-slate-600">Sales tax ({document.salesTaxRate}%)</span><strong className="tabular-nums">{money.format(tax)}</strong></div><div className="mt-1 flex justify-between gap-4 border-t border-slate-300 pt-3 text-lg"><span className="font-black">{row.document_type === "invoice" ? "Amount due" : row.document_type === "receipt" ? "Amount paid" : "Estimate total"}</span><strong className="tabular-nums text-[#0066cc]">{money.format(total)}</strong></div></div>
       </section>
       {document.attachments?.length ? <section className="border-t border-slate-200 px-5 py-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Attached photos &amp; documents</p>
