@@ -80,6 +80,18 @@ const SUPPLIER_CONTACT_STATUS_OPTIONS: Array<{ value: RequestSupplierContactStat
   { value: "quote_received", label: "Quote received" },
 ]
 
+const TAX_LOCATION_PRESETS = [
+  { value: "custom", label: "Custom / verified address", rate: null },
+  { value: "ny-nassau", label: "NY · Nassau County", rate: 8.625 },
+  { value: "ny-suffolk", label: "NY · Suffolk County", rate: 8.75 },
+  { value: "nyc", label: "NY · New York City", rate: 8.875 },
+  { value: "nj", label: "New Jersey", rate: 6.625 },
+] as const
+
+function taxPresetForRate(rate: number) {
+  return TAX_LOCATION_PRESETS.find((option) => option.rate !== null && Math.abs(option.rate - rate) < 0.0001)?.value || "custom"
+}
+
 function supplierContactStatusClass(status: RequestSupplierContactStatus) {
   if (status === "quote_received") return "border-emerald-200 bg-emerald-50 text-emerald-800"
   if (status === "awaiting_supplier_reply") return "border-amber-200 bg-amber-50 text-amber-900"
@@ -228,6 +240,7 @@ export function RequestManagementPanel({
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
   const [deliveryCharge, setDeliveryCharge] = useState(clientReadyToPayDefaults.deliveryCharge)
   const [salesTaxRate, setSalesTaxRate] = useState(clientReadyToPayDefaults.salesTaxRate)
+  const [taxLocationPreset, setTaxLocationPreset] = useState(() => taxPresetForRate(clientReadyToPayDefaults.salesTaxRate))
   const [taxableDelivery, setTaxableDelivery] = useState(true)
   const [taxRecommendation, setTaxRecommendation] = useState("")
   const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
@@ -386,6 +399,7 @@ export function RequestManagementPanel({
     setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
     setDeliveryCharge(saved?.documentData.deliveryCharge === undefined ? clientReadyToPayDefaults.deliveryCharge : Number(saved.documentData.deliveryCharge) || 0)
     setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate)
+    setTaxLocationPreset(taxPresetForRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate))
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
     setQuoteTerms(proposalTermsForEditor(saved?.documentData.terms))
     setRequestPayment(Boolean(savedPayment || legacyPaymentLink))
@@ -1059,6 +1073,7 @@ export function RequestManagementPanel({
                   setShipTo(suggestion.label)
                   if (suggestion.taxRate !== null) {
                     setSalesTaxRate(suggestion.taxRate)
+                    setTaxLocationPreset(taxPresetForRate(suggestion.taxRate))
                     setTaxRecommendation(`${suggestion.taxRate.toFixed(3)}% destination rate · ${suggestion.taxJurisdiction}`)
                   } else {
                     setTaxRecommendation("Address verified. Confirm the destination sales-tax rate before sending.")
@@ -1118,7 +1133,15 @@ export function RequestManagementPanel({
                   {!paymentMethods.length ? <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900" role="alert">Choose at least one payment option before saving.</p> : null}
                 </div> : null}
               </div>
-              <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between text-sm"><span>Subtotal</span><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteSubtotal)}</strong></div><label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Delivery</span><input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-center justify-between gap-3 text-sm"><span>Sales tax % <span className="block text-[10px] font-normal text-slate-500">Destination rate</span></span><input type="number" min="0" max="20" step="0.001" value={salesTaxRate} onChange={(event) => { setSalesTaxRate(Number(event.target.value)); setTaxRecommendation("Rate edited manually") }} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-600"><input type="checkbox" checked={taxableDelivery} onChange={(event) => setTaxableDelivery(event.target.checked)} className="mt-1" /><span>Include Avantia-billed delivery in the taxable amount</span></label>{taxRecommendation ? <p className="mt-2 text-xs font-semibold text-emerald-700">{taxRecommendation}</p> : <p className="mt-2 text-xs text-slate-500">Tax is calculated on materials and, when checked, Avantia-billed delivery.</p>}<div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div></aside>
+              <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex justify-between text-sm"><span>Subtotal</span><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteSubtotal)}</strong></div>
+                <label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Delivery</span><input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label>
+                <label className="mt-2 grid gap-1 text-xs font-bold text-slate-600">Tax location<select value={taxLocationPreset} onChange={(event) => { const value = event.target.value as (typeof TAX_LOCATION_PRESETS)[number]["value"]; setTaxLocationPreset(value); const preset = TAX_LOCATION_PRESETS.find((option) => option.value === value); if (preset?.rate !== null && preset?.rate !== undefined) { setSalesTaxRate(preset.rate); setTaxRecommendation(`${preset.rate.toFixed(3)}% · ${preset.label}`) } }} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-950">{TAX_LOCATION_PRESETS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                <label className="mt-2 flex items-center justify-between gap-3 text-sm"><span>Sales tax %</span><input type="number" min="0" max="20" step="0.001" value={salesTaxRate} onChange={(event) => { setSalesTaxRate(Number(event.target.value)); setTaxLocationPreset("custom"); setTaxRecommendation("Custom rate") }} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label>
+                <label className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-600"><input type="checkbox" checked={taxableDelivery} onChange={(event) => setTaxableDelivery(event.target.checked)} className="mt-1" /><span>Tax delivery</span></label>
+                {taxRecommendation ? <p className="mt-2 text-xs font-semibold text-emerald-700">{taxRecommendation}</p> : null}
+                <div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div>
+              </aside>
             </div>
             {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
           </div>

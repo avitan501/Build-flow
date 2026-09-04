@@ -27,6 +27,8 @@ export function recommendedSalesTax(state: string, county: string) {
   const normalizedState = state.trim().toUpperCase()
   const normalizedCounty = county.trim().toLowerCase()
   if (normalizedState === "NY" && normalizedCounty.includes("nassau")) return { rate: 8.625, jurisdiction: "Nassau County, NY" }
+  if (normalizedState === "NY" && normalizedCounty.includes("suffolk")) return { rate: 8.75, jurisdiction: "Suffolk County, NY" }
+  if (normalizedState === "NY" && ["bronx", "kings", "new york", "queens", "richmond"].some((name) => normalizedCounty.includes(name))) return { rate: 8.875, jurisdiction: "New York City" }
   if (normalizedState === "NJ") return { rate: 6.625, jurisdiction: "New Jersey" }
   return { rate: null, jurisdiction: "" }
 }

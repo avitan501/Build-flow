@@ -372,6 +372,69 @@ export async function updateMaterialRequestAssigneeAction(input: { requestId: st
   return { ok: true as const }
 }
 
+export async function updateMaterialRequestTitleAction(input: { requestId: string; title: string }) {
+  const requestId = String(input.requestId || "").trim()
+  const title = String(input.title || "").trim().replace(/\s+/g, " ").slice(0, 300)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || title.length < 2) return { ok: false as const, error: "Enter a request name." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id,title").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string; title: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  if (request.title === title) return { ok: true as const }
+
+  const { data: updated, error: updateError } = await supabase.from("quote_requests").update({ title }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
+  if (updateError || !updated) return { ok: false as const, error: "The request name could not be saved." }
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "request_updated",
+    source: "admin",
+    title: "Material request renamed",
+    description: `${request.title} → ${title}`,
+    metadata: { quote_request_id: request.id, manager_action: "request_title", previous_title: request.title, request_title: title },
+  })
+  if (eventError) {
+    await supabase.from("quote_requests").update({ title: request.title }).eq("id", requestId)
+    return { ok: false as const, error: "The request name was not changed because its history could not be saved." }
+  }
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/supplier-quotes")
+  return { ok: true as const }
+}
+
+export async function updateMaterialRequestClientNameAction(input: { requestId: string; clientName: string }) {
+  const requestId = String(input.requestId || "").trim()
+  const clientName = String(input.clientName || "").trim().replace(/\s+/g, " ").slice(0, 160)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || clientName.length < 2) return { ok: false as const, error: "Enter the client name." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  const admin = createAdminClient()
+  const { data: profile } = await admin.from("profiles").select("full_name").eq("id", request.owner_id).maybeSingle<{ full_name: string | null }>()
+  if (profile?.full_name === clientName) return { ok: true as const }
+  const { data: updated, error: updateError } = await admin.from("profiles").update({ full_name: clientName }).eq("id", request.owner_id).select("id").maybeSingle<{ id: string }>()
+  if (updateError || !updated) return { ok: false as const, error: "The client name could not be saved." }
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "request_updated",
+    source: "admin",
+    title: "Client name updated",
+    description: `${profile?.full_name || "Client"} → ${clientName}`,
+    metadata: { quote_request_id: request.id, manager_action: "client_name", previous_client_name: profile?.full_name || "", client_name: clientName },
+  })
+  if (eventError) {
+    await admin.from("profiles").update({ full_name: profile?.full_name || null }).eq("id", request.owner_id)
+    return { ok: false as const, error: "The client name was not changed because its history could not be saved." }
+  }
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/users")
+  return { ok: true as const }
+}
+
 export async function organizeClientMaterialRequestAction(formData: FormData) {
   const requestId = String(formData.get("requestId") || "").trim()
   const force = formData.get("force") === "true"

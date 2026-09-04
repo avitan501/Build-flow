@@ -3,6 +3,7 @@ import { CustomerRequestStatus } from "@/components/buildflow/customer-request-s
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestLiveSync } from "@/components/buildflow/request-live-sync";
+import { RequestInlineNameEditor } from "@/components/buildflow/request-inline-name-editor";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
   RequestManagementPanel,
@@ -583,9 +584,7 @@ export default async function OwnerMaterialRequestPage({
                   Request #{request.public_number}
                 </span>
               </div>
-              <h1 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">
-                {request.title}
-              </h1>
+              <div className="mt-0.5 min-w-0"><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
               {projectLabel ? (
                 <p className="mt-0.5 truncate text-xs text-slate-500">
                   {projectLabel}
@@ -599,7 +598,7 @@ export default async function OwnerMaterialRequestPage({
             <div className="flex min-w-0 flex-wrap items-end gap-2 border-t border-slate-100 pt-3 text-sm lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
               <div className="min-w-28 flex-1 pb-1 lg:flex-none">
                 <p className="text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Client</p>
-                <p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p>
+                <RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" />
               </div>
               <RequestClientContact />
               <div className="w-44"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact /></div>
