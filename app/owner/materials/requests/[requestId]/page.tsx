@@ -107,6 +107,11 @@ type CurrentClientDocumentAcceptance = {
   accepted_at: string;
   accepted_timezone: string;
 };
+type CurrentClientDocumentView = {
+  client_document_id: string;
+  document_version: number;
+  last_opened_at: string;
+};
 
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
@@ -202,10 +207,10 @@ export default async function OwnerMaterialRequestPage({
       .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean; contact_status: "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received"; notes: string }>>(),
     supabase
       .from("request_client_documents")
-      .select("document_type,document_number,document_data,public_token,version,updated_at")
+      .select("id,document_type,document_number,document_data,public_token,manager_preview_token,version,updated_at")
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
-      .returns<Array<{ document_type: "estimate" | "invoice" | "receipt"; document_number: string; document_data: RequestClientDocumentSnapshot["documentData"]; public_token: string; version: number; updated_at: string }>>(),
+      .returns<Array<{ id: string; document_type: "estimate" | "invoice" | "receipt"; document_number: string; document_data: RequestClientDocumentSnapshot["documentData"]; public_token: string; manager_preview_token: string; version: number; updated_at: string }>>(),
     supabase
       .rpc("get_request_current_client_document_acceptances", { p_request_id: requestId })
       .returns<CurrentClientDocumentAcceptance[]>(),
@@ -218,6 +223,18 @@ export default async function OwnerMaterialRequestPage({
       `Could not load this material request: ${requestError.message}`,
     );
   if (!request) notFound();
+  const currentClientDocumentIds = (clientDocuments ?? []).map((document) => document.id);
+  const { data: currentClientDocumentViews, error: currentClientDocumentViewsError } = currentClientDocumentIds.length
+    ? await supabase
+        .from("request_client_document_views")
+        .select("client_document_id,document_version,last_opened_at")
+        .in("client_document_id", currentClientDocumentIds)
+        .returns<CurrentClientDocumentView[]>()
+    : { data: [] as CurrentClientDocumentView[], error: null };
+  if (currentClientDocumentViewsError) console.error("Client document views could not be loaded", { requestId, reason: currentClientDocumentViewsError.message });
+  const currentClientDocumentViewByVersion = new Map(
+    (currentClientDocumentViews ?? []).map((view) => [`${view.client_document_id}:${view.document_version}`, view]),
+  );
   const currentClientDocumentAcceptanceRows = Array.isArray(currentClientDocumentAcceptances)
     ? currentClientDocumentAcceptances as CurrentClientDocumentAcceptance[]
     : [];
@@ -717,7 +734,7 @@ export default async function OwnerMaterialRequestPage({
             step2CompletedOverride={workflowOverrides.get(2) ?? null}
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             initialPaymentDelivery={initialPaymentDelivery}
-            initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, version: entry.version, updatedAt: entry.updated_at }))}
+            initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, managerPreviewToken: entry.manager_preview_token, version: entry.version, updatedAt: entry.updated_at, lastOpenedAt: currentClientDocumentViewByVersion.get(`${entry.id}:${entry.version}`)?.last_opened_at ?? null }))}
             requestAttachments={(attachments ?? []).flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}

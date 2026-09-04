@@ -44,8 +44,10 @@ export type RequestClientDocumentSnapshot = {
   documentType: RequestClientDocumentType
   documentNumber: string
   publicToken: string
+  managerPreviewToken: string
   version: number
   updatedAt: string
+  lastOpenedAt: string | null
   documentData: {
     issueDate?: string
     clientEmail?: string
@@ -927,10 +929,15 @@ export function RequestManagementPanel({
           {clientDocuments.length ? <div className="mt-2 grid gap-2" aria-label="Saved client documents">{clientDocuments.map((saved) => {
             const label = saved.documentType === "invoice" ? "Invoice" : saved.documentType === "receipt" ? "Receipt" : "Estimate"
             const deletionKey = `${saved.documentType}:${saved.version}`
+            const viewDetail = saved.documentType === "receipt"
+              ? null
+              : saved.lastOpenedAt
+                ? `Opened · ${new Date(saved.lastOpenedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" })}`
+                : "Not opened"
             return <article key={saved.publicToken} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-              <div className="flex items-center gap-3"><FileCheck2 className="h-4 w-4 shrink-0 text-[#0066cc]" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-[#12263f]">{label} {saved.documentNumber}</p><p className="text-[10px] font-medium text-slate-600">Version {saved.version} · {new Date(saved.updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET</p></div></div>
+              <div className="flex items-center gap-3"><FileCheck2 className="h-4 w-4 shrink-0 text-[#0066cc]" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-[#12263f]">{label} {saved.documentNumber}</p><p className="text-[10px] font-medium text-slate-600">Version {saved.version} · {new Date(saved.updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET</p>{viewDetail ? <p className={`mt-0.5 text-[10px] font-bold ${saved.lastOpenedAt ? "text-emerald-700" : "text-amber-700"}`}>{viewDetail}</p> : null}</div></div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <a href={`/client-document/${saved.publicToken}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-[#0066cc]">Open</a>
+                <a href={`/client-document/${saved.publicToken}?preview=${saved.managerPreviewToken}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-[#0066cc]">Open</a>
                 <button type="button" onClick={() => openDocument(saved.documentType, saved)} disabled={pending} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" />Edit</button>
                 <button type="button" onClick={() => deleteClientDocument(saved)} disabled={pending} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-white px-2 text-xs font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" />{deletingDocument === deletionKey ? "Deleting…" : "Delete"}</button>
               </div>

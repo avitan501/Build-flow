@@ -13,14 +13,17 @@ import { formatSiteDateTime } from "@/lib/site-date-time"
 import { createClient } from "@/lib/supabase/server"
 
 import { ClientDocumentAcceptance, type ClientDocumentAcceptanceReceipt } from "./client-document-acceptance"
+import { ClientDocumentViewTracker } from "./client-document-view-tracker"
 
 export const metadata = { robots: { index: false, follow: false } }
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
-export default async function ClientDocumentPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function ClientDocumentPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ preview?: string | string[] }> }) {
   await connection()
   const { token } = await params
+  const query = await searchParams
+  const managerPreviewToken = typeof query.preview === "string" ? query.preview.trim().slice(0, 36) : null
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound()
   const supabase = await createClient()
   const { data: row } = await supabase.rpc("get_request_client_document", { p_public_token: token }).maybeSingle<StoredRequestClientDocumentWithAcceptance>()
@@ -53,6 +56,7 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
     : undefined
 
   return <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(145deg,#eef5fb_0%,#f8fafc_45%,#f3f4f6_100%)] px-3 py-4 text-slate-950 sm:px-6 sm:py-8">
+    {row.document_type !== "receipt" ? <ClientDocumentViewTracker token={token} documentVersion={row.version} managerPreviewToken={managerPreviewToken} /> : null}
     <article className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_60px_rgba(15,23,42,.10)]">
       <header className="border-b border-slate-200 bg-white px-5 py-5 sm:px-8 sm:py-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
