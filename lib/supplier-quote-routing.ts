@@ -3,6 +3,7 @@ type DirectorySupplier = { id: string; name: string }
 type QuoteMatchItem = {
   id: string
   item_code?: string | null
+  comparison_item_id?: string | null
   description: string
   specification: string
 }
@@ -112,13 +113,18 @@ export function planRequestComparisonSync<
   return { currentItems, existingBySourceId, missingItems, obsoleteItems, semanticTransfers }
 }
 
+const COMPARISON_NOISE_WORDS = new Set([
+  "day", "days", "week", "weeks", "lead", "time", "item", "sells",
+  "non", "coded", "special", "specials", "cancellable", "cancelable",
+  "returnable", "price", "net", "total", "each", "ea", "pc", "pcs",
+])
+
 function comparisonWords(value: string) {
   return new Set(
-    value
-      .toLowerCase()
+    normalizedComparisonText(value)
       .replace(/[^a-z0-9]+/g, " ")
       .split(" ")
-      .filter((word) => word.length > 1),
+      .filter((word) => word.length > 1 && !COMPARISON_NOISE_WORDS.has(word)),
   )
 }
 
@@ -129,6 +135,12 @@ function normalizedComparisonText(value: string) {
     .replace(/[‘’′]/g, " ft ")
     .replace(/\b(?:sheet\s*rock|she+t+ro+ck|sheet\s*rok|gypsum\s+(?:board|panel)|wall\s*board|wallboard|dry\s*wall)\b/g, "drywall")
     .replace(/\b(?:panel|placa)\s+de\s+yeso\b|\btablaroca\b/g, "drywall")
+    .replace(/\b(?:assy|asy|asmy|assembl)\b/g, "assembly")
+    .replace(/\b(?:vlv|valved)\b/g, "valve")
+    .replace(/\bcapped\b/g, "cap")
+    .replace(/\brpz\b/g, "reduced pressure zone backflow")
+    .replace(/\bbfp\b/g, "backflow preventer")
+    .replace(/\bos\s*&?\s*y\b|\bosy\b/g, "outside screw yoke")
     .replace(/\b(inches|inch)\b/g, "in")
     .replace(/\b(feet|foot)\b/g, "ft")
     .replace(/[^a-z0-9./]+/g, " ")
@@ -155,6 +167,16 @@ function comparisonQualifiers(value: string) {
     "pressure treated",
     "untreated",
   ].filter((qualifier) => normalized.includes(qualifier)))
+}
+
+function comparisonModelCodes(value: string) {
+  const normalized = normalizedComparisonText(value)
+  return new Set(
+    normalized
+      .split(/\s+/)
+      .map((word) => word.replace(/[^a-z0-9]/g, ""))
+      .filter((word) => word.length >= 3 && /[a-z]/.test(word) && /\d/.test(word)),
+  )
 }
 
 function hasConflictingSpecifications(left: string, right: string) {
@@ -185,8 +207,15 @@ function comparisonMatchScore(
   ) return 5
   const quoteWords = comparisonWords(quoteText)
   const requestWords = comparisonWords(requestText)
-  const overlap = [...quoteWords].filter((word) => requestWords.has(word)).length
-  return overlap / Math.max(quoteWords.size, requestWords.size, 1)
+  const overlap = [...quoteWords].filter((word) => requestWords.has(word))
+  const quoteModels = comparisonModelCodes(quoteText)
+  const requestModels = comparisonModelCodes(requestText)
+  const sharedModels = [...quoteModels].filter((model) => requestModels.has(model))
+  const weightedOverlap = overlap.reduce((score, word) => score + (/\d/.test(word) ? 2 : word.length >= 6 ? 1.5 : 1), 0)
+  const quoteWeight = [...quoteWords].reduce((score, word) => score + (/\d/.test(word) ? 2 : word.length >= 6 ? 1.5 : 1), 0)
+  const requestWeight = [...requestWords].reduce((score, word) => score + (/\d/.test(word) ? 2 : word.length >= 6 ? 1.5 : 1), 0)
+  const textScore = weightedOverlap / Math.max(quoteWeight, requestWeight, 1)
+  return sharedModels.length ? Math.max(2.5, textScore) : textScore
 }
 
 export function matchSupplierQuoteItems<TQuote extends QuoteMatchItem, TRequest extends RequestMatchItem>(
@@ -194,22 +223,36 @@ export function matchSupplierQuoteItems<TQuote extends QuoteMatchItem, TRequest 
   requestItems: TRequest[],
   minimumScore = 0.3,
 ) {
+  const requestById = new Map(requestItems.map((item) => [item.id, item]))
+  const explicit = quoteItems.flatMap((item) => {
+    const comparisonItem = item.comparison_item_id ? requestById.get(item.comparison_item_id) : null
+    return comparisonItem ? [{ item, comparisonItem }] : []
+  })
+  const explicitCounts = new Map<string, number>()
+  for (const { comparisonItem } of explicit) {
+    explicitCounts.set(comparisonItem.id, (explicitCounts.get(comparisonItem.id) ?? 0) + 1)
+  }
+  const duplicateExplicitIds = new Set([...explicitCounts].flatMap(([id, count]) => count > 1 ? [id] : []))
+  const safeExplicit = explicit.filter(({ comparisonItem }) => !duplicateExplicitIds.has(comparisonItem.id))
+  const usedQuoteIds = new Set(explicit.map(({ item }) => item.id))
+  const usedRequestIds = new Set(explicit.map(({ comparisonItem }) => comparisonItem.id))
   const candidates = quoteItems.flatMap((quoteItem, quoteIndex) =>
-    requestItems.map((requestItem, requestIndex) => ({
+    usedQuoteIds.has(quoteItem.id) ? [] : requestItems.flatMap((requestItem, requestIndex) => usedRequestIds.has(requestItem.id) ? [] : [{
       quoteItem,
       quoteIndex,
       requestItem,
       requestIndex,
       score: comparisonMatchScore(quoteItem, requestItem),
-    })),
+    }]),
   ).filter((candidate) => candidate.score >= minimumScore)
     .sort((left, right) => right.score - left.score || left.quoteIndex - right.quoteIndex || left.requestIndex - right.requestIndex)
 
-  const usedQuoteIds = new Set<string>()
-  const usedRequestIds = new Set<string>()
-  const matches: Array<{ item: TQuote; comparisonItem: TRequest }> = []
+  const matches: Array<{ item: TQuote; comparisonItem: TRequest }> = [...safeExplicit]
   for (const candidate of candidates) {
     if (usedQuoteIds.has(candidate.quoteItem.id) || usedRequestIds.has(candidate.requestItem.id)) continue
+    const alternatives = candidates.filter((entry) => entry.quoteItem.id === candidate.quoteItem.id && !usedRequestIds.has(entry.requestItem.id))
+    const runnerUp = alternatives.find((entry) => entry.requestItem.id !== candidate.requestItem.id)
+    if (runnerUp && candidate.score - runnerUp.score < 0.15) continue
     usedQuoteIds.add(candidate.quoteItem.id)
     usedRequestIds.add(candidate.requestItem.id)
     matches.push({ item: candidate.quoteItem, comparisonItem: candidate.requestItem })

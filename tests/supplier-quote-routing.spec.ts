@@ -105,7 +105,12 @@ test("quote review provides a safe supplier select or create path and routing re
   expect(actions).toContain("createAndAssignSupplierQuoteDirectoryAction")
   expect(workspace).toContain('aria-label="Supplier Directory record"')
   expect(workspace).toContain("Prices remain isolated under the supplier you confirm.")
+  expect(workspace).toContain("Client item match")
+  expect(workspace).toContain("Match automatically")
+  expect(actions).toContain('comparison_item_id: item.comparisonItemId')
+  expect(actions).toContain('eq("comparison_id", quote.comparison_id)')
   expect(page).toContain('supabase.rpc("staff_load_catalog_suppliers")')
+  expect(page).toContain('select("id,description,specification")')
 })
 
 test("request specifications preserve the fields needed to distinguish same-name materials", () => {
@@ -158,6 +163,55 @@ test("partial supplier quotes match only present lines and leave the rest of the
   ]
   const quote = [{ id: "only-drywall", description: "Sheetrock", specification: "5/8 in · 4 x 8 ft · Regular" }]
   expect(matchSupplierQuoteItems(quote, requests)).toEqual([{ item: quote[0], comparisonItem: requests[0] }])
+})
+
+test("FW Webb abbreviations and quote noise match the correct client-request plumbing rows", () => {
+  const requests = [
+    { id: "valve", description: "Meter outlet control valve", specification: "4 in · OS&Y" },
+    { id: "backflow", description: "FEBCO reduced-pressure-zone assembly", specification: "4 in · Model LF860-OSY/FS" },
+    { id: "test-tee", description: "Valved and capped test tee", specification: "2 in" },
+  ]
+  const quote = [
+    { id: "q-valve", description: "Epoxy RW Osy Valve (no Tap)", specification: '4” Epoxy Ulffm Rw Osy Valve (no Tap); Non coded specials; 1-2 DAY LEAD TIME' },
+    { id: "q-backflow", description: "LF RPZ Backflow", specification: '4” LF RPZ Backflow LF860-OSY-4; Febco; IN NH, 6-10 WEEK LEAD IF IT SELLS' },
+    { id: "q-test-tee", description: "T-60 Test Cap W/ Valve Assembly", specification: '2” T-60 Test Cap W/ Vlv Asy; Victaulic; 5-6 WEEK LEAD TIME; ITEM IS NON CANCELLABLE, NON RETURNABLE' },
+  ]
+
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([
+    { item: quote[0], comparisonItem: requests[0] },
+    { item: quote[1], comparisonItem: requests[1] },
+    { item: quote[2], comparisonItem: requests[2] },
+  ])
+})
+
+test("a saved manual client-item selection overrides weak wording but cannot cross request scope", () => {
+  const requests = [
+    { id: "right", description: "Valved and capped test tee", specification: "2 in" },
+    { id: "other", description: "Meter outlet control valve", specification: "4 in" },
+  ]
+  const manual = { id: "quote", comparison_item_id: "right", description: "T-60", specification: "2 in" }
+  const stale = { id: "stale", comparison_item_id: "outside-this-request", description: "Unrelated", specification: "" }
+
+  expect(matchSupplierQuoteItems([manual], requests)).toEqual([{ item: manual, comparisonItem: requests[0] }])
+  expect(matchSupplierQuoteItems([stale], requests)).toEqual([])
+})
+
+test("duplicate manual selections do not silently put two supplier prices on one client row", () => {
+  const requests = [{ id: "target", description: "Backflow preventer", specification: "4 in" }]
+  const quote = [
+    { id: "first", comparison_item_id: "target", description: "First", specification: "4 in" },
+    { id: "second", comparison_item_id: "target", description: "Second", specification: "4 in" },
+  ]
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([])
+})
+
+test("ambiguous generic valve lines remain unmatched for manual review", () => {
+  const requests = [
+    { id: "inlet", description: "Control valve", specification: "4 in · inlet" },
+    { id: "outlet", description: "Control valve", specification: "4 in · outlet" },
+  ]
+  const quote = [{ id: "generic", description: "Control valve", specification: "4 in" }]
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([])
 })
 
 test("does not auto-route an unspecified supplier line onto a sized client row", () => {

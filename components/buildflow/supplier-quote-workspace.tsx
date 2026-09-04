@@ -29,22 +29,24 @@ type EditableItem = {
   unitPrice: number | null
   selected: boolean
   catalogItemId: string | null
+  comparisonItemId: string | null
 }
 
 function editableItem(item: SupplierQuoteItemRecord): EditableItem {
-  return { id: item.id, itemCode: item.item_code, description: item.description, specification: item.specification, quantity: Number(item.quantity), unit: item.unit, unitPrice: item.unit_price === null ? null : Number(item.unit_price), selected: item.selected, catalogItemId: item.catalog_item_id }
+  return { id: item.id, itemCode: item.item_code, description: item.description, specification: item.specification, quantity: Number(item.quantity), unit: item.unit, unitPrice: item.unit_price === null ? null : Number(item.unit_price), selected: item.selected, catalogItemId: item.catalog_item_id, comparisonItemId: item.comparison_item_id }
 }
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 }
 
-export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, departments, suppliers }: {
+export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, departments, suppliers, comparisonItems = [] }: {
   quote: SupplierQuoteRecord
   initialItems: SupplierQuoteItemRecord[]
   documentUrl: string | null
   departments: string[]
   suppliers: Array<{ id: string; name: string }>
+  comparisonItems?: Array<{ id: string; description: string; specification: string }>
 }) {
   const router = useRouter()
   const [items, setItems] = useState(initialItems.map(editableItem))
@@ -200,7 +202,7 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
           <div className="divide-y divide-slate-200">
             {items.map((item, index) => <article key={item.id} className={`grid grid-cols-2 gap-3 p-3 sm:grid-cols-4 lg:grid-cols-[2.5rem_minmax(13rem,2fr)_minmax(8rem,1fr)_6rem_6rem_7rem_7rem_2.5rem] lg:items-end lg:p-4 ${item.selected ? "bg-white" : "bg-slate-50 opacity-65"}`}>
               <label className="col-span-2 flex items-center gap-2 text-xs font-bold text-slate-500 sm:col-span-4 lg:col-span-1 lg:grid lg:justify-items-center"><span className="lg:hidden">Use item</span><input type="checkbox" checked={item.selected} onChange={(event) => updateItem(item.id, { selected: event.target.checked })} className="h-5 w-5 accent-[#0071e3]" aria-label={`Use item ${index + 1}`} /><span className="tabular-nums">{index + 1}</span></label>
-              <label className="col-span-2 grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 sm:col-span-4 lg:col-span-1">Material<input value={item.description} onChange={(event) => updateItem(item.id, { description: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold normal-case tracking-normal text-slate-950" /></label>
+              <div className="col-span-2 grid gap-2 sm:col-span-4 lg:col-span-1"><label className="grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Material<input value={item.description} onChange={(event) => updateItem(item.id, { description: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-semibold normal-case tracking-normal text-slate-950" /></label>{comparisonItems.length ? <label className="grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Client item match<select value={item.comparisonItemId ?? ""} onChange={(event) => updateItem(item.id, { comparisonItemId: event.target.value || null })} className="min-h-10 min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium normal-case tracking-normal text-slate-950"><option value="">Match automatically</option>{comparisonItems.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.description}{candidate.specification ? ` · ${candidate.specification}` : ""}</option>)}</select></label> : null}</div>
               <label className="col-span-2 grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500 sm:col-span-4 lg:col-span-1">Specification<input value={item.specification} onChange={(event) => updateItem(item.id, { specification: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm normal-case tracking-normal text-slate-950" /></label>
               <label className="grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Qty<input type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) })} className="min-h-10 rounded-lg border border-slate-300 px-2 text-sm text-slate-950" /></label>
               <label className="grid gap-1 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Unit<input value={item.unit} onChange={(event) => updateItem(item.id, { unit: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-2 text-sm normal-case tracking-normal text-slate-950" /></label>

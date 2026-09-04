@@ -41,6 +41,7 @@ type EditableQuoteItem = {
   unit: string;
   unitPrice: number | null;
   selected: boolean;
+  comparisonItemId?: string | null;
 };
 
 const UUID_PATTERN =
@@ -731,6 +732,27 @@ export async function saveSupplierQuoteAction(input: {
   if (!Array.isArray(input.items) || input.items.length > 500)
     return { ok: false, error: "Save no more than 500 quote items at once." };
 
+  const manualComparisonItemIds = input.items.flatMap((item) =>
+    item.comparisonItemId && UUID_PATTERN.test(item.comparisonItemId)
+      ? [item.comparisonItemId]
+      : [],
+  );
+  const requestedComparisonItemIds = [...new Set(manualComparisonItemIds)];
+  if (requestedComparisonItemIds.length !== manualComparisonItemIds.length)
+    return { ok: false, error: "Match each client item to only one supplier row." };
+  if (requestedComparisonItemIds.length) {
+    if (!quote.comparison_id)
+      return { ok: false, error: "This quote is not linked to a client request, so a manual item match cannot be saved." };
+    const { data: allowedComparisonItems, error: allowedComparisonItemsError } = await supabase
+      .from("quote_comparison_items")
+      .select("id")
+      .eq("comparison_id", quote.comparison_id)
+      .in("id", requestedComparisonItemIds)
+      .returns<Array<{ id: string }>>();
+    if (allowedComparisonItemsError || allowedComparisonItems?.length !== requestedComparisonItemIds.length)
+      return { ok: false, error: "One selected client item is no longer available. Reload the quote and choose it again." };
+  }
+
   let rows;
   try {
     const ignoredExistingIds: string[] = [];
@@ -765,6 +787,9 @@ export async function saveSupplierQuoteAction(input: {
             : Math.round(quantity * unitPrice * 100) / 100,
         selected: Boolean(item.selected),
         review_status: item.selected ? "ready" : "ignored",
+        comparison_item_id: item.comparisonItemId && UUID_PATTERN.test(item.comparisonItemId)
+          ? item.comparisonItemId
+          : null,
       }];
     });
     if (ignoredExistingIds.length) {
