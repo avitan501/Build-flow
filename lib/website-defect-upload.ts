@@ -29,6 +29,28 @@ export function validateWebsiteDefectFiles(files: Array<{ name: string; type: st
   return null
 }
 
+export async function websiteDefectDeploymentIsStale(
+  request: typeof fetch = fetch,
+  currentRelease = process.env.NEXT_PUBLIC_SENTRY_RELEASE ?? "",
+) {
+  const normalizedCurrent = currentRelease.trim().toLowerCase()
+  if (!/^[a-f0-9]{7,40}$/.test(normalizedCurrent)) return false
+  try {
+    const response = await request(`/api/release?source=website-defects&t=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    })
+    if (!response.ok) return false
+    const payload: unknown = await response.json()
+    const latest = payload && typeof payload === "object" && "release" in payload
+      ? String(payload.release ?? "").trim().toLowerCase()
+      : ""
+    return /^[a-f0-9]{7,40}$/.test(latest) && latest !== normalizedCurrent
+  } catch {
+    return false
+  }
+}
+
 export function websiteDefectUploadErrorStatus(error: unknown) {
   if (!error || typeof error !== "object") return null
   const direct = "status" in error ? Number(error.status) : Number.NaN

@@ -7,7 +7,7 @@ import { useState, useTransition } from "react"
 
 import { completeWebsiteDefectUploadsAction, prepareWebsiteDefectUploadsAction, recordWebsiteQaCheckAction, updateWebsiteDefectAction } from "@/app/admin/ai-tools/website-defects/actions"
 import { createClient } from "@/lib/supabase/client"
-import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, validateWebsiteDefectFiles, WEBSITE_DEFECT_MAX_FILES, websiteDefectUploadErrorMessage, websiteDefectUploadErrorStatus } from "@/lib/website-defect-upload"
+import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, validateWebsiteDefectFiles, WEBSITE_DEFECT_MAX_FILES, websiteDefectDeploymentIsStale, websiteDefectUploadErrorMessage, websiteDefectUploadErrorStatus } from "@/lib/website-defect-upload"
 
 const STATUS_OPTIONS = [
   ["new", "New"],
@@ -130,6 +130,7 @@ export function WebsiteDefectInbox({ issues, checks, canManage }: { issues: Webs
   const [files, setFiles] = useState<File[]>([])
   const [message, setMessage] = useState("")
   const [isError, setIsError] = useState(false)
+  const [staleDeployment, setStaleDeployment] = useState(false)
   const [pending, startTransition] = useTransition()
 
   function submit(formData: FormData) {
@@ -140,6 +141,12 @@ export function WebsiteDefectInbox({ issues, checks, canManage }: { issues: Webs
     if (validationError) { setIsError(true); setMessage(validationError); return }
     startTransition(async () => {
       try {
+        if (await websiteDefectDeploymentIsStale()) {
+          setStaleDeployment(true)
+          setIsError(true)
+          setMessage("A newer website version is ready. Open it in a new tab and choose these files there. This tab will stay open as your reference.")
+          return
+        }
         const normalizedFiles = files.map((file) => ({ file, fileName: file.name, fileType: normalizeWebsiteDefectFileType(file), fileSize: file.size }))
         setMessage(`Preparing ${files.length} private ${files.length === 1 ? "upload" : "uploads"}…`)
         const prepared = await prepareWebsiteDefectUploadsAction({ files: normalizedFiles.map(({ fileName, fileType, fileSize }) => ({ fileName, fileType, fileSize })) })
@@ -204,7 +211,7 @@ export function WebsiteDefectInbox({ issues, checks, canManage }: { issues: Webs
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_8rem]"><label className="grid gap-1 text-xs font-bold">Page URL <span className="font-normal text-slate-400">(optional)</span><input name="pageUrl" type="url" placeholder="Paste the page link" className="h-11 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" /></label><label className="grid gap-1 text-xs font-bold">Priority<select name="priority" className="h-11 rounded-lg border border-slate-300 bg-white px-2 text-sm"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label></div>
           <label className={`mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 text-center transition-[border-color,background-color] ${files.length ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-sky-400 hover:bg-sky-50"}`}><Upload className="h-6 w-6 text-[#0071e3]" /><strong className="mt-2 text-sm">{files.length ? `${files.length} ${files.length === 1 ? "file" : "files"} selected` : "Choose videos or screenshots"}</strong><span className="mt-1 text-xs text-slate-500">Up to {WEBSITE_DEFECT_MAX_FILES} files · 100 MB each · 250 MB total</span><input type="file" multiple accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp" disabled={pending || files.length >= WEBSITE_DEFECT_MAX_FILES} className="sr-only" onChange={(event) => { const selected = Array.from(event.target.files ?? []); const existing = new Set(files.map((file) => `${file.name}:${file.size}:${file.lastModified}`)); const next = [...files, ...selected.filter((file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`))]; const error = validateWebsiteDefectFiles(next); if (error) { setIsError(true); setMessage(error) } else { setFiles(next); setMessage(""); setIsError(false) } event.currentTarget.value = "" }} /></label>
           {files.length ? <ul aria-label="Selected issue files" className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">{files.map((file, index) => <li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex min-h-11 items-center gap-2 px-3 py-2"><span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-slate-800">{file.name}</span><span className="text-[10px] text-slate-500">{(file.size / 1024 / 1024).toFixed(1)} MB</span></span><button type="button" disabled={pending} onClick={() => { setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index)); setMessage(""); setIsError(false) }} aria-label={`Remove ${file.name}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 className="h-4 w-4" /></button></li>)}</ul> : null}
-          <button type="submit" disabled={!files.length || pending} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:bg-slate-300">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Bug className="h-4 w-4" />}{pending ? "Saving the issue…" : isError ? "Try upload again" : files.length ? `Upload ${files.length} ${files.length === 1 ? "file" : "files"} and create issue` : "Choose files to continue"}</button>
+          {staleDeployment ? <a href="/admin/ai-tools/website-defects" target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white"><Upload className="h-4 w-4" />Open latest version</a> : <button type="submit" disabled={!files.length || pending} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:bg-slate-300">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Bug className="h-4 w-4" />}{pending ? "Saving the issue…" : isError ? "Try upload again" : files.length ? `Upload ${files.length} ${files.length === 1 ? "file" : "files"} and create issue` : "Choose files to continue"}</button>}
           {message ? <p role="status" className={`mt-3 rounded-lg px-3 py-2 text-xs font-bold ${isError ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{message}</p> : null}
         </form>
       </div>

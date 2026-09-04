@@ -4,7 +4,7 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
-import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, validateWebsiteDefectFiles, WEBSITE_DEFECT_MAX_FILES, WEBSITE_DEFECT_MAX_FILE_SIZE, WEBSITE_DEFECT_MAX_TOTAL_SIZE, websiteDefectUploadErrorMessage } from "@/lib/website-defect-upload"
+import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, validateWebsiteDefectFiles, WEBSITE_DEFECT_MAX_FILES, WEBSITE_DEFECT_MAX_FILE_SIZE, WEBSITE_DEFECT_MAX_TOTAL_SIZE, websiteDefectDeploymentIsStale, websiteDefectUploadErrorMessage } from "@/lib/website-defect-upload"
 
 const root = process.cwd()
 
@@ -49,6 +49,9 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(inbox).toContain("Connection interrupted—retrying file")
   expect(inbox).toContain("selected.file.slice(0, selected.file.size, selected.fileType)")
   expect(inbox).toContain('isError ? "Try upload again"')
+  expect(inbox).toContain("websiteDefectDeploymentIsStale")
+  expect(inbox).toContain("Open latest version")
+  expect(inbox).toContain('target="_blank"')
   expect(inbox).toContain('multiple accept="video/mp4')
   expect(inbox).toContain('aria-label="Selected issue files"')
   expect(inbox).toContain("Remove ${file.name}")
@@ -66,6 +69,14 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(accessMigration).toContain("create policy website_qa_checks_owner_update")
   expect(accessMigration).toContain("create policy website_defect_files_owner_delete")
   expect(accessMigration).not.toContain("private.is_staff())")
+})
+
+test("a stale Website Defects tab detects the latest release without looping an old Server Action", async () => {
+  const responseFor = (release: string) => async () => new Response(JSON.stringify({ release }), { status: 200 })
+  expect(await websiteDefectDeploymentIsStale(responseFor("bbbbbbb") as typeof fetch, "aaaaaaa")).toBe(true)
+  expect(await websiteDefectDeploymentIsStale(responseFor("AAAAAAA") as typeof fetch, "aaaaaaa")).toBe(false)
+  expect(await websiteDefectDeploymentIsStale(async () => { throw new Error("offline") }, "aaaaaaa")).toBe(false)
+  expect(await websiteDefectDeploymentIsStale(responseFor("bbbbbbb") as typeof fetch, "development")).toBe(false)
 })
 
 test("mobile file metadata is normalized without accepting unapproved formats", () => {
