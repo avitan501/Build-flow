@@ -96,7 +96,7 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
         <p className="mt-2 text-sm leading-6 text-slate-700">Use Avantia Build&apos;s secure hosted payment page. Do not send payment details by email or text.</p>
         <a href={document.paymentLink} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white">Open secure payment page</a>
       </section> : null}
-      {row.document_type !== "receipt" ? <ClientDocumentAcceptance token={token} documentVersion={row.version} documentLabel={label} clientEmail={document.clientEmail} initialReceipt={receipt} /> : null}
+      {row.document_type !== "receipt" ? <ClientDocumentAcceptance token={token} documentVersion={row.version} documentLabel={label} initialReceipt={receipt} /> : null}
       <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-8">
         <a href={`/client-document/${token}/download`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-bold">Download PDF</a>
       </footer>

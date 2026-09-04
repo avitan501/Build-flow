@@ -35,7 +35,6 @@ const acceptanceSchema = z.object({
   token: z.string().uuid(),
   documentVersion: z.coerce.number().int().positive(),
   signerName: z.string().trim().min(2).max(120),
-  signerEmail: z.string().trim().max(320).optional(),
   consent: z.literal("accepted"),
 })
 
@@ -58,7 +57,6 @@ export async function acceptClientDocumentAction(
     token: formData.get("token"),
     documentVersion: formData.get("documentVersion"),
     signerName: formData.get("signerName"),
-    signerEmail: formData.get("signerEmail") || undefined,
     consent: formData.get("consent"),
   })
   if (!input.success) return { status: "error", message: "Enter your name and check the acknowledgement box." }
@@ -75,9 +73,6 @@ export async function acceptClientDocumentAction(
     const document = parseRequestClientDocument(row)
     if (!document) return { status: "error", message: "This document cannot be acknowledged right now." }
     const signerEmail = document.clientEmail || null
-    if (signerEmail && input.data.signerEmail?.toLowerCase() !== signerEmail) {
-      return { status: "error", message: "Enter the same email address shown on this document." }
-    }
 
     const { data, error } = await supabase.rpc("accept_request_client_document_public", {
       p_public_token: input.data.token,
