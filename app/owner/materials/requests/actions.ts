@@ -8,7 +8,7 @@ import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { deliverEmailWithSupabaseFallback } from "@/lib/email-delivery-fallback"
 import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
-import { buildProjectUploadStoragePath, sanitizeProjectUploadFileName } from "@/lib/projects"
+import { buildProjectUploadStoragePath } from "@/lib/projects"
 import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyRequestAttachmentStorage } from "@/lib/request-attachment-upload"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
@@ -60,11 +60,11 @@ export async function prepareRequestAttachmentUploadAction(input: {
   if (fileError) return { ok: false, code: "invalid_file", error: fileError }
 
   try {
-    const { supabase, user } = await requireStaffProfile("customers")
-    const { data: request, error: requestError } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
+    const { supabase } = await requireStaffProfile("customers")
+    const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
     if (requestError || !request) return { ok: false, code: "request_not_found", error: "Request not found." }
-    const storagePath = `public-intake/${user.id}/${randomUUID()}-${sanitizeProjectUploadFileName(file.filename)}`
-    const { data, error } = await createAdminClient().storage.from("project-uploads").createSignedUploadUrl(storagePath)
+    const storagePath = buildProjectUploadStoragePath({ ownerId: request.owner_id, projectId: request.project_id, uploadId: randomUUID(), fileName: file.filename })
+    const { data, error } = await supabase.storage.from("project-uploads").createSignedUploadUrl(storagePath)
     if (error || !data?.token) {
       console.error("Existing request signed upload preparation failed", { requestId, code: error?.statusCode || "storage_error" })
       return { ok: false, code: "prepare_failed", error: "The private upload could not be prepared. Please try again." }
@@ -141,43 +141,35 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
     || validateRequestAttachmentFile(attachment))
   if (invalid) return { ok: false, code: "invalid_files", error: "One of the selected files is invalid. Remove it and try again." }
 
-  let admin: ReturnType<typeof createAdminClient> | null = null
   const storedPaths: string[] = []
-  const stagedPaths = attachments.map((attachment) => attachment.storagePath)
   try {
-    const { supabase, user } = await requireStaffProfile("customers")
-    const expectedStagingPrefix = `public-intake/${user.id}/`
-    if (attachments.some((attachment) => !attachment.storagePath.startsWith(expectedStagingPrefix) || attachment.storagePath.includes(".."))) {
-      return { ok: false, code: "invalid_files", error: "One of the selected files could not be verified. Please upload it again." }
-    }
-    admin = createAdminClient()
+    const { supabase } = await requireStaffProfile("customers")
     const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
     if (requestError || !request?.project_id || !request.owner_id) {
-      await admin.storage.from("project-uploads").remove(stagedPaths)
       return { ok: false, code: "request_not_found", error: "Request not found." }
     }
+    const expectedStoragePrefix = `${request.owner_id}/${request.project_id}/`
+    if (attachments.some((attachment) => !attachment.storagePath.startsWith(expectedStoragePrefix) || attachment.storagePath.includes(".."))) {
+      return { ok: false, code: "invalid_files", error: "One of the selected files could not be verified. Please upload it again." }
+    }
+    const storage = supabase.storage.from("project-uploads")
     for (const attachment of attachments) {
-      const storage = admin.storage.from("project-uploads")
       const verified = await verifyRequestAttachmentStorage(
         () => storage.info(attachment.storagePath),
         { size: attachment.size, type: attachment.type },
       )
       if (!verified.ok) throw new Error("attachment_verification_failed")
-      const finalPath = buildProjectUploadStoragePath({ ownerId: request.owner_id, projectId: request.project_id, uploadId: randomUUID(), fileName: attachment.filename })
-      const { error: moveError } = await storage.move(attachment.storagePath, finalPath)
-      if (moveError) throw new Error("attachment_move_failed")
-      storedPaths.push(finalPath)
-      const { error: recordError } = await admin.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: finalPath, file_type: attachment.type, file_size: attachment.size })
+      storedPaths.push(attachment.storagePath)
+      const { error: recordError } = await supabase.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: attachment.storagePath, file_type: attachment.type, file_size: attachment.size })
       if (recordError) throw new Error("attachment_record_failed")
     }
   } catch (cause) {
-    if (admin) {
-      try {
-        if (storedPaths.length) await admin.from("quote_request_attachments").delete().eq("request_id", requestId).in("file_path", storedPaths)
-        await admin.storage.from("project-uploads").remove([...new Set([...stagedPaths, ...storedPaths])])
-      } catch (cleanupCause) {
-        console.error("Existing request attachment cleanup failed", cleanupCause)
-      }
+    try {
+      const { supabase } = await requireStaffProfile("customers")
+      if (storedPaths.length) await supabase.from("quote_request_attachments").delete().eq("request_id", requestId).in("file_path", storedPaths)
+      await supabase.storage.from("project-uploads").remove([...new Set(attachments.map((attachment) => attachment.storagePath))])
+    } catch (cleanupCause) {
+      console.error("Existing request attachment cleanup failed", cleanupCause)
     }
     console.error("Existing request attachment storage failed", cause)
     return { ok: false, code: "storage_failed", error: "The files could not be attached. Please try again." }
