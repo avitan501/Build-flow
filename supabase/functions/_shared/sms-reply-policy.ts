@@ -33,7 +33,7 @@ export function smsReplyLanguage(value: string) {
   if (/[\u0590-\u05ff]/.test(value)) return "he";
   if (
     /[áéíóúñ¿¡]/i.test(value) ||
-    /\b(?:hola|gracias|necesito|precio|entrega|cotizaci[oó]n|direcci[oó]n)\b/i.test(
+    /\b(?:hola|gracias|necesito|quiero|precio|entrega|cotizaci[oó]n|direcci[oó]n|paneles?|piezas?|hojas?|cajas?|bolsas?|pulgadas?|correcto|confirmo|por favor)\b/i.test(
       value,
     )
   )
@@ -55,7 +55,57 @@ const SMS_MATERIAL_SPELLING_ALIASES: Record<string, string> = {
   disponivle: "disponible", entreja: "entrega", maniana: "mañana", manana: "mañana",
   nececito: "necesito", nesecito: "necesito", nesesito: "necesito", plomeria: "plomería",
   presio: "precio", tornilos: "tornillos", umedad: "humedad",
+  yesso: "yeso", yesoo: "yeso", draywall: "drywall", sheetrokc: "sheetrock",
+  peices: "pieces", peice: "piece",
 };
+
+const SMS_SPOKEN_DIMENSION_NUMBERS: Record<string, string> = {
+  one: "1", two: "2", three: "3", four: "4", five: "5", six: "6",
+  seven: "7", eight: "8", nine: "9", ten: "10", twelve: "12",
+  sixteen: "16", uno: "1", una: "1", dos: "2", tres: "3", cuatro: "4",
+  cinco: "5", seis: "6", siete: "7", ocho: "8", nueve: "9", diez: "10",
+  doce: "12", dieciseis: "16", dieciséis: "16",
+};
+
+const SMS_SPOKEN_QUANTITY_NUMBERS: Record<string, string> = {
+  ...SMS_SPOKEN_DIMENSION_NUMBERS,
+  eleven: "11", thirteen: "13", fourteen: "14", fifteen: "15", twenty: "20",
+  thirty: "30", forty: "40", fifty: "50", sixty: "60", seventy: "70",
+  eighty: "80", ninety: "90", hundred: "100", once: "11", trece: "13",
+  catorce: "14", quince: "15", veinte: "20", treinta: "30", cuarenta: "40",
+  cincuenta: "50", sesenta: "60", setenta: "70", ochenta: "80", noventa: "90",
+  cien: "100",
+};
+
+function normalizeSmsSpokenQuantityCounts(value: string) {
+  const words = Object.keys(SMS_SPOKEN_QUANTITY_NUMBERS).join("|");
+  return value.replace(
+    new RegExp(`\\b(${words})\\s+(?=(?:pcs?|pieces?|peace|pees|sheets?|hojas?|panels?|paneles?|boxes?|cajas?|bags?|bolsas?|buckets?|cubetas?|rolls?|rollos?|gallons?|galones?|units?|unidades?|drywall|sheetrock|yeso|lumber|studs?)\\b)`, "gi"),
+    (_match, count: string) =>
+      `${SMS_SPOKEN_QUANTITY_NUMBERS[count.toLocaleLowerCase("en-US")] || count} `,
+  );
+}
+
+function normalizeSmsSpokenDimensions(value: string) {
+  const number =
+    "(?:\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|twelve|sixteen|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|dieciseis|dieciséis)";
+  const canonicalNumber = (part: string) =>
+    SMS_SPOKEN_DIMENSION_NUMBERS[part.toLocaleLowerCase("en-US")] || part;
+  return value
+    .replace(/\b(?:five\s+eighths?|cinco\s+octavos?)\b/gi, "5/8")
+    .replace(/\b(?:one\s+half|un(?:a)?\s+mitad|medio)\b/gi, "1/2")
+    .replace(/\b(?:three\s+quarters?|tres\s+cuartos?)\b/gi, "3/4")
+    .replace(
+      new RegExp(`\\b(${number})\\s*(?:by|por|x|×)\\s*(${number})\\s*(?:by|por|x|×)\\s*(${number})\\b`, "gi"),
+      (_match, first: string, second: string, third: string) =>
+        `${canonicalNumber(first)}x${canonicalNumber(second)}x${canonicalNumber(third)}`,
+    )
+    .replace(
+      new RegExp(`\\b(${number})\\s*(?:by|por|x|×)\\s*(${number})\\b`, "gi"),
+      (_match, first: string, second: string) =>
+        `${canonicalNumber(first)}x${canonicalNumber(second)}`,
+    );
+}
 
 function smsSpellingDistance(left: string, right: string) {
   if (Math.abs(left.length - right.length) > 2) return 3;
@@ -90,7 +140,21 @@ function normalizeSmsConstructionWord(word: string) {
 }
 
 export function normalizeSmsMaterialAnswerTypos(value: string) {
-  return value
+  return normalizeSmsSpokenQuantityCounts(normalizeSmsSpokenDimensions(value))
+    .replace(/\b(?:sheet\s+rock|sheet\s+rack)\b/gi, "sheetrock")
+    .replace(/\b(?:dry\s+wall|try\s+wall)\b/gi, "drywall")
+    .replace(/\b(?:home\s+line)\b/gi, "Homeline")
+    .replace(/\b(?:queue|cue)\s+oh\b|\bq\s+o\b/gi, "QO")
+    .replace(/\b(?:sherman|shermon)\s+williams?\b/gi, "Sherwin Williams")
+    .replace(/\b(\d+(?:\.\d+)?)\s+(?:peace|pees)\b/gi, "$1 pieces")
+    .replace(/\bpiezas?\b/gi, "pieces")
+    .replace(/\bhojas?\b/gi, "sheets")
+    .replace(/\bcajas?\b/gi, "boxes")
+    .replace(/\bbolsas?\b/gi, "bags")
+    .replace(/\bcubetas?\b/gi, "buckets")
+    .replace(/\brollos?\b/gi, "rolls")
+    .replace(/\bpulgadas?\b/gi, "in.")
+    .replace(/\bpies\b/gi, "ft")
     .replace(/\b(?:relugar|regualr|reglar|reguler)\b/gi, "regular")
     .replace(/\b(?:tyep\s*x|typex)\b/gi, "Type X")
     .replace(/\bmoist(?:er|ure)\s+resist(?:ent|ant)\b/gi, "moisture-resistant")
@@ -458,6 +522,10 @@ export function smsOutputSafetySignals(params: {
     /\b(?:your|the)\s+(?:order|quote|delivery|request)\s+(?:is|was|has been)\s+(?:ready|approved|confirmed|shipped|dispatched|scheduled|completed|processed)|\b(?:supplier|vendor)\s+(?:confirmed|approved|replied)|(?:ההזמנה|ההצעה|המשלוח|הבקשה)\s+(?:מוכנה|אושרה|נשלחה|נקבעה|הושלמה)|\b(?:su|el|la)\s+(?:pedido|cotizaci[oó]n|entrega|solicitud)\s+(?:est[aá]|fue|ha sido)\s+(?:list[oa]|aprobad[oa]|confirmad[oa]|enviad[oa]|programad[oa]|completad[oa])/i.test(
       reply,
     );
+  const unrequestedSolution =
+    /\b(?:you should use|the best (?:choice|option|solution) is|i (?:recommend|suggest) (?:using|choosing)|we (?:recommend|suggest) (?:using|choosing)|the right product is)\b|\b(?:debe usar|la mejor (?:opci[oó]n|soluci[oó]n) es|recomiendo (?:usar|elegir)|recomendamos (?:usar|elegir))\b/i.test(
+      reply,
+    );
   const question = inspectSmsQuestionStructure(reply, params.knownFields);
   const listCompletionQuestion =
     /\bdo you need anything else(?: on this list)?\b|\banything else(?: on this list)?\b|\b(?:necesita|quieres?) (?:agregar )?algo m[aá]s\b|(?:צריך|צריכה|צריכים) להוסיף עוד משהו|(?:האם )?צריך עוד משהו/i.test(
@@ -477,6 +545,8 @@ export function smsOutputSafetySignals(params: {
     signals.push("reply makes a delivery or order promise");
   if (transactionalStatusAssertion)
     signals.push("reply asserts an unsupported transactional status");
+  if (unrequestedSolution)
+    signals.push("reply proposes an unrequested product solution");
   if (
     smsReplySuggestsOptionalItems(reply) &&
     !isApprovedSheetrockRelatedSuggestion(

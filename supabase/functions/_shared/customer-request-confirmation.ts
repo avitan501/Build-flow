@@ -1,4 +1,4 @@
-const affirmativeConfirmation = /^(?:yes(?:[,!. ]+confirm(?:ed)?)?|כן|מאשר(?:ת)?|sí|si|confirmo)[.! ]*$/iu
+const affirmativeConfirmation = /^(?:yes(?:[,!. ]+confirm(?:ed)?)?|correct|that(?:'s| is) correct|looks correct|i (?:confirm|approve)|כן|מאשר(?:ת)?|נכון|זה נכון|sí|si|confirmo|correcto|est[aá] correcto|apruebo)[.! ]*$/iu
 const negativeConfirmation = /\b(?:no|not|don't|do not|cancel|stop|לא|אל|ביטול|בטל|לא נכון|no confirmo|cancelar)\b/iu
 
 export function isExplicitCustomerRequestConfirmation(value: string | null | undefined) {

@@ -65,7 +65,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("todaySummary?.checkInAt");
   expect(page).toContain("Supplier Quote Storage");
   expect(page).toContain("Quote Comparison");
-  expect(page).toContain('{ href: CARLOS_MEETING_URL, label: "Google Meet" }');
+  expect(page).toContain('<GoogleMeetLauncher variant="row" />');
   expect(shell).toContain('label: "Manager Dashboard"');
   expect(shell).toContain('{ href: "/admin/users", label: "Customers"');
   expect(shell).toContain(

@@ -17,6 +17,7 @@ import { CarlosGoalsWorkspace } from "@/app/admin/goals-progress/page";
 import type { ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
+import { GoogleMeetLauncher } from "@/components/buildflow/google-meet-launcher";
 import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 import {
   DAILY_WORK_SUMMARY_PREFIX,
@@ -36,9 +37,6 @@ import { formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time";
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const WHATSAPP_URL = "/admin/communications?channel=whatsapp";
-const CARLOS_MEETING_URL =
-  "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
-
 type RequestRow = {
   id: string;
   owner_id: string;
@@ -277,7 +275,6 @@ export default async function AdminDashboardPage({
                     { href: "/admin/payments", label: "Payment Center" },
                   ]
                 : []),
-              { href: CARLOS_MEETING_URL, label: "Google Meet" },
               {
                 href: "/admin/ai-tools/media-messages",
                 label: "Media & Messages",
@@ -476,6 +473,9 @@ export default async function AdminDashboardPage({
                       <h3 className="text-sm font-semibold">{section.title}</h3>
                     </header>
                     <div>
+                      {section.title === "Manager Tools" ? (
+                        <GoogleMeetLauncher variant="row" />
+                      ) : null}
                       {section.links.map((item) => {
                         const external = item.href.startsWith("https://");
                         return (

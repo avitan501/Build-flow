@@ -37,8 +37,8 @@ test("manager navigation is compact and keeps one communication center at the bo
   expect(shell).not.toContain('shortLabel: "WhatsApp"')
   expect(shell).not.toContain("CARLOS_MEETING_URL")
   expect(shell).not.toContain('/admin/communications?channel=whatsapp')
-  expect(aiTools).toContain('title: "Google Meet"')
-  expect(aiTools).toContain('add=buildavantiap%40gmail.com')
+  expect(aiTools).toContain("<GoogleMeetLauncher />")
+  expect(aiTools).not.toContain("calendar.google.com/calendar/render")
 })
 
 test("legacy WhatsApp threads preserve their contact when routed into the unified inbox", async () => {
