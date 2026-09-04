@@ -266,6 +266,10 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
+              {
+                href: "/admin/ai-tools/website-defects",
+                label: "Website Defects",
+              },
               ...(access.owner
                 ? [
                     {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
 
 const BUCKET = "website-defects"
 const MAX_FILE_SIZE = 100 * 1024 * 1024
@@ -22,14 +23,20 @@ function safeFileName(value: string) {
   return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 180) || "website-defect"
 }
 
-async function managerContext() {
+async function reporterContext() {
   const context = await requireManagerPortalProfile()
-  if (!context.access.aiTools) throw new Error("Website Defects is available only to authorized managers.")
+  if (!canReportWebsiteDefects(context.access)) throw new Error("Website Defects is available only to authorized staff.")
+  return context
+}
+
+async function ownerContext() {
+  const context = await requireManagerPortalProfile()
+  if (!canManageWebsiteDefects(context.access)) throw new Error("Only the owner can manage website issue status and QA results.")
   return context
 }
 
 export async function prepareWebsiteDefectUploadAction(input: { fileName: string; fileType: string; fileSize: number }): Promise<Result<{ defectId: string; filePath: string; token: string }>> {
-  const { supabase, user } = await managerContext()
+  const { supabase, user } = await reporterContext()
   const fileName = clean(input.fileName, 240)
   const fileType = clean(input.fileType, 100).toLowerCase()
   const fileSize = Number(input.fileSize)
@@ -44,7 +51,7 @@ export async function prepareWebsiteDefectUploadAction(input: { fileName: string
 }
 
 export async function completeWebsiteDefectUploadAction(input: { defectId: string; filePath: string; fileName: string; fileType: string; fileSize: number; title?: string; description?: string; pageUrl?: string; priority?: string }): Promise<Result<{ issueNumber: number }>> {
-  const { supabase, user } = await managerContext()
+  const { supabase, user } = await reporterContext()
   const fileName = clean(input.fileName, 240)
   const fileType = clean(input.fileType, 100).toLowerCase()
   const fileSize = Number(input.fileSize)
@@ -93,7 +100,7 @@ export async function completeWebsiteDefectUploadAction(input: { defectId: strin
 }
 
 export async function updateWebsiteDefectAction(input: { id: string; title?: string; description?: string; pageUrl?: string; reviewNotes?: string; status?: string; priority?: string }): Promise<Result> {
-  const { supabase, user } = await managerContext()
+  const { supabase, user } = await ownerContext()
   if (!UUID.test(input.id)) return { ok: false, error: "Issue not found." }
   const update: Record<string, unknown> = { updated_by: user.id }
   if (input.title !== undefined) {
@@ -119,7 +126,7 @@ export async function updateWebsiteDefectAction(input: { id: string; title?: str
 }
 
 export async function recordWebsiteQaCheckAction(input: { id: string; result: string; notes?: string }): Promise<Result> {
-  const { supabase, user } = await managerContext()
+  const { supabase, user } = await ownerContext()
   const id = clean(input.id, 100)
   if (!/^[a-z0-9-]+$/.test(id) || !QA_RESULTS.has(input.result)) return { ok: false, error: "Choose a valid test and result." }
   const { error } = await supabase.from("website_qa_checks").update({

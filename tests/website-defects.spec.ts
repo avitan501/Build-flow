@@ -3,21 +3,28 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
+
 const root = process.cwd()
 
 test("Manager Tools exposes a private website defect issue inbox", async () => {
-  const [tools, page, actions, inbox, migration] = await Promise.all([
+  const [tools, dashboard, page, actions, inbox, migration, accessMigration] = await Promise.all([
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/website-defects/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/website-defects/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/website-defect-inbox.tsx"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260903205430_create_website_defects.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260904053000_protect_website_defect_management.sql"), "utf8"),
   ])
 
   expect(tools).toContain('href: "/admin/ai-tools/website-defects"')
   expect(tools).toContain('title: "Website Defects"')
+  expect(dashboard).toContain('href: "/admin/ai-tools/website-defects"')
+  expect(dashboard).toContain('label: "Website Defects"')
   expect(page).toContain("requireManagerPortalProfile")
-  expect(page).toContain("!access.aiTools")
+  expect(page).toContain("!canReportWebsiteDefects(access)")
+  expect(page).toContain("canManage={canManageWebsiteDefects(access)}")
   expect(page).toContain('createSignedUrl(row.file_path')
   expect(actions).toContain("prepareWebsiteDefectUploadAction")
   expect(actions).toContain("completeWebsiteDefectUploadAction")
@@ -26,11 +33,15 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(actions).toContain("MAX_FILE_SIZE = 100 * 1024 * 1024")
   expect(actions).toContain('"video/quicktime"')
   expect(actions).toContain("expectedPrefix")
+  expect(actions).toContain("reporterContext()")
+  expect(actions).toContain("ownerContext()")
   expect(inbox).toContain("Upload and create issue")
   expect(inbox).toContain("Ready to verify")
   expect(inbox).toContain("Codex review / fix notes")
   expect(inbox).toContain("Required website checks")
   expect(inbox).toContain("Last checked:")
+  expect(inbox).toContain("canManage: boolean")
+  expect(inbox).toContain("Review the latest owner-verified results.")
   expect(migration).toContain("alter table public.website_defects enable row level security")
   expect(migration).toContain("public = false")
   expect(migration).toContain("website_defect_files_manager_read")
@@ -38,6 +49,18 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(migration).toContain("create table if not exists public.website_qa_checks")
   expect(migration).toContain("Send a message as a client")
   expect(migration).toContain("Create and send a proposal")
+  expect(accessMigration).toContain("create policy website_defects_owner_update")
+  expect(accessMigration).toContain("create policy website_qa_checks_owner_update")
+  expect(accessMigration).toContain("create policy website_defect_files_owner_delete")
+  expect(accessMigration).not.toContain("private.is_staff())")
+})
+
+test("approved operations staff can report defects but only the owner can manage them", () => {
+  expect(canReportWebsiteDefects({ owner: true, operationsManager: false })).toBe(true)
+  expect(canReportWebsiteDefects({ owner: false, operationsManager: true })).toBe(true)
+  expect(canReportWebsiteDefects({ owner: false, operationsManager: false })).toBe(false)
+  expect(canManageWebsiteDefects({ owner: true, operationsManager: false })).toBe(true)
+  expect(canManageWebsiteDefects({ owner: false, operationsManager: true })).toBe(false)
 })
 
 test("website defect uploads stay private and become numbered trackable issues", async () => {

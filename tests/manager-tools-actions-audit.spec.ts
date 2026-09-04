@@ -53,8 +53,9 @@ test("interactive Manager Tools actions use the same capability as their visible
   expect(smsPage).toContain("!access.aiTools || !access.customers")
   expect(smsActions).toContain("!access.aiTools || !access.customers")
 
-  expect(defectPage).toContain("!access.aiTools")
-  expect(defectActions).toContain("!context.access.aiTools")
+  expect(defectPage).toContain("!canReportWebsiteDefects(access)")
+  expect(defectActions).toContain("!canReportWebsiteDefects(context.access)")
+  expect(defectActions).toContain("!canManageWebsiteDefects(context.access)")
   for (const action of [
     "prepareWebsiteDefectUploadAction",
     "completeWebsiteDefectUploadAction",
