@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { normalizeWebsiteDefectMimeType, verifyWebsiteDefectStorage } from "@/lib/website-defect-upload-validation"
 import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
 
 const BUCKET = "website-defects"
@@ -38,10 +39,10 @@ async function ownerContext() {
 export async function prepareWebsiteDefectUploadAction(input: { fileName: string; fileType: string; fileSize: number }): Promise<Result<{ defectId: string; filePath: string; token: string }>> {
   const { supabase, user } = await reporterContext()
   const fileName = clean(input.fileName, 240)
-  const fileType = clean(input.fileType, 100).toLowerCase()
+  const fileType = normalizeWebsiteDefectMimeType(clean(input.fileType, 100))
   const fileSize = Number(input.fileSize)
   if (!fileName || !ALLOWED_TYPES.has(fileType)) return { ok: false, error: "Choose an MP4, MOV, WebM, JPG, PNG, or WebP file." }
-  if (!Number.isFinite(fileSize) || fileSize < 1 || fileSize > MAX_FILE_SIZE) return { ok: false, error: "Keep each recording or image under 100 MB." }
+  if (!Number.isSafeInteger(fileSize) || fileSize < 1 || fileSize > MAX_FILE_SIZE) return { ok: false, error: "Keep each recording or image up to 100 MB." }
 
   const defectId = crypto.randomUUID()
   const filePath = `${user.id}/${defectId}/${safeFileName(fileName)}`
@@ -53,22 +54,27 @@ export async function prepareWebsiteDefectUploadAction(input: { fileName: string
 export async function completeWebsiteDefectUploadAction(input: { defectId: string; filePath: string; fileName: string; fileType: string; fileSize: number; title?: string; description?: string; pageUrl?: string; priority?: string }): Promise<Result<{ issueNumber: number }>> {
   const { supabase, user } = await reporterContext()
   const fileName = clean(input.fileName, 240)
-  const fileType = clean(input.fileType, 100).toLowerCase()
+  const fileType = normalizeWebsiteDefectMimeType(clean(input.fileType, 100))
   const fileSize = Number(input.fileSize)
-  const expectedPrefix = `${user.id}/${input.defectId}/`
-  if (!UUID.test(input.defectId) || !input.filePath.startsWith(expectedPrefix) || !ALLOWED_TYPES.has(fileType) || fileSize < 1 || fileSize > MAX_FILE_SIZE) return { ok: false, error: "The uploaded file reference is invalid." }
+  const expectedFilePath = `${user.id}/${input.defectId}/${safeFileName(fileName)}`
+  if (!fileName || !UUID.test(input.defectId) || input.filePath !== expectedFilePath || !ALLOWED_TYPES.has(fileType) || !Number.isSafeInteger(fileSize) || fileSize < 1 || fileSize > MAX_FILE_SIZE) return { ok: false, error: "The uploaded file reference is invalid." }
 
-  const admin = createAdminClient()
-  const { data: stored, error: storedError } = await admin.storage.from(BUCKET).info(input.filePath)
-  if (storedError || !stored) return { ok: false, error: "The upload did not finish. Try it again." }
-  const storedSize = Number(stored.size)
-  if (!Number.isFinite(storedSize) || storedSize !== fileSize || stored.contentType !== fileType) {
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch {
+    return { ok: false, error: "The upload could not be verified right now. Try again." }
+  }
+  const verified = await verifyWebsiteDefectStorage(
+    () => admin.storage.from(BUCKET).info(input.filePath),
+    { size: fileSize, type: fileType },
+  )
+  if (!verified.ok && verified.reason === "unavailable") {
+    return { ok: false, error: "The upload is still being verified. Try again in a moment." }
+  }
+  if (!verified.ok) {
     await admin.storage.from(BUCKET).remove([input.filePath])
     return { ok: false, error: "The uploaded file did not match the selected recording." }
-  }
-  if (storedSize > MAX_FILE_SIZE) {
-    await admin.storage.from(BUCKET).remove([input.filePath])
-    return { ok: false, error: "The uploaded file is larger than 100 MB." }
   }
 
   const description = String(input.description ?? "").trim().slice(0, 4000)
@@ -85,8 +91,8 @@ export async function completeWebsiteDefectUploadAction(input: { defectId: strin
     priority,
     file_name: fileName,
     file_path: input.filePath,
-    mime_type: fileType,
-    file_size: fileSize,
+    mime_type: verified.actual.type,
+    file_size: verified.actual.size,
     assigned_to: "Codex",
     created_by: user.id,
     updated_by: user.id,
