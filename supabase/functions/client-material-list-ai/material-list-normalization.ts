@@ -54,7 +54,11 @@ export function findStructuredMaterialSource(
       return { source, score: overlap / Math.max(sourceWords.size, 1) }
     })
     .sort((left, right) => right.score - left.score)
-  if (!ranked[0] || ranked[0].score < 0.5) return null
+  if (!ranked[0] || ranked[0].score <= 0) return null
+  // A single structured source is safe to recover even when the AI removes
+  // non-product labels such as "QA test" from its normalized item name.
+  if (ranked.length === 1) return ranked[0].source
+  if (ranked[0].score < 0.5) return null
   if (ranked[1]?.score === ranked[0].score) return null
   return ranked[0].source
 }
@@ -90,6 +94,37 @@ export function detectExplicitQuantityUnit(value: string): DetectedQuantityUnit 
     unit: normalizedUnit(prefix?.[2] ?? suffix?.[3] ?? ""),
     itemText: (prefix?.[3] ?? suffix?.[1] ?? "").replace(/^of\s+/i, "").trim(),
   }
+}
+
+export function findExplicitQuantityUnitEvidence(
+  item: { name: string; sourceText: string },
+  sourceValue: string,
+) {
+  const queryWords = materialWords(`${item.name} ${item.sourceText}`)
+  if (!queryWords.size) return null
+  const ranked = sourceValue
+    .split(/\r?\n/)
+    .map((line) => ({ line: cleanLine(line), detected: detectExplicitQuantityUnit(line) }))
+    .filter((candidate): candidate is { line: string; detected: DetectedQuantityUnit } => Boolean(candidate.detected))
+    .map((candidate) => {
+      const evidenceWords = materialWords(candidate.detected.itemText)
+      const overlap = [...evidenceWords].filter((word) => queryWords.has(word)).length
+      return {
+        ...candidate,
+        overlap,
+        queryCoverage: overlap / Math.max(queryWords.size, 1),
+        evidenceCoverage: overlap / Math.max(evidenceWords.size, 1),
+      }
+    })
+    .filter((candidate) => candidate.overlap > 0)
+    .sort((left, right) => right.overlap - left.overlap || right.queryCoverage - left.queryCoverage || right.evidenceCoverage - left.evidenceCoverage)
+  if (!ranked[0]) return null
+  const second = ranked[1]
+  if (second
+    && second.overlap === ranked[0].overlap
+    && second.queryCoverage === ranked[0].queryCoverage
+    && second.evidenceCoverage === ranked[0].evidenceCoverage) return null
+  return ranked[0]
 }
 
 export function removeResolvedQuantityUnitReasons(reasons: string[], detected: DetectedQuantityUnit | null) {

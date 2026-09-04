@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
-import { dimensionalLumberNeedsType, fastenerNeedsLength, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
+import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
 import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
@@ -129,6 +129,17 @@ function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
 }
 
+function cleanMultiline(value: unknown, max: number) {
+  return String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim().replace(/\s+/g, " "))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, max)
+}
+
 function inferredSalesUnit(nameValue: unknown, departmentValue: unknown) {
   const value = `${clean(nameValue, 300)} ${clean(departmentValue, 120)}`.toLowerCase()
   if (/\b(?:screws?|nails?|fasteners?|anchors?)\b/.test(value)) return "boxes"
@@ -216,7 +227,7 @@ Deno.serve(async (request: Request) => {
 
   try {
     const typedSource = originalSources.map((originalSource) => {
-      const requestDetails = clean(originalSource.metadata?.request_details, 20_000)
+      const requestDetails = cleanMultiline(originalSource.metadata?.request_details, 20_000)
       const sourceName = clean(originalSource.name, 4_000)
       const savedSourceItem = sourceName && sourceName !== "Free-text material list"
         ? `${Number(originalSource.quantity) || 1} ${clean(originalSource.unit, 60) || "each"} — ${sourceName}`
@@ -290,8 +301,13 @@ Deno.serve(async (request: Request) => {
     const organizedAt = new Date().toISOString()
     const rows = items.map((item) => {
       const sourceText = clean(item.sourceText, 1200)
-      const matchedSource = findStructuredMaterialSource(
+      const explicitEvidence = findExplicitQuantityUnitEvidence(
         { name: item.name, sourceText },
+        typedSource,
+      )
+      const groundedSourceText = explicitEvidence?.line || sourceText
+      const matchedSource = findStructuredMaterialSource(
+        { name: item.name, sourceText: groundedSourceText },
         originalSources.map((candidate) => ({
           id: candidate.id,
           name: candidate.name,
@@ -301,7 +317,7 @@ Deno.serve(async (request: Request) => {
         })),
       )
       const resolvedQuantityUnit = resolveMaterialQuantityUnit({
-        sourceText,
+        sourceText: groundedSourceText,
         extractedQuantity: item.quantity,
         extractedUnit: item.unit,
         structuredSource: matchedSource,
@@ -315,17 +331,17 @@ Deno.serve(async (request: Request) => {
       const normalizedUnit = extractedUnit || inferredSalesUnit(item.name, item.department)
       const proposedDimensions = clean(item.dimensions, 300)
       const proposedThickness = clean(item.thickness, 160)
-      const thickness = verifiedThickness(proposedThickness, typedSource || sourceText)
+      const thickness = verifiedThickness(proposedThickness, groundedSourceText)
       const details = clean(item.details, 1200)
       const originalReviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
-      const fastenerDimensions = recognizedFastenerDimensions(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const fastenerDimensions = recognizedFastenerDimensions(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
       const dimensions = fastenerDimensions || proposedDimensions
       const reviewReasons = removeResolvedFastenerReasons(removeResolvedQuantityUnitReasons(originalReviewReasons, detected), fastenerDimensions)
         .filter((reason) => !quantityWasDefaulted || !/\bquantity\b/i.test(reason))
         .filter((reason) => !unitWasDefaulted || !/\b(?:sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
       const missingThickness = materialRequiresThickness(item.name) && !thickness
-      const missingLumberType = dimensionalLumberNeedsType(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
-      const missingFastenerLength = fastenerNeedsLength(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const missingLumberType = dimensionalLumberNeedsType(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const missingFastenerLength = fastenerNeedsLength(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
       const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
       const reviewStatus = missingThickness || missingLumberType || missingFastenerLength ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
@@ -349,7 +365,7 @@ Deno.serve(async (request: Request) => {
           dimensions,
           thickness,
           request_details: details,
-          source_text: sourceText,
+          source_text: groundedSourceText,
           quantity_defaulted: quantityWasDefaulted,
           unit_defaulted: unitWasDefaulted,
           review_status: reviewStatus,

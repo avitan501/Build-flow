@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
 
 const sidingFormats = [
   "14 squares of siding",
@@ -34,6 +34,26 @@ test("preserves an explicit underlayment quantity instead of accepting an AI def
   })).toMatchObject({ quantity: 6, unit: "rolls" })
 })
 
+test("recovers a quantity from the matching original free-text line when AI source text drops it", () => {
+  const evidence = findExplicitQuantityUnitEvidence(
+    { name: "Flooring underlayment", sourceText: "underlayment" },
+    "6 rolls underlayment\n2 boxes flooring nails",
+  )
+  expect(evidence).toMatchObject({ line: "6 rolls underlayment", detected: { quantity: 6, unit: "rolls" } })
+  expect(resolveMaterialQuantityUnit({
+    sourceText: evidence?.line || "underlayment",
+    extractedQuantity: 1,
+    extractedUnit: "each",
+  })).toMatchObject({ quantity: 6, unit: "rolls" })
+})
+
+test("does not borrow a quantity when two original free-text lines are equally plausible", () => {
+  expect(findExplicitQuantityUnitEvidence(
+    { name: "Fastener", sourceText: "fastener" },
+    "2 boxes framing fastener\n4 boxes roofing fastener",
+  )).toBeNull()
+})
+
 test("maps a structured edited item back to its own quantity without crossing other rows", () => {
   const sources = [
     { id: "underlayment", name: "Underlayment", quantity: 6, unit: "rolls" },
@@ -50,6 +70,29 @@ test("maps a structured edited item back to its own quantity without crossing ot
     extractedUnit: "each",
     structuredSource: matched,
   })).toMatchObject({ quantity: 3, unit: "tubes" })
+})
+
+test("a sole structured QA item keeps its saved quantity after AI normalization and retry", () => {
+  const matched = findStructuredMaterialSource(
+    { name: "Fastener", sourceText: "fastener" },
+    [{ id: "qa-item", name: "QA test fastener", quantity: 7, unit: "boxes" }],
+  )
+  expect(matched?.id).toBe("qa-item")
+  expect(resolveMaterialQuantityUnit({
+    sourceText: "fastener",
+    extractedQuantity: 1,
+    extractedUnit: "each",
+    structuredSource: matched,
+  })).toMatchObject({ quantity: 7, unit: "boxes" })
+})
+
+test("the organizer preserves line breaks and grounds saved rows before replacing retry results", async () => {
+  const source = await readFile(path.join(process.cwd(), "supabase/functions/client-material-list-ai/index.ts"), "utf8")
+  expect(source).toContain("cleanMultiline(originalSource.metadata?.request_details")
+  expect(source).toContain("findExplicitQuantityUnitEvidence")
+  expect(source).toContain("sourceText: groundedSourceText")
+  expect(source).toContain("source_text: groundedSourceText")
+  expect(source.indexOf("const explicitEvidence")).toBeLessThan(source.indexOf('insert(rows).select("id")'))
 })
 
 test("editing one original row synchronizes its sole organized quantity", async () => {
