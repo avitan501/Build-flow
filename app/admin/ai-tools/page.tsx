@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { BarChart3, Bot, Bug, Calculator, Clapperboard, Files, LibraryBig, ListTree, MessageSquareText, Search, Store } from "lucide-react"
+import { BarChart3, Bot, Bug, Calculator, Clapperboard, Files, LibraryBig, ListTree, MessageSquareText, Search, Store, UserPlus } from "lucide-react"
 
 import { GoogleMeetLauncher } from "@/components/buildflow/google-meet-launcher"
 import { requireManagerPortalProfile } from "@/lib/auth"
@@ -15,8 +15,10 @@ export default async function AdminAiToolsPage() {
     ...(access.owner ? [{ href: "/admin/ai-tools/aura", title: "Aura AI", description: "Reply settings, construction knowledge, and the private internal library in one place.", icon: Bot, badge: "Private" }] : []),
     ...(access.owner ? [{ href: "/admin/ai-tools/internal-library", title: "Aura Internal Library", description: "Search private, retrieval-only operating knowledge. Nothing here can be sent to a customer.", icon: LibraryBig, badge: "Owner" }] : []),
     ...(access.owner ? [{ href: "/admin/ai-tools/construction-amazon-deals", title: "Amazon Construction Deals", description: "Research construction products through the verified Amazon Associates record.", icon: Store, badge: "Owner" }] : []),
+    ...(access.owner ? [{ href: "/admin/ai-tools/lead-drafts", title: "Leads — Needs Review", description: "Resolve only unclear, incomplete, or duplicate contacts. Clear David screenshots become NEW leads automatically.", icon: UserPlus, badge: "Exceptions" }] : []),
     { href: "/admin/ai-tools/locate-cheap-item", title: "Locate Cheap Item", description: "Compare live public sources for a specific material without sending or ordering.", icon: Search, badge: "Live beta" },
     ...(access.customers ? [{ href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the global safety and follow-up rules for customer text replies.", icon: MessageSquareText }] : []),
+    ...(access.customers ? [{ href: "/admin/ai-tools/quick-add-lead", title: "Quick Add Lead", description: "Small manual fallback for a new lead when no screenshot is available.", icon: UserPlus, badge: "Fallback" }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/material-list", title: "Material List Organizer", description: "Turn field notes and supplier lists into editable rows and CSV.", icon: ListTree },
     { href: "/shop/wood-floor/flooring-calculator", title: "Wood Floor Calculator", description: "Room takeoff, waste allowance, and marked-plan workflow.", icon: Calculator },

@@ -11,8 +11,10 @@ const cardRoutes = [
   "/admin/ai-tools/aura",
   "/admin/ai-tools/internal-library",
   "/admin/ai-tools/construction-amazon-deals",
+  "/admin/ai-tools/lead-drafts",
   "/admin/ai-tools/locate-cheap-item",
   "/admin/ai-tools/sms-replies",
+  "/admin/ai-tools/quick-add-lead",
   "/admin/documents",
   "/admin/ai-tools/material-list",
   "/shop/wood-floor/flooring-calculator",
@@ -31,7 +33,7 @@ test("every Manager Tools card resolves to a real page and restricted cards matc
   expect(tools).toContain('...(access.customers ? [{ href: "/admin/ai-tools/sms-replies"')
   expect(tools).toContain('...(access.suppliers ? [{ href: "/admin/documents"')
   expect(tools).toContain('...(access.traffic ? [{ href: "/admin/traffic"')
-  expect(tools.match(/\.\.\.\(access\.owner \?/g)).toHaveLength(4)
+  expect(tools.match(/\.\.\.\(access\.owner \?/g)).toHaveLength(5)
 })
 
 test("interactive Manager Tools actions use the same capability as their visible page", async () => {
