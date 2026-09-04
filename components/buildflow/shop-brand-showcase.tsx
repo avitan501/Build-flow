@@ -18,13 +18,13 @@ const SHOP_BRANDS = [
 export function ShopBrandShowcase({ compact = false, transparent = false, title = "Shop Our Brands" }: { compact?: boolean; transparent?: boolean; title?: string }) {
   return (
     <ShopTranslationBoundary>
-    <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
+    <section {...(title ? { "aria-labelledby": "shop-brands-heading" } : { "aria-label": "Construction material brands" })} className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-2.5 sm:py-3" : "py-8 sm:py-10"}`}>
-        <div className="text-center">
+        {title ? <div className="text-center">
           <h2 id="shop-brands-heading" className={`${compact ? "text-sm sm:text-base font-medium text-slate-500" : "text-2xl sm:text-3xl font-semibold text-[#1d1d1f]"} tracking-normal`}>{title}</h2>
-        </div>
+        </div> : null}
 
-        <div className={`${compact ? "mt-2" : "mt-6"} brand-marquee`} data-testid="shop-brand-grid">
+        <div className={`${compact && title ? "mt-2" : title ? "mt-6" : ""} brand-marquee`} data-testid="shop-brand-grid">
           <div className="brand-marquee-track">
             {[0, 1].map((groupIndex) => (
               <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
@@ -36,7 +36,7 @@ export function ShopBrandShowcase({ compact = false, transparent = false, title 
                         alt={groupIndex === 0 ? `${brand.name} logo` : ""}
                         fill
                         sizes="176px"
-                        loading="eager"
+                        loading={compact ? "lazy" : "eager"}
                         className={`object-contain ${brand.scale}`}
                       />
                     </div>

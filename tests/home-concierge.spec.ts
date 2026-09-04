@@ -9,27 +9,32 @@ test("new homepage presents the approved request flow", async ({ page }) => {
   await expect(
     page.getByRole("heading", { level: 1, name: /One Quote. Better Options./ }),
   ).toBeVisible();
-  await expect(page.getByText("Before / after", { exact: true })).toBeVisible();
+  await expect(page.getByText("Building materials", { exact: true })).toBeVisible();
+  await expect(page.getByText("Before / after", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Check My Quote", exact: true })).toHaveAttribute(
     "href",
     "/beat-a-quote",
   );
-  await expect(page.getByRole("link", { name: "Send a Photo", exact: true })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Send My Material List", exact: true })).toHaveAttribute(
     "href",
     "/request-quote",
   );
   await expect(page.locator("#brands").getByText("Serving all 50 states", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: /Send the list/ }),
+    page.getByRole("heading", { name: "Tell us what you need." }),
   ).toBeVisible();
   await expect(
-    page.locator('video:has(source[src="/videos/homepage-material-process.mp4"])'),
+    page.locator('video:has(source[src="/videos/homepage-material-process-v2.mp4"])'),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Three direct ways to start." }),
   ).toBeVisible();
   for (const title of ["Beat Your Quote", "Send Any Material List", "Find a Specific Item"]) {
     await expect(page.getByRole("heading", { name: title })).toBeAttached();
+  }
+  await expect(page.getByRole("heading", { name: "Why contractors send us the list" })).toBeVisible();
+  for (const reason of ["Compare the full cost", "Approve before we order", "One team follows through"]) {
+    await expect(page.getByRole("heading", { name: reason })).toBeAttached();
   }
   for (const asset of [
     "service-beat-quote-v4.webp",
@@ -64,7 +69,7 @@ test("all three mobile service photographs can be revealed in the swipe rail", a
 test("homepage process film is motion footage rather than a generated slide sequence", async ({ page }) => {
   await page.goto("/");
 
-  const film = page.locator('video:has(source[src="/videos/homepage-material-process.mp4"])');
+  const film = page.locator('video:has(source[src="/videos/homepage-material-process-v2.mp4"])');
   await expect(film).toBeVisible();
   await expect(film).toHaveAttribute("autoplay", "");
   await expect(film).toHaveAttribute("loop", "");
@@ -83,11 +88,13 @@ test("new homepage keeps the approved mobile composition compact", async ({ page
 
   await expect(page.getByRole("heading", { level: 1, name: /One Quote. Better Options./ })).toBeVisible();
   const primary = page.getByRole("link", { name: "Check My Quote", exact: true });
-  const secondary = page.getByRole("link", { name: "Send a Photo", exact: true });
+  const secondary = page.getByRole("link", { name: "Send My Material List", exact: true });
   const primaryBox = await primary.boundingBox();
   const secondaryBox = await secondary.boundingBox();
-  expect(primaryBox?.width ?? 0).toBeGreaterThan(300);
-  expect(secondaryBox?.width ?? 0).toBeGreaterThan(300);
+  expect(primaryBox?.width ?? 0).toBeGreaterThan(180);
+  expect(primaryBox?.width ?? 0).toBeLessThan(260);
+  expect(secondaryBox?.width ?? 0).toBeGreaterThan(180);
+  expect(secondaryBox?.width ?? 0).toBeLessThan(260);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

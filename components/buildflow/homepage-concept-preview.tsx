@@ -9,7 +9,7 @@ import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
-  { id: 2, name: "Light Quote Check", eyebrow: "Compare before you buy", headline: <>One Quote.<br />Better Options.</>, summary: "We compare the supplier, total price, and delivery.", primary: "Check My Quote", secondary: "Send a Photo", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
+  { id: 2, name: "Light Quote Check", eyebrow: "Compare before you buy", headline: <>One Quote.<br />Better Options.</>, summary: "We compare the supplier, total price, and delivery.", primary: "Check My Quote", secondary: "Send My Material List", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
   { id: 3, name: "Crew Moving", eyebrow: "Materials this week?", headline: <>Keep the Crew<br />Moving.</>, summary: "Send the list. We chase the material—not your crew.", primary: "Send My List", secondary: "How It Works", videos: [["/videos/avantia-story/02-contractor-crew-moving.mp4", "/videos/avantia-story/02-contractor-crew-moving-poster.jpg"], ["/videos/avantia-story/09-job-gets-busy.mp4", "/videos/avantia-story/09-job-gets-busy-poster.jpg"]] },
   { id: 4, name: "Supplier Grid", eyebrow: "One request. More reach.", headline: <>Stop Calling<br />Every Supplier.</>, summary: "Avantia organizes the request and checks matching sources.", primary: "Start a Request", secondary: "Text My List", videos: [["/videos/avantia-story/04-supplier-send-products.mp4", "/videos/avantia-story/04-supplier-send-products-poster.jpg"], ["/videos/avantia-story/07-many-calls-one-job.mp4", "/videos/avantia-story/07-many-calls-one-job-poster.jpg"]] },
   { id: 5, name: "Delivery Mission", eyebrow: "From list to jobsite", headline: <>Materials.<br />Handled.</>, summary: "Quote review, supplier follow-up, and delivery coordination.", primary: "Send It to Avantia", secondary: "Upload Quote", videos: [["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"], ["/videos/avantia-story/05-designer-order-coordination.mp4", "/videos/avantia-story/05-designer-order-coordination-poster.jpg"], ["/videos/avantia-story/06-designer-materials-desk.mp4", "/videos/avantia-story/06-designer-materials-desk-poster.jpg"]] },
@@ -45,6 +45,12 @@ const reviewServices = [
   },
 ] as const
 
+const reviewReasons = [
+  { title: "Compare the full cost", detail: "See material, tax, delivery, and lead time together." },
+  { title: "Approve before we order", detail: "Review the exact quote and terms before anything is placed." },
+  { title: "One team follows through", detail: "We coordinate the supplier, the order, and jobsite delivery." },
+] as const
+
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
   const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
   const secondaryHref = secondary.toLowerCase().includes("text")
@@ -75,7 +81,7 @@ function HomepageReviewSections() {
 
   return <>
     <div id="brands" className="border-y border-black/8 bg-[#f4efe6] py-3 text-slate-950">
-      <ShopBrandShowcase compact transparent title="Materials from brands contractors know" />
+      <ShopBrandShowcase compact transparent title="" />
       <p className="mx-auto -mt-0.5 flex max-w-[88rem] items-center justify-center gap-1.5 px-5 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
         <MapPin className="h-3.5 w-3.5 text-[#1677ff]" aria-hidden="true" />
         Serving all 50 states
@@ -85,9 +91,8 @@ function HomepageReviewSections() {
     <section className="overflow-hidden bg-[#f4efe6] px-5 py-14 text-slate-950 sm:px-8 sm:py-20" aria-labelledby="text-request-heading">
       <div className="mx-auto grid max-w-6xl items-center gap-9 lg:grid-cols-[0.82fr_1.18fr] lg:gap-16">
         <div className="max-w-lg">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">From the jobsite</p>
-          <h2 id="text-request-heading" className="mt-3 text-4xl font-semibold leading-[0.94] tracking-[-0.055em] text-balance sm:text-6xl">Send the list.<br />We’ll take it from there.</h2>
-          <p className="mt-5 max-w-md text-sm font-semibold leading-6 text-slate-600 sm:text-base">Type it, photograph it, or attach the plan. Start with what you already have.</p>
+          <h2 id="text-request-heading" className="text-4xl font-semibold leading-[0.94] tracking-[-0.055em] text-balance sm:text-6xl">Tell us what you need.</h2>
+          <p className="mt-5 max-w-md text-sm font-semibold leading-6 text-slate-600 sm:text-base">Send a plan, photo, or material list. Tell us about the project, and we’ll take care of the order.</p>
           <Link href="/request-quote" className="mt-7 inline-flex min-h-12 items-center gap-2 border-b-2 border-slate-950 text-sm font-black text-slate-950 transition hover:border-[#1677ff] hover:text-[#1677ff]">
             Send a material request <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>
@@ -103,7 +108,7 @@ function HomepageReviewSections() {
             </video>
             <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
               <MessageSquareText className="h-4 w-4 text-[#e7b85d]" aria-hidden="true" />
-              Text a photo or material list
+              Text or WhatsApp your material list
             </div>
           </div>
         </div>
@@ -132,6 +137,19 @@ function HomepageReviewSections() {
         </Link>)}
       </div>
     </section>
+
+    <section className="border-t border-white/10 bg-[#030507] px-5 py-10 text-white sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
+      <div className="mx-auto max-w-7xl">
+        <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why contractors send us the list</h2>
+        <div className="mt-6 grid gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-3">
+          {reviewReasons.map((reason, index) => <article key={reason.title} className="bg-[#030507] p-5 sm:p-6">
+            <span className="text-[10px] font-black tracking-[0.18em] text-[#f1c66e]">0{index + 1}</span>
+            <h3 className="mt-4 text-lg font-semibold">{reason.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-white/62">{reason.detail}</p>
+          </article>)}
+        </div>
+      </div>
+    </section>
   </>
 }
 
@@ -139,6 +157,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
   const [conceptId, setConceptId] = useState(initialConceptId)
   const [videoIndex, setVideoIndex] = useState(0)
   const [heroPhotoIndex, setHeroPhotoIndex] = useState(0)
+  const [heroDeckReady, setHeroDeckReady] = useState(false)
   const [paused, setPaused] = useState(false)
   const [approved, setApproved] = useState<number | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -148,10 +167,16 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
   useEffect(() => { const video = videoRef.current; if (!video || paused) return; void video.play().catch(() => undefined) }, [videoSource, paused])
 
   useEffect(() => {
+    if (!reviewOnly) return
+    const timer = window.setTimeout(() => setHeroDeckReady(true), 700)
+    return () => window.clearTimeout(timer)
+  }, [reviewOnly])
+
+  useEffect(() => {
     if (!reviewOnly || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
     const interval = window.setInterval(() => {
       setHeroPhotoIndex((current) => (current + 1) % reviewHeroPhotos.length)
-    }, 5600)
+    }, 3600)
     return () => window.clearInterval(interval)
   }, [paused, reviewOnly])
 
@@ -180,15 +205,16 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
 
     <section className={`relative min-h-[100svh] overflow-hidden ${conceptId === 5 ? "bg-[#edf2f7] text-slate-950" : "bg-black"}`}>
       {reviewOnly ? <div className="absolute inset-y-0 right-0 h-full w-full overflow-hidden sm:w-[62%]" aria-label={reviewHeroPhotos[heroPhotoIndex].label} role="img">
-        {reviewHeroPhotos.map((photo, index) => <Image
+        {reviewHeroPhotos.map((photo, index) => index === 0 || heroDeckReady ? <Image
           key={photo.src}
           src={photo.src}
           alt=""
           fill
           priority={index === 0}
           sizes="(max-width: 640px) 100vw, 62vw"
-          className={`object-cover brightness-[.72] contrast-[1.08] saturate-[.78] transition-[opacity,transform] duration-[1400ms] ease-out motion-reduce:transform-none motion-reduce:transition-none ${photo.position} ${index === heroPhotoIndex ? "scale-[1.035] opacity-100" : "scale-100 opacity-0"}`}
-        />)}
+          quality={75}
+          className={`object-cover brightness-[.72] contrast-[1.08] saturate-[.78] transition-[opacity,transform] duration-[950ms] ease-out motion-reduce:transform-none motion-reduce:transition-none ${photo.position} ${index === heroPhotoIndex ? "scale-[1.04] opacity-100" : "scale-100 opacity-0"}`}
+        /> : null)}
       </div> : <video key={videoSource} ref={videoRef} src={videoSource} poster={posterSource} autoPlay muted playsInline preload="auto" onEnded={() => setVideoIndex((current) => (current + 1) % concept.videos.length)} className={`absolute object-cover ${conceptId === 2 ? "inset-y-0 right-0 h-full w-full sm:w-[62%]" : conceptId === 4 ? "inset-y-0 right-0 h-full w-full lg:w-[68%]" : conceptId === 5 ? "inset-x-4 bottom-5 top-24 h-[calc(100%-7.25rem)] w-[calc(100%-2rem)] rounded-[2rem] sm:inset-x-[38%] sm:w-[60%]" : "inset-0 h-full w-full scale-[1.015]"}`} aria-hidden="true" />}
 
       {conceptId === 1 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.08)_40%,rgba(0,0,0,.84))]" /><div className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col justify-end px-5 pb-24 pt-24 sm:px-8 lg:px-12"><div className="max-w-3xl drop-shadow-[0_5px_28px_rgba(0,0,0,.65)]">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><p className="mt-3 text-xs font-semibold text-white/65">No account. No obligation.</p></div></div></> : null}

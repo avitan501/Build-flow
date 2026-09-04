@@ -275,7 +275,8 @@ test("traffic recording keeps the established Supabase project when Vercel publi
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
   await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: "Materials from brands contractors know" })).toBeVisible()
+  await expect(page.getByText("Materials from brands contractors know", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("region", { name: "Construction material brands" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
 })
 
