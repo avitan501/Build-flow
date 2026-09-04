@@ -6,6 +6,59 @@ export type DetectedQuantityUnit = {
   itemText: string
 }
 
+export function resolveMaterialQuantityUnit(input: {
+  sourceText: string
+  extractedQuantity: number | null
+  extractedUnit: string | null
+  structuredSource?: { quantity: number; unit: string | null } | null
+}) {
+  const detected = detectExplicitQuantityUnit(input.sourceText)
+  const structuredQuantity = Number(input.structuredSource?.quantity)
+  const aiQuantity = Number(input.extractedQuantity)
+  const quantity = detected?.quantity
+    ?? (Number.isFinite(structuredQuantity) && structuredQuantity > 0 ? structuredQuantity : null)
+    ?? (Number.isFinite(aiQuantity) && aiQuantity > 0 ? aiQuantity : null)
+  const unit = detected?.unit
+    || String(input.structuredSource?.unit ?? "").trim()
+    || String(input.extractedUnit ?? "").trim()
+  return { quantity, unit, detected }
+}
+
+type StructuredMaterialSource = {
+  id: string
+  name: string
+  quantity: number
+  unit: string | null
+  details?: string
+}
+
+function materialWords(value: string) {
+  return new Set(value
+    .toLowerCase()
+    .replace(/\b(?:sheet\s*rock|she+t+ro+ck|dry\s*wall|gypsum\s+(?:board|panel)|(?:panel|placa)\s+de\s+yeso|tablaroca)\b/g, "drywall")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((word) => word.length > 1 && !/^(?:each|pieces?|pcs?|rolls?|sheets?|boxes?|the|and|for)$/.test(word)))
+}
+
+export function findStructuredMaterialSource(
+  item: { name: string; sourceText: string },
+  sources: StructuredMaterialSource[],
+) {
+  const queryWords = materialWords(`${item.name} ${item.sourceText}`)
+  const ranked = sources
+    .filter((source) => source.name.trim() && !/^free-text material list$/i.test(source.name.trim()))
+    .map((source) => {
+      const sourceWords = materialWords(`${source.name} ${source.details ?? ""}`)
+      const overlap = [...sourceWords].filter((word) => queryWords.has(word)).length
+      return { source, score: overlap / Math.max(sourceWords.size, 1) }
+    })
+    .sort((left, right) => right.score - left.score)
+  if (!ranked[0] || ranked[0].score < 0.5) return null
+  if (ranked[1]?.score === ranked[0].score) return null
+  return ranked[0].source
+}
+
 function cleanLine(value: string) {
   return value
     .replace(/^\s*(?:[-*•]\s+|\d+[.)]\s*)/, "")

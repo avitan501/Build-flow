@@ -461,6 +461,31 @@ export async function saveOriginalMaterialItemAction(input: {
     if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here.", version }
     const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
     if (error) return { ok: false as const, error: "The original item could not be saved.", version }
+    const { data: organizedRows } = await supabase
+      .from("quote_request_items")
+      .select("id,metadata")
+      .eq("request_id", requestId)
+      .contains("metadata", { ai_organized: true, source_item_id: itemId })
+      .returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
+    if (organizedRows?.length === 1) {
+      const organized = organizedRows[0]
+      const { error: syncError } = await supabase
+        .from("quote_request_items")
+        .update({
+          quantity,
+          unit,
+          metadata: {
+            ...(organized.metadata ?? {}),
+            quantity_defaulted: false,
+            unit_defaulted: false,
+            source_quantity_synced_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", organized.id)
+        .eq("request_id", requestId)
+      if (syncError)
+        return { ok: false as const, error: "The original item saved, but its organized quantity could not be synchronized. Refresh and try again.", version }
+    }
   } else {
     const { data: departmentSource } = await supabase
       .from("quote_request_items")

@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 
-import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
 
 const sidingFormats = [
   "14 squares of siding",
@@ -22,6 +24,39 @@ test("recognizes common singular and plural construction units", () => {
   expect(detectExplicitQuantityUnit("2 boxes roofing nails")).toMatchObject({ quantity: 2, unit: "boxes" })
   expect(detectExplicitQuantityUnit("3 rolls insulation")).toMatchObject({ quantity: 3, unit: "rolls" })
   expect(detectExplicitQuantityUnit("Joint compound: 4 pails")).toMatchObject({ quantity: 4, unit: "pails" })
+})
+
+test("preserves an explicit underlayment quantity instead of accepting an AI default", () => {
+  expect(resolveMaterialQuantityUnit({
+    sourceText: "6 rolls underlayment",
+    extractedQuantity: 1,
+    extractedUnit: "each",
+  })).toMatchObject({ quantity: 6, unit: "rolls" })
+})
+
+test("maps a structured edited item back to its own quantity without crossing other rows", () => {
+  const sources = [
+    { id: "underlayment", name: "Underlayment", quantity: 6, unit: "rolls" },
+    { id: "qa-item", name: "QA acoustic sealant", quantity: 3, unit: "tubes" },
+  ]
+  const matched = findStructuredMaterialSource(
+    { name: "Acoustic sealant", sourceText: "QA acoustic sealant" },
+    sources,
+  )
+  expect(matched?.id).toBe("qa-item")
+  expect(resolveMaterialQuantityUnit({
+    sourceText: "QA acoustic sealant",
+    extractedQuantity: 1,
+    extractedUnit: "each",
+    structuredSource: matched,
+  })).toMatchObject({ quantity: 3, unit: "tubes" })
+})
+
+test("editing one original row synchronizes its sole organized quantity", async () => {
+  const actions = await readFile(path.join(process.cwd(), "app/owner/materials/requests/actions.ts"), "utf8")
+  expect(actions).toContain('.contains("metadata", { ai_organized: true, source_item_id: itemId })')
+  expect(actions).toContain("organizedRows?.length === 1")
+  expect(actions).toContain("quantity_defaulted: false")
 })
 
 test("keeps a leading lumber count separate from 2x4x8 dimensions", () => {

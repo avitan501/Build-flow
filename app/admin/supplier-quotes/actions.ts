@@ -8,6 +8,7 @@ import {
   type CatalogSupplier,
 } from "@/lib/material-catalog";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
+import { loadInboundSupplierQuoteAttachment } from "@/lib/aura/inbound-supplier-quote";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
 import {
   detectSupplierMatch,
@@ -267,13 +268,37 @@ export async function uploadSupplierQuoteAction(
   formData: FormData,
 ): Promise<ActionResult<{ quoteId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
-  const file = formData.get("quoteFile");
+  const sourceCommunicationId = clean(formData.get("sourceCommunicationId"), 80);
+  const sourceAttachmentId = clean(formData.get("sourceAttachmentId"), 160);
+  const inboundSource = sourceCommunicationId || sourceAttachmentId
+    ? await loadInboundSupplierQuoteAttachment(sourceCommunicationId, sourceAttachmentId, { includeFile: true })
+    : null;
+  if ((sourceCommunicationId || sourceAttachmentId) && !inboundSource)
+    return { ok: false, error: "That received email attachment is unavailable or is not a supported supplier quote." };
+  const uploadedFile = formData.get("quoteFile");
+  const file = inboundSource?.file ?? (uploadedFile instanceof File ? uploadedFile : null);
   if (!(file instanceof File) || file.size === 0)
     return { ok: false, error: "Choose a supplier quote file." };
   if (file.size > MAX_FILE_SIZE)
     return { ok: false, error: "The quote must be 25 MB or smaller." };
   if (!ALLOWED_TYPES.has(file.type))
     return { ok: false, error: "Use a PDF, CSV, TXT, JPG, PNG, or WEBP file." };
+
+  if (inboundSource) {
+    const { data: existingSource } = await supabase
+      .from("supplier_quotes")
+      .select("id")
+      .eq("source_communication_id", inboundSource.metadata.communicationId)
+      .eq("source_attachment_id", inboundSource.metadata.attachmentId)
+      .maybeSingle<{ id: string }>();
+    if (existingSource) {
+      return {
+        ok: true,
+        data: { quoteId: existingSource.id },
+        message: "This received quote is already stored. Opening its review.",
+      };
+    }
+  }
 
   const linkMode =
     clean(formData.get("linkMode"), 20) === "request" ? "request" : "unlinked";
@@ -405,6 +430,9 @@ export async function uploadSupplierQuoteAction(
   const manualQuoteDate = clean(formData.get("quoteDate"), 10);
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
+    source_communication_id: inboundSource?.metadata.communicationId ?? null,
+    source_attachment_id: inboundSource?.metadata.attachmentId ?? null,
+    source_contact_name: inboundSource?.metadata.senderEmail || null,
     client_id: client?.id ?? null,
     client_name_snapshot: clientName,
     comparison_id: comparisonId,
@@ -425,7 +453,9 @@ export async function uploadSupplierQuoteAction(
       "Original document saved privately. AI extraction is in progress.",
     delivery_charge: 0,
     tax_percent: 0,
-    notes: "",
+    notes: inboundSource
+      ? clean(`Received by email from ${inboundSource.metadata.senderEmail || "unknown sender"}${inboundSource.metadata.subject ? ` · ${inboundSource.metadata.subject}` : ""}.`, 4000)
+      : "",
     created_by: user.id,
     updated_by: user.id,
   });
@@ -433,6 +463,21 @@ export async function uploadSupplierQuoteAction(
     await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([filePath]);
     if (createdComparison && comparisonId)
       await supabase.from("quote_comparisons").delete().eq("id", comparisonId);
+    if (inboundSource && quoteError.code === "23505") {
+      const { data: existingSource } = await supabase
+        .from("supplier_quotes")
+        .select("id")
+        .eq("source_communication_id", inboundSource.metadata.communicationId)
+        .eq("source_attachment_id", inboundSource.metadata.attachmentId)
+        .maybeSingle<{ id: string }>();
+      if (existingSource) {
+        return {
+          ok: true,
+          data: { quoteId: existingSource.id },
+          message: "This received quote is already stored. Opening its review.",
+        };
+      }
+    }
     console.error("Supplier quote record creation failed", quoteError);
     await captureOperationalError(quoteError, {
       feature: "supplier-quotes",
@@ -517,7 +562,10 @@ export async function uploadSupplierQuoteAction(
 
   const quoteNumber = manualQuoteNumber || extraction.metadata.quoteNumber;
   const quoteDate = manualQuoteDate || extraction.metadata.quoteDate;
-  const reviewNote =
+  const sourceNote = inboundSource
+    ? `Received by email from ${inboundSource.metadata.senderEmail || "unknown sender"}${inboundSource.metadata.subject ? ` · ${inboundSource.metadata.subject}` : ""}.`
+    : "";
+  const reviewNote = [sourceNote,
     supplierDirectoryNote ||
     (supplierSelection === "auto" && !supplierId
       ? "Supplier was read from the document but did not match the Supplier Directory. Confirm the supplier before routing."
@@ -525,7 +573,7 @@ export async function uploadSupplierQuoteAction(
           extraction.metadata.supplierName.toLowerCase() !==
             supplierName.toLowerCase()
         ? `Document supplier detected as ${extraction.metadata.supplierName}. Confirm the selected Supplier Directory record.`
-        : "");
+        : "")].filter(Boolean).join("\n");
   const { error: quoteUpdateError } = await supabase
     .from("supplier_quotes")
     .update({
@@ -607,9 +655,14 @@ export async function saveSupplierQuoteAction(input: {
 
   let rows;
   try {
-    rows = input.items.map((item, index) => {
+    const ignoredExistingIds: string[] = [];
+    rows = input.items.flatMap((item, index) => {
       const description = clean(item.description, 500);
       const quantity = safeNumber(item.quantity);
+      if ((!description || quantity <= 0) && !item.selected) {
+        if (UUID_PATTERN.test(item.id)) ignoredExistingIds.push(item.id);
+        return [];
+      }
       if (!description || quantity <= 0)
         throw new Error(
           `Check item ${index + 1}: material and quantity are required.`,
@@ -618,7 +671,7 @@ export async function saveSupplierQuoteAction(input: {
         item.unitPrice === null || item.unitPrice === undefined
           ? null
           : safeNumber(item.unitPrice);
-      return {
+      return [{
         ...(UUID_PATTERN.test(item.id) ? { id: item.id } : {}),
         quote_id: quote.id,
         line_number: index + 1,
@@ -634,8 +687,16 @@ export async function saveSupplierQuoteAction(input: {
             : Math.round(quantity * unitPrice * 100) / 100,
         selected: Boolean(item.selected),
         review_status: item.selected ? "ready" : "ignored",
-      };
+      }];
     });
+    if (ignoredExistingIds.length) {
+      const { error: ignoredError } = await supabase
+        .from("supplier_quote_items")
+        .update({ selected: false, review_status: "ignored" })
+        .eq("quote_id", quote.id)
+        .in("id", ignoredExistingIds);
+      if (ignoredError) throw ignoredError;
+    }
     const { error: itemError } = rows.length
       ? await supabase
           .from("supplier_quote_items")
@@ -1017,6 +1078,8 @@ async function createComparisonFromQuote(
   const { supabase, user, quote } = await loadQuote(quoteId);
   if (!quote)
     return { ok: false, error: "This supplier quote could not be found." };
+  if (quote.status === "needs_review")
+    return { ok: false, error: "Review and save the extracted supplier rows before adding them to a comparison." };
   if (!quote.supplier_id)
     return {
       ok: false,
@@ -1032,6 +1095,7 @@ async function createComparisonFromQuote(
     .select("*")
     .eq("quote_id", quote.id)
     .in("id", selectedIds)
+    .eq("selected", true)
     .order("line_number")
     .returns<SupplierQuoteItemRecord[]>();
   if (itemsError || !items?.length)
@@ -1039,19 +1103,22 @@ async function createComparisonFromQuote(
       ok: false,
       error: "The selected quote items could not be loaded.",
     };
+  if (items.length !== selectedIds.length || items.some((item) => item.review_status !== "ready"))
+    return { ok: false, error: "Only reviewed and saved supplier rows can be compared." };
 
   let comparison: {
     id: string;
     request_id: string | null;
+    client_id: string | null;
     status: string;
   } | null = null;
   let createdComparison = false;
   if (quote.comparison_id) {
     const current = await supabase
       .from("quote_comparisons")
-      .select("id,request_id,status")
+      .select("id,request_id,client_id,status")
       .eq("id", quote.comparison_id)
-      .maybeSingle<{ id: string; request_id: string | null; status: string }>();
+      .maybeSingle<{ id: string; request_id: string | null; client_id: string | null; status: string }>();
     if (current.error)
       return {
         ok: false,
@@ -1059,6 +1126,8 @@ async function createComparisonFromQuote(
       };
     comparison = current.data;
   }
+  if (comparison?.request_id && (!quote.client_id || comparison.client_id !== quote.client_id))
+    return { ok: false, error: "The quote and comparison do not belong to the same client request." };
   if (comparison && ["awarded", "archived"].includes(comparison.status))
     return {
       ok: false,
@@ -1077,8 +1146,8 @@ async function createComparisonFromQuote(
         department: quote.department,
         created_by: user.id,
       })
-      .select("id,request_id,status")
-      .single<{ id: string; request_id: string | null; status: string }>();
+      .select("id,request_id,client_id,status")
+      .single<{ id: string; request_id: string | null; client_id: string | null; status: string }>();
     if (created.error || !created.data)
       return {
         ok: false,
@@ -1263,12 +1332,39 @@ async function createComparisonFromQuote(
     is_available: item.unit_price !== null,
     notes: clean(item.description, 1000),
   }));
+  const previousPricesResult = await supabase
+    .from("quote_comparison_prices")
+    .select("bid_id,item_id,unit_price,is_available,notes")
+    .eq("bid_id", bid.id)
+    .returns<Array<{
+      bid_id: string;
+      item_id: string;
+      unit_price: number | null;
+      is_available: boolean;
+      notes: string;
+    }>>();
+  if (previousPricesResult.error)
+    return fail("The previous supplier pricing could not be checked safely.");
+  const previousPrices = previousPricesResult.data ?? [];
+  const { error: stalePricesError } = await supabase
+    .from("quote_comparison_prices")
+    .delete()
+    .eq("bid_id", bid.id);
+  if (stalePricesError) return fail("The previous supplier pricing could not be refreshed safely.");
   const { error: pricesError } = await supabase
     .from("quote_comparison_prices")
     .upsert(priceRows, { onConflict: "bid_id,item_id" });
   if (pricesError) {
-    if (!existingBid.data)
+    if (!existingBid.data) {
       await supabase.from("quote_comparison_bids").delete().eq("id", bid.id);
+    } else {
+      await supabase
+        .from("quote_comparison_prices")
+        .delete()
+        .eq("bid_id", bid.id);
+      if (previousPrices.length)
+        await supabase.from("quote_comparison_prices").insert(previousPrices);
+    }
     return fail("The supplier pricing could not be copied to the comparison.");
   }
 

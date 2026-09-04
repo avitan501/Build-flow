@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
@@ -519,8 +520,8 @@ export function AuraCommunicationWorkspace({
                     src={item.url}
                   />
                 ) : (
+                  <div key={`${item.url}-${index}`} className="flex min-w-0 flex-wrap gap-2">
                   <a
-                    key={`${item.url}-${index}`}
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -529,6 +530,8 @@ export function AuraCommunicationWorkspace({
                     <Paperclip className="h-4 w-4 shrink-0" />
                     <span className="truncate">Open attachment {index + 1}</span>
                   </a>
+                  {incoming && communication.channel === "email" && item.providerAttachmentId && item.storagePath ? <Link href={`/admin/supplier-quotes?communication=${encodeURIComponent(communication.id)}&attachment=${encodeURIComponent(item.providerAttachmentId)}`} className="inline-flex min-h-9 items-center rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white">Review as supplier quote</Link> : null}
+                  </div>
                 ),
               )}
             </div>

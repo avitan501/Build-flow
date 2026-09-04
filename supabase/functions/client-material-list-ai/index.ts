@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
-import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
+import { dimensionalLumberNeedsType, fastenerNeedsLength, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
+import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -175,6 +176,10 @@ async function updateSource(source: SourceItem, state: Record<string, unknown>) 
   await admin.from("quote_request_items").update({ metadata: { ...(source.metadata ?? {}), ...state } }).eq("id", source.id)
 }
 
+async function updateSources(sources: SourceItem[], state: Record<string, unknown>) {
+  await Promise.all(sources.map((source) => updateSource(source, state)))
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
   if (!await authorized(request)) return json({ error: "Staff authorization required" }, 401)
@@ -195,10 +200,11 @@ Deno.serve(async (request: Request) => {
   ])
   if (!requestRecord || !sourceItems?.length) return json({ error: "Request not found" }, 404)
 
-  const source = sourceItems.find((item) => item.metadata?.ai_organized !== true) ?? sourceItems[0]
+  const originalSources = sourceItems.filter((item) => item.metadata?.ai_organized !== true)
+  const source = originalSources[0] ?? sourceItems[0]
   const existing = sourceItems.filter((item) => item.metadata?.ai_organized === true)
   if (existing.length && !force) {
-    await updateSource(source, { ai_organization_status: "organized", ai_organization_item_count: existing.length })
+    await updateSources(originalSources, { ai_organization_status: "organized", ai_organization_item_count: existing.length })
     const reviewCount = existing.filter((item) => item.metadata?.review_status !== "ready").length
     return json({ ok: true, status: "already_organized", itemCount: existing.length, reviewCount })
   }
@@ -206,17 +212,17 @@ Deno.serve(async (request: Request) => {
   if (source.metadata?.ai_organization_status === "processing" && Number.isFinite(startedAt) && Date.now() - startedAt < 10 * 60 * 1000) {
     return json({ ok: true, status: "processing", itemCount: 0 })
   }
-  await updateSource(source, { ai_organization_status: "processing", ai_organization_started_at: new Date().toISOString() })
+  await updateSources(originalSources, { ai_organization_status: "processing", ai_organization_started_at: new Date().toISOString() })
 
   try {
-    const requestDetails = clean(source.metadata?.request_details, 20_000)
-    const sourceName = clean(source.name, 4_000)
-    const savedSourceItem = sourceName && sourceName !== "Free-text material list"
-      ? `${Number(source.quantity) || 1} ${clean(source.unit, 60) || "each"} — ${sourceName}`
-      : ""
-    const typedSource = [requestDetails, savedSourceItem]
-      .filter(Boolean)
-      .join("\n\n")
+    const typedSource = originalSources.map((originalSource) => {
+      const requestDetails = clean(originalSource.metadata?.request_details, 20_000)
+      const sourceName = clean(originalSource.name, 4_000)
+      const savedSourceItem = sourceName && sourceName !== "Free-text material list"
+        ? `${Number(originalSource.quantity) || 1} ${clean(originalSource.unit, 60) || "each"} — ${sourceName}`
+        : ""
+      return [requestDetails, savedSourceItem].filter(Boolean).join("\n")
+    }).filter(Boolean).join("\n\n")
     const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }]
     if (typedSource) content.push({ type: "input_text", text: `Customer's typed material notes:\n\n${typedSource}` })
 
@@ -268,10 +274,12 @@ Deno.serve(async (request: Request) => {
     if (!response.ok) throw new Error(`openai_${response.status}`)
     const text = responseText(await response.json())
     const result = JSON.parse(text) as AiResult
-    const items = result.documentType === "material_list" ? result.items.slice(0, 300) : []
+    const items = result.documentType === "material_list"
+      ? mergeSemanticallyEquivalentMaterialItems(result.items.slice(0, 300))
+      : []
 
     if (!items.length) {
-      await updateSource(source, {
+      await updateSources(originalSources, {
         ai_organization_status: result.documentType === "plan" ? "plan_requires_takeoff" : "needs_review",
         ai_organization_summary: clean(result.summary, 1000),
         ai_organization_completed_at: new Date().toISOString(),
@@ -282,11 +290,27 @@ Deno.serve(async (request: Request) => {
     const organizedAt = new Date().toISOString()
     const rows = items.map((item) => {
       const sourceText = clean(item.sourceText, 1200)
-      const detected = detectExplicitQuantityUnit(sourceText)
-      const extractedQuantity = Number.isFinite(item.quantity) && Number(item.quantity) > 0 ? Number(item.quantity) : detected?.quantity
+      const matchedSource = findStructuredMaterialSource(
+        { name: item.name, sourceText },
+        originalSources.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          quantity: candidate.quantity,
+          unit: candidate.unit,
+          details: clean(candidate.metadata?.request_details, 1200),
+        })),
+      )
+      const resolvedQuantityUnit = resolveMaterialQuantityUnit({
+        sourceText,
+        extractedQuantity: item.quantity,
+        extractedUnit: item.unit,
+        structuredSource: matchedSource,
+      })
+      const detected = resolvedQuantityUnit.detected
+      const extractedQuantity = resolvedQuantityUnit.quantity
       const quantityWasDefaulted = !Number.isFinite(extractedQuantity) || Number(extractedQuantity) <= 0
       const quantity = quantityWasDefaulted ? 1 : Number(extractedQuantity)
-      const extractedUnit = clean(item.unit, 60) || detected?.unit || ""
+      const extractedUnit = clean(resolvedQuantityUnit.unit, 60)
       const unitWasDefaulted = !extractedUnit
       const normalizedUnit = extractedUnit || inferredSalesUnit(item.name, item.department)
       const proposedDimensions = clean(item.dimensions, 300)
@@ -321,7 +345,7 @@ Deno.serve(async (request: Request) => {
           ai_organized: true,
           ai_model: AI_MODEL,
           ai_organized_at: organizedAt,
-          source_item_id: source.id,
+          source_item_id: matchedSource?.id || source.id,
           dimensions,
           thickness,
           request_details: details,
@@ -351,7 +375,7 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    await updateSource(source, {
+    await updateSources(originalSources, {
       ai_organization_status: "organized",
       ai_organization_summary: clean(result.summary, 1000),
       ai_organization_item_count: rows.length,
@@ -361,7 +385,7 @@ Deno.serve(async (request: Request) => {
     return json({ ok: true, status: "organized", itemCount: rows.length, reviewCount })
   } catch (cause) {
     const code = cause instanceof Error ? cause.message.slice(0, 120) : "unknown_error"
-    await updateSource(source, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_completed_at: new Date().toISOString() })
+    await updateSources(originalSources, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_completed_at: new Date().toISOString() })
     return json({ error: "The material list could not be organized automatically." }, 502)
   }
 })

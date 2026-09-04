@@ -10,6 +10,8 @@ export type SupplierQuoteStatus =
 
 export type SupplierQuoteRecord = {
   id: string;
+  source_communication_id: string | null;
+  source_attachment_id: string | null;
   source_document_id: string | null;
   source_vendor_name: string | null;
   source_contact_name: string | null;
@@ -79,6 +81,16 @@ export type SupplierQuoteRequestOption = {
   projectAddress: string;
   status: string;
   createdAt: string;
+};
+
+export type InboundSupplierQuoteAttachment = {
+  communicationId: string;
+  attachmentId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  senderEmail: string;
+  subject: string;
 };
 
 export function supplierQuoteStatusLabel(status: SupplierQuoteStatus) {

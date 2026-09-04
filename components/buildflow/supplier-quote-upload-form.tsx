@@ -6,9 +6,9 @@ import { useEffect, useRef, useState, useTransition } from "react"
 
 import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
 import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
-import type { SupplierQuoteClient, SupplierQuoteRequestOption, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
+import type { InboundSupplierQuoteAttachment, SupplierQuoteClient, SupplierQuoteRequestOption, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
-export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled, initialRequestId = "", initialDepartment = "Others", initiallyOpen = false }: {
+export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled, initialRequestId = "", initialDepartment = "Others", initiallyOpen = false, inboundAttachment = null }: {
   clients: SupplierQuoteClient[]
   requests: SupplierQuoteRequestOption[]
   suppliers: SupplierQuoteSupplier[]
@@ -18,13 +18,14 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
   initialRequestId?: string
   initialDepartment?: string
   initiallyOpen?: boolean
+  inboundAttachment?: InboundSupplierQuoteAttachment | null
 }) {
   const initialRequest = requests.find((request) => request.id === initialRequestId)
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(Boolean(initialRequest) || initiallyOpen)
-  const [fileName, setFileName] = useState("")
+  const [fileName, setFileName] = useState(inboundAttachment?.fileName ?? "")
   const [linkMode, setLinkMode] = useState<"unlinked" | "request">(initialRequest ? "request" : "unlinked")
   const [clientSelection, setClientSelection] = useState(initialRequest?.clientId ?? "")
   const [requestId, setRequestId] = useState(initialRequest?.id ?? "")
@@ -108,6 +109,7 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
             <button ref={closeButtonRef} type="button" onClick={closeModal} aria-label="Close upload form" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"><X className="h-4 w-4" /></button>
           </div>
           <form ref={formRef} action={submit} className="flex min-h-0 flex-1 flex-col">
+            {inboundAttachment ? <><input type="hidden" name="sourceCommunicationId" value={inboundAttachment.communicationId} /><input type="hidden" name="sourceAttachmentId" value={inboundAttachment.attachmentId} /></> : null}
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
               <div className="grid min-w-0 gap-x-5 gap-y-4 sm:grid-cols-2">
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Quote connection
@@ -126,10 +128,10 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
                 </label>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Quote number <span className="font-normal text-slate-400">Optional</span><input name="quoteNumber" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-sm" placeholder="Q-1048" /></label>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Quote date <input name="quoteDate" type="date" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                <label className="min-w-0 sm:col-span-2">
+                {inboundAttachment ? <div className="min-w-0 rounded-xl border border-sky-200 bg-sky-50 px-4 py-4 sm:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0071e3]">Received supplier email</p><p className="mt-1 break-words text-sm font-bold text-slate-950">{inboundAttachment.fileName}</p><p className="mt-1 text-xs leading-5 text-slate-600">From {inboundAttachment.senderEmail || "unknown sender"}{inboundAttachment.subject ? ` · ${inboundAttachment.subject}` : ""}</p><p className="mt-2 text-xs font-semibold text-amber-800">Choose the correct client request and supplier. The extracted rows will open for review before any price is compared.</p></div> : <label className="min-w-0 sm:col-span-2">
                   <span className="flex min-h-28 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center text-sm font-semibold text-slate-700 transition hover:border-[#0071e3] hover:bg-sky-50 sm:flex-row sm:gap-3"><FileUp className="h-5 w-5 shrink-0 text-[#0071e3]" /><span className="min-w-0 break-words">{fileName || "Choose PDF, CSV, TXT, or image · 25 MB maximum"}</span></span>
                   <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
-                </label>
+                </label>}
                 {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
                 <div className="grid min-w-0 gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:col-span-2 sm:grid-cols-3 sm:p-4" aria-label="Safe supplier quote import steps">
                   <p className="text-xs font-semibold leading-5 text-emerald-950"><span className="mr-1.5 text-emerald-700">1</span>Original PDF stays private</p>

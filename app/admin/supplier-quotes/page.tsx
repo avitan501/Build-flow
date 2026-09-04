@@ -2,6 +2,7 @@ import { ArrowRight, ClipboardList, Columns3, Download, FileCheck2, FileClock, F
 import Link from "next/link"
 
 import { SupplierQuoteUploadForm } from "@/components/buildflow/supplier-quote-upload-form"
+import { loadInboundSupplierQuoteAttachment } from "@/lib/aura/inbound-supplier-quote"
 import { requireStaffProfile } from "@/lib/auth"
 import { materialCatalogDepartmentOptions, type CatalogSupplier } from "@/lib/material-catalog"
 import { preferredRequestMaterialSources, toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
@@ -21,13 +22,16 @@ function QuoteRows({ quotes, unlinked = false }: { quotes: SupplierQuoteRecord[]
 }
 
 export default async function SupplierQuotesPage({ searchParams }: {
-  searchParams: Promise<{ supplier?: string; client?: string; date?: string; request?: string; department?: string; from?: string }>
+  searchParams: Promise<{ supplier?: string; client?: string; date?: string; request?: string; department?: string; from?: string; communication?: string; attachment?: string }>
 }) {
   const filters = await searchParams
   const supplierFilter = filters.supplier?.trim() || ""
   const clientFilter = filters.client?.trim() || ""
   const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(filters.date || "") ? filters.date || "" : ""
   const { supabase } = await requireStaffProfile("suppliers")
+  const inboundAttachment = filters.communication && filters.attachment
+    ? (await loadInboundSupplierQuoteAttachment(filters.communication, filters.attachment))?.metadata ?? null
+    : null
   const [quotesResult, suppliersResult, clientsResult, requestsResult, requestItemsResult, projectsResult, comparisonsResult, ocrStatus] = await Promise.all([
     supabase.from("supplier_quotes").select("*").neq("status", "archived").order("updated_at", { ascending: false }).limit(200).returns<SupplierQuoteRecord[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
@@ -101,7 +105,7 @@ export default async function SupplierQuotesPage({ searchParams }: {
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Manager Portal</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Supplier Quote Storage</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">One private place for supplier documents, extracted materials, current pricing, and the next action.</p></div>
-          <SupplierQuoteUploadForm key={`${initialRequestId || "new-quote"}-${initialDepartment}-${openedFromCatalog}`} clients={clients} requests={openRequests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={departmentOptions} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} initialRequestId={initialRequestId} initialDepartment={initialDepartment} initiallyOpen={openedFromCatalog} />
+          <SupplierQuoteUploadForm key={`${initialRequestId || "new-quote"}-${initialDepartment}-${openedFromCatalog}-${inboundAttachment?.attachmentId || "manual"}`} clients={clients} requests={openRequests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={departmentOptions} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} initialRequestId={initialRequestId} initialDepartment={initialDepartment} initiallyOpen={openedFromCatalog || Boolean(inboundAttachment)} inboundAttachment={inboundAttachment} />
         </header>
 
         {!enabled ? <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Supplier Quote Storage is waiting for its database update.</div> : null}

@@ -53,6 +53,51 @@ function comparisonWords(value: string) {
   )
 }
 
+function normalizedComparisonText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[“”″]/g, " in ")
+    .replace(/[‘’′]/g, " ft ")
+    .replace(/\b(?:sheet\s*rock|she+t+ro+ck|sheet\s*rok|gypsum\s+(?:board|panel)|wall\s*board|wallboard|dry\s*wall)\b/g, "drywall")
+    .replace(/\b(?:panel|placa)\s+de\s+yeso\b|\btablaroca\b/g, "drywall")
+    .replace(/\b(inches|inch)\b/g, "in")
+    .replace(/\b(feet|foot)\b/g, "ft")
+    .replace(/[^a-z0-9./]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function comparisonMeasures(value: string) {
+  const normalized = normalizedComparisonText(value)
+  return [...new Set([
+    ...(normalized.match(/\b\d+(?:\.\d+)?(?:\s+\d+\/\d+|\/\d+)?\s*(?:in|ft)\b/g) ?? []),
+    ...(normalized.match(/\b\d+(?:\.\d+)?(?:\s+x\s+\d+(?:\.\d+)?){1,2}(?:\s*(?:in|ft))?\b/g) ?? []),
+  ])].sort()
+}
+
+function comparisonQualifiers(value: string) {
+  const normalized = normalizedComparisonText(value)
+  return new Set([
+    "regular",
+    "type x",
+    "fire rated",
+    "moisture resistant",
+    "mold resistant",
+    "pressure treated",
+    "untreated",
+  ].filter((qualifier) => normalized.includes(qualifier)))
+}
+
+function hasConflictingSpecifications(left: string, right: string) {
+  const leftMeasures = comparisonMeasures(left)
+  const rightMeasures = comparisonMeasures(right)
+  if (leftMeasures.join("|") !== rightMeasures.join("|")) return true
+  const leftQualifiers = comparisonQualifiers(left)
+  const rightQualifiers = comparisonQualifiers(right)
+  return [...leftQualifiers].some((qualifier) => !rightQualifiers.has(qualifier))
+    || [...rightQualifiers].some((qualifier) => !leftQualifiers.has(qualifier))
+}
+
 function comparisonMatchScore(
   quoteItem: QuoteMatchItem,
   requestItem: RequestMatchItem,
@@ -61,14 +106,9 @@ function comparisonMatchScore(
     `${quoteItem.item_code || ""} ${quoteItem.description} ${quoteItem.specification}`.trim()
   const requestText =
     `${requestItem.description} ${requestItem.specification}`.trim()
-  const normalizedQuote = quoteText
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-  const normalizedRequest = requestText
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
+  if (hasConflictingSpecifications(quoteText, requestText)) return 0
+  const normalizedQuote = normalizedComparisonText(quoteText)
+  const normalizedRequest = normalizedComparisonText(requestText)
   if (normalizedQuote === normalizedRequest) return 10
   if (
     normalizedQuote.includes(normalizedRequest) ||

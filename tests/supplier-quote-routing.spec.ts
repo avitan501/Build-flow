@@ -59,3 +59,35 @@ test("duplicate material names match one-to-one by specification", () => {
     { item: quoteItems[1], comparisonItem: requestItems[0] },
   ])
 })
+
+test("supplier quote matching understands English and Spanish drywall wording without crossing specifications", () => {
+  const requests = [
+    { id: "regular", description: "Sheet rok", specification: "5/8 in · 4 x 8 ft · Regular" },
+    { id: "fire", description: "Drywall", specification: "5/8 in · 4 x 8 ft · Type X fire rated" },
+    { id: "other-size", description: "Drywall", specification: "1/2 in · 4 x 8 ft · Regular" },
+  ]
+  const quote = [
+    { id: "spanish-regular", description: "Panel de yeso", specification: "5/8 in · 4 x 8 ft · Regular" },
+    { id: "english-fire", description: "Sheetrock", specification: "5/8 in · 4 x 8 ft · Type X fire rated" },
+  ]
+
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([
+    { item: quote[0], comparisonItem: requests[0] },
+    { item: quote[1], comparisonItem: requests[1] },
+  ])
+})
+
+test("partial supplier quotes match only present lines and leave the rest of the request untouched", () => {
+  const requests = [
+    { id: "drywall", description: "Drywall", specification: "5/8 in · 4 x 8 ft · Regular" },
+    { id: "screws", description: "Drywall screws", specification: "1 1/4 in" },
+  ]
+  const quote = [{ id: "only-drywall", description: "Sheetrock", specification: "5/8 in · 4 x 8 ft · Regular" }]
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([{ item: quote[0], comparisonItem: requests[0] }])
+})
+
+test("does not auto-route an unspecified supplier line onto a sized client row", () => {
+  const requests = [{ id: "rated", description: "Drywall", specification: "5/8 in · Type X fire rated" }]
+  const quote = [{ id: "unspecified", description: "Drywall", specification: "" }]
+  expect(matchSupplierQuoteItems(quote, requests)).toEqual([])
+})
