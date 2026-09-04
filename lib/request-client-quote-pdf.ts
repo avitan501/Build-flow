@@ -156,8 +156,8 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   page.drawText(totalLabel, { x: totalsX, y: y - 2, size: 13, font: bold, color: navy }); rightText(page, bold, money(total), 564, y - 2, 13)
 
   const termsY = Math.min(y - 48, 160)
-  page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
-  wrap(regular, includeRequiredProposalTerms(input.terms), 6.8, 330).slice(0, 11).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 12 - index * 8.5, size: 6.8, font: regular, color: slate }))
+  page.drawText("Terms & conditions", { x: 40, y: termsY, size: 8, font: bold, color: blue })
+  wrap(regular, includeRequiredProposalTerms(input.terms), 6.4, 330).slice(0, 10).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 11 - index * 8, size: 6.4, font: regular, color: slate }))
   if (input.paymentRequest) {
     const paymentCopy = requestClientPaymentDocumentCopy(input.paymentRequest, documentType)
     page.drawText(paymentCopy.heading, { x: 392, y: termsY, size: 9, font: bold, color: blue })

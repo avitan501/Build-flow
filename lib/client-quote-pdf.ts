@@ -144,10 +144,10 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
   rightText(page, bold, money(input.summary.clientTotal), 560, y - 10, 12, navy);
 
   const termsY = y - 55;
-  page.drawText("Terms & conditions", { x: 42, y: termsY, size: 9, font: bold, color: blue });
-  const termLines = wrap(regular, DEFAULT_PROPOSAL_TERMS, 6.8, 510).slice(0, 10);
+  page.drawText("Terms & conditions", { x: 42, y: termsY, size: 8, font: bold, color: blue });
+  const termLines = wrap(regular, DEFAULT_PROPOSAL_TERMS, 6.4, 510).slice(0, 8);
   termLines.forEach((line, index) => {
-    page.drawText(line, { x: 42, y: termsY - 13 - index * 8.5, size: 6.8, font: regular, color: slate });
+    page.drawText(line, { x: 42, y: termsY - 11 - index * 8, size: 6.4, font: regular, color: slate });
   });
 
   if (input.comparison.client_message.trim()) {

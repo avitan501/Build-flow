@@ -85,3 +85,14 @@ test("staff request uploads have narrowly request-bound Storage and attachment p
   expect(migration).toContain("request.project_id = quote_request_attachments.project_id")
   expect(migration).toContain("request.owner_id = quote_request_attachments.owner_id")
 })
+
+test("request attachment policies authorize admins without weakening request scoping", async () => {
+  const migration = await readFile(path.join(root, "supabase/migrations/20260904190348_allow_admin_request_attachment_uploads.sql"), "utf8")
+  expect(migration.match(/private\.is_admin\(\)/g)).toHaveLength(4)
+  expect(migration.match(/private\.has_staff_capability\('customers'\)/g)).toHaveLength(4)
+  expect(migration.match(/request\.owner_id::text = \(storage\.foldername\(storage\.objects\.name\)\)\[1\]/g)).toHaveLength(3)
+  expect(migration.match(/request\.project_id::text = \(storage\.foldername\(storage\.objects\.name\)\)\[2\]/g)).toHaveLength(3)
+  expect(migration).toContain("request.id = quote_request_attachments.request_id")
+  expect(migration).toContain("request.project_id = quote_request_attachments.project_id")
+  expect(migration).toContain("request.owner_id = quote_request_attachments.owner_id")
+})

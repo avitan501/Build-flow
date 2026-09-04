@@ -1074,7 +1074,7 @@ export function RequestManagementPanel({
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
               <div className="grid gap-3">
-                <label className="grid gap-1 text-xs font-bold">Terms & conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={3} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+                <label className="grid gap-1 text-xs font-bold">Terms &amp; conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={2} className="min-h-16 resize-y rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal leading-4" /></label>
                 <label className="grid gap-1 text-xs font-bold">Email message<textarea value={quoteMessage} onChange={(event) => setQuoteMessage(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
                 <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold"><input type="checkbox" checked={requestPayment} onChange={(event) => { setRequestPayment(event.target.checked); if (event.target.checked && !paymentAmountDue) setPaymentAmountDue(quoteTotal.toFixed(2)) }} className="h-4 w-4 accent-[#0071e3]" />{documentType === "receipt" ? "Include payment details" : "Request payment from client"}</label>
                 {requestPayment ? <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 sm:p-4">

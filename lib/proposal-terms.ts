@@ -11,10 +11,13 @@ export const REQUIRED_PROPOSAL_TERMS = [
 ]
 
 export const DEFAULT_PROPOSAL_TERMS = [
-  "Prices may change until the order is approved and processed.",
+  "Please confirm the items, quantities, and delivery details above are correct.",
+  "Prices and availability may change until the order is processed.",
   "All sales are final unless stated otherwise.",
-  "Delivery, taxes, and freight are included only when shown above.",
-  ...REQUIRED_PROPOSAL_TERMS,
+  "Taxes, delivery, and freight apply only when shown.",
+  CREDIT_CARD_PROCESSING_TERM,
+  "Approved returns may be subject to a restocking fee of up to 25% plus disclosed return, pickup, or freight costs.",
+  "Before requesting a stop-payment, reversal, or chargeback, please contact Avantia so we can help. Your legal rights remain unchanged.",
 ].join(" ")
 
 export function includeRequiredProposalTerms(terms: string) {

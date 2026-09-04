@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
+import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "../lib/proposal-terms"
+
 const root = process.cwd()
 
 test("acceptance receipts are immutable, versioned, and service-only", async () => {
@@ -126,10 +128,19 @@ test("shared proposal terms disclose the 25% return fee and preserve statutory d
   const terms = await readFile(path.join(root, "lib/proposal-terms.ts"), "utf8")
   const acceptance = await readFile(path.join(root, "lib/request-client-document-acceptance.ts"), "utf8")
   expect(terms).toContain("restocking fee of up to 25%")
+  expect(terms).toContain("Please confirm the items, quantities, and delivery details above are correct.")
+  expect(terms).toContain("Your legal rights remain unchanged.")
   expect(terms).toContain("prior written authorization")
   expect(terms).toContain("Before requesting a stop-payment, reversal, or chargeback")
   expect(terms).toContain("does not waive any billing-error, dispute, or other right")
   expect(terms).not.toMatch(/cannot (?:request|initiate|file).*(?:chargeback|stop-payment)/i)
   expect(acceptance).toContain('CLIENT_DOCUMENT_TERMS_VERSION = "avantia-client-document-terms-v2"')
   expect(acceptance).toContain("includeRequiredProposalTerms")
+})
+
+test("new estimates use one compact client-friendly terms block without appended duplicates", () => {
+  expect(DEFAULT_PROPOSAL_TERMS).toContain("Please confirm the items, quantities, and delivery details above are correct.")
+  expect(DEFAULT_PROPOSAL_TERMS).toContain("All sales are final unless stated otherwise.")
+  expect(DEFAULT_PROPOSAL_TERMS.length).toBeLessThan(600)
+  expect(includeRequiredProposalTerms(DEFAULT_PROPOSAL_TERMS)).toBe(DEFAULT_PROPOSAL_TERMS)
 })
