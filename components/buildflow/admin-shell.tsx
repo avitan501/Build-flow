@@ -23,6 +23,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
+import { ManagerGlobalSearch } from "@/components/buildflow/manager-global-search";
 
 const ManagerNotificationCenter = dynamic(
   () => import("@/components/buildflow/manager-notification-center").then((module) => module.ManagerNotificationCenter),
@@ -298,9 +299,12 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
               <Menu className="h-5 w-5" />
             </button>
           </div>
-          <Link href="/" aria-label="Open the Avantia Build customer website" className="min-w-0"><AvantiaBuildLockup compact /></Link>
+          <ManagerGlobalSearch access={access} mobile />
           <ManagerNotificationCenter compact />
         </header>
+        <div className="sticky top-0 z-40 hidden h-14 items-center border-b border-slate-200 bg-[#f5f5f7]/95 px-5 backdrop-blur lg:flex">
+          <ManagerGlobalSearch access={access} />
+        </div>
         {children}
       </div>
 

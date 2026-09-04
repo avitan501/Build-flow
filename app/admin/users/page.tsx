@@ -233,7 +233,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                 ...directoryConversation(auraCommunications, customer.phone, visibleEmail),
                 ...communicationLogs.map<DirectoryConversationEntry>((log) => ({ id: `manual-${log.id}`, channel: log.channel === "call" ? "call" : "whatsapp", direction: log.direction === "inbound" ? "incoming" : "outgoing", message: [log.summary, log.outcome ? `Next: ${log.outcome}` : ""].filter(Boolean).join(" · "), status: "recorded", occurredAt: log.createdAt })),
               ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
-              return <article key={customer.id} className="grid min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)]">
+              return <article id={`client-${customer.id}`} key={customer.id} className="scroll-mt-32 grid min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0"><h2 className="text-base font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{visibleEmail || "No email"}</p><p className="mt-1 text-xs text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
