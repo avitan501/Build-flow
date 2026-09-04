@@ -873,6 +873,64 @@ export async function saveRequestClientDocumentAction(input: RequestClientQuoteI
   return { ok: true, providerId: null, shareUrl: saved.shareUrl }
 }
 
+export async function deleteRequestClientDocumentAction(input: { requestId: string; documentType: RequestClientDocumentType; publicToken: string; version: number }) {
+  const requestId = String(input.requestId || "").trim()
+  const documentType = String(input.documentType || "") as RequestClientDocumentType
+  const publicToken = String(input.publicToken || "").trim()
+  const version = Number(input.version)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)
+    || !["estimate", "invoice", "receipt"].includes(documentType)
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(publicToken)
+    || !Number.isSafeInteger(version)
+    || version < 1) return { ok: false as const, error: "The selected client document is invalid." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const [{ data: request, error: requestError }, { data: saved, error: savedError }, { data: acceptances, error: acceptanceError }] = await Promise.all([
+    supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>(),
+    supabase.from("request_client_documents").select("id,document_number,document_type,public_token,version").eq("request_id", requestId).eq("document_type", documentType).eq("public_token", publicToken).maybeSingle<{ id: string; document_number: string; document_type: RequestClientDocumentType; public_token: string; version: number }>(),
+    supabase.rpc("get_request_current_client_document_acceptances", { p_request_id: requestId }),
+  ])
+  if (requestError || savedError || !request || !saved) return { ok: false as const, error: "The client document was not found. Refresh and try again." }
+  if (acceptanceError) return { ok: false as const, error: "Client acceptance could not be checked, so the document was not deleted." }
+  const acceptanceRows = Array.isArray(acceptances) ? acceptances as Array<{ document_type: RequestClientDocumentType }> : []
+  if (acceptanceRows.some((acceptance) => acceptance.document_type === documentType)) {
+    return { ok: false as const, error: "This document has a recorded client acceptance and cannot be deleted. Save a corrected version instead." }
+  }
+  if (saved.version !== version) return { ok: false as const, error: "This document changed after you opened the page. Refresh before deleting it." }
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch {
+    return { ok: false as const, error: "Document deletion is not available right now. Please try again later." }
+  }
+  const { data: deleted, error: deleteError } = await admin.from("request_client_documents")
+    .delete()
+    .eq("id", saved.id)
+    .eq("request_id", requestId)
+    .eq("document_type", documentType)
+    .eq("public_token", publicToken)
+    .eq("version", version)
+    .select("id")
+    .maybeSingle<{ id: string }>()
+  if (deleteError?.code === "23503") return { ok: false as const, error: "This document has a recorded client acceptance and cannot be deleted. Save a corrected version instead." }
+  if (deleteError || !deleted) return { ok: false as const, error: "The document was not deleted. Refresh and try again." }
+
+  const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `${label} ${saved.document_number} deleted`,
+    description: "The saved client document and its live public link were deleted by an authorized staff member.",
+    metadata: { quote_request_id: requestId, client_action: "client_document_deleted", document_type: documentType, document_number: saved.document_number, document_version: version },
+  })
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath(`/client-document/${publicToken}`)
+  return { ok: true as const, warning: eventError ? "The document was deleted, but its activity entry could not be saved." : undefined }
+}
+
 export async function previewRequestClientQuoteAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
   const prepared = await prepareRequestClientQuote(input)
   if (!prepared.ok) return prepared

@@ -1,13 +1,13 @@
 "use client"
 
-import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
+import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Pencil, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
+import { deleteRequestClientDocumentAction, previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
 import { saveRequestSupplierProgressNoteAction } from "@/app/owner/materials/requests/supplier-progress-actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
@@ -231,6 +231,8 @@ export function RequestManagementPanel({
   const [paymentInstructions, setPaymentInstructions] = useState<Partial<Record<RequestPaymentMethod, string>>>({})
   const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
+  const [deletedDocumentTokens, setDeletedDocumentTokens] = useState<string[]>([])
+  const [deletingDocument, setDeletingDocument] = useState("")
   const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
   const [pending, startTransition] = useTransition()
   const pendingRef = useRef(pending)
@@ -361,8 +363,8 @@ export function RequestManagementPanel({
     window.setTimeout(() => contactTriggerRef.current?.focus(), 0)
   }
 
-  function openDocument(nextType: RequestClientDocumentType) {
-    const saved = initialClientDocuments.find((entry) => entry.documentType === nextType)
+  function openDocument(nextType: RequestClientDocumentType, selectedDocument?: RequestClientDocumentSnapshot) {
+    const saved = selectedDocument ?? clientDocuments.find((entry) => entry.documentType === nextType)
     const savedPayment = saved?.documentData.paymentRequest
     const savedPaymentMethods = savedPayment?.methods?.length ? savedPayment.methods : savedPayment?.method ? [savedPayment.method] : ["credit_card" as const]
     const legacyPaymentLink = saved?.documentData.paymentLink
@@ -673,6 +675,32 @@ export function RequestManagementPanel({
     })
   }
 
+  function deleteClientDocument(saved: RequestClientDocumentSnapshot) {
+    const label = saved.documentType === "invoice" ? "Invoice" : saved.documentType === "receipt" ? "Receipt" : "Estimate"
+    if (!window.confirm(`Delete ${label} ${saved.documentNumber} version ${saved.version}? Its live client link will stop working. This cannot be undone.`)) return
+    const deletionKey = `${saved.documentType}:${saved.version}`
+    setDeletingDocument(deletionKey)
+    setFeedback("")
+    setFeedbackError(false)
+    startTransition(async () => {
+      try {
+        const result = await deleteRequestClientDocumentAction({ requestId, documentType: saved.documentType, publicToken: saved.publicToken, version: saved.version })
+        setFeedbackError(!result.ok)
+        setFeedback(result.ok ? result.warning || `${label} ${saved.documentNumber} deleted.` : result.error)
+        if (result.ok) {
+          setDeletedDocumentTokens((current) => [...current, saved.publicToken])
+          setDocumentLinks((current) => ({ ...current, [saved.documentType]: undefined }))
+          router.refresh()
+        }
+      } catch {
+        setFeedbackError(true)
+        setFeedback("The document could not be deleted. Check the connection and try again.")
+      } finally {
+        setDeletingDocument("")
+      }
+    })
+  }
+
   function sendQuote() {
     setQuoteFeedback("")
     startTransition(async () => {
@@ -746,7 +774,8 @@ export function RequestManagementPanel({
     ? winningBid ? `Selected: ${winningBid.supplierName}` : "Supplier pricing complete"
     : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step2Action]}`
   const fulfillmentDetail = `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
-  const latestClientDocument = initialClientDocuments[0] ?? null
+  const clientDocuments = initialClientDocuments.filter((document) => !deletedDocumentTokens.includes(document.publicToken))
+  const latestClientDocument = clientDocuments[0] ?? null
   const supplierProgressRows = selectedSupplierNames.map((name) => {
     const supplier = findCanonicalSupplier(availableSuppliers, { supplierId: null, name }) ?? null
     const bid = comparisons.flatMap((comparison) => comparison.bids).find((candidate) => supplierNameCollator.compare(candidate.supplierName, name) === 0) ?? null
@@ -850,7 +879,18 @@ export function RequestManagementPanel({
             </li>)}
           </ol>
 
-          {latestClientDocument ? <div className="mt-2 flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><FileCheck2 className="h-4 w-4 shrink-0 text-[#0066cc]" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-[#12263f]">{latestClientDocument.documentType[0].toUpperCase() + latestClientDocument.documentType.slice(1)} {latestClientDocument.documentNumber}</p><p className="text-[10px] text-slate-500">Version {latestClientDocument.version} · live link always shows the latest saved version</p></div>{documentLinks[latestClientDocument.documentType] ? <a href={documentLinks[latestClientDocument.documentType]} target="_blank" rel="noreferrer" className="shrink-0 text-[10px] font-bold text-[#0066cc] underline">Open</a> : null}</div> : null}
+          {clientDocuments.length ? <div className="mt-2 grid gap-2" aria-label="Saved client documents">{clientDocuments.map((saved) => {
+            const label = saved.documentType === "invoice" ? "Invoice" : saved.documentType === "receipt" ? "Receipt" : "Estimate"
+            const deletionKey = `${saved.documentType}:${saved.version}`
+            return <article key={saved.publicToken} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div className="flex items-center gap-3"><FileCheck2 className="h-4 w-4 shrink-0 text-[#0066cc]" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-[#12263f]">{label} {saved.documentNumber}</p><p className="text-[10px] font-medium text-slate-600">Version {saved.version} · {new Date(saved.updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET</p></div></div>
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                <a href={`/client-document/${saved.publicToken}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-[#0066cc]">Open</a>
+                <button type="button" onClick={() => openDocument(saved.documentType, saved)} disabled={pending} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-800 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" />Edit</button>
+                <button type="button" onClick={() => deleteClientDocument(saved)} disabled={pending} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-white px-2 text-xs font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" />{deletingDocument === deletionKey ? "Deleting…" : "Delete"}</button>
+              </div>
+            </article>
+          })}</div> : null}
 
           <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mt-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep3PrimaryAction()}</div>
 
