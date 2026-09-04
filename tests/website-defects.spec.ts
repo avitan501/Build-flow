@@ -4,7 +4,7 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
-import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, websiteDefectUploadErrorMessage } from "@/lib/website-defect-upload"
+import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, validateWebsiteDefectFiles, WEBSITE_DEFECT_MAX_FILES, WEBSITE_DEFECT_MAX_FILE_SIZE, WEBSITE_DEFECT_MAX_TOTAL_SIZE, websiteDefectUploadErrorMessage } from "@/lib/website-defect-upload"
 
 const root = process.cwd()
 
@@ -33,19 +33,27 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(actions).toContain("recordWebsiteQaCheckAction")
   expect(actions).toContain("MAX_FILE_SIZE = 100 * 1024 * 1024")
   expect(actions).toContain('"video/quicktime"')
-  expect(actions).toContain("expectedPrefix")
+  expect(actions).toContain("expectedFilePath")
   expect(actions).toContain("reporterContext()")
   expect(actions).toContain("ownerContext()")
-  expect(inbox).toContain("Upload and create issue")
+  expect(inbox).toContain("and create issue")
   expect(inbox).toContain("Ready to verify")
   expect(inbox).toContain("Codex review / fix notes")
   expect(inbox).toContain("Required website checks")
   expect(inbox).toContain("Last checked:")
   expect(inbox).toContain("canManage: boolean")
   expect(inbox).toContain("Review the latest owner-verified results.")
-  expect(inbox).toContain("Connection interrupted—retrying securely…")
-  expect(inbox).toContain("file.slice(0, file.size, fileType)")
+  expect(inbox).toContain("prepareWebsiteDefectUploadsAction")
+  expect(inbox).toContain("completeWebsiteDefectUploadsAction")
+  expect(inbox).toContain("Connection interrupted—retrying file")
+  expect(inbox).toContain("selected.file.slice(0, selected.file.size, selected.fileType)")
   expect(inbox).toContain('isError ? "Try upload again"')
+  expect(inbox).toContain('multiple accept="video/mp4')
+  expect(inbox).toContain('aria-label="Selected issue files"')
+  expect(inbox).toContain("Remove ${file.name}")
+  expect(inbox).toContain("WebsiteDefectAttachmentRecord")
+  expect(inbox).toContain("issue.attachments ?? []")
+  expect(inbox).toContain("{index + 1}/{media.length}")
   expect(migration).toContain("alter table public.website_defects enable row level security")
   expect(migration).toContain("public = false")
   expect(migration).toContain("website_defect_files_manager_read")
@@ -65,6 +73,21 @@ test("mobile file metadata is normalized without accepting unapproved formats", 
   expect(normalizeWebsiteDefectFileType({ name: "screen-recording.MOV", type: "application/octet-stream" })).toBe("video/quicktime")
   expect(normalizeWebsiteDefectFileType({ name: "screen-recording.exe", type: "" })).toBe("")
   expect(normalizeWebsiteDefectFileType({ name: "fake.jpg", type: "application/x-msdownload" })).toBe("")
+})
+
+test("one website issue accepts a bounded multi-file selection", () => {
+  const photo = { name: "screen.jpg", type: "image/jpeg", size: 1024 }
+  expect(WEBSITE_DEFECT_MAX_FILES).toBe(6)
+  expect(WEBSITE_DEFECT_MAX_FILE_SIZE).toBe(100 * 1024 * 1024)
+  expect(WEBSITE_DEFECT_MAX_TOTAL_SIZE).toBe(250 * 1024 * 1024)
+  expect(validateWebsiteDefectFiles([photo, { name: "recording.mp4", type: "video/mp4", size: 2048 }])).toBeNull()
+  expect(validateWebsiteDefectFiles(Array.from({ length: 7 }, (_, index) => ({ ...photo, name: `${index}.jpg` })))).toContain("up to 6")
+  expect(validateWebsiteDefectFiles([{ ...photo, size: WEBSITE_DEFECT_MAX_FILE_SIZE + 1 }])).toContain("100 MB")
+  expect(validateWebsiteDefectFiles([
+    { name: "one.mp4", type: "video/mp4", size: 90 * 1024 * 1024 },
+    { name: "two.mp4", type: "video/mp4", size: 90 * 1024 * 1024 },
+    { name: "three.mp4", type: "video/mp4", size: 90 * 1024 * 1024 },
+  ])).toContain("250 MB")
 })
 
 test("secure upload retries only transient failures and gives actionable safe errors", () => {
