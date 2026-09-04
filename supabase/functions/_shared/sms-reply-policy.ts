@@ -1448,10 +1448,21 @@ export function smsBareOrderIntentReply(value: string) {
     return null;
   const language = smsReplyLanguage(trimmed);
   if (language === "he")
-    return "בהחלט—שלח את רשימת החומרים והכמויות, כתובת המשלוח ומתי אתה צריך אותם. הצוות יאשר זמינות ומשלוח.";
+    return "בהחלט. שלח את רשימת החומרים שלך, שורה אחת לכל מוצר, עם כמות ומידה אם ידועות. לדוגמה: 50 לוחות Sheetrock רגיל בעובי 5/8 אינץ'. נארגן את הבקשה ונשלח אותה לאישור שלך לפני שמזמינים משהו.";
   if (language === "es")
-    return "Claro—envíe la lista de materiales y cantidades, la dirección de entrega y para cuándo los necesita. El equipo confirmará disponibilidad y entrega.";
-  return "Absolutely—send the material list and quantities, delivery address, and when you need them. Our team will confirm availability and delivery.";
+    return "Claro. Envíe su lista de materiales, un producto por línea, con la cantidad y la medida si las conoce. Ejemplo: 50 paneles de Sheetrock regular de 5/8 pulg. Organizaremos la solicitud y se la enviaremos para su aprobación antes de pedir nada.";
+  return "Absolutely. Send your material list, one item per line, with the quantity and size if known. Example: 50 sheets of 5/8-in. regular Sheetrock. We’ll organize the request and send it back for your approval before anything is ordered.";
+}
+
+export function publicStartTextOpeningMessage() {
+  return [
+    "Welcome to Avantia Build.",
+    "Send your material list, one item per line, with the quantity and size if known.",
+    "Example:",
+    "50 sheets — 5/8-in. regular Sheetrock",
+    "45 pieces — 2x4x8 lumber",
+    "We’ll organize the request and send it back for your approval. Nothing is ordered or charged until you approve. Reply STOP to opt out.",
+  ].join("\n");
 }
 
 export function applyAvantiaMaterialDefaults<

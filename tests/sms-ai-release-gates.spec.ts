@@ -474,7 +474,7 @@ test("an idle SMS thread starts with fresh context and a safe order prompt", asy
   ]
   expect(smsMessagesAfterInactivityBoundary(messages)).toEqual([messages[2]])
   expect(smsBareOrderIntentReply("Can I order")).toBe(
-    "Absolutely—send the material list and quantities, delivery address, and when you need them. Our team will confirm availability and delivery.",
+    "Absolutely. Send your material list, one item per line, with the quantity and size if known. Example: 50 sheets of 5/8-in. regular Sheetrock. We’ll organize the request and send it back for your approval before anything is ordered.",
   )
   expect(smsBareOrderIntentReply("Can I order 45 sheets of 5/8 Sheetrock")).toBeNull()
 
@@ -482,6 +482,8 @@ test("an idle SMS thread starts with fresh context and a safe order prompt", asy
   expect(broker).toContain("smsMessagesAfterInactivityBoundary(afterConfirmation)")
   expect(broker).toContain("updated_at < now() - interval '24 hours'")
   expect(broker).toContain("Repeated automatic reply suppressed")
+  expect(broker).toContain("Tell us what you need for your project")
+  expect(broker).toContain("send it back for your approval before anything is ordered")
 })
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {

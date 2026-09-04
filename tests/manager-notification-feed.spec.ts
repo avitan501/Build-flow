@@ -71,4 +71,6 @@ test("communication notifications have distinct operational categories", () => {
   expect(managerNotificationCategory(event({ href: "/admin/goals-progress/website-work" }))).toBe("task");
   expect(managerNotificationCategory(event({ event_type: "test", href: "/admin/build-map" }))).toBe("system");
   expect(managerNotificationCategoryLabel("missed_call")).toBe("Missed call");
+  expect(managerNotificationCategoryLabel("message")).toBe("Text message");
+  expect(managerNotificationCategoryLabel("email")).toBe("Incoming email");
 });

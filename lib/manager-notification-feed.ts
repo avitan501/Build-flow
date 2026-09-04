@@ -89,10 +89,10 @@ export function managerNotificationCategoryLabel(
   category: ManagerNotificationCategory,
 ) {
   const labels: Record<ManagerNotificationCategory, string> = {
-    message: "Incoming message",
+    message: "Text message",
     incoming_call: "Incoming call",
     missed_call: "Missed call",
-    email: "Email",
+    email: "Incoming email",
     task: "Task",
     system: "System",
     request: "Material request",

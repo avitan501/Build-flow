@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createHmac, webcrypto } from "node:crypto";
+import { publicStartTextOpeningMessage } from "../supabase/functions/_shared/sms-reply-policy";
 
 const root = process.cwd();
 
@@ -54,13 +55,9 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(route).toContain("AbortSignal.timeout(30_000)");
   expect(route).toContain("same idempotency key");
   expect(route).not.toContain("input.message");
-  expect(broker).toContain("PUBLIC_START_TEXT_WELCOME");
-  expect(broker).toContain("PUBLIC_START_TEXT_EXAMPLE");
+  expect(broker).toContain("PUBLIC_START_TEXT_OPENING");
   expect(broker).toContain(
-    "await sendQuoSms(phone, PUBLIC_START_TEXT_WELCOME)",
-  );
-  expect(broker).toContain(
-    "await sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE)",
+    "await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING)",
   );
   expect(broker).toContain("interval '5 minutes'");
   expect(broker).toContain(
@@ -69,10 +66,15 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(broker).toContain(
     "We couldn't send the text. Please try again shortly.",
   );
-  expect(broker).toContain("Welcome to Avantia Build.");
-  expect(broker).toContain(
-    '"Example:\\n50 sheets 5/8 regular Sheetrock\\n45 pcs 2x4x8',
-  );
+  expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v5"');
+  const opening = publicStartTextOpeningMessage();
+  expect(opening).toContain("Welcome to Avantia Build.");
+  expect(opening).toContain("50 sheets — 5/8-in. regular Sheetrock");
+  expect(opening).toContain("45 pieces — 2x4x8 lumber");
+  expect(opening).toContain("Nothing is ordered or charged until you approve.");
+  expect(opening).toContain("Reply STOP to opt out.");
+  expect((broker.match(/sendQuoSms\(phone, PUBLIC_START_TEXT_OPENING\)/g) || [])).toHaveLength(1);
+  expect(broker).not.toContain("sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE");
   expect(broker).toContain('delivery: "partial"');
   expect(route).toContain('result.delivery || "processing"');
   expect(route).not.toContain('result.delivery || "sent"');
@@ -99,7 +101,7 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   );
   expect(publicHandler).not.toContain("await req.json()");
   expect(broker).toContain("input.consent !== true");
-  expect(broker).toContain("Reply STOP to opt out");
+  expect(opening).toContain("Reply STOP to opt out");
   expect(broker).not.toContain("sendQuoSms(phone, input.message");
   expect(broker).toContain("interval '24 hours'");
   expect(broker).toContain("interval '1 hour'");

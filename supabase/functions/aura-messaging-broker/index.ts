@@ -43,6 +43,7 @@ import {
   smsUnansweredFollowUpStageText,
   smsUnansweredFollowUpText,
   smsBareOrderIntentReply,
+  publicStartTextOpeningMessage,
 } from "../_shared/sms-reply-policy.ts";
 import { isExplicitCustomerRequestConfirmation } from "../_shared/customer-request-confirmation.ts";
 import {
@@ -2875,7 +2876,7 @@ function customerSmsFallback(
     safetyReason = "Current pricing requires manager review.";
   } else if (greeting) {
     reply =
-      "Hi! Send your material list, photo, plan, product link, or quote with quantities and the delivery address, and Avantia will help organize the next step.";
+      "Hi! Tell us what you need for your project by sending a material list, photo, plan, product link, or quote. Include quantities if you know them—we’ll organize the request and send it back for your approval before anything is ordered.";
     autoSafe = !hardBlocked;
     safetyReason = "A greeting is safe to answer automatically.";
   } else if (shortConfirmation) {
@@ -8954,11 +8955,8 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v4";
-const PUBLIC_START_TEXT_WELCOME =
-  "Welcome to Avantia Build. Reply with at least one material item and quantity. We’ll organize a request for your review.";
-const PUBLIC_START_TEXT_EXAMPLE =
-  "Example:\n50 sheets 5/8 regular Sheetrock\n45 pcs 2x4x8\n\nAfter the request and price are confirmed, our team will contact you before payment. No order is placed automatically. Reply STOP to opt out.";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v5";
+const PUBLIC_START_TEXT_OPENING = publicStartTextOpeningMessage();
 
 async function handlePublicStartByText(req: Request) {
   const payload = await req.text();
@@ -9113,21 +9111,14 @@ async function handlePublicStartByText(req: Request) {
   if (!claim)
     return json({ error: "Please wait before requesting another text." }, 429);
   if (!claim.send) return json({ ok: true, delivery: claim.delivery });
-  // Send the two fixed messages in order. Never background the second message:
-  // it could otherwise become the latest conversation event after a fast
-  // customer reply and incorrectly suppress that reply's automation.
+  // One logical outbound message prevents an example from arriving after a
+  // fast customer reply and keeps the opening copy in a guaranteed order.
   try {
     const providerId =
       claim.welcomeProviderId ||
-      (await sendQuoSms(phone, PUBLIC_START_TEXT_WELCOME));
+      (await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING));
     if (!claim.welcomeProviderId) {
       await sql`update public.public_start_text_requests set provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
-    }
-    const exampleProviderId =
-      claim.exampleProviderId ||
-      (await sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE));
-    if (!claim.exampleProviderId) {
-      await sql`update public.public_start_text_requests set example_provider_message_id = ${exampleProviderId}, example_sent_at = now(), updated_at = now() where id = ${claim.id}::uuid`;
     }
     await sql`update public.public_start_text_requests set status = 'sent', last_error = null, updated_at = now() where id = ${claim.id}::uuid`;
     return json({ ok: true, delivery: "sent" });
