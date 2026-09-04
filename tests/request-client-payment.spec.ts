@@ -150,3 +150,18 @@ test("client document UI and PDF use explicit payment requests without raw crede
   expect(livePage).toContain("Call Avantia Build to coordinate payment")
   expect(livePage).not.toContain('row.document_type === "invoice" ? <a href={AVANTIA_PAYMENT_LINK}')
 })
+
+test("client estimate modal keeps editable, disabled, and read-only text high contrast", async () => {
+  const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
+  const modalStart = panel.indexOf('{quoteOpen && typeof document !== "undefined"')
+  const modal = panel.slice(modalStart)
+  expect(modalStart).toBeGreaterThan(0)
+  expect(modal).toContain("bg-white text-slate-950 shadow-2xl")
+  expect(modal).toContain("[&_input]:text-slate-950")
+  expect(modal).toContain("[&_textarea]:text-slate-950")
+  expect(modal).toContain("[&_select]:text-slate-950")
+  expect(modal).toContain("[&_input:disabled]:text-slate-800")
+  expect(modal).toContain("[&_input:disabled]:opacity-100")
+  expect(modal).toContain("[&_input:read-only]:text-slate-800")
+  expect(modal).toContain("disabled:text-slate-600 disabled:opacity-100")
+})
