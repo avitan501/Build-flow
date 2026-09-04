@@ -9,6 +9,12 @@ export type CarlosActivityAiReview = {
   eventCount: number
 }
 
+export type CarlosWebsiteIssue = {
+  title: string
+  status: string
+  priority: string
+}
+
 export function serializeCarlosActivityAiReview(value: CarlosActivityAiReview) {
   return `${CARLOS_ACTIVITY_AI_REVIEW_PREFIX}${JSON.stringify(value)}`
 }
@@ -31,18 +37,21 @@ export function parseCarlosActivityAiReview(value: string | null | undefined): C
   }
 }
 
-export function fallbackCarlosActivityReview(events: ManagerStaffActivityEvent[], reportedProblems = "") {
+export function fallbackCarlosActivityReview(events: ManagerStaffActivityEvent[], reportedProblems = "", websiteIssues: CarlosWebsiteIssue[] = []) {
   const communications = events.filter((event) => event.event_type === "communication_sent")
   const completed = communications.filter((event) => ["sent", "completed"].includes(event.metadata?.outcome || "sent"))
   const failed = communications.filter((event) => ["failed", "provider_unconfirmed", "no_answer"].includes(event.metadata?.outcome || ""))
   const changes = events.filter((event) => event.event_type.startsWith("record_"))
   const areas = [...new Set(events.filter((event) => event.event_type === "page_view").map((event) => event.page_label))]
+  const unresolvedWebsiteIssues = websiteIssues.filter((issue) => issue.status !== "resolved")
   const problems = [
     failed.length ? `${failed.length} communication attempt${failed.length === 1 ? " needs" : "s need"} follow-up.` : "No failed communication was recorded.",
+    websiteIssues.length ? `${websiteIssues.length} website issue${websiteIssues.length === 1 ? " was" : "s were"} reported from Carlos's account; ${unresolvedWebsiteIssues.length} ${unresolvedWebsiteIssues.length === 1 ? "remains" : "remain"} unresolved.` : "No website issue was submitted from Carlos's account today.",
     reportedProblems.trim() ? `Carlos reported: ${reportedProblems.trim().slice(0, 600)}` : "Carlos did not report a website problem in the daily summary.",
   ]
   const next = [
     failed.length ? "Review the failed or unanswered communications first." : "Continue the highest-priority client and supplier follow-ups.",
+    unresolvedWebsiteIssues.length ? `Review Carlos's unresolved website issues: ${unresolvedWebsiteIssues.slice(0, 3).map((issue) => issue.title).join("; ")}.` : "No unresolved Carlos-submitted website issue needs review.",
     events.length && !changes.length ? "Confirm that completed work was saved to the correct client, request, quote, or supplier record." : "Review today’s saved record changes before closing the day.",
   ]
   return [

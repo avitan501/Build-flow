@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer"
 
 import type { ExtractedSupplierQuoteItem } from "@/lib/supplier-quote-parser"
+import { normalizeSupplierQuoteUnit, supplierQuoteLineTotal } from "@/lib/supplier-quote-pricing"
 
 export type SupplierQuoteAiMetadata = {
   supplierName: string
@@ -101,15 +102,16 @@ export function normalizeSupplierQuoteAiPayload(value: unknown): SupplierQuoteAi
         const quantity = positiveNumber(item.quantity)
         const unitPrice = nonNegativeNumber(item.unitPrice)
         const statedTotal = nonNegativeNumber(item.lineTotal)
-        return {
+        const normalized = {
           itemCode: cleanText(item.itemCode, 120),
           description: cleanText(item.description, 500),
           specification: cleanText(item.specification, 1000),
           quantity,
-          unit: cleanText(item.unit, 40) || "each",
+          unit: normalizeSupplierQuoteUnit(cleanText(item.unit, 40)),
           unitPrice,
-          lineTotal: statedTotal ?? (unitPrice === null ? null : Math.round(quantity * unitPrice * 100) / 100),
+          lineTotal: statedTotal,
         }
+        return { ...normalized, lineTotal: supplierQuoteLineTotal(normalized) }
       })
       .filter((item) => isUsableMaterialDescription(item.description) && !NON_MATERIAL_LINE_PATTERN.test(item.description))
       .slice(0, MAX_AI_ITEMS),
@@ -163,7 +165,7 @@ const quoteSchema = {
 
 const EXTRACTION_PROMPT = `Read this supplier quote, estimate, invoice, receipt, or material price list. Use the visual layout of the attached document as the source of truth when columns are misaligned in the text layer. Use OCR when the document is scanned or photographed. Extract only actual purchasable material rows. Do not turn headings, addresses, subtotals, tax, delivery, discounts, payments, or grand totals into material items.
 
-Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Capture leadTimeDays only when a delivery or availability lead time is explicitly printed. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
+Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. ML/M-L means one thousand linear feet and MS/M-S means one thousand square feet; preserve the printed unit price and printed line total without multiplying either by 1,000 again. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Capture leadTimeDays only when a delivery or availability lead time is explicitly printed. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
 
 export async function extractSupplierQuoteWithAi(file: File, extractedText = "", invoke?: SupplierQuoteAiInvoker): Promise<SupplierQuoteAiResult | null> {
   if (invoke) {

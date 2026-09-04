@@ -9,6 +9,7 @@ import {
   DAILY_WORK_SUMMARY_PREFIX,
   DAILY_WORK_SUMMARY_TITLE_PREFIX,
   isValidDailyWorkDateKey,
+  normalizeDailyWorkSummarySections,
   parseDailyWorkSummary,
   serializeDailyWorkSummary,
   type DailyAttendanceAction,
@@ -62,9 +63,12 @@ export async function saveDailyWorkSummaryAction(input: {
 }): Promise<SaveDailySummaryResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const date = input.date.trim()
-  const completed = input.completed.trim().slice(0, 4000)
-  const open = input.open.trim().slice(0, 4000)
-  const problems = input.problems.trim().slice(0, 4000)
+  const sections = normalizeDailyWorkSummarySections({
+    completed: input.completed.trim().slice(0, 4000),
+    open: input.open.trim().slice(0, 4000),
+    problems: input.problems.trim().slice(0, 4000),
+  })
+  const { completed, open, problems } = sections
 
   if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
   if (!completed && !open && !problems) return { ok: false, error: "Add completed work, open work, or a website problem." }
@@ -122,13 +126,20 @@ export async function recordDailyAttendanceAction(input: {
   const transition = applyDailyAttendanceAction(current, input.action, nowAt)
   if (!transition.ok) return transition
 
-  const checkoutCompleted = input.action === "check_out" ? String(input.completed || "").trim().slice(0, 4000) : ""
+  const checkoutSections = input.action === "check_out"
+    ? normalizeDailyWorkSummarySections({
+        completed: String(input.completed || "").trim().slice(0, 4000),
+        open: String(input.open || "").trim().slice(0, 4000),
+        problems: String(input.problems || "").trim().slice(0, 4000),
+      })
+    : null
+  const checkoutCompleted = checkoutSections?.completed ?? ""
   if (input.action === "check_out" && !checkoutCompleted) return { ok: false, error: "Write what you completed today before checking out." }
 
   const { checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds } = transition.attendance
   const completed = input.action === "check_out" ? checkoutCompleted : current?.completed ?? ""
-  const open = input.action === "check_out" ? String(input.open || "").trim().slice(0, 4000) : current?.open ?? ""
-  const problems = input.action === "check_out" ? String(input.problems || "").trim().slice(0, 4000) : current?.problems ?? ""
+  const open = checkoutSections?.open ?? current?.open ?? ""
+  const problems = checkoutSections?.problems ?? current?.problems ?? ""
   const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds, paidAt: current?.paidAt })
   const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`

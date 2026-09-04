@@ -182,7 +182,9 @@ function comparisonModelCodes(value: string) {
 function hasConflictingSpecifications(left: string, right: string) {
   const leftMeasures = comparisonMeasures(left)
   const rightMeasures = comparisonMeasures(right)
-  if (leftMeasures.join("|") !== rightMeasures.join("|")) return true
+  // A supplier often prints a fuller size than a short client request. That is
+  // safe to rank when the request itself has no size; the opposite is not.
+  if (rightMeasures.length && leftMeasures.join("|") !== rightMeasures.join("|")) return true
   const leftQualifiers = comparisonQualifiers(left)
   const rightQualifiers = comparisonQualifiers(right)
   return [...leftQualifiers].some((qualifier) => !rightQualifiers.has(qualifier))

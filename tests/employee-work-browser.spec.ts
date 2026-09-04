@@ -49,6 +49,15 @@ test("daily smart review has a safe deterministic fallback and saved format", ()
   expect(parseCarlosActivityAiReview(details)?.eventCount).toBe(1)
 })
 
+test("daily smart review uses the employee-owned website issue count", () => {
+  const answer = fallbackCarlosActivityReview([], "Identified 6 issues", [
+    { title: "Upload failed", status: "new", priority: "high" },
+    { title: "Math mismatch", status: "resolved", priority: "normal" },
+  ])
+  expect(answer).toContain("2 website issues were reported from Carlos's account; 1 remains unresolved")
+  expect(answer).toContain("Upload failed")
+})
+
 test("manager UI uses reusable employee naming and exposes owner live screen", async () => {
   const [browserPage, toolsPage, activityPage] = await Promise.all([
     readFile(path.join(root, "app/admin/ai-tools/work-browser/page.tsx"), "utf8"),

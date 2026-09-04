@@ -11,6 +11,7 @@ import {
   DAILY_WORK_SUMMARY_PREFIX,
   DAILY_WORK_TIME_ZONE,
   isValidDailyWorkDateKey,
+  normalizeDailyWorkSummarySections,
   parseDailyWorkSummary,
   totalPausedMilliseconds,
 } from "../lib/daily-work-summary"
@@ -67,6 +68,7 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(actions).toContain("checkoutCompleted")
   expect(actions).toContain("Write what you completed today before checking out.")
   expect(actions).toContain("uploadDailyProblemPhotoAction")
+  expect(actions).toContain("normalizeDailyWorkSummarySections")
   expect(actions).toContain("10 * 1024 * 1024")
   expect(actions).toContain("SUPPLIER_QUOTE_BUCKET")
   expect(actions).toContain("created_by: user.id")
@@ -76,6 +78,24 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(helper).toContain("problemAttachments")
   expect(helper).toContain("pausedMilliseconds")
   expect(helper).toContain("paidAt")
+})
+
+test("labelled pending and problem sections cannot stay buried in completed work", () => {
+  expect(normalizeDailyWorkSummarySections({
+    completed: "Created the estimate\nPending:\nCall Burton Supply\nWait for Aryeh's quote\nWebsite problems: Upload failed",
+    open: "Follow up with Amy",
+    problems: "",
+  })).toEqual({
+    completed: "Created the estimate",
+    open: "Follow up with Amy\nCall Burton Supply\nWait for Aryeh's quote",
+    problems: "Upload failed",
+  })
+
+  expect(normalizeDailyWorkSummarySections({
+    completed: "Fixed catalog import\nProblems:\nCatalog add failed",
+    open: "",
+    problems: "Catalog add failed",
+  })).toEqual({ completed: "Fixed catalog import", open: "", problems: "Catalog add failed" })
 })
 
 test("dashboard clock opens Carlos time log instead of looking like a dead button", async () => {

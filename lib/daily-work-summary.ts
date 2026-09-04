@@ -28,6 +28,45 @@ type DailyWorkSummaryRow = {
 
 export type DailyAttendanceAction = "check_in" | "pause" | "resume" | "check_out"
 
+type DailyWorkSections = Pick<DailyWorkSummary, "completed" | "open" | "problems">
+
+const SECTION_HEADING = /^\s*(pending|still\s+open|open(?:\s+items?)?|problems?|website\s+(?:problems?|issues?)|issues?)\s*:\s*(.*)$/i
+
+function sectionForHeading(value: string): "open" | "problems" {
+  return /problem|issue/i.test(value) ? "problems" : "open"
+}
+
+function appendSection(current: string, addition: string) {
+  const cleanCurrent = current.trim()
+  const cleanAddition = addition.trim()
+  if (!cleanAddition || cleanCurrent.includes(cleanAddition)) return cleanCurrent
+  return [cleanCurrent, cleanAddition].filter(Boolean).join("\n")
+}
+
+/** Moves explicitly labelled Pending/Open/Problems blocks out of Completed. */
+export function normalizeDailyWorkSummarySections(input: DailyWorkSections): DailyWorkSections {
+  const completedLines: string[] = []
+  const extracted: Record<"open" | "problems", string[]> = { open: [], problems: [] }
+  let activeSection: "open" | "problems" | null = null
+
+  for (const line of input.completed.replace(/\r\n?/g, "\n").split("\n")) {
+    const heading = line.match(SECTION_HEADING)
+    if (heading) {
+      activeSection = sectionForHeading(heading[1])
+      if (heading[2]?.trim()) extracted[activeSection].push(heading[2].trim())
+      continue
+    }
+    if (activeSection) extracted[activeSection].push(line)
+    else completedLines.push(line)
+  }
+
+  return {
+    completed: completedLines.join("\n").trim(),
+    open: appendSection(input.open, extracted.open.join("\n")),
+    problems: appendSection(input.problems, extracted.problems.join("\n")),
+  }
+}
+
 type DailyAttendanceState = Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">
 
 type DailyAttendanceTransition =

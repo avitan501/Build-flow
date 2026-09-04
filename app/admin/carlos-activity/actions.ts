@@ -6,6 +6,7 @@ import { requireManagerPortalProfile } from "@/lib/auth"
 import {
   fallbackCarlosActivityReview,
   serializeCarlosActivityAiReview,
+  type CarlosWebsiteIssue,
 } from "@/lib/carlos-activity-review"
 import { newYorkBusinessDayRange } from "@/lib/carlos-daily-goals"
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary"
@@ -34,7 +35,7 @@ export async function analyzeCarlosActivityAction(): Promise<ReviewResult> {
     .maybeSingle<{ id: string }>()
   if (staff.error || !staff.data) return { ok: false, error: "Carlos’s active employee profile was not found." }
 
-  const [activityResult, summaryResult] = await Promise.all([
+  const [activityResult, summaryResult, websiteIssuesResult] = await Promise.all([
     supabase
       .from("manager_staff_activity_events")
       .select("id,user_id,event_type,page_path,page_label,metadata,occurred_at")
@@ -53,11 +54,21 @@ export async function analyzeCarlosActivityAction(): Promise<ReviewResult> {
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle<{ id: string; title: string; details: string | null; updated_at: string }>(),
+    supabase
+      .from("website_defects")
+      .select("title,status,priority")
+      .eq("created_by", staff.data.id)
+      .gte("created_at", day.start)
+      .lt("created_at", day.end)
+      .order("created_at", { ascending: true })
+      .limit(100)
+      .returns<CarlosWebsiteIssue[]>(),
   ])
   if (activityResult.error) return { ok: false, error: "Today’s activity could not be loaded." }
 
   const events = activityResult.data ?? []
   const dailySummary = summaryResult.data ? parseDailyWorkSummary(summaryResult.data) : null
+  const websiteIssues = websiteIssuesResult.error ? [] : websiteIssuesResult.data ?? []
   const safeEvents = events.map((event) => ({
     at: event.occurred_at,
     type: event.event_type,
@@ -69,7 +80,7 @@ export async function analyzeCarlosActivityAction(): Promise<ReviewResult> {
     request: clean(event.metadata?.request, 120),
   }))
   const reportedProblems = dailySummary?.problems ?? ""
-  const fallback = fallbackCarlosActivityReview(events, reportedProblems)
+  const fallback = fallbackCarlosActivityReview(events, reportedProblems, websiteIssues)
   const context = JSON.stringify({
     workDate: day.dateKey,
     trackedEvents: safeEvents,
@@ -78,6 +89,11 @@ export async function analyzeCarlosActivityAction(): Promise<ReviewResult> {
       open: clean(dailySummary?.open, 1200),
       problems: clean(reportedProblems, 1200),
     },
+    websiteIssues: websiteIssues.map((issue) => ({
+      title: clean(issue.title, 160),
+      status: clean(issue.status, 40),
+      priority: clean(issue.priority, 40),
+    })),
   })
 
   let answer = ""
@@ -86,7 +102,7 @@ export async function analyzeCarlosActivityAction(): Promise<ReviewResult> {
       body: {
         action: "dashboard_ai",
         model: "terra",
-        query: "Review Carlos’s Avantia activity for this New York workday. Write exactly three short sections: Results, Possible problems, and Recommended next steps. Use only the supplied tracked activity and employee summary. Point out failed communications, unusually repeated steps, work that may not have been saved, and reported website problems. Do not invent facts, productivity, recipients, message contents, or work outside the tracked browser.",
+        query: "Review Carlos’s Avantia activity for this New York workday. Write exactly three short sections: Results, Possible problems, and Recommended next steps. Use only the supplied tracked activity, employee summary, and website issues. Treat websiteIssues as the authoritative count of issues submitted from Carlos's account; do not copy an unverified issue count from free text. Point out failed communications, unusually repeated steps, work that may not have been saved, and reported website problems. Do not invent facts, productivity, recipients, message contents, or work outside the tracked browser.",
         context,
       },
     })

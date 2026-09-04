@@ -18,7 +18,9 @@ export type ParsedSupplierQuoteMetadata = {
   leadTimeDays: number | null
 }
 
-const UNIT_PATTERN = "(?:ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bags?|rolls?|bundles?|pails?|buckets?|tubes?|cartons?|gallons?|packs?|cases?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
+import { normalizeSupplierQuoteUnit } from "@/lib/supplier-quote-pricing"
+
+const UNIT_PATTERN = "(?:m\\s*[/.-]?\\s*[ls]f?|ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bags?|rolls?|bundles?|pails?|buckets?|tubes?|cartons?|gallons?|packs?|cases?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
 const MONEY_PATTERN = "\\$?([0-9][0-9,]*(?:\\.[0-9]{1,4})?)"
 
 function amount(value: string | undefined) {
@@ -33,12 +35,7 @@ function quantity(value: string | undefined) {
 }
 
 function normalizeUnit(value: string | undefined) {
-  const unit = String(value ?? "each").trim().toLowerCase().replace(/\./g, "")
-  if (["ea", "each", "pc", "pcs", "piece", "pieces"].includes(unit)) return "each"
-  if (["sf", "sq ft"].includes(unit)) return "sq. ft."
-  if (["lf", "lin ft"].includes(unit)) return "lin. ft."
-  if (["yd", "yds", "yard", "yards"].includes(unit)) return "yard"
-  return unit || "each"
+  return normalizeSupplierQuoteUnit(value)
 }
 
 function cleanDescription(value: string) {

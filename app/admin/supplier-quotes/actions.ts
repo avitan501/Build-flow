@@ -22,6 +22,7 @@ import {
   requestItemSpecification,
   resolveExplicitSupplierSelection,
 } from "@/lib/supplier-quote-routing";
+import { supplierQuoteComparableUnitPrice, supplierQuoteLineTotal } from "@/lib/supplier-quote-pricing";
 import {
   SUPPLIER_QUOTE_BUCKET,
   type SupplierQuoteItemRecord,
@@ -40,6 +41,7 @@ type EditableQuoteItem = {
   quantity: number;
   unit: string;
   unitPrice: number | null;
+  lineTotal: number | null;
   selected: boolean;
   comparisonItemId?: string | null;
 };
@@ -781,10 +783,7 @@ export async function saveSupplierQuoteAction(input: {
         quantity,
         unit: clean(item.unit, 40) || "each",
         unit_price: unitPrice,
-        line_total:
-          unitPrice === null
-            ? null
-            : Math.round(quantity * unitPrice * 100) / 100,
+        line_total: supplierQuoteLineTotal({ quantity, unitPrice, lineTotal: item.lineTotal }),
         selected: Boolean(item.selected),
         review_status: item.selected ? "ready" : "ignored",
         comparison_item_id: item.comparisonItemId && UUID_PATTERN.test(item.comparisonItemId)
@@ -1079,10 +1078,9 @@ export async function addSupplierQuoteItemsToCatalogAction(
   const category = normalizeMaterialCatalogDepartment(quote.department);
   const { data: existingItems, error: existingError } = await supabase
     .from("material_catalog_items")
-    .select("id,name")
+    .select("id,name,item_code,status")
     .eq("category", category)
-    .eq("status", "active")
-    .returns<Array<{ id: string; name: string }>>();
+    .returns<Array<{ id: string; name: string; item_code: string; status: string }>>();
   if (existingError)
     return { ok: false, error: "The material catalog could not be checked." };
   const existingByName = new Map(
@@ -1091,17 +1089,18 @@ export async function addSupplierQuoteItemsToCatalogAction(
       item.id,
     ]),
   );
+  const existingByCode = new Map((existingItems ?? []).map((item) => [item.item_code, item.id]));
   let added = 0;
   let updated = 0;
   const links: Array<{ id: string; catalog_item_id: string }> = [];
   const prices = [];
 
   for (const item of items) {
+    const itemCode = `SQ-${quote.id.slice(0, 6).toUpperCase()}-${String(item.line_number).padStart(3, "0")}`;
     let catalogItemId = existingByName.get(
       item.description.trim().toLowerCase(),
-    );
+    ) ?? existingByCode.get(itemCode);
     if (!catalogItemId) {
-      const itemCode = `SQ-${quote.id.slice(0, 6).toUpperCase()}-${String(item.line_number).padStart(3, "0")}`;
       const { data: created, error: createError } = await supabase
         .from("material_catalog_items")
         .insert({
@@ -1132,6 +1131,15 @@ export async function addSupplierQuoteItemsToCatalogAction(
       existingByName.set(item.description.trim().toLowerCase(), catalogItemId);
       added += 1;
     } else {
+      const { error: reactivateError } = await supabase
+        .from("material_catalog_items")
+        .update({ status: "active", updated_by: user.id })
+        .eq("id", catalogItemId);
+      if (reactivateError)
+        return {
+          ok: false,
+          error: `Could not reactivate ${item.description} in the catalog.`,
+        };
       updated += 1;
     }
     links.push({ id: item.id, catalog_item_id: catalogItemId });
@@ -1140,13 +1148,16 @@ export async function addSupplierQuoteItemsToCatalogAction(
       supplier_id: quote.supplier_id,
       supplier_name_snapshot: quote.supplier_name,
       supplier_sku: item.item_code,
-      unit_price: item.unit_price,
+      unit_price: supplierQuoteComparableUnitPrice({ quantity: item.quantity, unitPrice: item.unit_price, lineTotal: item.line_total }),
       availability: item.unit_price === null ? "unknown" : "available",
       notes: `Imported from quote ${quote.quote_number || quote.file_name}`,
       price_type: "supplier_quote",
       verification_status: "supplier_quote",
       verified_at: quote.quote_date || new Date().toISOString(),
       expires_at: quote.expires_on,
+      source_quantity: item.quantity,
+      source_unit: item.unit,
+      source_line_total: supplierQuoteLineTotal({ quantity: item.quantity, unitPrice: item.unit_price, lineTotal: item.line_total }),
       updated_by: user.id,
     });
   }
@@ -1585,7 +1596,7 @@ async function createComparisonFromQuote(
   const priceRows = matched.map(({ item, comparisonItem }) => ({
     bid_id: bid.id,
     item_id: comparisonItem!.id,
-    unit_price: item.unit_price,
+    unit_price: supplierQuoteComparableUnitPrice({ quantity: item.quantity, unitPrice: item.unit_price, lineTotal: item.line_total }),
     is_available: item.unit_price !== null,
     notes: clean(item.description, 1000),
   }));
