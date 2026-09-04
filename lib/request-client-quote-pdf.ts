@@ -6,7 +6,7 @@ import path from "node:path"
 import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf-lib"
 
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
-import { requestPaymentGuidance, requestPaymentMethodLabel, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
+import { requestClientPaymentDocumentCopy, requestPaymentMethodsLabel, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 
 export type RequestClientQuoteLine = {
   description: string
@@ -158,15 +158,36 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
   wrap(regular, includeRequiredProposalTerms(input.terms), 6.8, 330).slice(0, 11).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 12 - index * 8.5, size: 6.8, font: regular, color: slate }))
   if (input.paymentRequest) {
-    page.drawText("Payment request", { x: 392, y: termsY, size: 9, font: bold, color: blue })
+    const paymentCopy = requestClientPaymentDocumentCopy(input.paymentRequest, documentType)
+    page.drawText(paymentCopy.heading, { x: 392, y: termsY, size: 9, font: bold, color: blue })
     const paymentLines = [
-      `Amount due: ${money(input.paymentRequest.amountDue)}`,
-      `Method: ${requestPaymentMethodLabel(input.paymentRequest.method)}`,
-      ...wrap(regular, input.paymentRequest.instructions, 7.2, 172).filter(Boolean).slice(0, 3),
-      ...wrap(regular, requestPaymentGuidance(input.paymentRequest), 7.2, 172).slice(0, 3),
-      ...wrap(regular, input.paymentRequest.securePaymentUrl || "", 7.2, 172).filter(Boolean).slice(0, 3),
+      `${paymentCopy.amountLabel}: ${money(input.paymentRequest.amountDue)}`,
+      `Options: ${requestPaymentMethodsLabel(input.paymentRequest.methods)}`,
+      ...paymentCopy.sections.flatMap((section) => [
+        `${section.label}:`,
+        ...wrap(regular, section.instructions, 7.2, 172).filter(Boolean).slice(0, 2),
+        ...wrap(regular, section.guidance, 7.2, 172).filter(Boolean).slice(0, 2),
+      ]),
+      ...wrap(regular, paymentCopy.securePaymentUrl || "", 7.2, 172).filter(Boolean).slice(0, 2),
     ]
-    paymentLines.slice(0, 11).forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 10, size: 7.2, font: regular, color: slate }))
+    if (paymentLines.length <= 11) {
+      paymentLines.forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 10, size: 7.2, font: regular, color: slate }))
+    } else {
+      [...paymentLines.slice(0, 2), "Full payment instructions continue on the next page."].forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 10, size: 7.2, font: regular, color: slate }))
+      page = addPage()
+      page.drawText(paymentCopy.heading, { x: 40, y: 670, size: 11, font: bold, color: blue })
+      const fullPaymentLines = [
+        `${paymentCopy.amountLabel}: ${money(input.paymentRequest.amountDue)}`,
+        `Options: ${requestPaymentMethodsLabel(input.paymentRequest.methods)}`,
+        ...paymentCopy.sections.flatMap((section) => [
+          section.label,
+          ...wrap(regular, section.instructions, 8, 500).filter(Boolean),
+          ...wrap(regular, section.guidance, 8, 500).filter(Boolean),
+        ]),
+        ...wrap(regular, paymentCopy.securePaymentUrl || "", 8, 500).filter(Boolean),
+      ]
+      fullPaymentLines.forEach((line, index) => page.drawText(clean(line), { x: 40, y: 648 - index * 13, size: 8, font: regular, color: slate }))
+    }
   } else if (input.paymentLink) {
     page.drawText("Secure payment", { x: 392, y: termsY, size: 8.5, font: bold, color: blue })
     wrap(regular, input.paymentLink, 7.2, 172).slice(0, 4).forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 13 - index * 10, size: 7.2, font: regular, color: slate }))

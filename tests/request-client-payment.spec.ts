@@ -7,7 +7,8 @@ import { parseRequestClientDocument } from "../lib/request-client-document-data"
 import {
   containsRawPaymentCredentialsInPayload,
   hasForbiddenPaymentFields,
-  requestPaymentGuidance,
+  requestClientPaymentDocumentCopy,
+  requestPaymentGuidanceForMethod,
   sanitizeRequestClientPayment,
 } from "../lib/request-client-payment"
 
@@ -15,24 +16,31 @@ const root = process.cwd()
 
 test("payment requests keep only safe method, amount, instructions, and hosted HTTPS URL", () => {
   expect(sanitizeRequestClientPayment({
-    method: "credit_card",
+    methods: ["credit_card", "ach"],
     amountDue: 1250.129,
-    instructions: "Please use the project reference shown above.",
+    methodInstructions: {
+      credit_card: "Please use the project reference shown above.",
+      ach: "Call our office for secure ACH instructions.",
+    },
     securePaymentUrl: "https://buy.stripe.com/existing-session",
   })).toEqual({
     ok: true,
     value: {
-      method: "credit_card",
+      methods: ["credit_card", "ach"],
       amountDue: 1250.13,
-      instructions: "Please use the project reference shown above.",
+      methodInstructions: {
+        credit_card: "Please use the project reference shown above.",
+        ach: "Call our office for secure ACH instructions.",
+      },
       securePaymentUrl: "https://buy.stripe.com/existing-session",
     },
   })
   expect(sanitizeRequestClientPayment({ method: "ach", amountDue: 725, instructions: "Call us." })).toEqual({
     ok: true,
-    value: { method: "ach", amountDue: 725, instructions: "Call us." },
+    value: { methods: ["ach"], amountDue: 725, methodInstructions: { ach: "Call us." } },
   })
   expect(sanitizeRequestClientPayment({ method: "check", amountDue: 725, instructions: "" }).ok).toBe(true)
+  expect(sanitizeRequestClientPayment({ methods: [], amountDue: 725, methodInstructions: {} })).toEqual({ ok: false, error: "Choose at least one payment option." })
 })
 
 test("payment requests reject raw card and bank credentials before persistence or rendering", () => {
@@ -48,11 +56,31 @@ test("payment requests reject raw card and bank credentials before persistence o
   expect(sanitizeRequestClientPayment({ method: "check", amountDue: 0, instructions: "" }).ok).toBe(false)
 })
 
-test("manual payment methods give phone-safe guidance without inventing a provider", () => {
-  expect(requestPaymentGuidance({ method: "credit_card" })).toContain("coordinate card payment")
-  expect(requestPaymentGuidance({ method: "ach" })).toContain("coordinate secure ACH payment")
-  expect(requestPaymentGuidance({ method: "check" })).toContain("coordinate check delivery")
-  expect(requestPaymentGuidance({ method: "credit_card", securePaymentUrl: "https://buy.stripe.com/existing-session" })).toContain("secure hosted payment page")
+test("manual payment methods say the client pays Avantia Build without inventing a provider", () => {
+  expect(requestPaymentGuidanceForMethod("credit_card")).toContain("coordinate card payment")
+  expect(requestPaymentGuidanceForMethod("ach")).toContain("Pay Avantia Build by ACH")
+  expect(requestPaymentGuidanceForMethod("check")).toContain("payable to Avantia Build")
+  expect(requestPaymentGuidanceForMethod("credit_card", "https://buy.stripe.com/existing-session")).toContain("Pay Avantia Build")
+})
+
+test("PDF and live-link payment copy comes only from saved manager selections", () => {
+  const payment = {
+    methods: ["credit_card", "ach"] as const,
+    amountDue: 125,
+    methodInstructions: { credit_card: "Call our office.", ach: "Ask for secure ACH instructions." },
+    securePaymentUrl: "https://example.com/pay",
+  }
+  const invoice = requestClientPaymentDocumentCopy({ ...payment, methods: [...payment.methods] }, "invoice")
+  expect(invoice.heading).toBe("How to pay Avantia Build")
+  expect(invoice.amountLabel).toBe("Amount due to Avantia Build")
+  expect(invoice.sections.map((section) => section.label)).toEqual(["Credit card", "ACH"])
+  expect(invoice.sections.map((section) => section.instructions)).toEqual(["Call our office.", "Ask for secure ACH instructions."])
+  expect(invoice.securePaymentUrl).toBe("https://example.com/pay")
+
+  const receipt = requestClientPaymentDocumentCopy({ ...payment, methods: [...payment.methods] }, "receipt")
+  expect(receipt.heading).toBe("Payment received by Avantia Build")
+  expect(receipt.sections.every((section) => section.guidance === "")).toBe(true)
+  expect(receipt.securePaymentUrl).toBeUndefined()
 })
 
 test("stored documents support explicit payment requests and safe legacy payment links", () => {
@@ -72,10 +100,10 @@ test("stored documents support explicit payment requests and safe legacy payment
     ...base,
     document_data: {
       ...commonDocumentData,
-      paymentRequest: { method: "ach", amountDue: 25, instructions: "Call first." },
+      paymentRequest: { methods: ["ach", "check"], amountDue: 25, methodInstructions: { ach: "Call first.", check: "Payable to Avantia Build." } },
     },
   })
-  expect(current?.paymentRequest).toEqual({ method: "ach", amountDue: 25, instructions: "Call first." })
+  expect(current?.paymentRequest).toEqual({ methods: ["ach", "check"], amountDue: 25, methodInstructions: { ach: "Call first.", check: "Payable to Avantia Build." } })
 
   const legacy = parseRequestClientDocument({
     ...base,
@@ -97,18 +125,28 @@ test("client document UI and PDF use explicit payment requests without raw crede
     readFile(path.join(root, "app/client-document/[token]/page.tsx"), "utf8"),
   ])
   expect(panel).toContain("Request payment from client")
-  expect(panel).toContain("Credit card")
-  expect(panel).toContain("ACH")
-  expect(panel).toContain("Check")
+  expect(panel).toContain("Credit card / approved payment app")
+  expect(panel).toContain("Payment options shown to the client")
+  expect(panel).toContain("how to pay Avantia Build")
+  expect(panel).toContain("setPaymentMethods")
+  expect(panel).toContain("setPaymentInstructions")
+  expect(panel).toContain("savedPaymentMethods")
+  expect(panel).toContain("paymentOptionsInvalid")
   expect(panel).not.toContain("Include ACH payment information in this PDF")
   expect(panel).not.toContain("ach.routingNumber")
   expect(panel).not.toContain("ach.accountNumber")
   expect(actions).toContain("containsRawPaymentCredentialsInPayload(input)")
   expect(actions).toContain("sanitizeRequestClientPayment(input.paymentRequest)")
   expect(actions).not.toContain("input.ach")
-  expect(pdf).toContain('page.drawText("Payment request"')
+  expect(pdf).toContain("requestClientPaymentDocumentCopy")
+  expect(pdf).toContain("page.drawText(paymentCopy.heading")
+  expect(pdf).toContain("paymentCopy.sections.flatMap")
+  expect(pdf).toContain("Full payment instructions continue on the next page.")
+  expect(pdf).toContain("fullPaymentLines.forEach")
   expect(pdf).not.toContain('page.drawText("ACH payment information"')
   expect(livePage).toContain("document.paymentRequest")
-  expect(livePage).toContain("Coordinate payment by phone")
+  expect(livePage).toContain("paymentCopy.heading")
+  expect(livePage).toContain("paymentCopy.sections.map")
+  expect(livePage).toContain("Call Avantia Build to coordinate payment")
   expect(livePage).not.toContain('row.document_type === "invoice" ? <a href={AVANTIA_PAYMENT_LINK}')
 })

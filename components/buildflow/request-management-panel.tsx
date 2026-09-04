@@ -18,7 +18,7 @@ import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
-import { requestPaymentGuidance, type RequestPaymentMethod } from "@/lib/request-client-payment"
+import { requestPaymentGuidanceForMethod, type RequestPaymentMethod } from "@/lib/request-client-payment"
 import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
@@ -54,7 +54,7 @@ export type RequestClientDocumentSnapshot = {
     salesTaxRate?: number
     taxableDelivery?: boolean
     terms?: string
-    paymentRequest?: { method: RequestPaymentMethod; amountDue: number; instructions: string; securePaymentUrl?: string }
+    paymentRequest?: { methods?: RequestPaymentMethod[]; method?: RequestPaymentMethod; amountDue: number; methodInstructions?: Partial<Record<RequestPaymentMethod, string>>; instructions?: string; securePaymentUrl?: string }
     paymentLink?: string
   }
 }
@@ -225,9 +225,9 @@ export function RequestManagementPanel({
   const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
   const [quoteMessage, setQuoteMessage] = useState("Please review your Avantia Build estimate. Reply with any questions or approval.")
   const [requestPayment, setRequestPayment] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<RequestPaymentMethod>("credit_card")
+  const [paymentMethods, setPaymentMethods] = useState<RequestPaymentMethod[]>(["credit_card"])
   const [paymentAmountDue, setPaymentAmountDue] = useState("")
-  const [paymentInstructions, setPaymentInstructions] = useState("")
+  const [paymentInstructions, setPaymentInstructions] = useState<Partial<Record<RequestPaymentMethod, string>>>({})
   const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
   const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
@@ -362,6 +362,7 @@ export function RequestManagementPanel({
   function openDocument(nextType: RequestClientDocumentType) {
     const saved = initialClientDocuments.find((entry) => entry.documentType === nextType)
     const savedPayment = saved?.documentData.paymentRequest
+    const savedPaymentMethods = savedPayment?.methods?.length ? savedPayment.methods : savedPayment?.method ? [savedPayment.method] : ["credit_card" as const]
     const legacyPaymentLink = saved?.documentData.paymentLink
     const prefix = nextType === "invoice" ? "INV" : nextType === "receipt" ? "REC" : "AVA"
     setDocumentType(nextType)
@@ -375,9 +376,9 @@ export function RequestManagementPanel({
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
     setQuoteTerms(includeRequiredProposalTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS))
     setRequestPayment(Boolean(savedPayment || legacyPaymentLink))
-    setPaymentMethod(savedPayment?.method || "credit_card")
+    setPaymentMethods(savedPaymentMethods)
     setPaymentAmountDue(savedPayment?.amountDue ? String(savedPayment.amountDue) : legacyPaymentLink ? savedDocumentTotal(saved.documentData).toFixed(2) : "")
-    setPaymentInstructions(savedPayment?.instructions || "")
+    setPaymentInstructions(savedPayment?.methodInstructions || (savedPayment?.instructions ? { [savedPaymentMethods[0]]: savedPayment.instructions } : {}))
     setHostedPaymentUrl(savedPayment?.securePaymentUrl || legacyPaymentLink || AVANTIA_PAYMENT_LINK)
     setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice. Reply with any questions." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
     setContactOpen(false)
@@ -555,6 +556,14 @@ export function RequestManagementPanel({
   const quoteTax = (quoteSubtotal + (taxableDelivery ? deliveryCharge : 0)) * salesTaxRate / 100
   const quoteTotal = quoteSubtotal + deliveryCharge + quoteTax
   const documentLabel = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+  const paymentOptionsInvalid = requestPayment && !paymentMethods.length
+
+  function togglePaymentMethod(method: RequestPaymentMethod, checked: boolean) {
+    setPaymentMethods((current) => checked
+      ? [...new Set([...current, method])]
+      : current.filter((entry) => entry !== method))
+    if (checked && method === "credit_card" && !hostedPaymentUrl) setHostedPaymentUrl(AVANTIA_PAYMENT_LINK)
+  }
 
   function quoteInput(): RequestClientQuoteInput {
     return {
@@ -572,10 +581,10 @@ export function RequestManagementPanel({
       taxableDelivery,
       terms: includeRequiredProposalTerms(quoteTerms),
       paymentRequest: requestPayment ? {
-        method: paymentMethod,
+        methods: paymentMethods,
         amountDue: Number(paymentAmountDue),
-        instructions: paymentInstructions,
-        ...(hostedPaymentUrl.trim() ? { securePaymentUrl: hostedPaymentUrl.trim() } : {}),
+        methodInstructions: paymentInstructions,
+        ...(paymentMethods.includes("credit_card") && hostedPaymentUrl.trim() ? { securePaymentUrl: hostedPaymentUrl.trim() } : {}),
       } : undefined,
     }
   }
@@ -931,23 +940,36 @@ export function RequestManagementPanel({
               <div className="grid gap-3">
                 <label className="grid gap-1 text-xs font-bold">Terms & conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={3} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
                 <label className="grid gap-1 text-xs font-bold">Email message<textarea value={quoteMessage} onChange={(event) => setQuoteMessage(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
-                <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold"><input type="checkbox" checked={requestPayment} onChange={(event) => { setRequestPayment(event.target.checked); if (event.target.checked && !paymentAmountDue) setPaymentAmountDue(quoteTotal.toFixed(2)) }} className="h-4 w-4 accent-[#0071e3]" />Request payment from client</label>
+                <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold"><input type="checkbox" checked={requestPayment} onChange={(event) => { setRequestPayment(event.target.checked); if (event.target.checked && !paymentAmountDue) setPaymentAmountDue(quoteTotal.toFixed(2)) }} className="h-4 w-4 accent-[#0071e3]" />{documentType === "receipt" ? "Include payment details" : "Request payment from client"}</label>
                 {requestPayment ? <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 sm:p-4">
-                  <p className="text-xs font-bold leading-5 text-slate-700">Add only payment-request details. Never enter card numbers, CVV/security codes, routing numbers, or bank account numbers.</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs font-bold">Payment method<select value={paymentMethod} onChange={(event) => { const method = event.target.value as RequestPaymentMethod; setPaymentMethod(method); if (method !== "credit_card" && hostedPaymentUrl === AVANTIA_PAYMENT_LINK) setHostedPaymentUrl(""); if (method === "credit_card" && !hostedPaymentUrl) setHostedPaymentUrl(AVANTIA_PAYMENT_LINK) }} className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"><option value="credit_card">Credit card</option><option value="ach">ACH</option><option value="check">Check</option></select></label>
-                    <label className="grid gap-1 text-xs font-bold">Amount due<input type="number" min="0.01" max="10000000" step="0.01" inputMode="decimal" value={paymentAmountDue} onChange={(event) => setPaymentAmountDue(event.target.value)} className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
-                    <label className="grid gap-1 text-xs font-bold sm:col-span-2">Optional instructions<textarea value={paymentInstructions} onChange={(event) => setPaymentInstructions(event.target.value)} maxLength={500} rows={2} placeholder="For example: Please call us to coordinate payment." className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" /></label>
-                    <label className="grid gap-1 text-xs font-bold sm:col-span-2">Hosted secure payment URL <span className="font-normal text-slate-500">(optional)</span><input type="url" inputMode="url" autoComplete="url" value={hostedPaymentUrl} onChange={(event) => setHostedPaymentUrl(event.target.value)} placeholder="Paste an existing HTTPS payment link" className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /><span className="font-normal leading-5 text-slate-500">Use only an existing HTTPS checkout URL. Leave blank when payment must be coordinated by phone.</span></label>
-                  </div>
-                  <p className="mt-3 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-700">{requestPaymentGuidance({ method: paymentMethod, securePaymentUrl: hostedPaymentUrl.trim() || undefined })}</p>
+                  <p className="text-xs font-bold leading-5 text-slate-700">These options tell the client how to pay Avantia Build. Never enter a full card number, CVV/security code, routing number, or bank account number here.</p>
+                  <label className="mt-3 grid gap-1 text-xs font-bold">Amount {documentType === "receipt" ? "paid" : "due to Avantia Build"}<input type="number" min="0.01" max="10000000" step="0.01" inputMode="decimal" value={paymentAmountDue} onChange={(event) => setPaymentAmountDue(event.target.value)} className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                  <fieldset className="mt-3 grid gap-3">
+                    <legend className="text-xs font-black text-slate-900">{documentType === "receipt" ? "Payment methods shown on the receipt" : "Payment options shown to the client"}</legend>
+                    {([
+                      { method: "credit_card" as const, label: "Credit card / approved payment app", placeholder: "For example: Call our office and we will process the card securely." },
+                      { method: "ach" as const, label: "ACH", placeholder: "For example: Call our office to receive secure ACH instructions." },
+                      { method: "check" as const, label: "Check", placeholder: "For example: Make checks payable to Avantia Build." },
+                    ]).map((option) => {
+                      const selected = paymentMethods.includes(option.method)
+                      return <div key={option.method} className={`rounded-lg border p-3 ${selected ? "border-sky-300 bg-white" : "border-slate-200 bg-slate-50"}`}>
+                        <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" checked={selected} onChange={(event) => togglePaymentMethod(option.method, event.target.checked)} className="h-4 w-4 accent-[#0071e3]" />{option.label}</label>
+                        {selected ? <div className="mt-2 grid gap-2">
+                          <textarea value={paymentInstructions[option.method] || ""} onChange={(event) => setPaymentInstructions((current) => ({ ...current, [option.method]: event.target.value }))} maxLength={500} rows={2} placeholder={option.placeholder} aria-label={`${option.label} instructions shown to client`} className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" />
+                          <p className="text-xs font-semibold leading-5 text-slate-600">{requestPaymentGuidanceForMethod(option.method, hostedPaymentUrl.trim() || undefined)}</p>
+                        </div> : null}
+                      </div>
+                    })}
+                  </fieldset>
+                  {paymentMethods.includes("credit_card") ? <label className="mt-3 grid gap-1 text-xs font-bold">Hosted secure payment URL <span className="font-normal text-slate-500">(optional)</span><input type="url" inputMode="url" autoComplete="url" value={hostedPaymentUrl} onChange={(event) => setHostedPaymentUrl(event.target.value)} placeholder="Paste an existing HTTPS payment link" className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /><span className="font-normal leading-5 text-slate-500">Use only an existing hosted checkout URL. Card details are entered with the processor, never on this website.</span></label> : null}
+                  {!paymentMethods.length ? <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900" role="alert">Choose at least one payment option before saving.</p> : null}
                 </div> : null}
               </div>
               <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between text-sm"><span>Subtotal</span><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteSubtotal)}</strong></div><label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Delivery</span><input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-center justify-between gap-3 text-sm"><span>Sales tax % <span className="block text-[10px] font-normal text-slate-500">Destination rate</span></span><input type="number" min="0" max="20" step="0.001" value={salesTaxRate} onChange={(event) => { setSalesTaxRate(Number(event.target.value)); setTaxRecommendation("Rate edited manually") }} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-600"><input type="checkbox" checked={taxableDelivery} onChange={(event) => setTaxableDelivery(event.target.checked)} className="mt-1" /><span>Include Avantia-billed delivery in the taxable amount</span></label>{taxRecommendation ? <p className="mt-2 text-xs font-semibold text-emerald-700">{taxRecommendation}</p> : <p className="mt-2 text-xs text-slate-500">Tax is calculated on materials and, when checked, Avantia-billed delivery.</p>}<div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div></aside>
             </div>
             {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>

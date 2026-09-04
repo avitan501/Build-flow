@@ -3,9 +3,9 @@ export const REQUEST_PAYMENT_METHODS = ["credit_card", "ach", "check"] as const
 export type RequestPaymentMethod = (typeof REQUEST_PAYMENT_METHODS)[number]
 
 export type RequestClientPaymentRequest = {
-  method: RequestPaymentMethod
+  methods: RequestPaymentMethod[]
   amountDue: number
-  instructions: string
+  methodInstructions: Partial<Record<RequestPaymentMethod, string>>
   securePaymentUrl?: string
 }
 
@@ -47,7 +47,7 @@ export function hasForbiddenPaymentFields(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasForbiddenPaymentFields)
   return Object.entries(value as Record<string, unknown>).some(([key, entry]) => {
     const normalized = key.toLowerCase().replace(/[^a-z]/g, "")
-    if (["ach", "cardnumber", "cvv", "cvc", "routingnumber", "accountnumber", "bankaccount"].includes(normalized)) return true
+    if (["cardnumber", "cvv", "cvc", "routingnumber", "accountnumber", "bankaccount"].includes(normalized)) return true
     return hasForbiddenPaymentFields(entry)
   })
 }
@@ -85,21 +85,32 @@ export function sanitizeRequestClientPayment(value: unknown):
     return { ok: false, error: "Payment requests cannot contain card or bank account details." }
   }
   const input = value as Record<string, unknown>
-  const method = String(input.method || "") as RequestPaymentMethod
-  if (!REQUEST_PAYMENT_METHODS.includes(method)) return { ok: false, error: "Choose credit card, ACH, or check." }
+  const requestedMethods = Array.isArray(input.methods) ? input.methods : [input.method]
+  if (requestedMethods.some((method) => !REQUEST_PAYMENT_METHODS.includes(String(method || "") as RequestPaymentMethod))) {
+    return { ok: false, error: "Choose credit card, ACH, or check." }
+  }
+  const methods = REQUEST_PAYMENT_METHODS.filter((method) => requestedMethods.includes(method))
+  if (!methods.length) return { ok: false, error: "Choose at least one payment option." }
   const amountDue = Number(input.amountDue)
   if (!Number.isFinite(amountDue) || amountDue <= 0 || amountDue > 10_000_000) return { ok: false, error: "Enter a valid amount due." }
-  const instructions = String(input.instructions || "").trim().slice(0, 500)
-  if (containsRawPaymentCredentials(instructions)) return { ok: false, error: "Remove card or bank account details from the instructions." }
+  const rawMethodInstructions = input.methodInstructions && typeof input.methodInstructions === "object" && !Array.isArray(input.methodInstructions)
+    ? input.methodInstructions as Record<string, unknown>
+    : {}
+  const legacyInstructions = String(input.instructions || "").trim()
+  const methodInstructions = Object.fromEntries(methods.flatMap((method, index) => {
+    const instructions = String(rawMethodInstructions[method] ?? (index === 0 ? legacyInstructions : "")).trim().slice(0, 500)
+    return instructions ? [[method, instructions]] : []
+  })) as Partial<Record<RequestPaymentMethod, string>>
+  if (Object.values(methodInstructions).some(containsRawPaymentCredentials)) return { ok: false, error: "Remove card or bank account details from the instructions." }
   if (containsRawPaymentCredentials(String(input.securePaymentUrl || ""))) return { ok: false, error: "The hosted payment URL cannot contain card or bank account details." }
   const paymentUrl = secureHostedUrl(input.securePaymentUrl)
   if (!paymentUrl.ok) return { ok: false, error: "Use a valid HTTPS hosted payment URL or leave it blank." }
   return {
     ok: true,
     value: {
-      method,
+      methods,
       amountDue: Math.round(amountDue * 100) / 100,
-      instructions,
+      methodInstructions,
       ...(paymentUrl.value ? { securePaymentUrl: paymentUrl.value } : {}),
     },
   }
@@ -114,9 +125,35 @@ export function requestPaymentMethodLabel(method: RequestPaymentMethod) {
   return paymentMethodLabels[method]
 }
 
-export function requestPaymentGuidance(payment: Pick<RequestClientPaymentRequest, "method" | "securePaymentUrl">) {
-  if (payment.securePaymentUrl) return "Use the secure hosted payment page below. Do not send payment details by email or text."
-  if (payment.method === "ach") return "Call or text Avantia Build at (516) 908-8319 to coordinate secure ACH payment. Never send routing or account details by email or text."
-  if (payment.method === "check") return "Call or text Avantia Build at (516) 908-8319 to coordinate check delivery or mailing instructions."
+export function requestPaymentMethodsLabel(methods: RequestPaymentMethod[]) {
+  return methods.map(requestPaymentMethodLabel).join(", ")
+}
+
+export function requestPaymentGuidanceForMethod(method: RequestPaymentMethod, securePaymentUrl?: string) {
+  if (method === "credit_card" && securePaymentUrl) return "Pay Avantia Build using the secure hosted payment page below. Do not send card details by email or text."
+  if (method === "ach") return "Pay Avantia Build by ACH. Call or text (516) 908-8319 to coordinate securely; never send routing or account details by email or text."
+  if (method === "check") return "Make the check payable to Avantia Build. Call or text (516) 908-8319 to coordinate delivery or mailing instructions."
   return "Call or text Avantia Build at (516) 908-8319 to coordinate card payment. Never send a card number or security code by email or text."
+}
+
+export function requestPaymentGuidance(payment: Pick<RequestClientPaymentRequest, "methods" | "securePaymentUrl">) {
+  return payment.methods.map((method) => requestPaymentGuidanceForMethod(method, payment.securePaymentUrl)).join("\n")
+}
+
+export function requestClientPaymentDocumentCopy(
+  payment: RequestClientPaymentRequest,
+  documentType: "estimate" | "invoice" | "receipt",
+) {
+  const isReceipt = documentType === "receipt"
+  return {
+    heading: isReceipt ? "Payment received by Avantia Build" : "How to pay Avantia Build",
+    amountLabel: isReceipt ? "Amount paid" : "Amount due to Avantia Build",
+    sections: payment.methods.map((method) => ({
+      method,
+      label: requestPaymentMethodLabel(method),
+      instructions: payment.methodInstructions[method] || "",
+      guidance: isReceipt ? "" : requestPaymentGuidanceForMethod(method, payment.securePaymentUrl),
+    })),
+    securePaymentUrl: !isReceipt && payment.methods.includes("credit_card") ? payment.securePaymentUrl : undefined,
+  }
 }

@@ -8,7 +8,7 @@ import {
   clientDocumentTermsHash,
 } from "@/lib/request-client-document-acceptance"
 import { parseRequestClientDocument, type StoredRequestClientDocumentWithAcceptance } from "@/lib/request-client-document-data"
-import { requestPaymentGuidance, requestPaymentMethodLabel } from "@/lib/request-client-payment"
+import { requestClientPaymentDocumentCopy } from "@/lib/request-client-payment"
 import { formatSiteDateTime } from "@/lib/site-date-time"
 import { createClient } from "@/lib/supabase/server"
 
@@ -33,6 +33,7 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
   const total = subtotal + document.deliveryCharge + tax
   const termsText = clientDocumentTerms(document.terms)
   const termsHash = clientDocumentTermsHash(termsText)
+  const paymentCopy = document.paymentRequest ? requestClientPaymentDocumentCopy(document.paymentRequest, row.document_type) : null
   const receipt: ClientDocumentAcceptanceReceipt | undefined = row.acceptance_id
     && row.accepted_document_version === row.version
     && row.accepted_terms_version === CLIENT_DOCUMENT_TERMS_VERSION
@@ -66,12 +67,15 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
         <div className="ml-auto mt-5 grid max-w-sm gap-2 text-sm"><div className="flex justify-between"><span>Materials</span><strong>{money.format(subtotal)}</strong></div><div className="flex justify-between"><span>Delivery</span><strong>{money.format(document.deliveryCharge)}</strong></div><div className="flex justify-between"><span>Sales tax ({document.salesTaxRate}%)</span><strong>{money.format(tax)}</strong></div><div className="flex justify-between border-t border-slate-300 pt-3 text-lg"><span>{row.document_type === "invoice" ? "Amount due" : row.document_type === "receipt" ? "Amount paid" : "Estimate total"}</span><strong>{money.format(total)}</strong></div></div>
       </section>
       <section className="border-t border-slate-200 px-5 py-5 sm:px-8"><p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Terms &amp; conditions</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{termsText}</p></section>
-      {document.paymentRequest ? <section className="border-t border-sky-200 bg-sky-50/70 px-5 py-5 sm:px-8">
-        <p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">Payment request</p>
-        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-slate-500">Amount due</span><strong className="mt-0.5 block text-lg tabular-nums">{money.format(document.paymentRequest.amountDue)}</strong></p><p><span className="text-slate-500">Payment method</span><strong className="mt-0.5 block">{requestPaymentMethodLabel(document.paymentRequest.method)}</strong></p></div>
-        {document.paymentRequest.instructions ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{document.paymentRequest.instructions}</p> : null}
-        <p className="mt-3 text-sm leading-6 text-slate-700">{requestPaymentGuidance(document.paymentRequest)}</p>
-        {document.paymentRequest.securePaymentUrl ? <a href={document.paymentRequest.securePaymentUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white">Open secure payment page</a> : <a href="tel:+15169088319" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#0071e3] bg-white px-5 text-sm font-bold text-[#0066cc]">Coordinate payment by phone</a>}
+      {document.paymentRequest && paymentCopy ? <section className="border-t border-sky-200 bg-sky-50/70 px-5 py-5 sm:px-8">
+        <p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">{paymentCopy.heading}</p>
+        <p className="mt-3 text-sm"><span className="text-slate-500">{paymentCopy.amountLabel}</span><strong className="mt-0.5 block text-lg tabular-nums">{money.format(document.paymentRequest.amountDue)}</strong></p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">{paymentCopy.sections.map((section) => <article key={section.method} className="rounded-lg border border-sky-200 bg-white p-4">
+          <h2 className="text-sm font-black">{section.label}</h2>
+          {section.instructions ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{section.instructions}</p> : null}
+          {section.guidance ? <p className="mt-2 text-sm leading-6 text-slate-700">{section.guidance}</p> : null}
+        </article>)}</div>
+        {row.document_type !== "receipt" ? paymentCopy.securePaymentUrl ? <a href={paymentCopy.securePaymentUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white">Pay Avantia Build securely</a> : <a href="tel:+15169088319" className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-[#0071e3] bg-white px-5 text-sm font-bold text-[#0066cc]">Call Avantia Build to coordinate payment</a> : null}
       </section> : document.paymentLink ? <section className="border-t border-sky-200 bg-sky-50/70 px-5 py-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">Secure payment</p>
         <p className="mt-2 text-sm leading-6 text-slate-700">Use Avantia Build&apos;s secure hosted payment page. Do not send payment details by email or text.</p>
