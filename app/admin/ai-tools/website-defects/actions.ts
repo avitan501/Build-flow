@@ -9,6 +9,8 @@ import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-
 
 const BUCKET = "website-defects"
 const MAX_FILE_SIZE = 100 * 1024 * 1024
+const MAX_BATCH_FILE_COUNT = 6
+const MAX_BATCH_TOTAL_SIZE = 250 * 1024 * 1024
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm"])
 const STATUSES = new Set(["new", "reviewing", "fixing", "ready_to_verify", "resolved"])
@@ -49,6 +51,37 @@ export async function prepareWebsiteDefectUploadAction(input: { fileName: string
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(filePath)
   if (error || !data?.token) return { ok: false, error: "The private upload could not be prepared. Try again." }
   return { ok: true, data: { defectId, filePath, token: data.token } }
+}
+
+export async function prepareWebsiteDefectUploadsAction(input: { files: Array<{ fileName: string; fileType: string; fileSize: number }> }): Promise<Result<{ defectId: string; uploads: Array<{ fileName: string; fileType: string; fileSize: number; filePath: string; token: string }> }>> {
+  const { supabase, user } = await reporterContext()
+  if (!Array.isArray(input.files) || input.files.length < 1 || input.files.length > MAX_BATCH_FILE_COUNT) {
+    return { ok: false, error: "Choose between 1 and 6 recordings or images." }
+  }
+  const files = input.files.map((file) => ({
+    fileName: clean(file.fileName, 240),
+    fileType: normalizeWebsiteDefectMimeType(clean(file.fileType, 100)),
+    fileSize: Number(file.fileSize),
+  }))
+  if (files.some((file) => !file.fileName || !ALLOWED_TYPES.has(file.fileType))) {
+    return { ok: false, error: "Choose only MP4, MOV, WebM, JPG, PNG, or WebP files." }
+  }
+  if (files.some((file) => !Number.isSafeInteger(file.fileSize) || file.fileSize < 1 || file.fileSize > MAX_FILE_SIZE)) {
+    return { ok: false, error: "Keep each recording or image up to 100 MB." }
+  }
+  if (files.reduce((total, file) => total + file.fileSize, 0) > MAX_BATCH_TOTAL_SIZE) {
+    return { ok: false, error: "Keep all files together up to 250 MB." }
+  }
+
+  const defectId = crypto.randomUUID()
+  const uploads = []
+  for (const [index, file] of files.entries()) {
+    const filePath = `${user.id}/${defectId}/${String(index + 1).padStart(2, "0")}-${safeFileName(file.fileName)}`
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(filePath)
+    if (error || !data?.token) return { ok: false, error: "The private uploads could not be prepared. Try again." }
+    uploads.push({ ...file, filePath, token: data.token })
+  }
+  return { ok: true, data: { defectId, uploads } }
 }
 
 export async function completeWebsiteDefectUploadAction(input: { defectId: string; filePath: string; fileName: string; fileType: string; fileSize: number; title?: string; description?: string; pageUrl?: string; priority?: string }): Promise<Result<{ issueNumber: number }>> {
@@ -103,6 +136,121 @@ export async function completeWebsiteDefectUploadAction(input: { defectId: strin
   }
   revalidatePath("/admin/ai-tools/website-defects")
   return { ok: true, data: { issueNumber: data.issue_number } }
+}
+
+export async function completeWebsiteDefectUploadsAction(input: { defectId: string; files: Array<{ fileName: string; fileType: string; fileSize: number; filePath: string }>; title?: string; description?: string; pageUrl?: string; priority?: string }): Promise<Result<{ issueNumber: number }>> {
+  const { supabase, user } = await reporterContext()
+  if (!UUID.test(input.defectId) || !Array.isArray(input.files) || input.files.length < 1 || input.files.length > MAX_BATCH_FILE_COUNT) {
+    return { ok: false, error: "The uploaded file references are invalid." }
+  }
+  const files = input.files.map((file, index) => ({
+    fileName: clean(file.fileName, 240),
+    fileType: normalizeWebsiteDefectMimeType(clean(file.fileType, 100)),
+    fileSize: Number(file.fileSize),
+    filePath: String(file.filePath ?? ""),
+    position: index,
+  }))
+  const hasInvalidFile = files.some((file) => {
+    const expectedPath = `${user.id}/${input.defectId}/${String(file.position + 1).padStart(2, "0")}-${safeFileName(file.fileName)}`
+    return !file.fileName
+      || !ALLOWED_TYPES.has(file.fileType)
+      || !Number.isSafeInteger(file.fileSize)
+      || file.fileSize < 1
+      || file.fileSize > MAX_FILE_SIZE
+      || file.filePath !== expectedPath
+  })
+  if (hasInvalidFile || files.reduce((total, file) => total + file.fileSize, 0) > MAX_BATCH_TOTAL_SIZE) {
+    return { ok: false, error: "The uploaded file references are invalid." }
+  }
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch {
+    return { ok: false, error: "The uploads could not be verified right now. Try again." }
+  }
+  const verification = await Promise.all(files.map(async (file) => ({
+    file,
+    result: await verifyWebsiteDefectStorage(
+      () => admin.storage.from(BUCKET).info(file.filePath),
+      { size: file.fileSize, type: file.fileType },
+    ),
+  })))
+  if (verification.some(({ result }) => !result.ok && result.reason === "unavailable")) {
+    return { ok: false, error: "The uploads are still being verified. Try again in a moment." }
+  }
+  if (verification.some(({ result }) => !result.ok)) {
+    await admin.storage.from(BUCKET).remove(files.map((file) => file.filePath))
+    return { ok: false, error: "One of the uploaded files did not match the selected recording or image." }
+  }
+
+  const verifiedFiles = verification.map(({ file, result }) => {
+    if (!result.ok) throw new Error("Unreachable unverified website defect file")
+    return { ...file, fileSize: result.actual.size, fileType: result.actual.type }
+  })
+  const primary = verifiedFiles[0]
+  const description = String(input.description ?? "").trim().slice(0, 4000)
+  const fallbackTitle = description.split(/\r?\n/)[0]?.trim() || primary.fileName.replace(/\.[^.]+$/, "") || "Website issue"
+  const title = clean(input.title || fallbackTitle, 160)
+  const pageUrl = clean(input.pageUrl, 1000)
+  const priority = new Set(["normal", "high", "urgent"]).has(String(input.priority)) ? String(input.priority) : "normal"
+  const extraFiles = verifiedFiles.slice(1).map((file) => ({
+    position: file.position,
+    storage_bucket: BUCKET,
+    file_name: file.fileName,
+    file_path: file.filePath,
+    mime_type: file.fileType,
+    file_size: file.fileSize,
+  }))
+
+  const issuePayload = {
+    id: input.defectId,
+    title,
+    description,
+    page_url: pageUrl,
+    status: "new",
+    priority,
+    file_name: primary.fileName,
+    file_path: primary.filePath,
+    mime_type: primary.fileType,
+    file_size: primary.fileSize,
+    assigned_to: "Codex",
+  }
+  const { data: issueNumber, error } = await supabase.rpc("create_website_defect_batch", {
+    p_issue: issuePayload,
+    p_attachments: extraFiles,
+  })
+  const savedIssueNumber = Number(issueNumber)
+  if (error || !Number.isSafeInteger(savedIssueNumber) || savedIssueNumber < 1) {
+    const { data: existing } = await supabase.from("website_defects")
+      .select("issue_number,created_by,file_name,file_path,mime_type,file_size")
+      .eq("id", input.defectId)
+      .maybeSingle<{ issue_number: number; created_by: string; file_name: string; file_path: string; mime_type: string; file_size: number }>()
+    if (existing?.created_by === user.id
+      && existing.file_name === primary.fileName
+      && existing.file_path === primary.filePath
+      && existing.mime_type === primary.fileType
+      && Number(existing.file_size) === primary.fileSize) {
+      const { data: existingAttachments } = await supabase.from("website_defect_attachments")
+        .select("position,file_name,file_path,mime_type,file_size")
+        .eq("defect_id", input.defectId)
+        .order("position", { ascending: true })
+        .returns<Array<{ position: number; file_name: string; file_path: string; mime_type: string; file_size: number }>>()
+      const exactManifest = (existingAttachments?.length ?? -1) === extraFiles.length
+        && extraFiles.every((file, index) => {
+          const saved = existingAttachments?.[index]
+          return saved?.position === file.position
+            && saved.file_name === file.file_name
+            && saved.file_path === file.file_path
+            && saved.mime_type === file.mime_type
+            && Number(saved.file_size) === file.file_size
+        })
+      if (exactManifest) return { ok: true, data: { issueNumber: existing.issue_number } }
+    }
+    return { ok: false, error: "The issue files could not be saved together. Try again; uploaded files were kept safely." }
+  }
+  revalidatePath("/admin/ai-tools/website-defects")
+  return { ok: true, data: { issueNumber: savedIssueNumber } }
 }
 
 export async function updateWebsiteDefectAction(input: { id: string; title?: string; description?: string; pageUrl?: string; reviewNotes?: string; status?: string; priority?: string }): Promise<Result> {

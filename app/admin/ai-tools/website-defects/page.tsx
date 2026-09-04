@@ -23,13 +23,59 @@ type WebsiteDefectRow = {
   created_at: string
 }
 
+type WebsiteDefectAttachmentRow = {
+  id: string
+  defect_id: string
+  position: number
+  file_name: string
+  file_path: string
+  mime_type: string
+  file_size: number
+}
+
 export default async function WebsiteDefectsPage() {
   const { supabase, access } = await requireManagerPortalProfile()
   if (!canReportWebsiteDefects(access)) redirect("/")
   const { data } = await supabase.from("website_defects").select("id,issue_number,title,description,page_url,status,priority,file_name,file_path,mime_type,file_size,assigned_to,review_notes,created_at").order("created_at", { ascending: false }).limit(100).returns<WebsiteDefectRow[]>()
-  const issues: WebsiteDefectRecord[] = await Promise.all((data ?? []).map(async (row) => {
-    const { data: signed } = await supabase.storage.from("website-defects").createSignedUrl(row.file_path, 60 * 60)
-    return { id: row.id, issueNumber: row.issue_number, title: row.title, description: row.description, pageUrl: row.page_url, status: row.status, priority: row.priority, fileName: row.file_name, mimeType: row.mime_type, fileSize: row.file_size, mediaUrl: signed?.signedUrl ?? null, assignedTo: row.assigned_to, reviewNotes: row.review_notes, createdAt: row.created_at }
+  const defectRows = data ?? []
+  const defectIds = defectRows.map((row) => row.id)
+  const { data: attachmentData } = defectIds.length
+    ? await supabase.from("website_defect_attachments").select("id,defect_id,position,file_name,file_path,mime_type,file_size").in("defect_id", defectIds).order("position", { ascending: true }).returns<WebsiteDefectAttachmentRow[]>()
+    : { data: [] as WebsiteDefectAttachmentRow[] }
+  const attachmentRows = attachmentData ?? []
+  const allPaths = [...defectRows.map((row) => row.file_path), ...attachmentRows.map((row) => row.file_path)]
+  const { data: signedFiles } = allPaths.length
+    ? await supabase.storage.from("website-defects").createSignedUrls(allPaths, 60 * 60)
+    : { data: [] }
+  const signedUrlByPath = new Map((signedFiles ?? []).map((file) => [file.path, file.signedUrl]))
+  const attachmentsByDefect = new Map<string, WebsiteDefectAttachmentRow[]>()
+  for (const attachment of attachmentRows) {
+    const list = attachmentsByDefect.get(attachment.defect_id) ?? []
+    list.push(attachment)
+    attachmentsByDefect.set(attachment.defect_id, list)
+  }
+  const issues: WebsiteDefectRecord[] = defectRows.map((row) => ({
+    id: row.id,
+    issueNumber: row.issue_number,
+    title: row.title,
+    description: row.description,
+    pageUrl: row.page_url,
+    status: row.status,
+    priority: row.priority,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    fileSize: row.file_size,
+    mediaUrl: signedUrlByPath.get(row.file_path) ?? null,
+    assignedTo: row.assigned_to,
+    reviewNotes: row.review_notes,
+    createdAt: row.created_at,
+    attachments: (attachmentsByDefect.get(row.id) ?? []).map((attachment) => ({
+      id: attachment.id,
+      fileName: attachment.file_name,
+      mimeType: attachment.mime_type,
+      fileSize: attachment.file_size,
+      mediaUrl: signedUrlByPath.get(attachment.file_path) ?? null,
+    })),
   }))
   const { data: qaRows } = await supabase.from("website_qa_checks").select("id,title,instructions,last_result,last_notes,last_checked_at").order("journey_order", { ascending: true }).returns<Array<{ id: string; title: string; instructions: string; last_result: string; last_notes: string; last_checked_at: string | null }>>()
   const checks: WebsiteQaCheckRecord[] = (qaRows ?? []).map((row) => ({ id: row.id, title: row.title, instructions: row.instructions, lastResult: row.last_result, lastNotes: row.last_notes, lastCheckedAt: row.last_checked_at }))
