@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
+import { CarlosDailyScorecard } from "@/components/buildflow/carlos-daily-scorecard";
 import { ContractorCallScript } from "@/components/buildflow/carlos-outreach-scripts";
 import {
   AddOutreachLead,
@@ -20,6 +21,7 @@ import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { ManagerGoalPrioritySelect } from "@/components/buildflow/manager-goal-priority-select";
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { buildCarlosDailyGoals, countUniqueSuccessfulCommunications, newYorkBusinessDayRange } from "@/lib/carlos-daily-goals";
 import {
   CARLOS_FIXED_GOALS,
   fixedGoalKey as parseFixedGoalKey,
@@ -322,13 +324,16 @@ export async function CarlosGoalsWorkspace({
   embedded?: boolean;
 }) {
   const { supabase, access } = await requireManagerPortalProfile();
+  const day = newYorkBusinessDayRange();
+  const carlosProfile = await supabase.from("profiles").select("id").eq("role", "staff").eq("email", "buildavantiap@gmail.com").eq("is_active", true).limit(1).maybeSingle<{ id: string }>();
+  const carlosId = carlosProfile.data?.id || "00000000-0000-0000-0000-000000000000";
   const goalsQuery = supabase
     .from("manager_goals")
     .select("id,assignee,title,details,status,is_focus")
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult, publishedResult] =
+  const [clientResult, goalResult, leadResult, publishedResult, handledLeadResult, clientActivityResult, vendorContactResult, preparedQuoteResult, closedRequestResult] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -366,10 +371,22 @@ export async function CarlosGoalsWorkspace({
             priority: number;
           }>
         >(),
+      day ? supabase.from("manager_outreach_leads").select("id", { count: "exact", head: true }).neq("status", "new").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
+      day ? supabase.from("manager_staff_activity_events").select("id,occurred_at,metadata").eq("user_id", carlosId).eq("event_type", "communication_sent").gte("occurred_at", day.start).lt("occurred_at", day.end).limit(500).returns<Array<{ id: string; occurred_at: string; metadata: { outcome?: string; external_id?: string; channel?: string; recipient?: string; subject?: string } | null }>>() : Promise.resolve({ data: [] }),
+      day ? supabase.from("quote_request_supplier_recommendations").select("supplier_id", { count: "exact", head: true }).eq("updated_by", carlosId).neq("contact_status", "not_contacted").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
+      day ? supabase.from("request_client_documents").select("id", { count: "exact", head: true }).eq("updated_by", carlosId).in("document_type", ["estimate", "invoice"]).gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
+      day ? supabase.from("quote_requests").select("id", { count: "exact", head: true }).eq("manager_assignee", "carlos").eq("status", "closed").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
     ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
+  const dailyGoals = buildCarlosDailyGoals({
+    leads: handledLeadResult.count ?? 0,
+    clients: countUniqueSuccessfulCommunications(clientActivityResult.data ?? []),
+    vendors: vendorContactResult.count ?? 0,
+    quotes: preparedQuoteResult.count ?? 0,
+    closed: closedRequestResult.count ?? 0,
+  });
   const carlosFixedTaskKeys = new Set(
     Object.keys(CARLOS_FIXED_GOALS).map((key) => `carlos-fixed-${key}`),
   );
@@ -441,6 +458,7 @@ export async function CarlosGoalsWorkspace({
 
   const goalsWorkspace = (
     <>
+      <CarlosDailyScorecard goals={dailyGoals} />
       <section
         className="grid gap-2 md:grid-cols-2 xl:grid-cols-3"
         aria-label="Carlos tasks"

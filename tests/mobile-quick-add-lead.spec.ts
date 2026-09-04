@@ -54,3 +54,8 @@ test("Lead review is exception-only while trusted clear screenshots use the auto
   expect(page).toContain("confirmAuraIntakeAction")
   expect(page).toContain("cancelAuraIntakeAction")
 })
+
+test("each lead exposes the explicit editable welcome package action", async () => {
+  const directory = await readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8")
+  expect(directory.match(/showWelcomePackageButton/g)).toHaveLength(2)
+})
