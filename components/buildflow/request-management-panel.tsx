@@ -184,8 +184,8 @@ export function RequestManagementPanel({
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
-  const [supplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
-  const [recommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
+  const supplierIds = [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])]
+  const recommendedSupplierIds = [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])]
   const [supplierContactStatuses, setSupplierContactStatuses] = useState<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])))
   const [supplierNoteDrafts, setSupplierNoteDrafts] = useState<Record<string, string>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.note || ""])))
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
@@ -253,6 +253,7 @@ export function RequestManagementPanel({
   useEffect(() => {
     pendingRef.current = pending
   }, [pending])
+
   const clientMessage = useMemo(() => {
     const greetingText = greeting === "hello" ? `Hello ${client.name || "there"},` : greeting === "morning" ? `Good morning ${firstName},` : greeting === "afternoon" ? `Good afternoon ${firstName},` : `Hi ${firstName},`
     const selectedText = REPLY_BLOCKS.filter((block) => block.id === replyBlock).flatMap((block) => {
@@ -410,9 +411,14 @@ export function RequestManagementPanel({
   function openManualPricing() {
     setFeedback("")
     startTransition(async () => {
-      const result = await openRequestPricingComparisonAction(requestId)
-      if (!result.ok) { setFeedbackError(true); setFeedback(result.error); return }
-      router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
+      try {
+        const result = await openRequestPricingComparisonAction(requestId)
+        if (!result.ok) { setFeedbackError(true); setFeedback(result.error); return }
+        router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
+      } catch {
+        setFeedbackError(true)
+        setFeedback("The comparison could not be opened. Check the connection and try again.")
+      }
     })
   }
 
@@ -421,29 +427,42 @@ export function RequestManagementPanel({
     setSupplierContactStatuses((current) => ({ ...current, [supplierId]: status }))
     setFeedback("")
     startTransition(async () => {
-      const result = await updateRequestSupplierContactStatusAction({ requestId, supplierId, status })
-      if (!result.ok) {
+      try {
+        const result = await updateRequestSupplierContactStatusAction({ requestId, supplierId, status })
+        if (!result.ok) {
+          setSupplierContactStatuses((current) => ({ ...current, [supplierId]: previous }))
+          setFeedbackError(true)
+          setFeedback(result.error)
+          return
+        }
+        setFeedbackError(false)
+        setFeedback("Supplier status saved.")
+        router.refresh()
+      } catch {
         setSupplierContactStatuses((current) => ({ ...current, [supplierId]: previous }))
         setFeedbackError(true)
-        setFeedback(result.error)
-        return
+        setFeedback("The supplier status was not saved. Check the connection and try again.")
       }
-      setFeedbackError(false)
-      setFeedback("Supplier status saved.")
     })
   }
 
   function saveSupplierProgressNote(supplierId: string) {
     setFeedback("")
     startTransition(async () => {
-      const result = await saveRequestSupplierProgressNoteAction({ requestId, supplierId, note: supplierNoteDrafts[supplierId] || "" })
-      if (!result.ok) {
+      try {
+        const result = await saveRequestSupplierProgressNoteAction({ requestId, supplierId, note: supplierNoteDrafts[supplierId] || "" })
+        if (!result.ok) {
+          setFeedbackError(true)
+          setFeedback(result.error)
+          return
+        }
+        setFeedbackError(false)
+        setFeedback("Supplier note saved.")
+        router.refresh()
+      } catch {
         setFeedbackError(true)
-        setFeedback(result.error)
-        return
+        setFeedback("The supplier note was not saved. Check the connection and try again.")
       }
-      setFeedbackError(false)
-      setFeedback("Supplier note saved.")
     })
   }
 
@@ -728,7 +747,7 @@ export function RequestManagementPanel({
 
   const primaryWorkflowClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
   const secondaryWorkflowClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
-  const compactWorkflowClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-[#0066cc] transition hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] disabled:opacity-45"
+  const compactWorkflowClass = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-[#0066cc] transition hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] disabled:opacity-45 sm:min-h-9"
 
   function renderStep2PrimaryAction() {
     if (workflow.step2Complete) {
@@ -777,7 +796,7 @@ export function RequestManagementPanel({
             const contactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] || (row.bid ? "quote_received" : row.supplierPackage ? "request_sent" : "not_contacted") : "not_contacted"
             return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem]">
               <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
-              <div role="cell" className="col-span-2 grid gap-1.5 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
+              <div role="cell" className="col-span-2 grid gap-1.5 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-11 w-full rounded-lg border px-2.5 text-xs font-bold sm:min-h-10 ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800 sm:min-h-9" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45 sm:min-h-9">Save</button></div> : null}</div>
               <div role="cell" className="row-start-1 flex justify-end gap-1.5 sm:col-start-3">
               {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
               {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
@@ -834,7 +853,7 @@ export function RequestManagementPanel({
                 return <article key={comparison.id} className="rounded-xl border border-sky-200 bg-sky-50 p-3">
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{comparison.title}</p><p className="mt-0.5 text-[10px] font-semibold text-slate-500">{comparison.quoteNumber || "No quote number"} · {comparison.bids.length} supplier quote{comparison.bids.length === 1 ? "" : "s"}</p></div><a href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-[#0071e3] px-3 text-xs font-black text-white">Open comparison</a></div>
                   {comparison.bids.length ? <div className="mt-2 grid gap-1">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-2.5 py-2 text-xs"><span className="truncate font-bold text-slate-700">{bid.supplierName}</span><span className="shrink-0 font-black text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</span></div>)}</div> : null}
-                  {comparison.documents.length ? <div className="mt-2 flex flex-wrap gap-1.5">{comparison.documents.map((file) => file.sourceUrl ? <a key={file.id} href={file.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-[#0066cc]"><FileText className="h-3.5 w-3.5" />{file.fileName}</a> : <span key={file.id} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-bold text-slate-500"><FileText className="h-3.5 w-3.5" />{file.fileName}</span>)}</div> : null}
+                  {comparison.documents.length ? <div className="mt-2 flex flex-wrap gap-1.5">{comparison.documents.map((file) => file.sourceUrl ? <a key={file.id} href={file.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-[#0066cc] sm:min-h-9"><FileText className="h-3.5 w-3.5" />{file.fileName}</a> : <span key={file.id} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-bold text-slate-500 sm:min-h-9"><FileText className="h-3.5 w-3.5" />{file.fileName}</span>)}</div> : null}
                 </article>
               }) : <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center"><FolderOpen className="mx-auto h-6 w-6 text-slate-400" /><p className="mt-2 text-sm font-black text-slate-700">No price comparisons yet</p><p className="mt-1 text-xs text-slate-500">Upload a supplier quote or enter pricing manually for this request.</p></div>}
             </div>

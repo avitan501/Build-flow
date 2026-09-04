@@ -4,6 +4,7 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 import { comparisonItemForRequestSources } from "@/lib/request-worktable-matching"
+import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing"
 import { createAutosaveVersionGuard } from "@/lib/autosave-version"
 
 const root = process.cwd()
@@ -61,9 +62,10 @@ test("review and organization are one compact four-column material work table", 
 })
 
 test("request changes synchronize between staff screens", async () => {
-  const [page, liveSync] = await Promise.all([
+  const [page, liveSync, management] = await Promise.all([
     source(pagePath),
     source(liveSyncPath),
+    source(managementPath),
   ])
 
   expect(page).toContain("<RequestLiveSync />")
@@ -73,6 +75,10 @@ test("request changes synchronize between staff screens", async () => {
   expect(page).toContain("(supplierRecommendations ?? []).map")
   expect(page).toContain("entry.contact_status")
   expect(page).toContain("entry.notes")
+  expect(page).toContain("entry.contact_status}:${entry.notes}")
+  expect(management).toContain("router.refresh()")
+  expect(management).not.toMatch(/const \[supplierIds\]\s*=\s*useState/)
+  expect(management).not.toMatch(/const \[recommendedSupplierIds\]\s*=\s*useState/)
 })
 
 test("staff can add a request item after the client submitted the request", async () => {
@@ -87,6 +93,24 @@ test("staff can add a request item after the client submitted the request", asyn
   expect(actions).toContain('select("department")')
   expect(actions).toContain("departmentSource?.department")
   expect(actions).not.toContain('department: "Others"')
+  expect(actions).toContain("revalidatePath(`/owner/materials/requests/${requestId}`)")
+  expect(await source(originalEditorPath)).toContain("The item was not saved. Check the connection and try again.")
+})
+
+test("request actions fail visibly without throwing and stay compact with mobile-size targets", async () => {
+  const [management, editor] = await Promise.all([
+    source(managementPath),
+    source(originalEditorPath),
+  ])
+
+  expect(management).toContain("The comparison could not be opened. Check the connection and try again.")
+  expect(management).toContain("The supplier status was not saved. Check the connection and try again.")
+  expect(management).toContain("The supplier note was not saved. Check the connection and try again.")
+  expect(management).toContain("router.refresh()")
+  expect(management).toContain("min-h-11")
+  expect(management).toContain("sm:min-h-9")
+  expect(editor).toContain("min-h-11")
+  expect(editor).toContain("sm:min-h-9")
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {
@@ -107,8 +131,7 @@ test("comparison rows preserve exact request and supplier quote provenance", asy
     migration.indexOf("if new.source_request_item_id is null then\n    return new"),
   )
   expect(supplierActions).toContain("source_request_item_id: item.id")
-  expect(supplierActions).toContain("metadata?.ai_organized === true")
-  expect(supplierActions).toContain("const comparisonItems = organizedItems.length")
+  expect(supplierActions).toContain("effectiveRequestComparisonItems")
   expect(documentActions).toContain("source_request_item_id: item.id")
   expect(worktable).not.toContain("comparisonWords")
   expect(page).toContain("bid.source_supplier_quote_id")
@@ -275,7 +298,8 @@ test("client contact is available at the request header and does not consume ste
   expect(page).not.toContain("{profile?.email}")
   expect(contact).toContain("<Phone")
   expect(contact).toContain('aria-label="Contact client"')
-  expect(contact).toContain("h-9 w-9")
+  expect(contact).toContain("h-11 w-11")
+  expect(contact).toContain("sm:h-9 sm:w-9")
   expect(management).not.toContain("step={4}")
   expect(management).not.toContain('title="Contact client"')
   expect(management).not.toContain('<details id="contact-client"')
@@ -387,15 +411,14 @@ test("organizer has bounded OpenAI deadlines and the server action only enqueues
 })
 
 test("partial AI organization keeps manually added request rows in pricing", async () => {
-  const [page, supplierActions] = await Promise.all([
-    source(pagePath),
-    source(supplierQuoteActionsPath),
-  ])
+  const original = { id: "original", name: "Drywall", quantity: 20, unit: "sheet", department: "Drywall", metadata: null }
+  const organized = { id: "organized", name: "5/8 drywall", quantity: 20, unit: "sheet", department: "Drywall", metadata: { ai_organized: true, source_item_id: "original" } }
+  const manual = { id: "manual", name: "Joint compound", quantity: 2, unit: "bucket", department: "Drywall", metadata: { manually_added_at: "2026-09-04T00:00:00Z" } }
 
-  for (const implementation of [page, supplierActions]) {
-    expect(implementation).toContain("organizedSourceIds")
-    expect(implementation).toContain("!organizedSourceIds.has(item.id)")
-  }
+  expect(effectiveRequestComparisonItems([original, organized, manual]).map((item) => item.id)).toEqual([
+    "organized",
+    "manual",
+  ])
 })
 
 test("step three starts from the latest client-ready-to-pay values", async () => {

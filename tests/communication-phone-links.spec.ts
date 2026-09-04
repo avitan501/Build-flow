@@ -86,6 +86,7 @@ test("Communications uses a controlled launcher and prioritizes exact conversati
   expect(launcher).toContain("href={callHref || undefined}")
   expect(launcher).toContain("Copy number")
   expect(launcher).toContain("does not place a call")
+  expect(launcher).toContain("h-11 w-11")
   expect(launcher).not.toContain("@2chat/voice-sdk")
   expect(launcher).not.toContain("getTwoChatVoiceTokenAction")
 

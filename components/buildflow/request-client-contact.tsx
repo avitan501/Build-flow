@@ -13,7 +13,7 @@ export function RequestClientContact() {
     <button
       type="button"
       onClick={openContactComposer}
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 sm:h-9 sm:w-9"
       aria-label="Contact client"
       title="Contact client"
       aria-haspopup="dialog"
