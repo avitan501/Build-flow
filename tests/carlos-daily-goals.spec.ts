@@ -50,6 +50,6 @@ test("Carlos dashboard counts successful persisted activity without manual self-
   expect(page).toContain('neq("contact_status", "not_contacted")')
   expect(page).toContain('in("document_type", ["estimate", "invoice"])')
   expect(page).toContain('eq("status", "closed")')
-  expect(card).toContain("Failed attempts and repeated rows do not earn credit")
+  expect(card).toContain("Carlos daily wins")
   expect(page).not.toContain("manualDailyGoal")
 })

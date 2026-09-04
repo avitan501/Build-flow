@@ -60,7 +60,6 @@ function GoalDisclosure({
   number,
   eyebrow,
   title,
-  description,
   status = "open",
   priority = 3,
   canManagePriority = false,
@@ -71,7 +70,6 @@ function GoalDisclosure({
   number: number;
   eyebrow: string;
   title: string;
-  description?: string;
   status?: ManagerGoalStatus;
   priority?: number;
   canManagePriority?: boolean;
@@ -92,11 +90,6 @@ function GoalDisclosure({
             {eyebrow}
           </p>
           <h3 className="text-sm font-semibold leading-5">{title}</h3>
-          {description ? (
-            <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500">
-              {description}
-            </p>
-          ) : null}
         </div>
         <ChevronDown
           className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180"
@@ -134,7 +127,6 @@ function SupplierNetworkGoalLink({
         <div className="min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">Supplier network</p>
           <h3 className="text-sm font-semibold leading-5">Build Supplier Relationships</h3>
-          <p className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500">Open suppliers, channels, contacts and next steps.</p>
         </div>
         <ArrowRight className="h-4 w-4 text-[#0066cc]" aria-hidden="true" />
       </Link>
@@ -167,7 +159,6 @@ function AbcSupplyDemoGoal({ status, priority }: { status: ManagerGoalStatus; pr
       number={3}
       eyebrow="ABC"
       title="Prepare ABC Demo"
-      description="Finish branch, product, price, and demo checks."
     >
       <div className="grid gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
@@ -245,7 +236,6 @@ function ClientTargetGoal({
       number={1}
       eyebrow="Clients"
       title="Contact New Clients"
-      description="Call new leads and record the next step."
     >
       <ContractorCallScript />
       <div className="flex flex-wrap gap-2">

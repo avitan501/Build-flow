@@ -1,5 +1,7 @@
 import { CheckCircle2 } from "lucide-react"
 
+import { CarlosDashboardAutoRefresh } from "@/components/buildflow/carlos-dashboard-auto-refresh"
+
 export type CarlosDailyGoal = {
   key: "leads" | "clients" | "vendors" | "quotes" | "closed"
   label: string
@@ -13,6 +15,7 @@ export function CarlosDailyScorecard({ goals }: { goals: CarlosDailyGoal[] }) {
   const percent = target ? Math.round((completed / target) * 100) : 0
 
   return <section className="mb-3 overflow-hidden rounded-lg border border-sky-200 bg-white shadow-sm" aria-labelledby="carlos-daily-goals-title">
+    <CarlosDashboardAutoRefresh />
     <header className="flex items-center justify-between gap-3 border-b border-sky-100 bg-sky-50 px-3 py-2.5">
       <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-sky-700">Today · New York time</p><h2 id="carlos-daily-goals-title" className="text-sm font-bold">Carlos daily wins</h2></div>
       <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-sky-800">{percent}%</span>
@@ -26,6 +29,5 @@ export function CarlosDailyScorecard({ goals }: { goals: CarlosDailyGoal[] }) {
         </div>
       })}
     </div>
-    <p className="border-t border-slate-100 px-3 py-2 text-[10px] leading-4 text-slate-500">Updated only from saved, successful website activity. Failed attempts and repeated rows do not earn credit.</p>
   </section>
 }

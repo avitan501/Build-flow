@@ -344,9 +344,6 @@ export default async function AdminDashboardPage({
                     : "Requests needing work"}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Most recently updated first
-              </p>
             </div>
             {selectedStage ? (
               <Link
@@ -451,9 +448,6 @@ export default async function AdminDashboardPage({
               <strong id="manager-tools-heading" className="block text-sm">
                 Manager tools
               </strong>
-              <span className="block truncate text-xs text-slate-500">
-                Directories, suppliers, AI tools, payments, and notifications
-              </span>
             </span>
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
           </summary>
