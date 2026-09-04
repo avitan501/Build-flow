@@ -276,6 +276,10 @@ export default async function AdminDashboardPage({
                       href: "/admin/goals-progress/website-work",
                       label: "David Dashboard",
                     },
+                    {
+                      href: "/admin/ai-tools/work-browser",
+                      label: "Live Employee Screen",
+                    },
                     { href: "/admin/payments", label: "Payment Center" },
                   ]
                 : []),

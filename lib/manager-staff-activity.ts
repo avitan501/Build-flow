@@ -42,6 +42,7 @@ const MANAGER_ROUTE_LABELS: Array<[prefix: string, label: string]> = [
   ["/admin/ai-tools/material-list", "AI material list"],
   ["/admin/ai-tools/media-messages", "Media messages"],
   ["/admin/ai-tools/order-test", "Order testing"],
+  ["/admin/ai-tools/work-browser", "Employee work browser"],
   ["/admin/ai-tools/sms-replies", "AI text replies"],
   ["/admin/ai-tools/aura", "Aura AI"],
   ["/admin/supplier-approvals", "Supplier approvals"],

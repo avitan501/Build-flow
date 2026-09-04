@@ -2,7 +2,10 @@ import { ArrowLeft, Clock3, Eye, FilePenLine, Mail, MessageCircle, MessageSquare
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { CarlosActivityAiReviewCard } from "@/components/buildflow/carlos-activity-ai-review";
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { CARLOS_ACTIVITY_AI_REVIEW_PREFIX, parseCarlosActivityAiReview } from "@/lib/carlos-activity-review";
+import { newYorkBusinessDayRange } from "@/lib/carlos-daily-goals";
 import {
   managerActivityDuration,
   summarizeManagerStaffActivity,
@@ -66,6 +69,11 @@ export default async function CarlosActivityPage() {
   const events = result.error ? [] : result.data ?? [];
   const summary = summarizeManagerStaffActivity(events);
   const latestLabel = summary.latestEvent ? time(summary.latestEvent.occurred_at) : null;
+  const today = newYorkBusinessDayRange();
+  const reviewResult = today
+    ? await supabase.from("manager_goals").select("details").eq("assignee", "david").eq("title", `Carlos AI review - ${today.dateKey}`).like("details", `${CARLOS_ACTIVITY_AI_REVIEW_PREFIX}%`).order("updated_at", { ascending: false }).limit(1).maybeSingle<{ details: string | null }>()
+    : { data: null, error: null };
+  const latestReview = parseCarlosActivityAiReview(reviewResult.data?.details);
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
@@ -89,6 +97,8 @@ export default async function CarlosActivityPage() {
         <section className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950" aria-label="One glance summary">
           {summary.last24Hours.length ? <p><strong>Last 24 hours:</strong> {summary.pageViews} page{summary.pageViews === 1 ? "" : "s"} opened across {summary.areas.length} area{summary.areas.length === 1 ? "" : "s"}, {summary.successfulCommunications} completed communication{summary.successfulCommunications === 1 ? "" : "s"}, and {summary.recordChanges} record change{summary.recordChanges === 1 ? "" : "s"}.{summary.failedCommunications ? ` ${summary.failedCommunications} communication attempt${summary.failedCommunications === 1 ? "" : "s"} need attention.` : ""}{summary.topArea ? ` Most used: ${summary.topArea}.` : ""}{summary.latestPage ? ` Latest page: ${summary.latestPage}.` : ""}</p> : <p><strong>Last 24 hours:</strong> No Carlos activity was recorded.{latestLabel ? ` Last earlier activity: ${latestLabel}.` : ""}</p>}
         </section>
+
+        <CarlosActivityAiReviewCard initialReview={latestReview} />
 
         <section className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3"><h2 className="font-semibold">Live history</h2><p className="text-xs text-slate-500">Newest first. Recipient, request, outcome, and duration appear when available; message contents and passwords are never recorded here.</p></div>
