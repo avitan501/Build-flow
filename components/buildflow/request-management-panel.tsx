@@ -186,7 +186,8 @@ export function RequestManagementPanel({
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
   const supplierIds = [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])]
   const recommendedSupplierIds = [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])]
-  const [supplierContactStatuses, setSupplierContactStatuses] = useState<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])))
+  const supplierContactStatuses = useMemo<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])), [initialSupplierRecommendations])
+  const [supplierContactStatusOverrides, setSupplierContactStatusOverrides] = useState<Record<string, { base: RequestSupplierContactStatus; value: RequestSupplierContactStatus }>>({})
   const [supplierNoteDrafts, setSupplierNoteDrafts] = useState<Record<string, string>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.note || ""])))
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
@@ -423,14 +424,20 @@ export function RequestManagementPanel({
   }
 
   function updateSupplierContactStatus(supplierId: string, status: RequestSupplierContactStatus) {
-    const previous = supplierContactStatuses[supplierId] || "not_contacted"
-    setSupplierContactStatuses((current) => ({ ...current, [supplierId]: status }))
+    const base = supplierContactStatuses[supplierId] || "not_contacted"
+    const previousOverride = supplierContactStatusOverrides[supplierId]
+    setSupplierContactStatusOverrides((current) => ({ ...current, [supplierId]: { base, value: status } }))
     setFeedback("")
     startTransition(async () => {
       try {
         const result = await updateRequestSupplierContactStatusAction({ requestId, supplierId, status })
         if (!result.ok) {
-          setSupplierContactStatuses((current) => ({ ...current, [supplierId]: previous }))
+          setSupplierContactStatusOverrides((current) => {
+            if (previousOverride) return { ...current, [supplierId]: previousOverride }
+            const next = { ...current }
+            delete next[supplierId]
+            return next
+          })
           setFeedbackError(true)
           setFeedback(result.error)
           return
@@ -439,7 +446,12 @@ export function RequestManagementPanel({
         setFeedback("Supplier status saved.")
         router.refresh()
       } catch {
-        setSupplierContactStatuses((current) => ({ ...current, [supplierId]: previous }))
+        setSupplierContactStatusOverrides((current) => {
+          if (previousOverride) return { ...current, [supplierId]: previousOverride }
+          const next = { ...current }
+          delete next[supplierId]
+          return next
+        })
         setFeedbackError(true)
         setFeedback("The supplier status was not saved. Check the connection and try again.")
       }
@@ -793,7 +805,13 @@ export function RequestManagementPanel({
           </div>
 
           {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
-            const contactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] || (row.bid ? "quote_received" : row.supplierPackage ? "request_sent" : "not_contacted") : "not_contacted"
+            const persistedContactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] : undefined
+            const statusOverride = row.supplier ? supplierContactStatusOverrides[row.supplier.id] : undefined
+            const contactStatus = row.supplier
+              ? statusOverride && statusOverride.base === (persistedContactStatus || "not_contacted")
+                ? statusOverride.value
+                : persistedContactStatus || (row.bid ? "quote_received" : row.supplierPackage ? "request_sent" : "not_contacted")
+              : "not_contacted"
             return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem]">
               <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
               <div role="cell" className="col-span-2 grid gap-1.5 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-11 w-full rounded-lg border px-2.5 text-xs font-bold sm:min-h-10 ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800 sm:min-h-9" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45 sm:min-h-9">Save</button></div> : null}</div>

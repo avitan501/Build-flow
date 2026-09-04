@@ -81,6 +81,25 @@ test("request changes synchronize between staff screens", async () => {
   expect(management).not.toMatch(/const \[recommendedSupplierIds\]\s*=\s*useState/)
 })
 
+test("supplier progress persists centrally and refreshed staff screens do not keep the first local snapshot", async () => {
+  const [page, actions, management] = await Promise.all([
+    source(pagePath),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+    source(managementPath),
+  ])
+
+  expect(page).toContain("const admin = createAdminClient()")
+  expect(page).toMatch(/admin\s*\.from\("quote_request_supplier_recommendations"\)/)
+  expect(page).toContain("supplierRecommendationsError")
+  expect(actions).toContain('admin.from("quote_request_supplier_recommendations").upsert')
+  expect(actions).toContain('.select("contact_status").single')
+  expect(actions).toContain("savedStatus?.contact_status !== status")
+  expect(actions).not.toContain("The supplier status was not saved because its history could not be recorded.")
+  expect(management).toContain("supplierContactStatusOverrides")
+  expect(management).toContain("statusOverride.base === (persistedContactStatus || \"not_contacted\")")
+  expect(management).not.toMatch(/const \[supplierContactStatuses, setSupplierContactStatuses\]\s*=\s*useState/)
+})
+
 test("staff can add a request item after the client submitted the request", async () => {
   const [migration, actions] = await Promise.all([
     source(staffWorkflowMigrationPath),

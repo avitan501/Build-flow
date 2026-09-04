@@ -28,6 +28,7 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import { managerPipelineStage } from "@/lib/manager-dashboard";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
 import { formatSiteDateTime } from "@/lib/site-date-time";
@@ -118,6 +119,7 @@ export default async function OwnerMaterialRequestPage({
 }) {
   const { requestId } = await params;
   const { supabase } = await requireStaffProfile("customers");
+  const admin = createAdminClient();
   const [
     { data: request, error: requestError },
     { data: responses },
@@ -127,7 +129,7 @@ export default async function OwnerMaterialRequestPage({
     { data: packages },
     { data: clientActionEvents },
     { data: comparisons },
-    { data: supplierRecommendations },
+    { data: supplierRecommendations, error: supplierRecommendationsError },
     { data: clientDocuments },
     { data: currentClientDocumentAcceptances, error: clientDocumentAcceptancesError },
   ] = await Promise.all([
@@ -194,7 +196,7 @@ export default async function OwnerMaterialRequestPage({
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
       .returns<ComparisonRecord[]>(),
-    supabase
+    admin
       .from("quote_request_supplier_recommendations")
       .select("supplier_id,is_recommended,should_contact,contact_status,notes")
       .eq("request_id", requestId)
@@ -210,6 +212,7 @@ export default async function OwnerMaterialRequestPage({
       .returns<CurrentClientDocumentAcceptance[]>(),
   ]);
   if (attachmentsError) console.error("Request attachments could not be loaded", { requestId, reason: attachmentsError.message });
+  if (supplierRecommendationsError) throw new Error(`Could not load supplier progress: ${supplierRecommendationsError.message}`);
   if (clientDocumentAcceptancesError) console.error("Current client document acceptances could not be loaded", { requestId, reason: clientDocumentAcceptancesError.message });
   if (requestError)
     throw new Error(
