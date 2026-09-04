@@ -2,27 +2,16 @@
 
 import { Check, ClipboardList, Copy, Download, Plus, Trash2, Upload } from "lucide-react"
 import { useMemo, useState } from "react"
+import { parseMaterialIntakeList, type MaterialIntakeRow } from "@/lib/material-list-intake"
 
-type MaterialRow = { id: string; quantity: string; item: string; notes: string }
+type MaterialRow = MaterialIntakeRow
 
 function newId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
 }
 
-function parseLine(line: string): MaterialRow | null {
-  const clean = line.replace(/^[-*•]+\s*/, "").trim()
-  if (!clean || /^(qty|quantity)\s*[,|\t]/i.test(clean)) return null
-  const csv = clean.split(/\t|\s*\|\s*|,(?=\s*[^,]+$)/).map((part) => part.trim()).filter(Boolean)
-  if (csv.length >= 2 && /^\d+(?:\.\d+)?$/.test(csv[0])) return { id: newId(), quantity: csv[0], item: csv[1], notes: csv.slice(2).join("; ") }
-  const leading = clean.match(/^(\d+(?:\.\d+)?)\s+(?:x\s+)?(.+)$/i)
-  if (leading) return { id: newId(), quantity: leading[1], item: leading[2], notes: "" }
-  const trailing = clean.match(/^(.+?)\s+(?:x|qty\.?|quantity)\s*(\d+(?:\.\d+)?)$/i)
-  if (trailing) return { id: newId(), quantity: trailing[2], item: trailing[1], notes: "" }
-  return { id: newId(), quantity: "", item: clean, notes: "" }
-}
-
 function parseList(value: string) {
-  return value.split(/\r?\n/).map(parseLine).filter((row): row is MaterialRow => Boolean(row)).slice(0, 300)
+  return parseMaterialIntakeList(value, newId)
 }
 
 function csvCell(value: string) {
@@ -42,7 +31,7 @@ export function MaterialListOrganizer() {
   }
 
   function update(id: string, key: keyof Omit<MaterialRow, "id">, value: string) {
-    setRows((current) => current.map((row) => row.id === id ? { ...row, [key]: value } : row))
+    setRows((current) => current.map((row) => row.id === id ? { ...row, [key]: value, needsReview: false } : row))
   }
 
   async function copy() {
@@ -78,7 +67,8 @@ export function MaterialListOrganizer() {
 
       <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Organized output</p><h2 className="mt-1 text-lg font-bold text-slate-950">{rows.length} material {rows.length === 1 ? "line" : "lines"}</h2></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setRows((current) => [...current, { id: newId(), quantity: "", item: "", notes: "" }])} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700"><Plus className="h-4 w-4" />Add line</button><button type="button" disabled={!organizedText} onClick={copy} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 disabled:opacity-40">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Copied" : "Copy"}</button><button type="button" disabled={!rows.length} onClick={downloadCsv} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 disabled:opacity-40"><Download className="h-4 w-4" />CSV</button></div></div>
-        {rows.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[42rem] border-separate border-spacing-y-2 text-left"><thead><tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500"><th className="w-24 px-2">Quantity</th><th className="px-2">Material / specification</th><th className="px-2">Notes</th><th className="w-12"><span className="sr-only">Remove</span></th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td className="px-1"><input aria-label="Material quantity" inputMode="decimal" value={row.quantity} onChange={(event) => update(row.id, "quantity", event.target.value)} className={fieldClass} /></td><td className="px-1"><input aria-label="Material description" value={row.item} onChange={(event) => update(row.id, "item", event.target.value)} className={fieldClass} /></td><td className="px-1"><input aria-label="Material notes" value={row.notes} onChange={(event) => update(row.id, "notes", event.target.value)} className={fieldClass} /></td><td><button type="button" onClick={() => setRows((current) => current.filter((entry) => entry.id !== row.id))} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-rose-200 hover:text-rose-700" aria-label="Remove material line"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div> : <div className="mt-4 flex min-h-80 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 text-center"><div><ClipboardList className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-700">Paste a list and select Organize list.</p><p className="mt-1 text-xs text-slate-500">You can edit every line before copying or downloading it.</p></div></div>}
+        {rows.some((row) => row.needsReview) ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">Spelling or spoken-number corrections are marked for review. Confirm the quantity, dimensions, and material before using the list.</p> : null}
+        {rows.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[42rem] border-separate border-spacing-y-2 text-left"><thead><tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500"><th className="w-24 px-2">Quantity</th><th className="px-2">Material / specification</th><th className="px-2">Notes / confirmation</th><th className="w-12"><span className="sr-only">Remove</span></th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className={row.needsReview ? "bg-amber-50" : undefined}><td className="px-1"><input aria-label="Material quantity" inputMode="decimal" value={row.quantity} onChange={(event) => update(row.id, "quantity", event.target.value)} className={fieldClass} /></td><td className="px-1"><input aria-label="Material description" value={row.item} onChange={(event) => update(row.id, "item", event.target.value)} className={fieldClass} /></td><td className="px-1"><input aria-label="Material notes" value={row.notes} onChange={(event) => update(row.id, "notes", event.target.value)} className={fieldClass} /></td><td><button type="button" onClick={() => setRows((current) => current.filter((entry) => entry.id !== row.id))} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-rose-200 hover:text-rose-700" aria-label="Remove material line"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div> : <div className="mt-4 flex min-h-80 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 text-center"><div><ClipboardList className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-700">Paste a list and select Organize list.</p><p className="mt-1 text-xs text-slate-500">You can edit every line before copying or downloading it.</p></div></div>}
       </section>
     </div>
   )
