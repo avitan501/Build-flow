@@ -9,6 +9,7 @@ import {
   evaluateSmsReplyGate,
   filterSmsExactListItems,
   formatSmsRequestSummaryItem,
+  isSmsBareGreeting,
   inspectSmsQuestionStructure,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
@@ -780,6 +781,10 @@ test("staged unanswered follow-up is question-aware and cancels on every later r
   expect(smsUnansweredFollowUpEligible({ ...eligible, intent: "follow_up" })).toBe(false)
   expect(smsUnansweredFollowUpEligible({ ...eligible, requestComplete: true })).toBe(false)
   expect(smsUnansweredFollowUpEligible({ ...eligible, originalMessage: "STOP" })).toBe(false)
+  expect(isSmsBareGreeting("Hi")).toBe(true)
+  expect(isSmsBareGreeting("hola! ")).toBe(true)
+  expect(isSmsBareGreeting("Hi, I need drywall")).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, originalMessage: "Hi", intent: "greeting", questionReply: "How can we help?" })).toBe(false)
 
   const active = { sourceExists: true, autoSafeActive: true, hasLaterInbound: false, hasLaterOutbound: false, requestClosed: false }
   expect(smsUnansweredFollowUpCancellationReason(active)).toBeNull()

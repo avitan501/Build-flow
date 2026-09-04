@@ -66,13 +66,11 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(broker).toContain(
     "We couldn't send the text. Please try again shortly.",
   );
-  expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v5"');
+  expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v6"');
   const opening = publicStartTextOpeningMessage();
-  expect(opening).toContain("Welcome to Avantia Build.");
-  expect(opening).toContain("50 sheets — 5/8-in. regular Sheetrock");
-  expect(opening).toContain("45 pieces — 2x4x8 lumber");
-  expect(opening).toContain("Nothing is ordered or charged until you approve.");
-  expect(opening).toContain("Reply STOP to opt out.");
+  expect(opening).toBe(
+    "Hi, this is David with Avantia Build. Send your material list, photo, plan, or current quote here, and we’ll review pricing, availability, and delivery. You can also start here: https://build.avantiap.com",
+  );
   expect((broker.match(/sendQuoSms\(phone, PUBLIC_START_TEXT_OPENING\)/g) || [])).toHaveLength(1);
   expect(broker).not.toContain("sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE");
   expect(broker).toContain('delivery: "partial"');
@@ -101,7 +99,6 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   );
   expect(publicHandler).not.toContain("await req.json()");
   expect(broker).toContain("input.consent !== true");
-  expect(opening).toContain("Reply STOP to opt out");
   expect(broker).not.toContain("sendQuoSms(phone, input.message");
   expect(broker).toContain("interval '24 hours'");
   expect(broker).toContain("interval '1 hour'");

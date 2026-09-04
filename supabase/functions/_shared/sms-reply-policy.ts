@@ -1525,14 +1525,13 @@ export function smsBareOrderIntentReply(value: string) {
 }
 
 export function publicStartTextOpeningMessage() {
-  return [
-    "Welcome to Avantia Build.",
-    "Send your material list, one item per line, with the quantity and size if known.",
-    "Example:",
-    "50 sheets — 5/8-in. regular Sheetrock",
-    "45 pieces — 2x4x8 lumber",
-    "We’ll organize the request and send it back for your approval. Nothing is ordered or charged until you approve. Reply STOP to opt out.",
-  ].join("\n");
+  return "Hi, this is David with Avantia Build. Send your material list, photo, plan, or current quote here, and we’ll review pricing, availability, and delivery. You can also start here: https://build.avantiap.com";
+}
+
+export function isSmsBareGreeting(value: string) {
+  return /^\s*(?:hi|hello|hey|hola|shalom|שלום|היי|good (?:morning|afternoon|evening))[!.?\s]*$/iu.test(
+    value,
+  );
 }
 
 export function applyAvantiaMaterialDefaults<
@@ -2125,6 +2124,8 @@ export function smsUnansweredFollowUpEligible(params: {
       "follow_up",
     ].includes(params.intent)
   )
+    return false;
+  if (params.intent === "greeting" || isSmsBareGreeting(params.originalMessage))
     return false;
   if (isSmsOptOutMessage(params.originalMessage)) return false;
   if (!/[?？]/.test(reply) || /^\s*[?？]+\s*$/.test(reply)) return false;

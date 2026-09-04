@@ -14,7 +14,7 @@ type Channel = "sms" | "whatsapp" | "email"
 type TemplateKey = "welcome" | "friendly_follow_up" | "request_material_list" | "quote_follow_up" | "order_follow_up" | "custom"
 
 const templateLabels: Record<TemplateKey, string> = {
-  welcome: "Welcome",
+  welcome: "Welcome Package",
   friendly_follow_up: "Friendly follow-up",
   request_material_list: "Request material list",
   quote_follow_up: "Quote follow-up",
@@ -28,7 +28,7 @@ function firstName(name: string) {
 
 function templateMessage(template: TemplateKey, name: string, senderName: string) {
   const greeting = `Hi ${firstName(name)}`
-  if (template === "welcome") return `${greeting}, this is ${senderName} from Avantia Build.\n\nThis is our direct number for construction material requests. Send us your material list, plans, photos, or supplier quote, and we will organize the request and check available pricing.\n\nHow can we help with your current project?\n\nAvantia Build\n(516) 908-8319\nhttps://build.avantiap.com\n\nReply STOP if you no longer want to receive messages.`
+  if (template === "welcome") return `${greeting}, Carlos from Avantia Build. Send us any material list, quote, photo, plan, or hard-to-find item. We’ll check pricing, availability, and delivery for you. See how it works: https://build.avantiap.com`
   if (template === "friendly_follow_up") return `${greeting}, this is ${senderName} from Avantia Build.\n\nI am checking in to see whether you need pricing or materials for a current or upcoming project. You can send us a material list, plan, photo, or supplier quote.\n\nIs there anything you need help sourcing this week?\n\nReply STOP if you no longer want to receive messages.`
   if (template === "request_material_list") return `${greeting}, please send us the material list, plans, photos, quantities, and delivery address for your project.\n\nWe will organize the request and check available pricing. You can reply directly or upload it here:\nhttps://build.avantiap.com/request-quote`
   if (template === "quote_follow_up") return `${greeting}, I am following up regarding your Avantia Build estimate.\n\nPlease let us know if you approve it, have questions, or want us to review any changes before proceeding.`
@@ -44,11 +44,12 @@ function callHref(phone: string) {
   return `tel:${phone}`
 }
 
-export function ContactActions({ name, phone, email, senderName = "Avantia Build" }: { name: string; phone: string | null; email: string | null; senderName?: string }) {
+export function ContactActions({ name, phone, email, senderName = "Avantia Build", showWelcomePackageButton = false }: { name: string; phone: string | null; email: string | null; senderName?: string; showWelcomePackageButton?: boolean }) {
   const router = useRouter()
   const normalizedPhone = normalizeAuraPhone(phone) || ""
   const [channel, setChannel] = useState<Channel | null>(null)
   const [template, setTemplate] = useState<TemplateKey>("welcome")
+  const [isWelcomePackage, setIsWelcomePackage] = useState(false)
   const [message, setMessage] = useState("")
   const [subject, setSubject] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
@@ -66,6 +67,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setSubject("")
     setAttachment(null)
     setFeedback("")
+    setIsWelcomePackage(false)
   }
 
   function close() {
@@ -81,12 +83,14 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setVideoMenuOpen(false)
     setChannel(initialChannel)
     setTemplate("welcome")
+    setIsWelcomePackage(true)
     setMessage(templateMessage("welcome", name, senderName))
     setSubject("Welcome to Avantia Build")
   }
 
   function chooseTemplate(value: TemplateKey) {
     setTemplate(value)
+    setIsWelcomePackage(value === "welcome")
     setMessage(templateMessage(value, name, senderName))
     if (value === "welcome") setSubject("Welcome to Avantia Build")
     else if (value === "quote_follow_up") setSubject("Your Avantia Build estimate")
@@ -119,7 +123,10 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
         return
       }
       const recipient = channel === "email" ? email || "" : normalizedPhone
-      const result = await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message })
+      const welcomeIdempotencyKey = isWelcomePackage && channel !== "email" && normalizedPhone
+        ? `welcome/${normalizedPhone.replace(/\D/g, "")}`
+        : undefined
+      const result = await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message, idempotencyKey: welcomeIdempotencyKey })
       if (!result.ok) { setFeedback(result.error); return }
       resetComposer()
       router.refresh()
@@ -142,6 +149,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
 
   return <>
     <div className="relative flex flex-wrap items-center gap-1" aria-label={`Contact ${name}`}>
+      {showWelcomePackageButton ? <button type="button" disabled={!normalizedPhone} onClick={() => openComposer("sms")} className="inline-flex h-9 items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-800 disabled:opacity-35"><Send className="mr-1.5 h-3.5 w-3.5" />Send Welcome Package</button> : null}
       <button type="button" disabled={!normalizedPhone && !email} onClick={() => { setContactMenuOpen((open) => !open); setVideoMenuOpen(false) }} aria-expanded={contactMenuOpen} aria-haspopup="menu" aria-label={`Contact ${name}`} title="Contact" className={`${buttonClass} w-10 gap-0.5 text-[#0066cc]`}><ContactRound className="h-4 w-4" /><ChevronDown className="h-3 w-3" /></button>
       {contactMenuOpen ? <div role="menu" className="absolute right-0 top-11 z-40 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
         <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} onClick={() => { setContactMenuOpen(false); if (normalizedPhone) void recordCommunicationActivityAction({ channel: "call", recipient: normalizedPhone, label: name, outcome: "opened_on_device", durationSeconds: 0 }) }} className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold hover:bg-slate-50 ${normalizedPhone ? "text-slate-800" : "pointer-events-none opacity-35"}`}><Phone className="h-4 w-4 text-[#0066cc]" />Call</a>

@@ -10,6 +10,7 @@ import {
   evaluateSmsReplyGate,
   filterSmsExactListItems,
   formatSmsRequestSummaryItem,
+  isSmsBareGreeting,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   mergeSmsCorrectionItems,
@@ -5055,6 +5056,20 @@ async function processCustomerSmsAutomation(
     `;
     return;
   }
+  // A bare greeting carries no intake information. In particular, it must not
+  // create a second welcome after Carlos has already opened the conversation.
+  // The approved Welcome template remains an explicit manager action.
+  if (isSmsBareGreeting(body)) {
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_ai_bare_greeting_suppressed', ${sql.json({
+        communicationId,
+        phone,
+        route: "manager-welcome-only",
+      })})
+    `;
+    return;
+  }
   const openDrafts = await sql<
     {
       id: string;
@@ -8970,7 +8985,7 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v5";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v6";
 const PUBLIC_START_TEXT_OPENING = publicStartTextOpeningMessage();
 
 async function handlePublicStartByText(req: Request) {
