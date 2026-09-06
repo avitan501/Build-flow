@@ -6,7 +6,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireStaffProfile } from "@/lib/auth";
 import { matchRequestClientQuoteItems } from "@/lib/client-quote-import";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { sendClientQuoteEmail } from "@/lib/cart-submission-email";
 import { deliverEmailWithSupabaseFallback } from "@/lib/email-delivery-fallback";
 import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
@@ -348,10 +347,9 @@ export async function importRequestClientQuotePricesAction(input: {
     return { ok: false, error: "This comparison has no request lines to match." };
   }
 
-  const admin = createAdminClient();
   let extraction: Awaited<ReturnType<typeof extractSupplierQuoteFile>>;
   try {
-    const { data: fileBlob, error: downloadError } = await admin.storage
+    const { data: fileBlob, error: downloadError } = await supabase.storage
       .from(CLIENT_QUOTE_ATTACHMENT_BUCKET)
       .download(attachment.file_path);
     if (downloadError || !fileBlob) throw downloadError ?? new Error("Client quote download failed");
@@ -367,7 +365,7 @@ export async function importRequestClientQuotePricesAction(input: {
   if (!matches.length) {
     return { ok: false, error: "No priced lines in this client quote matched the request. The file was kept; review the material names or enter prices manually." };
   }
-  const updates = await Promise.all(matches.map((match) => admin
+  const updates = await Promise.all(matches.map((match) => supabase
     .from("quote_comparison_items")
     .update({ client_unit_price: cleanUnitPrice(match.clientUnitPrice) })
     .eq("comparison_id", input.comparisonId)
@@ -383,7 +381,7 @@ export async function importRequestClientQuotePricesAction(input: {
     const values: { client_delivery_charge?: number; client_tax_percent?: number } = {};
     if (hasDelivery) values.client_delivery_charge = cleanMoney(extraction.metadata.deliveryCharge);
     if (hasTax) values.client_tax_percent = cleanTaxPercent(extraction.metadata.taxPercent);
-    const { error } = await admin.from("quote_comparisons").update(values).eq("id", input.comparisonId);
+    const { error } = await supabase.from("quote_comparisons").update(values).eq("id", input.comparisonId);
     if (error) {
       console.error("Client quote totals persistence failed", error);
       return { ok: false, error: "The line prices were imported, but delivery or tax could not be saved. Review those two fields before continuing." };
