@@ -60,5 +60,5 @@ test("organizer combines every accepted attachment while preserving manual-row r
   expect(source).toContain("All attached files belong to the same customer request")
   expect(source).toContain('metadata?.ai_organized !== true')
   expect(source).toContain('metadata?.ai_organized === true')
-  expect(source).toContain("source_item_id: source.id")
+  expect(source).toContain("source_item_id: matchedSource?.id || source.id")
 })

@@ -527,6 +527,11 @@ export default async function OwnerMaterialRequestPage({
       ...mapped,
     };
   });
+  const primarySupplierComparison = supplierComparisonTables.find((comparison) =>
+    comparison.suppliers.some((supplier) => supplier.selected),
+  ) ?? supplierComparisonTables.find((comparison) => comparison.suppliers.length > 0)
+    ?? supplierComparisonTables[0]
+    ?? null;
   const { data: requestEmailLinks } = await supabase
     .from("aura_communication_links")
     .select("communication_id")
@@ -608,7 +613,7 @@ export default async function OwnerMaterialRequestPage({
           defaultZipCode={zipCodeFromAddress(request.projects?.address)}
           organizationStatus={organizationStatus}
           organizationCompletedLabel={organizationCompletedLabel}
-          supplierComparisons={supplierComparisonTables}
+          supplierComparisons={primarySupplierComparison ? [primarySupplierComparison] : []}
           suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
           attachments={signedFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
         />

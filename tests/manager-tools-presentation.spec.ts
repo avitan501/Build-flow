@@ -38,7 +38,7 @@ test("standalone AI tools have compact headings, back navigation, and 44px actio
   }
   expect(media).not.toContain("sm:text-6xl")
   expect(media).not.toContain("min-h-10")
-  expect(defects).toContain("Upload 1 screen recording or screenshot per problem.")
+  expect(defects).toContain("Upload up to 6 recordings or screenshots for one problem.")
   expect(defects).toContain('min-h-11 w-full')
   expect(knowledge).not.toMatch(/className="h-(?:9|10) [^"]*"/)
   expect(smsLab).toContain("min-h-11")

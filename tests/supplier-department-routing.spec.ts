@@ -60,7 +60,7 @@ test("supplier categories remain available while manual request routing allows a
   expect(directory).toContain("Top / Preferred vendors")
   expect(directory).toContain("Approved but not active")
   expect(requestPanel).toContain("Suppliers selected in Step 1")
-  expect(requestPanel).toContain("All Supplier Directory")
+  expect(requestPanel).not.toContain("All Supplier Directory")
   expect(requestPanel).toContain("availableSuppliers")
   expect(requestPanel).not.toContain("supplierCanReceiveDepartmentRequest")
   expect(requestPanel).not.toContain("Choose a department first.")

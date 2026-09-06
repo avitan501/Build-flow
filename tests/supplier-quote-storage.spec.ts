@@ -404,7 +404,7 @@ test("client material lists are organized securely in the background", async () 
     ownerPage.indexOf("<RequestMaterialWorktable"),
   );
   expect(ownerPage).toContain("comparisons={comparisonSummaries}");
-  expect(ownerPage).toContain("supplierComparisons={supplierComparisonTables}");
+  expect(ownerPage).toContain("supplierComparisons={primarySupplierComparison ? [primarySupplierComparison] : []}");
   expect(ownerPage).toContain("quote_comparison_bids");
   expect(ownerPage).toContain("Activity log");
   expect(ownerPage).not.toContain("Next:");

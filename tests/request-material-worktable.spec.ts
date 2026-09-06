@@ -194,7 +194,9 @@ test("supplier quotes move into compact step two instead of expanding the reques
   ])
 
   expect(page).toContain("comparisonSummaries")
-  expect(page).toMatch(/comparisons=\{comparisonSummaries\}|supplierComparisons=\{supplierComparisonTables\}/)
+  expect(page).toMatch(/comparisons=\{comparisonSummaries\}|supplierComparisons=\{primarySupplierComparison \? \[primarySupplierComparison\] : \[\]\}/)
+  expect(page).toContain("comparison.suppliers.some((supplier) => supplier.selected)")
+  expect(page).toContain("supplierComparisonTables.find((comparison) => comparison.suppliers.length > 0)")
   expect(worktable).toContain("Supplier route")
   expect(worktable).toMatch(/supplierComparisons\.map/)
   expect(worktable).not.toContain("supplierColumns.map")

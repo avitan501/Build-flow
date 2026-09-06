@@ -85,13 +85,13 @@ test("auto-safe replies use multilingual deterministic blocks and concise missin
 test("customer images use the existing bounded fetch path without leaking the Quo credential", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   const start = broker.indexOf("async function visionImageInputs")
-  const end = broker.indexOf("async function trustedSmsProposal", start)
+  const end = broker.indexOf("type LeadScreenshotAssessment", start)
   const visionFetcher = broker.slice(start, end)
 
   expect(broker).toContain("safeExternalMediaUrl")
   expect(broker).toContain("!safeExternalMediaUrl(item.url)")
-  expect(visionFetcher).toContain("content-length")
-  expect(visionFetcher).toContain("10 * 1024 * 1024")
+  expect(broker).toContain('download.headers.get("content-length")')
+  expect(visionFetcher).toContain("boundedResponseBytes(response, 10 * 1024 * 1024)")
   expect(visionFetcher).not.toContain("Authorization")
   expect(visionFetcher).not.toContain("quoKey")
   expect(broker).toContain("Latest-message images attached for factual review")

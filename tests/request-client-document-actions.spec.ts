@@ -5,9 +5,11 @@ import { expect, test } from "@playwright/test"
 
 const root = process.cwd()
 
-test("saved client documents expose real Open, Edit, and confirmed Delete actions", async () => {
+test("saved client documents expose compact Open, Edit, and confirmed Delete actions", async () => {
   const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
   expect(panel).toContain('aria-label="Saved client documents"')
+  expect(panel).toContain('group/document-actions relative')
+  expect(panel).toContain('>Actions<ChevronDown')
   expect(panel).toContain('target="_blank"')
   expect(panel).toContain("openDocument(saved.documentType, saved)")
   expect(panel).toContain("deleteClientDocument(saved)")
@@ -25,7 +27,7 @@ test("editing an existing document prefills the composer from its selected saved
   expect(panel).toContain("selectedDocument ?? clientDocuments.find")
   expect(panel).toContain("setQuoteNumber(saved?.documentNumber")
   expect(panel).toContain("setQuoteLines(saved?.documentData.lines?.length")
-  expect(panel).toContain("setQuoteTerms(includeRequiredProposalTerms(saved?.documentData.terms")
+  expect(panel).toContain("setQuoteTerms(proposalTermsForEditor(saved?.documentData.terms")
   expect(panel).toContain("saveRequestClientDocumentAction(quoteInput())")
 })
 
