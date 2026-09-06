@@ -6,9 +6,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 
 async function validToken(request: Request) {
-  const admin = createAdminClient();
-  const { data } = await admin.rpc("get_curri_webhook_token");
-  const expected = (typeof data === "string" ? data : "").trim();
+  let expected = process.env.CURRI_WEBHOOK_TOKEN?.trim() || "";
+  if (!expected) {
+    try {
+      const admin = createAdminClient();
+      const { data } = await admin.rpc("get_curri_webhook_token");
+      expected = (typeof data === "string" ? data : "").trim();
+    } catch {
+      return false;
+    }
+  }
   const provided = request.headers.get("x-curri-webhook-token")?.trim() || new URL(request.url).searchParams.get("token")?.trim() || "";
   if (!expected || expected.length !== provided.length) return false;
   return timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
