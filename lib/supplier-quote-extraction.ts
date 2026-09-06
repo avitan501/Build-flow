@@ -16,7 +16,12 @@ const emptyMetadata: SupplierQuoteAiMetadata = {
   total: null,
 }
 
-export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "", invoke?: SupplierQuoteAiInvoker) {
+export async function extractSupplierQuoteFile(
+  file: File,
+  suppliedOcrText = "",
+  invoke?: SupplierQuoteAiInvoker,
+  options: { aiMode?: "always" | "when-empty" } = {},
+) {
   const type = file.type.toLowerCase()
   let text = ""
   if (type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -36,16 +41,19 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "",
   const parsedItems = parseSupplierQuoteText(text)
   const parsedMetadata = parseSupplierQuoteMetadata(text)
   let aiResult = null
-  try {
-    aiResult = await extractSupplierQuoteWithAi(file, text, invoke)
-  } catch (error) {
-    console.error("Supplier quote AI extraction failed", error)
-  }
-  if (!aiResult && invoke) {
+  const shouldUseAi = options.aiMode !== "when-empty" || parsedItems.length === 0
+  if (shouldUseAi) {
     try {
-      aiResult = await extractSupplierQuoteWithAi(file, text)
+      aiResult = await extractSupplierQuoteWithAi(file, text, invoke)
     } catch (error) {
-      console.error("Supplier quote direct AI fallback failed", error)
+      console.error("Supplier quote AI extraction failed", error)
+    }
+    if (!aiResult && invoke) {
+      try {
+        aiResult = await extractSupplierQuoteWithAi(file, text)
+      } catch (error) {
+        console.error("Supplier quote direct AI fallback failed", error)
+      }
     }
   }
 

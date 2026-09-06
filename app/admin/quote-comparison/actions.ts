@@ -348,55 +348,59 @@ export async function importRequestClientQuotePricesAction(input: {
     return { ok: false, error: "This comparison has no request lines to match." };
   }
 
+  const admin = createAdminClient();
+  let extraction: Awaited<ReturnType<typeof extractSupplierQuoteFile>>;
   try {
-    const admin = createAdminClient();
     const { data: fileBlob, error: downloadError } = await admin.storage
       .from(CLIENT_QUOTE_ATTACHMENT_BUCKET)
       .download(attachment.file_path);
     if (downloadError || !fileBlob) throw downloadError ?? new Error("Client quote download failed");
-    const file = new File([fileBlob], attachment.file_name, { type: attachment.file_type });
-    const extraction = await extractSupplierQuoteFile(file, "", async (payload) => {
-      const { data, error } = await supabase.functions.invoke("supplier-quote-ocr", { body: payload });
-      if (error) throw error;
-      return data;
-    });
-    const { matches } = matchRequestClientQuoteItems(extraction.items, comparisonItems);
-    const extractedCount = extraction.items.filter((item) => item.unitPrice !== null || (item.lineTotal !== null && item.quantity > 0)).length;
-    if (!matches.length) {
-      return { ok: false, error: "No priced lines in this client quote matched the request. The file was kept; review the material names or enter prices manually." };
-    }
-    const updates = await Promise.all(matches.map((match) => supabase
-      .from("quote_comparison_items")
-      .update({ client_unit_price: cleanUnitPrice(match.clientUnitPrice) })
-      .eq("comparison_id", input.comparisonId)
-      .eq("id", match.comparisonItemId)));
-    if (updates.some((update) => update.error)) throw new Error("Client line price update failed");
-
-    const hasDelivery = Number(extraction.metadata.deliveryCharge) > 0;
-    const hasTax = Number(extraction.metadata.taxPercent) > 0;
-    if (hasDelivery || hasTax) {
-      const values: { client_delivery_charge?: number; client_tax_percent?: number } = {};
-      if (hasDelivery) values.client_delivery_charge = cleanMoney(extraction.metadata.deliveryCharge);
-      if (hasTax) values.client_tax_percent = cleanTaxPercent(extraction.metadata.taxPercent);
-      const { error } = await supabase.from("quote_comparisons").update(values).eq("id", input.comparisonId);
-      if (error) throw error;
-    }
-    revalidatePath(comparisonPath(input.comparisonId));
-    return {
-      ok: true,
-      data: {
-        fileName: attachment.file_name,
-        matchedCount: matches.length,
-        extractedCount,
-        prices: matches.map((match) => ({ itemId: match.comparisonItemId, clientUnitPrice: cleanUnitPrice(match.clientUnitPrice) })),
-        deliveryCharge: hasDelivery ? cleanMoney(extraction.metadata.deliveryCharge) : null,
-        taxPercent: hasTax ? cleanTaxPercent(extraction.metadata.taxPercent) : null,
-      },
-    };
+    const file = new File([await fileBlob.arrayBuffer()], attachment.file_name, { type: attachment.file_type });
+    extraction = await extractSupplierQuoteFile(file, "", undefined, { aiMode: "when-empty" });
   } catch (error) {
     console.error("Client quote import failed", error);
     return { ok: false, error: "The client quote could not be read. The attachment is still saved; try again or enter the client prices manually." };
   }
+
+  const { matches } = matchRequestClientQuoteItems(extraction.items, comparisonItems);
+  const extractedCount = extraction.items.filter((item) => item.unitPrice !== null || (item.lineTotal !== null && item.quantity > 0)).length;
+  if (!matches.length) {
+    return { ok: false, error: "No priced lines in this client quote matched the request. The file was kept; review the material names or enter prices manually." };
+  }
+  const updates = await Promise.all(matches.map((match) => admin
+    .from("quote_comparison_items")
+    .update({ client_unit_price: cleanUnitPrice(match.clientUnitPrice) })
+    .eq("comparison_id", input.comparisonId)
+    .eq("id", match.comparisonItemId)));
+  if (updates.some((update) => update.error)) {
+    console.error("Client quote price persistence failed", updates.flatMap((update) => update.error ? [update.error] : []));
+    return { ok: false, error: "The client prices were read, but they could not be saved. Nothing was removed; try again." };
+  }
+
+  const hasDelivery = Number(extraction.metadata.deliveryCharge) > 0;
+  const hasTax = Number(extraction.metadata.taxPercent) > 0;
+  if (hasDelivery || hasTax) {
+    const values: { client_delivery_charge?: number; client_tax_percent?: number } = {};
+    if (hasDelivery) values.client_delivery_charge = cleanMoney(extraction.metadata.deliveryCharge);
+    if (hasTax) values.client_tax_percent = cleanTaxPercent(extraction.metadata.taxPercent);
+    const { error } = await admin.from("quote_comparisons").update(values).eq("id", input.comparisonId);
+    if (error) {
+      console.error("Client quote totals persistence failed", error);
+      return { ok: false, error: "The line prices were imported, but delivery or tax could not be saved. Review those two fields before continuing." };
+    }
+  }
+  revalidatePath(comparisonPath(input.comparisonId));
+  return {
+    ok: true,
+    data: {
+      fileName: attachment.file_name,
+      matchedCount: matches.length,
+      extractedCount,
+      prices: matches.map((match) => ({ itemId: match.comparisonItemId, clientUnitPrice: cleanUnitPrice(match.clientUnitPrice) })),
+      deliveryCharge: hasDelivery ? cleanMoney(extraction.metadata.deliveryCharge) : null,
+      taxPercent: hasTax ? cleanTaxPercent(extraction.metadata.taxPercent) : null,
+    },
+  };
 }
 
 export async function saveQuoteComparisonBidAction(input: {

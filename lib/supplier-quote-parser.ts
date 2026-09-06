@@ -20,7 +20,7 @@ export type ParsedSupplierQuoteMetadata = {
 
 import { normalizeSupplierQuoteUnit } from "@/lib/supplier-quote-pricing"
 
-const UNIT_PATTERN = "(?:m\\s*[/.-]?\\s*[ls]f?|ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bags?|rolls?|bundles?|pails?|buckets?|tubes?|cartons?|gallons?|packs?|cases?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
+const UNIT_PATTERN = "(?:m\\s*[/.-]?\\s*[ls]f?|ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bx|bags?|rolls?|rol|bundles?|pails?|buckets?|tubes?|cartons?|gallons?|packs?|cases?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
 const MONEY_PATTERN = "\\$?([0-9][0-9,]*(?:\\.[0-9]{1,4})?)"
 
 function amount(value: string | undefined) {
@@ -51,18 +51,32 @@ function isoDateFromEnglish(value: string) {
   return `${match[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 }
 
+function isoDate(value: string) {
+  const normalized = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized
+  const numeric = normalized.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (numeric) {
+    const month = Number(numeric[1])
+    const day = Number(numeric[2])
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${numeric[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    }
+  }
+  return isoDateFromEnglish(normalized)
+}
+
 export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMetadata {
   const normalized = text.replace(/\r/g, "")
   const quoteNumber = normalized.match(/^\s*(?:quote|quotation)(?:\s*(?:number|no\.?|#))?\s*:\s*([^\n]+)$/im)?.[1]?.trim().slice(0, 100) ?? ""
   const expiresText = normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1] ?? ""
   const deliveryCharge = amount(normalized.match(/^\s*(?:delivery|freight|shipping)(?:\s+(?:charge|fee))?\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
-  const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%/im)?.[1])
+  const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax(?:\s*\(\s*|\s*:\s*)([0-9]+(?:\.[0-9]+)?)\s*%\s*\)?\s*:?/im)?.[1])
   const subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?subtotal\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
   const total = amount(normalized.match(/^\s*(?:grand\s+)?total\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
   const leadTimeDays = quantity(normalized.match(/^\s*lead\s*time\s*:\s*([0-9]+)\s*(?:business\s+|calendar\s+)?days?\b/im)?.[1])
   return {
     quoteNumber,
-    expiresOn: /^\d{4}-\d{2}-\d{2}$/.test(expiresText.trim()) ? expiresText.trim() : isoDateFromEnglish(expiresText),
+    expiresOn: isoDate(expiresText),
     deliveryCharge,
     taxPercent: taxPercent === null ? null : Math.min(100, taxPercent),
     subtotal,
@@ -78,7 +92,32 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
   const trailing = new RegExp(`^(?:([A-Z0-9][A-Z0-9._/-]{2,})\\s+)?(.+?)\\s+([0-9][0-9,.]*)\\s+(${UNIT_PATTERN})?\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
   const ocrPriceRow = /^(.+?)\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?(?:\s*[|.]+)?$/i
 
-  for (const originalLine of text.replace(/\r/g, "").split("\n").slice(0, 10000)) {
+  const sourceLines = text.replace(/\r/g, "").split("\n").slice(0, 10000)
+  const candidateLines: string[] = []
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    const originalLine = sourceLines[index]
+    const line = originalLine.replace(/\s+/g, " ").trim()
+    const startsMaterial = /^(?=[A-Z0-9._/-]*\d)[A-Z0-9][A-Z0-9._/-]{2,}\s+\S/i.test(line)
+    if (startsMaterial && !line.match(leading) && !line.match(trailing)) {
+      let combined = line
+      let consumed = index
+      for (let next = index + 1; next < Math.min(sourceLines.length, index + 4); next += 1) {
+        combined = `${combined} ${sourceLines[next].replace(/\s+/g, " ").trim()}`.trim()
+        if (combined.match(leading) || combined.match(trailing)) {
+          consumed = next
+          break
+        }
+      }
+      if (consumed > index) {
+        candidateLines.push(combined)
+        index = consumed
+        continue
+      }
+    }
+    candidateLines.push(originalLine)
+  }
+
+  for (const originalLine of candidateLines) {
     const line = originalLine.replace(/\s+/g, " ").trim()
     if (line.length < 8 || line.length > 700) continue
     if (/^(subtotal|tax|delivery|freight|shipping|total|page|quote|estimate)\b/i.test(line)) continue
