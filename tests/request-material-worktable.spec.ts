@@ -456,9 +456,9 @@ test("every request comparison entry synchronizes before navigation", async () =
     source(path.join(root, "components/buildflow/request-material-worktable.tsx")),
     source(managementPath),
   ])
-  expect(worktable).toContain("openRequestPricingComparisonAction(requestId)")
+  expect(worktable).toContain("openRequestPricingComparisonAction(requestId, comparisonId)")
   expect(worktable).not.toContain('href={comparison.href}')
-  expect(management).toContain("onClick={openManualPricing}")
+  expect(management).toContain("openManualPricing(primaryComparison?.id)")
   expect(management).not.toContain('href={`/admin/quote-comparison/${primaryComparison.id}`}')
 })
 

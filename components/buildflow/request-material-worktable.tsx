@@ -122,10 +122,10 @@ export function RequestMaterialWorktable({
     })
   }
 
-  function openSynchronizedComparison() {
+  function openSynchronizedComparison(comparisonId: string) {
     setComparisonFeedback("")
     startComparisonTransition(async () => {
-      const result = await openRequestPricingComparisonAction(requestId)
+      const result = await openRequestPricingComparisonAction(requestId, comparisonId)
       if (!result.ok) {
         setComparisonFeedback(result.error)
         return
@@ -232,7 +232,7 @@ export function RequestMaterialWorktable({
         <p className="px-4 py-8 text-center text-sm font-semibold text-slate-500">No request items found.</p>
       )}
 
-      {supplierComparisons.length ? <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <button key={comparison.id} type="button" onClick={openSynchronizedComparison} disabled={comparisonPending} className="min-h-9 text-left text-xs font-bold text-[#0066cc] disabled:opacity-50">{comparisonPending ? "Syncing comparison…" : `Open full comparison · ${comparison.title}`}</button>)}{comparisonFeedback ? <span className="text-xs font-bold text-rose-700">{comparisonFeedback}</span> : null}</div> : null}
+      {supplierComparisons.length ? <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <button key={comparison.id} type="button" onClick={() => openSynchronizedComparison(comparison.id)} disabled={comparisonPending} className="min-h-9 text-left text-xs font-bold text-[#0066cc] disabled:opacity-50">{comparisonPending ? "Syncing comparison…" : `Open full comparison · ${comparison.title}`}</button>)}{comparisonFeedback ? <span className="text-xs font-bold text-rose-700">{comparisonFeedback}</span> : null}</div> : null}
     </section>
   )
 }

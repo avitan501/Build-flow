@@ -443,6 +443,7 @@ async function ensureClientRequestComparison(input: {
 
 export async function openRequestPricingComparisonAction(
   requestId: string,
+  comparisonId?: string,
 ): Promise<ActionResult<{ comparisonId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   if (!UUID_PATTERN.test(requestId)) return { ok: false, error: "The request is invalid." };
@@ -452,6 +453,39 @@ export async function openRequestPricingComparisonAction(
     .eq("id", requestId)
     .maybeSingle<{ owner_id: string }>();
   if (!request) return { ok: false, error: "The request could not be found." };
+  const safeComparisonId = clean(comparisonId, 100);
+  if (safeComparisonId) {
+    if (!UUID_PATTERN.test(safeComparisonId)) return { ok: false, error: "The comparison is invalid." };
+    const [{ data: knownComparison }, { data: requestItems, error: requestItemsError }] = await Promise.all([
+      supabase.from("quote_comparisons")
+        .select("id,client_quote_status")
+        .eq("id", safeComparisonId)
+        .eq("request_id", requestId)
+        .maybeSingle<{ id: string; client_quote_status: string | null }>(),
+      supabase.from("quote_request_items")
+        .select("id,name,quantity,unit,department,metadata")
+        .eq("request_id", requestId)
+        .order("created_at")
+        .returns<RequestItemForComparisonSync[]>(),
+    ]);
+    if (!knownComparison) return { ok: false, error: "The comparison could not be found for this request." };
+    try {
+      if (knownComparison.client_quote_status !== "sent") {
+        if (requestItemsError) throw requestItemsError;
+        await synchronizeDraftComparisonItems({
+          supabase,
+          comparisonId: knownComparison.id,
+          requestItems: requestItems ?? [],
+        });
+      }
+      revalidatePath(`/owner/materials/requests/${requestId}`);
+      revalidatePath(`/admin/quote-comparison/${knownComparison.id}`);
+      return { ok: true, data: { comparisonId: knownComparison.id }, message: "Pricing comparison ready." };
+    } catch (error) {
+      console.error("Known request comparison synchronization failed", error);
+      return { ok: false, error: "The comparison could not be synchronized with the request." };
+    }
+  }
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name,email")

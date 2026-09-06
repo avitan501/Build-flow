@@ -435,11 +435,11 @@ export function RequestManagementPanel({
     setContactOpen(true)
   }
 
-  function openManualPricing() {
+  function openManualPricing(comparisonId?: string) {
     setFeedback("")
     startTransition(async () => {
       try {
-        const result = await openRequestPricingComparisonAction(requestId)
+        const result = await openRequestPricingComparisonAction(requestId, comparisonId)
         if (!result.ok) { setFeedbackError(true); setFeedback(result.error); return }
         router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
       } catch {
@@ -925,7 +925,7 @@ export function RequestManagementPanel({
           <div className="flex flex-wrap justify-end gap-2">
             {renderStep2PrimaryAction()}
             {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Plus className="h-4 w-4" />{supplierQuoteCount ? "Add another quote" : "Add supplier quote"}</button> : null}
-            <button type="button" onClick={openManualPricing} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button>
+            <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button>
           </div>
 
           {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
