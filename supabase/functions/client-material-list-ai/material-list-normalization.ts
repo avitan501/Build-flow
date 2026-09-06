@@ -100,7 +100,11 @@ export function findExplicitQuantityUnitEvidence(
   item: { name: string; sourceText: string },
   sourceValue: string,
 ) {
-  const queryWords = materialWords(`${item.name} ${item.sourceText}`)
+  // AI sourceText can contain the entire request. Ground primarily by the
+  // normalized item name so one row cannot borrow another row's quantity.
+  const nameWords = materialWords(item.name)
+  const fallbackWords = materialWords(item.sourceText)
+  const queryWords = nameWords.size ? nameWords : fallbackWords
   if (!queryWords.size) return null
   const ranked = sourceValue
     .split(/\r?\n/)
@@ -151,7 +155,7 @@ function thicknessMeasurements(value: string) {
     .toLowerCase()
     .replace(/[\u201c\u201d]/g, '"')
     .replace(/\s+/g, " ")
-  const matches = normalized.matchAll(/(\d+\s*\/\s*\d+|\d+(?:\.\d+)?)\s*("|in(?:\.|ch(?:es)?)?|mm|cm|mil|gauge|ga)(?=\s|$|[,;:)])/gi)
+  const matches = normalized.matchAll(/(\d+\s*\/\s*\d+|\d+(?:\.\d+)?)\s*(?:[-–—]\s*)?("|in(?:\.|ch(?:es)?)?|mm|cm|mil|gauge|ga)(?=\s|$|[,;:)])/gi)
   return [...matches].map((match) => ({
     amount: match[1].replace(/\s+/g, ""),
     unit: /^(?:"|in)/i.test(match[2]) ? "in" : /^(?:ga|gauge)$/i.test(match[2]) ? "gauge" : match[2].toLowerCase(),

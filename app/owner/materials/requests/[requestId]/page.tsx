@@ -33,6 +33,7 @@ import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
+import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
@@ -401,18 +402,8 @@ export default async function OwnerMaterialRequestPage({
           minute: "2-digit",
         })
       : "";
-  const organizedSourceIds = new Set(
-    organizedItems.flatMap((item) =>
-      typeof item.metadata?.source_item_id === "string"
-        ? [item.metadata.source_item_id]
-        : [],
-    ),
-  );
   const departmentItems = organizedItems.length
-    ? [
-        ...organizedItems,
-        ...originalItems.filter((item) => !organizedSourceIds.has(item.id)),
-      ]
+    ? effectiveRequestComparisonItems(items ?? [])
     : (items ?? []);
   const routeSelections = resolveRequestSupplierRouteSelections(items ?? [], suppliers);
   const departments = Array.from(

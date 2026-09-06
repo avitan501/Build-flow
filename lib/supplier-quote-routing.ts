@@ -16,7 +16,12 @@ type RequestMatchItem = {
 
 type RequestSourceItem = {
   id: string
+  name?: string
   metadata: Record<string, unknown> | null
+}
+
+function isRawFreeTextContainer(item: RequestSourceItem) {
+  return clean(item.name, 300).toLowerCase() === "free-text material list"
 }
 
 type RequestComparisonSourceItem = RequestSourceItem & {
@@ -63,7 +68,11 @@ export function requestItemSpecification(
 export function effectiveRequestComparisonItems<T extends RequestSourceItem>(items: T[]) {
   const organizedItems = items.filter((item) => item.metadata?.ai_organized === true)
   if (!organizedItems.length) {
-    return items.filter((item) => item.metadata?.ai_organized !== true)
+    // This row stores the client's whole message while AI organization is in
+    // progress. It is not a material and must never become a priced line.
+    return items.filter(
+      (item) => item.metadata?.ai_organized !== true && !isRawFreeTextContainer(item),
+    )
   }
 
   const organizedSourceIds = new Set(
@@ -78,6 +87,7 @@ export function effectiveRequestComparisonItems<T extends RequestSourceItem>(ite
     ...items.filter(
       (item) =>
         item.metadata?.ai_organized !== true &&
+        !isRawFreeTextContainer(item) &&
         !organizedSourceIds.has(item.id),
     ),
   ]

@@ -54,6 +54,20 @@ test("does not borrow a quantity when two original free-text lines are equally p
   )).toBeNull()
 })
 
+test("grounds each AI item to its own line when AI source text repeats the whole request", () => {
+  const source = "24 sheets 5/8-in regular drywall\n10 pieces SPF studs\n5 boxes drywall screws"
+  const repeatedSource = source
+  expect(findExplicitQuantityUnitEvidence(
+    { name: "Regular drywall", sourceText: repeatedSource }, source,
+  )?.detected).toMatchObject({ quantity: 24, unit: "sheets" })
+  expect(findExplicitQuantityUnitEvidence(
+    { name: "SPF studs", sourceText: repeatedSource }, source,
+  )?.detected).toMatchObject({ quantity: 10, unit: "pieces" })
+  expect(findExplicitQuantityUnitEvidence(
+    { name: "Drywall screws", sourceText: repeatedSource }, source,
+  )?.detected).toMatchObject({ quantity: 5, unit: "boxes" })
+})
+
 test("maps a structured edited item back to its own quantity without crossing other rows", () => {
   const sources = [
     { id: "underlayment", name: "Underlayment", quantity: 6, unit: "rolls" },
@@ -143,6 +157,7 @@ test("accepts thickness only when the same explicit measurement exists in the so
   expect(verifiedThickness('1/2 in.', '220 sheets of 1/2" drywall')).toBe('1/2 in.')
   expect(verifiedThickness("12 mm", "Tile backer, 12 mm, 20 sheets")).toBe("12 mm")
   expect(verifiedThickness("16 gauge", "16 ga steel studs, 40 pieces")).toBe("16 gauge")
+  expect(verifiedThickness("5/8 in.", "24 sheets 5/8-in regular drywall")).toBe("5/8 in.")
 })
 
 test("rejects quantities and unsupported values presented as thickness", () => {

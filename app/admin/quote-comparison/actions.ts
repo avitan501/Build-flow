@@ -8,6 +8,7 @@ import { matchRequestClientQuoteItems } from "@/lib/client-quote-import";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendClientQuoteEmail } from "@/lib/cart-submission-email";
+import { deliverEmailWithSupabaseFallback } from "@/lib/email-delivery-fallback";
 import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
 import {
   analyzeQuoteComparison,
@@ -584,44 +585,40 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
     clientAttachments.push({ filename: cleanAttachmentDisplayName(attachment.file_name), content: Buffer.from(await data.arrayBuffer()).toString("base64") });
   }
   const deliveryId = crypto.randomUUID();
-  const directDelivery = await sendClientQuoteEmail({
-    comparisonId: comparison.id,
-    quoteNumber: comparison.quote_number,
-    recipientName: comparison.client_name_snapshot || "Client",
-    recipientEmail: comparison.client_email_snapshot,
-    jobAddress: comparison.job_address,
-    expiresOn: comparison.expires_on,
-    message: comparison.client_message,
-    items: summary.lines.map((line) => ({
-      description: line.description,
-      specification: line.specification,
-      quantity: line.quantity,
-      unit: line.unit,
-      unitPrice: line.clientUnitPrice ?? 0,
-      lineTotal: line.clientLineTotal,
-    })),
-    deliveryCharge: summary.clientDeliveryCharge,
-    taxPercent: summary.clientTaxPercent,
-    taxAmount: summary.clientTaxAmount,
-    total: summary.clientTotal,
-    pdfBase64: pdf.toString("base64"),
-    attachments: clientAttachments,
-    idempotencyKey: `avantia-client-quote-${comparison.id}-${deliveryId}`,
-  });
-  let delivery = directDelivery;
-  if (directDelivery.status === "not_configured") {
-    const { data: fallback, error: fallbackError } = await supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
+  const delivery = await deliverEmailWithSupabaseFallback(
+    () => sendClientQuoteEmail({
+      comparisonId: comparison.id,
+      quoteNumber: comparison.quote_number,
+      recipientName: comparison.client_name_snapshot || "Client",
+      recipientEmail: comparison.client_email_snapshot,
+      jobAddress: comparison.job_address,
+      expiresOn: comparison.expires_on,
+      message: comparison.client_message,
+      items: summary.lines.map((line) => ({
+        description: line.description,
+        specification: line.specification,
+        quantity: line.quantity,
+        unit: line.unit,
+        unitPrice: line.clientUnitPrice ?? 0,
+        lineTotal: line.clientLineTotal,
+      })),
+      deliveryCharge: summary.clientDeliveryCharge,
+      taxPercent: summary.clientTaxPercent,
+      taxAmount: summary.clientTaxAmount,
+      total: summary.clientTotal,
+      pdfBase64: pdf.toString("base64"),
+      attachments: clientAttachments,
+      idempotencyKey: `avantia-client-quote-${comparison.id}-${deliveryId}`,
+    }),
+    () => supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
       body: {
         action: "send_client_quote",
         requestId: comparison.id,
         deliveryId,
         attachment: { filename: `${comparison.quote_number}.pdf`, content: pdf.toString("base64") },
       },
-    });
-    delivery = !fallbackError && fallback?.ok
-      ? { status: "sent", providerId: fallback.providerId ?? "" }
-      : { status: "failed", error: fallback?.error || fallbackError?.message || "The client quote was not sent." };
-  }
+    }),
+  );
   const sent = delivery.status === "sent";
   const providerId = delivery.status === "sent" ? delivery.providerId : null;
   const deliveryError = delivery.status === "failed" ? delivery.error : delivery.status === "not_configured" ? "Email is not configured." : "";

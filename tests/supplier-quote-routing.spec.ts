@@ -52,6 +52,15 @@ test("stale comparison rows are reconciled to the current AI-organized request b
   expect(matchSupplierQuoteItems(supplierRows, currentComparison)).toHaveLength(3)
 })
 
+test("a free-text request container never becomes a priced comparison row", () => {
+  const raw = { id: "raw", name: "Free-text material list", metadata: { request_details: "24 drywall" } }
+  expect(effectiveRequestComparisonItems([raw])).toEqual([])
+  expect(effectiveRequestComparisonItems([
+    raw,
+    { id: "drywall", name: "Regular drywall", metadata: { ai_organized: true, source_item_id: "raw" } },
+  ]).map((item) => item.id)).toEqual(["drywall"])
+})
+
 test("explicit supplier selection accepts directory slugs and derives the trusted name", () => {
   const directory = [
     { id: "rio-supply", name: "Rio Supply" },
