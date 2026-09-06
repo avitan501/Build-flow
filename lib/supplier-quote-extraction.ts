@@ -16,11 +16,15 @@ const emptyMetadata: SupplierQuoteAiMetadata = {
   total: null,
 }
 
+export type SupplierQuoteExtractionOptions = {
+  aiMode?: "always" | "when-empty"
+}
+
 export async function extractSupplierQuoteFile(
   file: File,
   suppliedOcrText = "",
   invoke?: SupplierQuoteAiInvoker,
-  options: { aiMode?: "always" | "when-empty" } = {},
+  options: SupplierQuoteExtractionOptions = {},
 ) {
   const type = file.type.toLowerCase()
   let text = ""
