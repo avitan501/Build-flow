@@ -1652,9 +1652,12 @@ async function optimizeMetaWhatsAppWebhook() {
   );
   const responsePayload = await response.json().catch(() => ({})) as {
     success?: boolean;
+    error?: { code?: number; message?: string };
   };
   if (!response.ok || responsePayload.success !== true)
-    throw new Error("Meta did not accept the direct WhatsApp webhook");
+    throw new Error(
+      `Meta did not accept the direct WhatsApp webhook${responsePayload.error?.code ? ` (${responsePayload.error.code})` : ""}${responsePayload.error?.message ? `: ${responsePayload.error.message.slice(0, 240)}` : ""}`,
+    );
 
   const verified = await fetch(
     `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
@@ -11195,12 +11198,24 @@ Deno.serve(async (req: Request) => {
     if (input.action === "optimize_meta_whatsapp_webhook") {
       if (!manager.isOwner)
         return json({ error: "Only the owner can optimize WhatsApp." }, 403);
-      return json({ ok: true, ...(await optimizeMetaWhatsAppWebhook()) });
+      try {
+        return json({ ok: true, ...(await optimizeMetaWhatsAppWebhook()) });
+      } catch (error) {
+        return json({
+          error: error instanceof Error ? error.message : "WhatsApp could not be optimized.",
+        }, 400);
+      }
     }
     if (input.action === "configure_resend_email_webhook") {
       if (!manager.isOwner)
         return json({ error: "Only the owner can configure email events." }, 403);
-      return json({ ok: true, ...(await configureResendEmailWebhook()) });
+      try {
+        return json({ ok: true, ...(await configureResendEmailWebhook()) });
+      } catch (error) {
+        return json({
+          error: error instanceof Error ? error.message : "Email events could not be configured.",
+        }, 400);
+      }
     }
     if (input.action === "activate_meta_whatsapp") {
       if (!manager.isOwner)
