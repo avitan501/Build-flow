@@ -445,6 +445,12 @@ test("partial AI organization keeps manually added request rows in pricing", asy
   ])
 })
 
+test("organized requests do not render the free-text storage row as a material", async () => {
+  const worktable = await source(path.join(root, "components/buildflow/request-material-worktable.tsx"))
+  expect(worktable).toContain('item.name.trim().toLowerCase() === "free-text material list"')
+  expect(worktable).toContain("!isRawFreeTextContainer(item)")
+})
+
 test("step three starts from the latest client-ready-to-pay values", async () => {
   const [page, management] = await Promise.all([
     source(pagePath),

@@ -37,6 +37,10 @@ function supplierRouteVersion(metadata: Record<string, unknown> | null | undefin
   return JSON.stringify([metadata?.supplier_route_names ?? [], metadata?.supplier_route_notes ?? {}])
 }
 
+function isRawFreeTextContainer(item: ReviewableMaterialItem) {
+  return item.name.trim().toLowerCase() === "free-text material list"
+}
+
 function copyText(items: ReviewableMaterialItem[]) {
   return items.map((item) => [
     `${materialQuantity(item)} ${materialSalesUnit(item)}`,
@@ -81,8 +85,13 @@ export function RequestMaterialWorktable({
   const organizationInProgress = ["queued", "processing", "retrying"].includes(organizationStatus)
   const aiItems = organizedItems.map((item) => savedItems[item.id] ?? item)
   const representedSourceIds = new Set(aiItems.map((item) => typeof item.metadata?.source_item_id === "string" ? item.metadata.source_item_id : "").filter(Boolean))
-  const aiCoversEverySource = sourceItems.every((item) => representedSourceIds.has(item.id))
-  const items = aiItems.length ? [...aiItems, ...originalItems.filter((item) => !representedSourceIds.has(item.id))] : originalItems
+  const comparisonSources = aiItems.length
+    ? sourceItems.filter((item) => !isRawFreeTextContainer(item))
+    : sourceItems
+  const aiCoversEverySource = comparisonSources.every((item) => representedSourceIds.has(item.id))
+  const items = aiItems.length
+    ? [...aiItems, ...originalItems.filter((item) => !representedSourceIds.has(item.id) && !isRawFreeTextContainer(item))]
+    : originalItems
   const originalById = new Map(sourceItems.map((item) => [item.id, item]))
   const seenSourceIds = new Set<string>()
   const rows = items.map((item) => {
