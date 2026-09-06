@@ -68,11 +68,17 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
     'delivery: suppressed ? "already_sent" : "processing"',
   );
   expect(broker).toContain('partial ? "partial" : "failed"');
-  expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v6"');
+  expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v7"');
   const opening = publicStartTextOpeningMessage();
   expect(opening).toBe(
-    "Hi, this is David with Avantia Build. Send your material list, photo, plan, or current quote here, and we’ll review pricing, availability, and delivery. You can also start here: https://build.avantiap.com",
+    "Hi, Carlos from Avantia Build. Send your material list, photo, plan, or current quote. We’ll check pricing, availability, and delivery. See how it works (20 sec): https://build.avantiap.com/videos/avantia-request-material-whatsapp-en-clear-20s.mp4",
   );
+  expect(broker).toContain("async function ensurePublicStartLead");
+  expect(broker).toContain("public.manager_outreach_leads");
+  expect(broker).toContain("'public_start_lead_auto_created'");
+  expect(broker).toContain('assignedTo: "Carlos"');
+  expect(broker).toContain('welcomeVideo: "request-materials"');
+  expect(broker).toContain("linkPublicStartMessageToLead(providerId, lead)");
   expect((broker.match(/sendQuoSms\(phone, PUBLIC_START_TEXT_OPENING\)/g) || [])).toHaveLength(1);
   expect(broker).not.toContain("sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE");
   expect(route).toContain('result.delivery || "processing"');

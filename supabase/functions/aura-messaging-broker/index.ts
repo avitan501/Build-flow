@@ -9633,8 +9633,95 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v6";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v7";
 const PUBLIC_START_TEXT_OPENING = publicStartTextOpeningMessage();
+
+type PublicStartLead = {
+  contactId: string;
+  leadId: string | null;
+  leadLabel: string;
+  createdBy: string | null;
+};
+
+async function ensurePublicStartLead(phone: string): Promise<PublicStartLead> {
+  return await sql.begin(async (transaction) => {
+    await transaction`select pg_advisory_xact_lock(hashtextextended(${`public-start-lead:${phone}`}, 0))`;
+    const managerRows = await transaction<{ id: string }[]>`
+      select id from public.profiles
+      where lower(email) in ('buildavantiap@gmail.com', 'avitanneto@gmail.com', 'info@fivetownsbuilders.com')
+        and approval_status = 'approved'
+        and is_active = true
+      order by case when lower(email) = 'buildavantiap@gmail.com' then 0 else 1 end
+      limit 1
+    `;
+    const createdBy = managerRows[0]?.id || null;
+    const contactRows = await transaction<{ id: string }[]>`
+      insert into public.aura_contacts
+        (full_name, normalized_phone, notes, sms_ai_mode, sms_ai_style, auto_create_request_drafts)
+      values (${phone}, ${phone}, 'Website Send text lead.', 'auto_safe', 'friendly', true)
+      on conflict (normalized_phone) where normalized_phone is not null do update
+        set updated_at = public.aura_contacts.updated_at
+      returning id
+    `;
+    const contactId = contactRows[0]?.id;
+    if (!contactId) throw new Error("public_start_contact_not_created");
+
+    const existingLead = await transaction<{ id: string; full_name: string }[]>`
+      select id, full_name from public.manager_outreach_leads
+      where regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g') = regexp_replace(${phone}, '[^0-9]', '', 'g')
+      order by created_at asc
+      limit 1
+    `;
+    const leadLabel =
+      existingLead[0]?.full_name || `Website lead • ${phone.slice(-4)}`;
+    let leadId = existingLead[0]?.id || null;
+    if (!leadId && createdBy) {
+      const inserted = await transaction<{ id: string }[]>`
+        insert into public.manager_outreach_leads
+          (full_name, phone, notes, status, created_by)
+        values (${leadLabel}, ${phone}, 'Source: Homepage Send text', 'new', ${createdBy}::uuid)
+        returning id
+      `;
+      leadId = inserted[0]?.id || null;
+      if (leadId)
+        await transaction`
+          insert into public.aura_audit_log (actor_user_id, action, details)
+          values (${createdBy}::uuid, 'public_start_lead_auto_created', ${sql.json({ leadId, source: "homepage_send_text", assignedTo: "Carlos", welcomeVideo: "request-materials" })})
+        `;
+    }
+    if (leadId)
+      await transaction`
+        update public.aura_contacts
+        set notes = case
+          when notes is null
+            or notes in ('Website Send text lead.', 'Unclassified contact created from an incoming SMS.')
+          then ${`Avantia link:lead:${leadId}`}
+          else notes
+        end
+        where id = ${contactId}::uuid
+      `;
+    return { contactId, leadId, leadLabel, createdBy };
+  });
+}
+
+async function linkPublicStartMessageToLead(
+  providerMessageId: string,
+  lead: PublicStartLead,
+) {
+  if (!lead.leadId) return;
+  const communications = await sql<{ id: string }[]>`
+    select id from public.aura_communications
+    where provider = 'quo' and external_activity_id = ${providerMessageId}
+    limit 1
+  `;
+  if (!communications[0]?.id) return;
+  await sql`
+    insert into public.aura_communication_links
+      (communication_id, entity_type, entity_id, entity_label, link_source, confidence, created_by)
+    values (${communications[0].id}::uuid, 'lead', ${lead.leadId}, ${lead.leadLabel}, 'automatic', 1, ${lead.createdBy}::uuid)
+    on conflict (communication_id, entity_type, entity_id) do nothing
+  `;
+}
 
 async function handlePublicStartByText(req: Request) {
   const payload = await req.text();
@@ -9788,15 +9875,30 @@ async function handlePublicStartByText(req: Request) {
     });
   if (!claim)
     return json({ error: "Please wait before requesting another text." }, 429);
-  if (!claim.send) return json({ ok: true, delivery: claim.delivery });
+  if (!claim.send) {
+    if (claim.delivery === "sent" || claim.delivery === "processing")
+      EdgeRuntime.waitUntil(
+        ensurePublicStartLead(phone).catch((error) =>
+          console.error("Public starter lead tagging failed", error),
+        ),
+      );
+    return json({ ok: true, delivery: claim.delivery });
+  }
   // One logical outbound message prevents an example from arriving after a
   // fast customer reply and keeps the opening copy in a guaranteed order.
   EdgeRuntime.waitUntil(
     (async () => {
       try {
+        let lead: PublicStartLead | null = null;
+        try {
+          lead = await ensurePublicStartLead(phone);
+        } catch (error) {
+          console.error("Public starter lead tagging failed", error);
+        }
         const providerId =
           claim.welcomeProviderId ||
           (await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING));
+        if (lead) await linkPublicStartMessageToLead(providerId, lead);
         if (!claim.welcomeProviderId) {
           await sql`update public.public_start_text_requests set provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
         }
