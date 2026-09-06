@@ -301,6 +301,23 @@ export function smsHasFullDeliveryAddress(value: string) {
   );
 }
 
+export function smsMissingStreetTypeQuestion(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (/\b(?:st(?:reet)?|ave(?:nue)?|rd|road|blvd|boulevard|dr(?:ive)?|ln|lane|ct|court|way|pkwy|parkway)\b/i.test(normalized)) return null;
+  const match = normalized.match(/\b(\d{1,6})\s+([a-z][a-z0-9.'-]*)\s+(?:[a-z.'-]+\s+){1,4}[a-z]{2}\s+\d{5}(?:-\d{4})?\b/i);
+  if (!match) return null;
+  const street = `${match[1]} ${match[2].replace(/^./, (letter) => letter.toUpperCase())}`;
+  return `Is that ${street} Street, Avenue, Road, or another street type?`;
+}
+
+export function smsSidingFirstStepReply(value: string) {
+  const normalized = value.trim();
+  if (!/\bsiding\b/i.test(normalized)) return null;
+  if (!/\b(?:i|we)\s+(?:need|want)|\bcan\s+you\s+help|\bhelp\b/i.test(normalized)) return null;
+  if (/\b\d+(?:\.\d+)?\s*(?:sq(?:uare)?s?|sq\.?\s*ft|panels?|pieces?|pcs?|boxes?|rolls?|ft|feet)\b/i.test(normalized)) return null;
+  return "Yes, we can help with siding. Please send a few photos of each side of the house.";
+}
+
 export function smsReplySuggestsOptionalItems(value: string) {
   return (
     /\b(?:also (?:consider|add|include)|do you also need|would you like (?:to add|any)|related items?|accessories|optional items?|you may (?:also )?need|you(?:'ll| will| might| probably)? also need|we (?:recommend|suggest) (?:adding|including)|don['’]?t forget)\b/i.test(

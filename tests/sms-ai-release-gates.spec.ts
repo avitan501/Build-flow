@@ -23,6 +23,8 @@ import {
   smsContextualQuantityAnswerReply,
   smsCorrectionPendingQuestionReply,
   smsHasExplicitQuantity,
+  smsMissingStreetTypeQuestion,
+  smsSidingFirstStepReply,
   smsHasNeededByTiming,
   smsMaterialClarificationQuestions,
   smsMaterialIntelligenceAssessment,
@@ -46,6 +48,19 @@ import {
 } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
+
+test("real siding intake asks for photos before delivery details", () => {
+  expect(smsSidingFirstStepReply("I need siding to my house? Can you help"))
+    .toBe("Yes, we can help with siding. Please send a few photos of each side of the house.")
+  expect(smsSidingFirstStepReply("Need 40 squares siding")).toBeNull()
+})
+
+test("an address missing only its street type gets one precise question", () => {
+  expect(smsMissingStreetTypeQuestion("122 spruce cedarhurst ny 11516"))
+    .toBe("Is that 122 Spruce Street, Avenue, Road, or another street type?")
+  expect(smsMissingStreetTypeQuestion("122 Spruce St, Cedarhurst NY 11516")).toBeNull()
+  expect(smsMissingStreetTypeQuestion("Cedarhurst")).toBeNull()
+})
 
 test("request summaries pluralize packages and avoid repeated package wording", () => {
   expect(formatSmsRequestSummaryItem({ name: "1/2 in. regular Sheetrock", quantity: 1, unit: "each", quantityExplicit: false }))

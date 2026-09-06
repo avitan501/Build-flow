@@ -150,6 +150,34 @@ export function removeResolvedFastenerReasons(reasons: string[], dimensions: str
   return reasons.filter((reason) => !/\b(?:shank|diameter|nail\s+(?:size|length)|fastener\s+(?:size|dimension)|clarify\s+whether)\b/i.test(reason))
 }
 
+function hasLabeledLinearMeasurement(value: string) {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u2032]/g, "'")
+    .replace(/[\u201c\u201d\u2033]/g, '"')
+    .replace(/\s+/g, " ")
+  const amount = String.raw`\d+(?:[- ]\d+\s*\/\s*\d+|\s*\/\s*\d+|\.\d+)?`
+  const unit = String.raw`(?:"|'|in(?:\.|ch(?:es)?)?|ft\.?|feet|foot|mm|cm)`
+  return new RegExp(String.raw`\b(?:height|length|wide|width|tall|long)\s*(?:of\s*)?${amount}\s*${unit}\b`, "i").test(normalized)
+    || new RegExp(String.raw`\b${amount}\s*${unit}\s*(?:height|length|wide|width|tall|long)\b`, "i").test(normalized)
+}
+
+/** Clear only narrow missing-measurement warnings backed by source evidence. */
+export function removeResolvedMeasurementReasons(input: {
+  reasons: string[]
+  name: string
+  evidence: string
+  fastenerLengthMissing: boolean
+}) {
+  const hasMeasuredPostSize = /\b(?:corner\s+posts?|posts?|trim)\b/i.test(input.name)
+    && hasLabeledLinearMeasurement(input.evidence)
+  return input.reasons.filter((reason) => {
+    if (!input.fastenerLengthMissing && /\b(?:fastener|screw|nail|anchor)\s+length\s+(?:is\s+)?missing\b/i.test(reason)) return false
+    if (hasMeasuredPostSize && /^(?:the\s+)?(?:post\s+)?(?:size|height|length)\s+(?:is\s+)?missing\.?$/i.test(reason.trim())) return false
+    return true
+  })
+}
+
 function thicknessMeasurements(value: string) {
   const normalized = value
     .toLowerCase()
@@ -195,7 +223,7 @@ export function fastenerNeedsLength(name: string, sourceText: string) {
     .replace(/[\u201c\u201d]/g, '"')
     .replace(/\s+/g, " ")
   if (recognizedFastenerDimensions(name, product)) return false
-  const hasLength = /\b\d+(?:[- ]\d+\/\d+|\s*\/\s*\d+|\.\d+)?\s*(?:"|in(?:\.|ch(?:es)?)?)\b/i.test(product)
+  const hasLength = /\b\d+(?:[- ]\d+\/\d+|\s*\/\s*\d+|\.\d+)?\s*(?:"|in(?:\.|ch(?:es)?)?)(?=\s|$|[,;:)·])/i.test(product)
     || /\b\d+(?:\.\d+)?\s*(?:mm|cm)\b/i.test(product)
   return !hasLength
 }

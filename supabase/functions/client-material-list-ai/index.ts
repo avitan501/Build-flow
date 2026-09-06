@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
-import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
+import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedMeasurementReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
 import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
@@ -339,12 +339,19 @@ Deno.serve(async (request: Request) => {
       const originalReviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
       const fastenerDimensions = recognizedFastenerDimensions(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
       const dimensions = fastenerDimensions || proposedDimensions
-      const reviewReasons = removeResolvedFastenerReasons(removeResolvedQuantityUnitReasons(originalReviewReasons, detected), fastenerDimensions)
+      const preliminaryReviewReasons = removeResolvedFastenerReasons(removeResolvedQuantityUnitReasons(originalReviewReasons, detected), fastenerDimensions)
         .filter((reason) => !quantityWasDefaulted || !/\bquantity\b/i.test(reason))
         .filter((reason) => !unitWasDefaulted || !/\b(?:sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
       const missingThickness = materialRequiresThickness(item.name) && !thickness
       const missingLumberType = dimensionalLumberNeedsType(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
-      const missingFastenerLength = fastenerNeedsLength(item.name, [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const measurementEvidence = [groundedSourceText, proposedDimensions, details].filter(Boolean).join(" ")
+      const missingFastenerLength = fastenerNeedsLength(item.name, measurementEvidence)
+      const reviewReasons = removeResolvedMeasurementReasons({
+        reasons: preliminaryReviewReasons,
+        name: item.name,
+        evidence: measurementEvidence,
+        fastenerLengthMissing: missingFastenerLength,
+      })
       const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
       const reviewStatus = missingThickness || missingLumberType || missingFastenerLength ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"

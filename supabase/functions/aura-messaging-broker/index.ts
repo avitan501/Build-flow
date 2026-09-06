@@ -25,6 +25,8 @@ import {
   smsReplyLanguage,
   smsHasExplicitQuantity,
   smsHasFullDeliveryAddress,
+  smsMissingStreetTypeQuestion,
+  smsSidingFirstStepReply,
   smsHasNeededByTiming,
   smsMaterialIntelligenceAssessment,
   smsMessagesAfterInactivityBoundary,
@@ -5889,6 +5891,22 @@ async function processCustomerSmsAutomation(
       reply: result.reply,
       intent: "material_request",
       event: "message",
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: true,
+      exactListOnly,
+      protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+    });
+  }
+  const sidingFirstStepReply = smsSidingFirstStepReply(effectiveBody);
+  const missingStreetTypeReply = smsMissingStreetTypeQuestion(effectiveBody);
+  if (sidingFirstStepReply || missingStreetTypeReply) {
+    result.reply = missingStreetTypeReply || sidingFirstStepReply || result.reply;
+    result.autoSafe = true;
+    safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: missingStreetTypeReply ? "delivery" : "material_request",
+      event: preConfirmationCorrection ? "message" : customerEvent,
       participantRole: result.participantRole || "lead",
       modelAutoSafe: true,
       exactListOnly,
