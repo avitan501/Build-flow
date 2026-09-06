@@ -18,19 +18,10 @@ test("public contact bar opens a compact text sheet with WhatsApp hidden", async
   // sheet through the unobstructed primary dock action.
   await bar.getByRole("button", { name: "Start by Text" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByTestId("contact-sheet-video")).toBeVisible();
-  await expect(dialog.getByTestId("contact-sheet-video")).toHaveAttribute(
-    "autoplay",
-    "",
-  );
-  await expect(dialog.getByTestId("contact-sheet-video-stage")).toHaveClass(
-    /aspect-\[4\/5\]/,
-  );
-  await expect(dialog.getByTestId("contact-sheet-video")).toHaveClass(
-    /object-cover/,
-  );
+  await expect(dialog.getByTestId("contact-sheet-video")).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: /Watch how it works/ })).toBeVisible();
   await expect(dialog.getByRole("link", { name: /Open chat/ })).toHaveCount(0);
   await expect(dialog.getByRole("link", { name: "Terms" })).toHaveAttribute(
     "href",
@@ -45,31 +36,33 @@ test("public contact bar opens a compact text sheet with WhatsApp hidden", async
     const phone = element.querySelector<HTMLInputElement>(
       'input[name="phone"]',
     );
-    const video = element.querySelector<HTMLElement>(
-      '[data-testid="contact-sheet-video"]',
+    const watch = Array.from(element.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Watch how it works"),
     );
     const terms = Array.from(element.querySelectorAll("a")).find(
       (link) => link.textContent === "Terms",
     );
-    if (!phone || !video || !terms) return null;
+    if (!phone || !watch || !terms) return null;
     return {
-      phoneBeforeVideo: Boolean(
-        phone.compareDocumentPosition(video) & Node.DOCUMENT_POSITION_FOLLOWING,
+      phoneBeforeWatch: Boolean(
+        phone.compareDocumentPosition(watch) & Node.DOCUMENT_POSITION_FOLLOWING,
       ),
-      videoBeforeTerms: Boolean(
-        video.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING,
+      watchBeforeTerms: Boolean(
+        watch.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     };
   });
   expect(contentOrder).toEqual({
-    phoneBeforeVideo: true,
-    videoBeforeTerms: true,
+    phoneBeforeWatch: true,
+    watchBeforeTerms: true,
   });
 
-  const submit = dialog.getByRole("button", { name: "Send text" });
+  const submit = dialog.getByRole("button", { name: "Text me" });
   await expect(submit).toBeDisabled();
-  await dialog.getByLabel("Where should we text you?").fill("(516) 555-0123");
+  await dialog.getByLabel("Mobile number").fill("(516) 555-0123");
   await expect(submit).toBeEnabled();
+  const box = await dialog.boundingBox();
+  expect(box?.height).toBeLessThan(520);
 });
 
 test("start-by-text sends only the phone, consent, and honeypot to the public endpoint", async ({
@@ -90,13 +83,14 @@ test("start-by-text sends only the phone, consent, and honeypot to the public en
     .getByTestId("public-contact-bar")
     .getByRole("button", { name: "Start by Text" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
-  await dialog.getByLabel("Where should we text you?").fill("+1 516 555 0199");
-  await dialog.getByRole("button", { name: "Send text" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
+  await dialog.getByLabel("Mobile number").fill("+1 516 555 0199");
+  await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(
     dialog.getByRole("heading", { name: "Text sent." }),
   ).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Open Messages" })).toHaveAttribute("href", "sms:");
   expect(requestBody).toMatchObject({
     phone: "+1 516 555 0199",
     consent: true,
@@ -125,14 +119,14 @@ test("start-by-text shows a safe server error and remains usable", async ({
     .getByTestId("public-contact-bar")
     .getByRole("button", { name: "Start by Text" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
-  await dialog.getByLabel("Where should we text you?").fill("5165550100");
-  await dialog.getByRole("button", { name: "Send text" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
+  await dialog.getByLabel("Mobile number").fill("5165550100");
+  await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(dialog.getByRole("alert")).toHaveText(
     "Please wait before requesting another text.",
   );
-  await expect(dialog.getByRole("button", { name: "Send text" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Text me" })).toBeEnabled();
 });
 
 test("a recent starter request never pretends a second SMS was sent", async ({
@@ -151,9 +145,9 @@ test("a recent starter request never pretends a second SMS was sent", async ({
     .getByTestId("public-contact-bar")
     .getByRole("button", { name: "Start by Text" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
-  await dialog.getByLabel("Where should we text you?").fill("5165550100");
-  await dialog.getByRole("button", { name: "Send text" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
+  await dialog.getByLabel("Mobile number").fill("5165550100");
+  await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(
     dialog.getByRole("heading", { name: "Text already requested." }),
@@ -163,7 +157,7 @@ test("a recent starter request never pretends a second SMS was sent", async ({
   ).toBeVisible();
 });
 
-test("partial delivery retries only the missing example with the same key", async ({
+test("partial delivery checks status with the same key", async ({
   page,
 }) => {
   const requests: Array<{ phone: string; idempotencyKey: string }> = [];
@@ -187,18 +181,18 @@ test("partial delivery retries only the missing example with the same key", asyn
     .getByTestId("public-contact-bar")
     .getByRole("button", { name: "Start by Text" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
-  await dialog.getByLabel("Where should we text you?").fill("5165550100");
-  await dialog.getByRole("button", { name: "Send text" }).click();
-  await expect(dialog.getByRole("button", { name: "Retry example" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Retry example" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
+  await dialog.getByLabel("Mobile number").fill("5165550100");
+  await dialog.getByRole("button", { name: "Text me" }).click();
+  await expect(dialog.getByRole("button", { name: "Check status" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Check status" }).click();
   await expect(dialog.getByRole("heading", { name: "Text sent." })).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1].idempotencyKey).toBe(requests[0].idempotencyKey);
 
   await dialog.getByRole("button", { name: "Use another number" }).click();
-  await dialog.getByLabel("Where should we text you?").fill("5165550199");
-  await dialog.getByRole("button", { name: "Send text" }).click();
+  await dialog.getByLabel("Mobile number").fill("5165550199");
+  await dialog.getByRole("button", { name: "Text me" }).click();
   expect(requests[2].idempotencyKey).not.toBe(requests[0].idempotencyKey);
 });
 
@@ -233,10 +227,10 @@ test("the homepage opens a six-video swipeable walkthrough", async ({
   await page.goto("/");
   if ((page.viewportSize()?.width ?? 0) < 640) {
     await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
-    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+    await page.getByRole("button", { name: /Watch how it works/ }).click();
   } else {
     await page.getByRole("button", { name: "Open chat" }).click();
-    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+    await page.getByRole("button", { name: /Watch how it works/ }).click();
   }
 
   const dialog = page.getByRole("dialog", { name: "See the full flow." });
@@ -258,7 +252,7 @@ test("the homepage opens a six-video swipeable walkthrough", async ({
 
   await dialog.getByRole("button", { name: "Start my request" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Start with one text." }),
+    page.getByRole("dialog", { name: "Send us your material list." }),
   ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
 });
@@ -279,9 +273,9 @@ test("text submission acknowledges the click immediately while delivery finishes
     .getByTestId("public-contact-bar")
     .getByRole("button", { name: "Start by Text" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Start with one text." });
-  await dialog.getByLabel("Where should we text you?").fill("5165550199");
-  await dialog.getByRole("button", { name: "Send text" }).click();
+  const dialog = page.getByRole("dialog", { name: "Send us your material list." });
+  await dialog.getByLabel("Mobile number").fill("5165550199");
+  await dialog.getByRole("button", { name: "Text me" }).click();
   await expect(
     dialog.getByRole("heading", { name: "Starting your text…" }),
   ).toBeVisible({ timeout: 500 });
@@ -297,10 +291,10 @@ test("walkthrough respects reduced motion and closes cleanly when navigation hid
   await page.goto("/");
   if ((page.viewportSize()?.width ?? 0) < 640) {
     await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
-    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+    await page.getByRole("button", { name: /Watch how it works/ }).click();
   } else {
     await page.getByRole("button", { name: "Open chat" }).click();
-    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+    await page.getByRole("button", { name: /Watch how it works/ }).click();
   }
   const video = page.getByLabel("1 of 6: Start with one text");
   await expect(video).toBeVisible();

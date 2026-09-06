@@ -6,11 +6,8 @@ import {
   Check,
   MessageCircle,
   MessageSquareText,
-  PackageCheck,
-  Pause,
   Play,
   Send,
-  ShieldCheck,
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
@@ -92,14 +89,12 @@ export function PublicContactBar() {
   const titleId = useId();
   const phoneId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const demoVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
   const startTextAttemptKeyRef = useRef<string | null>(null);
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
   const [phone, setPhone] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [demoStep, setDemoStep] = useState(0);
   const [demoIndex, setDemoIndex] = useState(0);
   const [videoPlaying, setVideoPlaying] = useState(true);
   const open = openPanel !== null;
@@ -152,19 +147,6 @@ export function PublicContactBar() {
       });
       return;
     }
-    if (openPanel === "contact") {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        videoRef.current?.pause();
-        return;
-      }
-      if (videoPlaying) videoRef.current?.play().catch(() => undefined);
-      else videoRef.current?.pause();
-      return;
-    }
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
     demoVideoRefs.current.forEach((video) => {
       if (!video) return;
       video.pause();
@@ -177,7 +159,6 @@ export function PublicContactBar() {
   function openSheet(panel: Exclude<OpenPanel, null> = "contact") {
     setSubmitState("idle");
     setErrorMessage("");
-    setDemoStep(0);
     setDemoIndex(0);
     startTextAttemptKeyRef.current = null;
     setVideoPlaying(
@@ -300,12 +281,12 @@ export function PublicContactBar() {
                 >
                   {openPanel === "demo"
                     ? "See the full flow."
-                    : "Start with one text."}
+                    : "Send us your material list."}
                 </h2>
                 <p className="mt-1 max-w-sm text-xs leading-5 text-slate-600">
                   {openPanel === "demo"
                     ? "From your first message to a trackable material request."
-                    : "Enter your number to request a text."}
+                    : "We’ll text you immediately. Reply with a list, photo, plan, or quote."}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
@@ -413,7 +394,7 @@ export function PublicContactBar() {
               <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-5 sm:pb-4">
                 {submitState === "submitting" ? (
                   <div
-                    className="rounded-2xl border border-[#b8d2ff] bg-[linear-gradient(135deg,#eef5ff_0%,#edfffb_100%)] p-4"
+                    className="flex items-center gap-3 rounded-2xl border border-[#b8d2ff] bg-[linear-gradient(135deg,#eef5ff_0%,#edfffb_100%)] p-4"
                     role="status"
                     aria-live="polite"
                   >
@@ -423,22 +404,19 @@ export function PublicContactBar() {
                         aria-hidden="true"
                       />
                     </span>
-                    <h3 className="mt-3 text-base font-bold">
-                      Starting your text…
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-slate-700">
-                      Check Messages in a moment.
-                    </p>
+                    <div>
+                      <h3 className="text-base font-bold">Starting your text…</h3>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-700">
+                        Check Messages in a moment.
+                      </p>
+                    </div>
                   </div>
                 ) : submitState === "success" ||
                   submitState === "recent" ||
                   submitState === "processing" ||
                   submitState === "partial" ? (
-                  <div
-                    className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm"
-                    role="status"
-                  >
-                    <div className="flex items-center gap-3 bg-[#e9fbf5] p-4">
+                  <div className="rounded-2xl border border-emerald-200 bg-[#f3fcf8] p-4 shadow-sm" role="status">
+                    <div className="flex items-center gap-3">
                       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0d9488] text-white">
                         <Check className="h-5 w-5" aria-hidden="true" />
                       </span>
@@ -458,43 +436,20 @@ export function PublicContactBar() {
                             : submitState === "processing"
                               ? "We’re still sending it. Check Messages shortly."
                               : submitState === "partial"
-                                ? "The welcome text was sent. Retry the example or reply with your list now."
+                                ? "The welcome text was sent. Open Messages and reply with your list."
                                 : "Check Messages, then reply with your material list."}
                         </p>
-                        {submitState === "partial" ? (
-                          <button
-                            type="button"
-                            onClick={() => void requestStartByText()}
-                            className="mt-2 inline-flex min-h-8 items-center rounded-lg bg-[#2878ff] px-3 text-[10px] font-extrabold text-white"
-                          >
-                            Retry example
-                          </button>
-                        ) : null}
                       </div>
                     </div>
-                    <div className="p-4">
-                      <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-slate-500">
-                        Example reply
-                      </p>
-                      <p className="mt-1.5 rounded-xl bg-[#071126] px-3 py-2.5 text-xs font-semibold leading-5 text-white">
-                        50 sheets 5/8 regular Sheetrock
-                        <br />
-                        45 pcs 2x4x8
-                      </p>
-                      <ol className="mt-3 grid grid-cols-3 gap-1.5 text-center text-[9px] font-bold leading-3 text-slate-600">
-                        <li className="rounded-lg bg-slate-50 px-1 py-2">
-                          <Check className="mx-auto mb-1 h-3.5 w-3.5 text-[#0d9488]" />
-                          Text requested
-                        </li>
-                        <li className="rounded-lg bg-slate-50 px-1 py-2">
-                          <MessageSquareText className="mx-auto mb-1 h-3.5 w-3.5 text-[#2878ff]" />
-                          Reply with list
-                        </li>
-                        <li className="rounded-lg bg-slate-50 px-1 py-2">
-                          <PackageCheck className="mx-auto mb-1 h-3.5 w-3.5 text-[#2878ff]" />
-                          View request
-                        </li>
-                      </ol>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <a href="sms:" className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl bg-[#0d9488] px-4 text-xs font-extrabold text-white shadow-sm">
+                        Open Messages
+                      </a>
+                      {submitState === "partial" ? (
+                        <button type="button" onClick={() => void requestStartByText()} className="inline-flex min-h-10 items-center rounded-xl border border-emerald-200 bg-white px-3 text-xs font-bold text-emerald-900">
+                          Check status
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {
@@ -502,7 +457,7 @@ export function PublicContactBar() {
                           startTextAttemptKeyRef.current = null;
                           setSubmitState("idle");
                         }}
-                        className="mt-3 text-xs font-bold text-[#0f766e] underline underline-offset-4"
+                        className="inline-flex min-h-10 items-center px-2 text-xs font-bold text-[#0f766e] underline underline-offset-4"
                       >
                         Use another number
                       </button>
@@ -521,7 +476,7 @@ export function PublicContactBar() {
                         className="h-4 w-4 text-[#0f766e]"
                         aria-hidden="true"
                       />{" "}
-                      Where should we text you?
+                      Mobile number
                     </label>
                     <div className="mt-2 flex gap-2">
                       <input
@@ -545,7 +500,7 @@ export function PublicContactBar() {
                         disabled={!phoneIsValid}
                         className="inline-flex min-h-12 min-w-24 items-center justify-center gap-1.5 rounded-xl bg-[#2878ff] px-3 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(40,120,255,0.24)] transition hover:bg-[#1766ed] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                       >
-                        Send text{" "}
+                        Text me{" "}
                         <Send className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
                     </div>
@@ -554,15 +509,6 @@ export function PublicContactBar() {
                         Enter a 10-digit U.S. phone number.
                       </p>
                     ) : null}
-
-                    <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
-                      <ShieldCheck
-                        className="h-3.5 w-3.5 text-[#0d9488]"
-                        aria-hidden="true"
-                      />
-                      Reply with your list. A secure request link is provided
-                      after confirmation.
-                    </div>
 
                     <div
                       className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden"
@@ -587,97 +533,14 @@ export function PublicContactBar() {
                     ) : null}
                   </form>
                 )}
-                <div
-                  data-testid="contact-sheet-video-stage"
-                  className="relative mt-2 aspect-[4/5] w-full shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#071126] shadow-[0_14px_32px_rgba(7,17,38,0.2)] sm:aspect-[5/4]"
+                <button
+                  type="button"
+                  onClick={() => setOpenPanel("demo")}
+                  className="mt-2 inline-flex min-h-11 w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 text-xs font-bold text-[#071126] shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2878ff]"
                 >
-                  <video
-                    ref={videoRef}
-                    data-testid="contact-sheet-video"
-                    className="h-full w-full object-cover object-top"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg"
-                    aria-label="How to start an Avantia material request by text"
-                    onTimeUpdate={(event) =>
-                      setDemoStep(
-                        Math.min(
-                          4,
-                          Math.floor(event.currentTarget.currentTime / 4),
-                        ),
-                      )
-                    }
-                  >
-                    <source
-                      src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4"
-                      type="video/mp4"
-                    />
-                  </video>
-                  <div
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#071126]/90 via-[#071126]/20 to-[#071126]/35"
-                    aria-hidden="true"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setOpenPanel("demo")}
-                    className="absolute right-2.5 top-2.5 inline-flex min-h-8 items-center rounded-full border border-white/25 bg-[#071126]/80 px-3 text-[9px] font-extrabold text-white shadow-lg backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4]"
-                  >
-                    See full 6-step flow
-                  </button>
-                  <div
-                    className="pointer-events-none absolute inset-x-3 bottom-11 rounded-xl bg-[#071126]/92 px-3.5 py-3 text-white shadow-xl backdrop-blur"
-                    data-testid="text-demo-step"
-                  >
-                    <p className="text-[9px] font-extrabold uppercase tracking-[0.13em] text-[#5eead4]">
-                      How it works · 20 sec
-                    </p>
-                    <p className="mt-1 text-sm font-bold">
-                      {
-                        [
-                          "1 · Enter your number",
-                          "2 · Open Messages",
-                          "3 · Reply with your list",
-                          "4 · Confirm the details",
-                          "5 · Track your request",
-                        ][demoStep]
-                      }
-                    </p>
-                    <p className="mt-1 whitespace-pre-line text-[10px] leading-4 text-white/80">
-                      {
-                        [
-                          "Tap Send text",
-                          "Your Avantia text arrives",
-                          "50 sheets 5/8 regular Sheetrock\n45 pcs 2x4x8",
-                          "Submit the captured list for review",
-                          "Pricing is reviewed by our team",
-                        ][demoStep]
-                      }
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setVideoPlaying((playing) => !playing)}
-                    className="absolute bottom-2.5 right-2.5 inline-flex h-8 items-center gap-1 rounded-full bg-white px-2.5 text-[9px] font-bold text-[#071126] shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4]"
-                    aria-label={
-                      videoPlaying
-                        ? "Pause how it works video"
-                        : "Play how it works video"
-                    }
-                  >
-                    {videoPlaying ? (
-                      <Pause className="h-3 w-3" />
-                    ) : (
-                      <Play className="h-3 w-3" />
-                    )}
-                    {videoPlaying ? "Pause" : "Play"}
-                  </button>
-                  <p className="pointer-events-none absolute bottom-3 left-3 text-[8px] font-semibold text-white/80">
-                    Nothing is ordered automatically.
-                  </p>
-                </div>
+                  <span className="inline-flex items-center gap-2"><Play className="h-3.5 w-3.5 text-[#2878ff]" aria-hidden="true" />Watch how it works</span>
+                  <span className="text-[10px] font-semibold text-slate-500">20 sec</span>
+                </button>
                 <p className="mt-1.5 text-center text-[8px] leading-3 text-slate-500">
                   By sending, you agree to request texts. Msg rates may apply.
                   STOP to opt out.{" "}
