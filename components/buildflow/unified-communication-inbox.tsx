@@ -20,6 +20,7 @@ import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-t
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { formatSiteDate, formatSiteDateTime, formatSiteTime, siteBusinessDateKey } from "@/lib/site-date-time"
+import { createClient as createSupabaseClient } from "@/lib/supabase/client"
 
 export type AuraLeadRecipient = {
   id: string
@@ -290,6 +291,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     let timer: number | undefined
     let failures = 0
     const controller = new AbortController()
+    const supabase = createSupabaseClient()
 
     const schedule = () => {
       if (stopped) return
@@ -348,6 +350,17 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       }
     }
     const onFocus = () => { if (timer) window.clearTimeout(timer); void sync() }
+    const liveChannel = supabase
+      .channel("aura-communications-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "aura_communications" },
+        () => {
+          if (timer) window.clearTimeout(timer)
+          void sync()
+        },
+      )
+      .subscribe()
     timer = window.setTimeout(sync, 1_500)
     window.addEventListener("focus", onFocus)
     return () => {
@@ -355,6 +368,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       controller.abort()
       if (timer) window.clearTimeout(timer)
       window.removeEventListener("focus", onFocus)
+      void supabase.removeChannel(liveChannel)
     }
   }, [])
 

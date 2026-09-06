@@ -35,6 +35,7 @@ import {
 } from "@/lib/aura/identity";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { formatSiteDateTime } from "@/lib/site-date-time";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 
 export type AuraLeadRecipient = {
   id: string;
@@ -223,6 +224,15 @@ export function AuraCommunicationWorkspace({
     const refresh = () => {
       if (document.visibilityState === "visible") router.refresh();
     };
+    const supabase = createSupabaseClient();
+    const liveChannel = supabase
+      .channel("owner-aura-communications-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "aura_communications" },
+        refresh,
+      )
+      .subscribe();
     const timer = window.setInterval(refresh, 10_000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
@@ -230,6 +240,7 @@ export function AuraCommunicationWorkspace({
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
+      void supabase.removeChannel(liveChannel);
     };
   }, [router]);
 

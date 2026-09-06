@@ -341,6 +341,23 @@ async function metaWhatsAppConfig(requireActive = true) {
   return { accessToken, appSecret, verifyToken, appId, businessAccountId, phoneNumberId, from: META_WHATSAPP_BUSINESS_PHONE, graphVersion: graphVersion! };
 }
 
+async function metaWhatsAppVerificationConfig() {
+  const verifyToken = await secret(secretNames.metaVerifyToken);
+  return verifyToken ? { verifyToken } : null;
+}
+
+async function metaWhatsAppWebhookConfig() {
+  const appSecret = await secret(secretNames.metaAppSecret);
+  return appSecret
+    ? {
+        appSecret,
+        businessAccountId: META_WHATSAPP_BUSINESS_ACCOUNT_ID,
+        phoneNumberId: META_WHATSAPP_PHONE_NUMBER_ID,
+        from: META_WHATSAPP_BUSINESS_PHONE,
+      }
+    : null;
+}
+
 async function quoConfig() {
   const [apiKey, from] = await Promise.all([
     secret(secretNames.quoKey),
@@ -862,10 +879,6 @@ async function storeCommunication(input: {
     input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt))
       ? new Date(input.occurredAt).toISOString()
       : new Date().toISOString();
-  const linkedContact = await contactId(
-    input.counterpartyPhone || null,
-    input.counterpartyEmail || null,
-  );
   const rows = await sql<{ id: string }[]>`
     insert into public.aura_communications (
       provider, channel, external_activity_id, contact_id, direction,
@@ -873,7 +886,10 @@ async function storeCommunication(input: {
       next_steps, status, media, duration_seconds, occurred_at, last_event_at,
       mailbox_address, message_id, in_reply_to
     ) values (
-      ${input.provider}, ${input.channel}, ${input.externalId}, ${linkedContact}, ${input.direction},
+      ${input.provider}, ${input.channel}, ${input.externalId}, coalesce(
+        (select id from public.aura_contacts where normalized_phone = ${input.counterpartyPhone || null}::text limit 1),
+        (select id from public.aura_contacts where lower(email) = lower(${input.counterpartyEmail || null}::text) limit 1)
+      ), ${input.direction},
       ${input.counterpartyPhone || null}, ${input.counterpartyEmail || null}, ${input.businessPhone || null},
       ${input.subject || null}, ${input.body}, ${input.summary || null}, ${input.transcript || null},
       ${sql.json(input.nextSteps || [])}, ${input.status},
@@ -1455,7 +1471,7 @@ function metaMessageMedia(message: MetaWhatsAppMessage) {
 }
 
 async function handleMetaWhatsAppVerification(req: Request) {
-  const config = await metaWhatsAppConfig(false);
+  const config = await metaWhatsAppVerificationConfig();
   if (!config) return new Response("Not configured", { status: 503 });
   const url = new URL(req.url);
   const mode = url.searchParams.get("hub.mode");
@@ -1472,7 +1488,7 @@ async function handleMetaWhatsAppVerification(req: Request) {
 }
 
 async function handleMetaWhatsAppWebhook(req: Request) {
-  const config = await metaWhatsAppConfig(false);
+  const config = await metaWhatsAppWebhookConfig();
   if (!config) return json({ error: "Meta WhatsApp is not configured" }, 503);
   const rawBody = await req.text();
   const supplied = req.headers.get("x-hub-signature-256") || "";
@@ -1510,7 +1526,11 @@ async function handleMetaWhatsAppWebhook(req: Request) {
           occurredAt: /^\d+$/.test(message.timestamp || "") ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
         });
         scheduleMaterialShadowAssessment(communicationId);
-        await linkIncomingCommunicationToRequestState(remotePhone, communicationId, "whatsapp");
+        EdgeRuntime.waitUntil(
+          linkIncomingCommunicationToRequestState(remotePhone, communicationId, "whatsapp").catch((error) =>
+            console.error("Aura WhatsApp request-state link failed", error),
+          ),
+        );
       }
       for (const receipt of value.statuses || []) {
         const status = ["sent", "delivered", "read", "failed"].includes(receipt.status || "") ? receipt.status! : null;

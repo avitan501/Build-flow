@@ -142,7 +142,9 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(broker).toContain('url.searchParams.get("mode") === "meta-whatsapp-webhook"');
   expect(broker).toContain("handleMetaWhatsAppVerification");
   expect(broker).toContain("handleMetaWhatsAppWebhook");
-  expect(broker).toContain("metaWhatsAppConfig(false)");
+  expect(broker).toContain("metaWhatsAppVerificationConfig()");
+  expect(broker).toContain("metaWhatsAppWebhookConfig()");
+  expect(broker).toContain("Aura WhatsApp request-state link failed");
   expect(broker).toContain("hmacSha256HexRawKey");
   expect(broker).toContain('change.field !== "messages"');
   expect(broker).toContain('provider: "whatsapp"');

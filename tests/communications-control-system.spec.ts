@@ -9,6 +9,8 @@ test("communications use delta updates instead of full-page polling", () => {
   const updates = readFileSync(path.join(root, "app/api/admin/communications/updates/route.ts"), "utf8");
   expect(inbox).toContain("/api/admin/communications/updates?after=");
   expect(inbox).not.toContain("window.setInterval(refresh, 10_000)");
+  expect(inbox).toContain('table: "aura_communications"');
+  expect(inbox).toContain('channel("aura-communications-live")');
   expect(inbox).toContain("setLiveCommunications");
   expect(inbox).toContain("markCommunicationConversationReadAction");
   expect(updates).toContain('.gt("last_event_at", cursor)');
