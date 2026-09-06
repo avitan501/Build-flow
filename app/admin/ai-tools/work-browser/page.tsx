@@ -9,6 +9,7 @@ import {
   CARLOS_WORK_BROWSER_ACK_TITLE,
   CARLOS_WORK_BROWSER_EMAIL,
   CARLOS_WORK_BROWSER_STATEMENT,
+  carlosWorkBrowserDirectUrl,
   carlosWorkBrowserUrl,
   parseCarlosWorkBrowserAcknowledgement,
 } from "@/lib/carlos-work-browser"
@@ -34,11 +35,12 @@ export default async function CarlosWorkBrowserPage() {
 
   const ready = Boolean(acknowledgement)
   const browserUrl = carlosWorkBrowserUrl(access.owner)
+  const directBrowserUrl = carlosWorkBrowserDirectUrl(access.owner)
   return <main className="min-h-screen bg-[#0a1020] px-3 py-4 text-white sm:px-5 lg:px-7">
     <div className="mx-auto max-w-[96rem]">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div className="flex min-w-0 items-center gap-3"><Link href={access.owner ? "/admin/carlos-activity" : "/admin/build-map"} aria-label="Back" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5"><ArrowLeft className="h-4 w-4" /></Link><div className="min-w-0"><div className="flex items-center gap-2"><h1 className="truncate text-xl font-semibold">Employee Work Browser</h1><span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-1 text-[10px] font-bold text-emerald-300"><ShieldCheck className="h-3 w-3" />Monitored</span></div><p className="mt-0.5 text-xs text-slate-400">Current employee: Carlos · separate company profile</p></div></div>
-        {ready ? <a href={browserUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-3 text-xs font-bold"><ExternalLink className="h-4 w-4" />Full screen</a> : null}
+        {ready ? <a href={directBrowserUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-3 text-xs font-bold"><ExternalLink className="h-4 w-4" />Open work browser</a> : null}
       </header>
 
       {ready ? <>
@@ -47,6 +49,10 @@ export default async function CarlosWorkBrowserPage() {
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><LockKeyhole className="h-4 w-4 text-emerald-300" /><span>Private Carlos profile</span></div>
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><Eye className="h-4 w-4 text-amber-300" /><span>{access.owner ? "Owner view only" : "Management may view"}</span></div>
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><MonitorUp className="h-4 w-4 text-violet-300" /><span>{access.owner ? "Control stays with Carlos" : "You control this screen"}</span></div>
+        </section>
+        <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-300/25 bg-sky-300/10 p-3">
+          <p className="text-xs leading-5 text-sky-50">If the screen below is blank, use the direct Tailnet connection. It stays private and bypasses the Tailnet DNS problem.</p>
+          <a href={directBrowserUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg bg-white px-3 text-xs font-bold text-[#071126]"><ExternalLink className="h-4 w-4" />Open direct connection</a>
         </section>
         <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"><iframe title={access.owner ? "Carlos live work browser — view only" : "Carlos managed work browser"} src={browserUrl} className="h-[calc(100vh-13rem)] min-h-[34rem] w-full" allow="clipboard-read; clipboard-write; fullscreen" /></div>
         <p className="mt-2 text-[11px] text-slate-500">Acknowledged {formatSiteDateTime(acknowledgement!.acknowledgedAt, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}. Activity outside this company browser is not visible.</p>

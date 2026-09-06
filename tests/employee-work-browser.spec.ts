@@ -4,6 +4,7 @@ import path from "node:path"
 
 import {
   CARLOS_WORK_BROWSER_STATEMENT,
+  carlosWorkBrowserDirectUrl,
   carlosWorkBrowserUrl,
   parseCarlosWorkBrowserAcknowledgement,
   serializeCarlosWorkBrowserAcknowledgement,
@@ -40,6 +41,14 @@ test("owner and employee receive separate noVNC permission modes", () => {
   expect(employee.origin).toBe("https://ubuntu-16gb-hil-3.tailc90016.ts.net:8443")
 })
 
+test("work-browser offers a Tailnet IP fallback when MagicDNS is unavailable", () => {
+  const owner = new URL(carlosWorkBrowserDirectUrl(true))
+  const employee = new URL(carlosWorkBrowserDirectUrl(false))
+  expect(owner.origin).toBe("http://100.66.91.3:6081")
+  expect(owner.searchParams.get("view_only")).toBe("1")
+  expect(employee.searchParams.get("view_only")).toBe("0")
+})
+
 test("daily smart review has a safe deterministic fallback and saved format", () => {
   const events = [{ id: "1", user_id: "u1", event_type: "communication_sent" as const, page_path: "/admin/communications", page_label: "Communications", metadata: { outcome: "failed", channel: "email" }, occurred_at: "2026-09-04T15:00:00.000Z" }]
   const answer = fallbackCarlosActivityReview(events, "Quote upload button failed")
@@ -66,6 +75,7 @@ test("manager UI uses reusable employee naming and exposes owner live screen", a
   ])
   expect(browserPage).toContain("Employee Work Browser")
   expect(browserPage).toContain("Current employee: Carlos")
+  expect(browserPage).toContain("Open direct connection")
   expect(toolsPage).toContain("Live employee screen")
   expect(activityPage).toContain("CarlosActivityAiReviewCard")
 })

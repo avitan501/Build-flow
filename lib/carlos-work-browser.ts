@@ -30,14 +30,25 @@ export function parseCarlosWorkBrowserAcknowledgement(value: string | null | und
 }
 
 const DEFAULT_CARLOS_BROWSER_ORIGIN = "https://ubuntu-16gb-hil-3.tailc90016.ts.net:8443"
+const DEFAULT_CARLOS_BROWSER_DIRECT_ORIGIN = "http://100.66.91.3:6081"
 
-export function carlosWorkBrowserUrl(viewOnly: boolean) {
-  const origin = String(process.env.CARLOS_WORK_BROWSER_URL || DEFAULT_CARLOS_BROWSER_ORIGIN).replace(/\/+$/, "")
+function buildCarlosWorkBrowserUrl(origin: string, viewOnly: boolean) {
+  const normalizedOrigin = origin.replace(/\/+$/, "")
   const query = new URLSearchParams({
     autoconnect: "1",
     reconnect: "1",
     resize: "scale",
     view_only: viewOnly ? "1" : "0",
   })
-  return `${origin}/vnc.html?${query.toString()}`
+  return `${normalizedOrigin}/vnc.html?${query.toString()}`
+}
+
+export function carlosWorkBrowserUrl(viewOnly: boolean) {
+  const origin = String(process.env.CARLOS_WORK_BROWSER_URL || DEFAULT_CARLOS_BROWSER_ORIGIN).replace(/\/+$/, "")
+  return buildCarlosWorkBrowserUrl(origin, viewOnly)
+}
+
+export function carlosWorkBrowserDirectUrl(viewOnly: boolean) {
+  const origin = String(process.env.CARLOS_WORK_BROWSER_DIRECT_URL || DEFAULT_CARLOS_BROWSER_DIRECT_ORIGIN)
+  return buildCarlosWorkBrowserUrl(origin, viewOnly)
 }
