@@ -265,6 +265,47 @@ export async function sendAuraMessageAction(input: {
     revalidatePath("/admin/users");
     return { ok: true, externalId, occurredAt: new Date().toISOString() };
   } catch (error) {
+    if (
+      input.idempotencyKey &&
+      /^[a-z0-9:/_.-]{10,160}$/i.test(input.idempotencyKey)
+    ) {
+      const admin = createAdminClient();
+      const { data: accepted } = await admin
+        .from("aura_message_outbox")
+        .select("id,status")
+        .eq("created_by", user.id)
+        .eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)
+        .in("status", [
+          "pending",
+          "claimed",
+          "sending",
+          "retry_wait",
+          "accepted",
+          "sent",
+          "delivered",
+          "read",
+        ])
+        .maybeSingle<{ id: string; status: string }>();
+      if (accepted?.id) {
+        await recordAuraCommunicationActivity(supabase, user.id, {
+          channel,
+          recipient: activityRecipient,
+          label: activityLabel,
+          requestId: input.materialRequestId,
+          requestLabel: input.materialRequestTitle,
+          outcome: "sent",
+          startedAt,
+        });
+        revalidatePath("/owner/aura");
+        revalidatePath("/admin/communications");
+        revalidatePath("/admin/users");
+        return {
+          ok: true,
+          externalId: accepted.id,
+          occurredAt: new Date().toISOString(),
+        };
+      }
+    }
     await recordAuraCommunicationActivity(supabase, user.id, {
       channel,
       recipient: activityRecipient,
