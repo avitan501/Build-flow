@@ -451,6 +451,17 @@ test("organized requests do not render the free-text storage row as a material",
   expect(worktable).toContain("!isRawFreeTextContainer(item)")
 })
 
+test("every request comparison entry synchronizes before navigation", async () => {
+  const [worktable, management] = await Promise.all([
+    source(path.join(root, "components/buildflow/request-material-worktable.tsx")),
+    source(managementPath),
+  ])
+  expect(worktable).toContain("openRequestPricingComparisonAction(requestId)")
+  expect(worktable).not.toContain('href={comparison.href}')
+  expect(management).toContain("onClick={openManualPricing}")
+  expect(management).not.toContain('href={`/admin/quote-comparison/${primaryComparison.id}`}')
+})
+
 test("step three starts from the latest client-ready-to-pay values", async () => {
   const [page, management] = await Promise.all([
     source(pagePath),

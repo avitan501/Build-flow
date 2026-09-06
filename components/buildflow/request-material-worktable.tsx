@@ -4,6 +4,7 @@ import { Check, ChevronDown, Copy, FileText, Route, Search } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
+import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
 import { saveRequestItemSupplierRouteAction } from "@/app/owner/materials/requests/actions"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { MaterialOrganizationStatus } from "@/components/buildflow/material-organization-status"
@@ -79,8 +80,10 @@ export function RequestMaterialWorktable({
   const [batchSupplier, setBatchSupplier] = useState("")
   const [batchManual, setBatchManual] = useState("")
   const [batchFeedback, setBatchFeedback] = useState("")
+  const [comparisonFeedback, setComparisonFeedback] = useState("")
   const [expandedMobileSections, setExpandedMobileSections] = useState<string[]>([])
   const [batchPending, startBatchTransition] = useTransition()
+  const [comparisonPending, startComparisonTransition] = useTransition()
   const sourceItems = originalItems
   const organizationInProgress = ["queued", "processing", "retrying"].includes(organizationStatus)
   const aiItems = organizedItems.map((item) => savedItems[item.id] ?? item)
@@ -116,6 +119,18 @@ export function RequestMaterialWorktable({
       setBatchManual("")
       setBatchFeedback("Supplier route saved.")
       router.refresh()
+    })
+  }
+
+  function openSynchronizedComparison() {
+    setComparisonFeedback("")
+    startComparisonTransition(async () => {
+      const result = await openRequestPricingComparisonAction(requestId)
+      if (!result.ok) {
+        setComparisonFeedback(result.error)
+        return
+      }
+      router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
     })
   }
 
@@ -217,7 +232,7 @@ export function RequestMaterialWorktable({
         <p className="px-4 py-8 text-center text-sm font-semibold text-slate-500">No request items found.</p>
       )}
 
-      {supplierComparisons.length ? <div className="flex flex-wrap gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <a key={comparison.id} href={comparison.href} className="text-xs font-bold text-[#0066cc]">Open full comparison · {comparison.title}</a>)}</div> : null}
+      {supplierComparisons.length ? <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <button key={comparison.id} type="button" onClick={openSynchronizedComparison} disabled={comparisonPending} className="min-h-9 text-left text-xs font-bold text-[#0066cc] disabled:opacity-50">{comparisonPending ? "Syncing comparison…" : `Open full comparison · ${comparison.title}`}</button>)}{comparisonFeedback ? <span className="text-xs font-bold text-rose-700">{comparisonFeedback}</span> : null}</div> : null}
     </section>
   )
 }
