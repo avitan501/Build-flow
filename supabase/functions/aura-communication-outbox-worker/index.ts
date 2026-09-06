@@ -44,6 +44,28 @@ type AttachmentRow = {
   byte_size: number;
 };
 
+type MetaWhatsAppConfig = {
+  accessToken: string;
+  phoneNumberId: string;
+  graphVersion: string;
+};
+
+async function metaWhatsAppConfig(): Promise<MetaWhatsAppConfig | null> {
+  const [provider, accessToken, phoneNumberId, graphVersion] = await Promise.all([
+    vaultSecret("aura_whatsapp_provider"),
+    vaultSecret("aura_meta_whatsapp_access_token"),
+    vaultSecret("aura_meta_whatsapp_phone_number_id"),
+    vaultSecret("aura_meta_whatsapp_graph_version"),
+  ]);
+  if (
+    provider !== "meta" ||
+    !accessToken ||
+    phoneNumberId !== "1266268263238386" ||
+    !/^v\d+\.\d+$/.test(graphVersion || "")
+  ) return null;
+  return { accessToken, phoneNumberId, graphVersion: graphVersion! };
+}
+
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -184,6 +206,50 @@ async function providerRequest(row: OutboxRow, attachments: AttachmentRow[]) {
   }
 
   if (row.provider === "two_chat") {
+    const selectedProvider = await vaultSecret("aura_whatsapp_provider");
+    if (selectedProvider === "meta") {
+      const meta = await metaWhatsAppConfig();
+      if (!meta) throw new Error("provider_not_configured");
+      const attachment = attachments[0];
+      const mediaUrl = attachment ? await signedAttachment(attachment) : null;
+      const type = attachment?.content_type.startsWith("image/")
+        ? "image"
+        : attachment?.content_type.startsWith("video/")
+          ? "video"
+          : attachment?.content_type.startsWith("audio/")
+            ? "audio"
+            : "document";
+      const message = mediaUrl
+        ? {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: row.destination.replace(/[^0-9]/g, ""),
+            type,
+            [type]: {
+              link: mediaUrl,
+              ...(type === "document" ? { filename: attachment.filename } : {}),
+              ...(type !== "audio" && row.message_body ? { caption: row.message_body.slice(0, 1024) } : {}),
+            },
+          }
+        : {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: row.destination.replace(/[^0-9]/g, ""),
+            type: "text",
+            text: { preview_url: true, body: row.message_body.slice(0, 4096) },
+          };
+      return await fetch(
+        `https://graph.facebook.com/${meta.graphVersion}/${meta.phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${meta.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(message),
+        },
+      );
+    }
     const [apiKey, from] = await Promise.all([
       vaultSecret("aura_2chat_api_key"),
       vaultSecret("aura_2chat_whatsapp_from"),
@@ -240,9 +306,12 @@ async function acceptedProviderId(
     return typeof data?.id === "string" ? data.id : null;
   }
   if (provider === "two_chat")
-    return typeof payload.message_uuid === "string"
-      ? payload.message_uuid
-      : null;
+    return Array.isArray(payload.messages) &&
+        typeof (payload.messages[0] as Record<string, unknown> | undefined)?.id === "string"
+      ? String((payload.messages[0] as Record<string, unknown>).id)
+      : typeof payload.message_uuid === "string"
+        ? payload.message_uuid
+        : null;
   return typeof payload.id === "string" ? payload.id : null;
 }
 
@@ -374,7 +443,8 @@ async function processOne(row: OutboxRow) {
     }
     const providerStatus = row.provider === "quo"
       ? String((payload.data as Record<string, unknown> | undefined)?.status || "queued")
-      : row.provider === "two_chat" ? "queued" : "sent";
+      : row.provider === "two_chat" && Array.isArray(payload.messages) ? "accepted"
+        : row.provider === "two_chat" ? "queued" : "sent";
     await markAccepted(row, providerMessageId, providerStatus, attachments);
     return;
   }

@@ -117,33 +117,53 @@ test("legacy 2Chat call webhooks stay protected while Communications uses the sa
   expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');
 });
 
-test("2Chat uses a protected webhook and the secure Vault broker", async () => {
-  const [route, broker, actions, setup, dashboard] = await Promise.all([
-    readFile(path.join(process.cwd(), "app/api/aura/whatsapp/2chat/route.ts"), "utf8"),
+test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2Chat credentials", async () => {
+  const [route, broker, worker, actions, setup, dashboard] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/aura/whatsapp/route.ts"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-communication-outbox-worker/index.ts"), "utf8"),
     readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/aura-connection-setup.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8"),
   ]);
 
-  expect(route).toContain('searchParams.get("token")');
-  expect(route).toContain('functions/v1/aura-messaging-broker?mode=2chat-webhook');
-  expect(route).toContain('"x-avantia-2chat-token": token');
-  expect(route).toContain("processAuraOwnerCommand");
-  expect(broker).toContain('input.action === "configure_2chat"');
-  expect(broker).toContain("https://api.p.2chat.io/open/whatsapp/send-message");
-  expect(broker).toContain("https://api.p.2chat.io/open/webhooks/subscribe/");
-  expect(broker).toContain("aura_2chat_webhook_token");
+  expect(route).toContain('brokerUrl.searchParams.set("mode", "meta-whatsapp-webhook")');
+  expect(route).toContain('request.headers.get("x-hub-signature-256")');
+  expect(route).not.toContain("AURA_WHATSAPP_APP_SECRET");
+  expect(broker).toContain('input.action === "configure_meta_whatsapp"');
+  expect(broker).toContain('input.action === "activate_meta_whatsapp"');
+  expect(broker).toContain('url.searchParams.get("mode") === "meta-whatsapp-webhook"');
+  expect(broker).toContain("handleMetaWhatsAppVerification");
+  expect(broker).toContain("handleMetaWhatsAppWebhook");
+  expect(broker).toContain("metaWhatsAppConfig(false)");
+  expect(broker).toContain("hmacSha256HexRawKey");
+  expect(broker).toContain('change.field !== "messages"');
+  expect(broker).toContain('provider: "whatsapp"');
+  expect(broker).toContain('where provider = \'whatsapp\' and external_activity_id = ${receipt.id}');
+  expect(broker).toContain('whatsappProvider: activeWhatsApp ? directMetaSelected ? "meta" : "2chat" : null');
+  expect(broker).toContain("aura_meta_whatsapp_access_token");
+  expect(broker).toContain("aura_meta_whatsapp_app_secret");
+  expect(broker).toContain("aura_meta_whatsapp_verify_token");
+  expect(broker).toContain("aura_meta_whatsapp_business_account_id");
+  expect(broker).toContain("aura_meta_whatsapp_phone_number_id");
+  expect(broker).not.toContain('saveSecret(secretNames.twoChatKey, accessToken');
+  expect(worker).toContain('vaultSecret("aura_whatsapp_provider")');
+  expect(worker).toContain('vaultSecret("aura_meta_whatsapp_access_token")');
+  expect(worker).toContain('https://graph.facebook.com/${meta.graphVersion}/${meta.phoneNumberId}/messages');
+  expect(worker).toContain('messaging_product: "whatsapp"');
+  expect(worker).toContain("Array.isArray(payload.messages)");
+  expect(worker).toContain('if (!meta) throw new Error("provider_not_configured")');
   expect(broker).toContain('input.action === "send_sms"');
-  expect(actions).toContain('provider === "2chat"');
-  expect(actions).toContain('action: "configure_2chat"');
-  expect(setup).toContain("2Chat WhatsApp");
-  expect(setup).toContain("Meta Coexistence");
-  expect(setup).toContain("Do not use WhatsApp Web QR");
-  expect(setup).not.toContain("after scanning the WhatsApp QR");
-  expect(broker).toContain("Meta Coexistence connection");
-  expect(broker).not.toContain("connected by QR");
+  expect(actions).toContain('provider === "meta-whatsapp"');
+  expect(actions).toContain('action: "configure_meta_whatsapp"');
+  expect(actions).toContain('action: "activate_meta_whatsapp"');
+  expect(setup).toContain("Direct Meta WhatsApp");
+  expect(setup).toContain('value="meta-whatsapp"');
+  expect(setup).not.toContain('value="2chat"');
+  expect(setup).toContain("2Chat remains only for the existing call and recording service");
+  expect(setup).toContain("I verified and subscribed messages · Activate");
   expect(setup).toContain('value="quo"');
+  expect(dashboard).toContain("brokerStatus?.whatsappProvider");
   expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");
 });
 

@@ -40,7 +40,17 @@ export type PrepareQuoAttachmentResult =
 export type SendAuraVideoResult =
   { ok: true; title: string } | { ok: false; error: string };
 
-type BrokerResult = { ok?: boolean; error?: string; id?: string; duplicate?: boolean };
+type BrokerResult = {
+  ok?: boolean;
+  error?: string;
+  id?: string;
+  duplicate?: boolean;
+  callbackUrl?: string;
+  verifyToken?: string;
+};
+export type ConfigureAuraProviderResult =
+  | { ok: true; callbackUrl?: string; verifyToken?: string }
+  | { ok: false; error: string };
 export type TwoChatVoiceTokenResult =
   | { ok: true; token: string; from: string; expiresAt: string | null }
   | { ok: false; error: string };
@@ -474,6 +484,27 @@ export async function activateAuraTwoChatChannelAction(
   return { ok: true };
 }
 
+export async function activateAuraMetaWhatsAppAction(): Promise<SendAuraMessageResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura/connect");
+  try {
+    await invokeMessagingBroker(supabase, {
+      action: "activate_meta_whatsapp",
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Direct Meta WhatsApp could not be activated.",
+    };
+  }
+  revalidatePath("/owner/aura");
+  revalidatePath("/owner/aura/connect");
+  revalidatePath("/admin/communications");
+  return { ok: true };
+}
+
 const QUO_ATTACHMENT_TYPES = new Set([
   "application/pdf",
   "application/msword",
@@ -636,15 +667,17 @@ export async function sendAuraVideoAction(input: {
 
 export async function configureAuraProviderAction(
   formData: FormData,
-): Promise<SendAuraMessageResult> {
+): Promise<ConfigureAuraProviderResult> {
   const { supabase } = await requireOwnerAccess("/owner/aura");
   const provider = String(formData.get("provider") || "");
+  let setup: BrokerResult = {};
   try {
-    if (provider === "2chat") {
-      await invokeMessagingBroker(supabase, {
-        action: "configure_2chat",
-        apiKey: String(formData.get("apiKey") || ""),
-        from: String(formData.get("from") || ""),
+    if (provider === "meta-whatsapp") {
+      setup = await invokeMessagingBroker(supabase, {
+        action: "configure_meta_whatsapp",
+        accessToken: String(formData.get("accessToken") || ""),
+        appSecret: String(formData.get("appSecret") || ""),
+        graphVersion: String(formData.get("graphVersion") || ""),
       });
     } else if (provider === "quo") {
       await invokeMessagingBroker(supabase, {
@@ -673,7 +706,11 @@ export async function configureAuraProviderAction(
   revalidatePath("/owner/aura");
   revalidatePath("/owner/aura/connect");
   revalidatePath("/admin/communications");
-  return { ok: true };
+  return {
+    ok: true,
+    callbackUrl: setup.callbackUrl,
+    verifyToken: setup.verifyToken,
+  };
 }
 
 export async function confirmAuraIntakeAction(formData: FormData) {

@@ -109,6 +109,10 @@ const STAFF_EMAILS = new Set([
   "info@fivetownsbuilders.com",
 ]);
 const TWO_CHAT_BUSINESS_PHONE = "+13479378665";
+const META_WHATSAPP_BUSINESS_PHONE = "+15169901990";
+const META_WHATSAPP_APP_ID = "2874339416276903";
+const META_WHATSAPP_BUSINESS_ACCOUNT_ID = "1609047970612779";
+const META_WHATSAPP_PHONE_NUMBER_ID = "1266268263238386";
 const TRUSTED_SMS_COMMAND_PHONES = new Set(["+13475675077", "+15169398484"]);
 
 function isTrustedSmsCommandPhone(phone: string | null | undefined) {
@@ -122,6 +126,16 @@ const secretNames = {
   twoChatKey: "aura_2chat_api_key",
   twoChatFrom: "aura_2chat_whatsapp_from",
   twoChatWebhookToken: "aura_2chat_webhook_token",
+  whatsappProvider: "aura_whatsapp_provider",
+  metaAppId: "aura_meta_whatsapp_app_id",
+  metaAccessToken: "aura_meta_whatsapp_access_token",
+  metaAppSecret: "aura_meta_whatsapp_app_secret",
+  metaVerifyToken: "aura_meta_whatsapp_verify_token",
+  metaWebhookVerifiedTokenHash: "aura_meta_whatsapp_webhook_verified_token_hash",
+  metaBusinessAccountId: "aura_meta_whatsapp_business_account_id",
+  metaPhoneNumberId: "aura_meta_whatsapp_phone_number_id",
+  metaFrom: "aura_meta_whatsapp_from",
+  metaGraphVersion: "aura_meta_whatsapp_graph_version",
   quoKey: "aura_quo_api_key",
   quoFrom: "aura_quo_from_number",
   quoWebhookSecret: "aura_quo_webhook_signing_secret",
@@ -304,6 +318,29 @@ async function activeTwoChatWhatsAppConfig() {
   return { ...config, from: TWO_CHAT_BUSINESS_PHONE };
 }
 
+async function metaWhatsAppConfig(requireActive = true) {
+  const [provider, accessToken, appSecret, verifyToken, appId, businessAccountId, phoneNumberId, from, graphVersion] = await Promise.all([
+    secret(secretNames.whatsappProvider),
+    secret(secretNames.metaAccessToken),
+    secret(secretNames.metaAppSecret),
+    secret(secretNames.metaVerifyToken),
+    secret(secretNames.metaAppId),
+    secret(secretNames.metaBusinessAccountId),
+    secret(secretNames.metaPhoneNumberId),
+    secret(secretNames.metaFrom),
+    secret(secretNames.metaGraphVersion),
+  ]);
+  if (
+    (requireActive && provider !== "meta") || !accessToken || !appSecret || !verifyToken ||
+    appId !== META_WHATSAPP_APP_ID ||
+    businessAccountId !== META_WHATSAPP_BUSINESS_ACCOUNT_ID ||
+    phoneNumberId !== META_WHATSAPP_PHONE_NUMBER_ID ||
+    normalizePhone(from) !== META_WHATSAPP_BUSINESS_PHONE ||
+    !/^v\d+\.\d+$/.test(graphVersion || "")
+  ) return null;
+  return { accessToken, appSecret, verifyToken, appId, businessAccountId, phoneNumberId, from: META_WHATSAPP_BUSINESS_PHONE, graphVersion: graphVersion! };
+}
+
 async function quoConfig() {
   const [apiKey, from] = await Promise.all([
     secret(secretNames.quoKey),
@@ -366,6 +403,19 @@ async function hmacSha256Base64RawKey(key: string, data: string) {
     new TextEncoder().encode(data),
   );
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+async function hmacSha256HexRawKey(key: string, data: string) {
+  if (!key) return null;
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(signature)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function validResendSignature(
@@ -1337,6 +1387,149 @@ async function handleTwoChatWebhook(req: Request) {
       communicationId,
       "whatsapp",
     );
+  }
+  return json({ ok: true });
+}
+
+type MetaWhatsAppMessage = {
+  id?: string;
+  from?: string;
+  timestamp?: string;
+  type?: string;
+  text?: { body?: string };
+  image?: { id?: string; mime_type?: string; caption?: string };
+  audio?: { id?: string; mime_type?: string; voice?: boolean };
+  video?: { id?: string; mime_type?: string; caption?: string };
+  document?: { id?: string; mime_type?: string; filename?: string; caption?: string };
+  button?: { text?: string; payload?: string };
+  interactive?: {
+    button_reply?: { id?: string; title?: string };
+    list_reply?: { id?: string; title?: string; description?: string };
+  };
+};
+
+type MetaWhatsAppWebhook = {
+  object?: string;
+  entry?: Array<{
+    id?: string;
+    changes?: Array<{
+      field?: string;
+      value?: {
+        metadata?: { display_phone_number?: string; phone_number_id?: string };
+        contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
+        messages?: MetaWhatsAppMessage[];
+        statuses?: Array<{
+          id?: string;
+          status?: string;
+          timestamp?: string;
+          recipient_id?: string;
+          errors?: Array<{ code?: number; title?: string; message?: string }>;
+        }>;
+      };
+    }>;
+  }>;
+};
+
+function metaMessageBody(message: MetaWhatsAppMessage) {
+  if (message.type === "text") return message.text?.body?.trim() || null;
+  if (message.type === "button") return message.button?.text?.trim() || message.button?.payload?.trim() || null;
+  if (message.type === "interactive") return message.interactive?.button_reply?.title?.trim() || message.interactive?.list_reply?.title?.trim() || null;
+  if (message.type === "image") return message.image?.caption?.trim() || null;
+  if (message.type === "video") return message.video?.caption?.trim() || null;
+  if (message.type === "document") return message.document?.caption?.trim() || message.document?.filename?.trim() || null;
+  return null;
+}
+
+function metaMessageMedia(message: MetaWhatsAppMessage) {
+  const source = message.type === "image" ? message.image
+    : message.type === "audio" ? message.audio
+    : message.type === "video" ? message.video
+    : message.type === "document" ? message.document
+    : null;
+  if (!source?.id) return [];
+  return [{
+    providerAttachmentId: source.id,
+    type: source.mime_type || "application/octet-stream",
+    name: message.type === "document" ? message.document?.filename : undefined,
+  }];
+}
+
+async function handleMetaWhatsAppVerification(req: Request) {
+  const config = await metaWhatsAppConfig(false);
+  if (!config) return new Response("Not configured", { status: 503 });
+  const url = new URL(req.url);
+  const mode = url.searchParams.get("hub.mode");
+  const verifyToken = url.searchParams.get("hub.verify_token") || "";
+  const challenge = url.searchParams.get("hub.challenge") || "";
+  if (mode !== "subscribe" || !challenge || !constantTimeEqual(config.verifyToken, verifyToken))
+    return new Response("Forbidden", { status: 403 });
+  await saveSecret(
+    secretNames.metaWebhookVerifiedTokenHash,
+    await sha256Hex(config.verifyToken),
+    "Aura Meta webhook verified token fingerprint",
+  );
+  return new Response(challenge, { status: 200, headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" } });
+}
+
+async function handleMetaWhatsAppWebhook(req: Request) {
+  const config = await metaWhatsAppConfig(false);
+  if (!config) return json({ error: "Meta WhatsApp is not configured" }, 503);
+  const rawBody = await req.text();
+  const supplied = req.headers.get("x-hub-signature-256") || "";
+  const expected = await hmacSha256HexRawKey(config.appSecret, rawBody);
+  if (!expected || !supplied.startsWith("sha256=") || !constantTimeEqual(expected, supplied.slice(7)))
+    return json({ error: "Invalid signature" }, 401);
+
+  let payload: MetaWhatsAppWebhook;
+  try {
+    payload = JSON.parse(rawBody) as MetaWhatsAppWebhook;
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  if (payload.object !== "whatsapp_business_account") return json({ ok: true, ignored: true });
+
+  for (const entry of payload.entry || []) {
+    if (entry.id && entry.id !== config.businessAccountId) return json({ error: "Business account not allowed" }, 403);
+    for (const change of entry.changes || []) {
+      if (change.field !== "messages") continue;
+      const value = change.value;
+      if (value?.metadata?.phone_number_id !== config.phoneNumberId) return json({ error: "Business number not allowed" }, 403);
+      for (const message of value.messages || []) {
+        const remotePhone = normalizePhone(message.from);
+        if (!message.id || !remotePhone) continue;
+        const communicationId = await storeCommunication({
+          provider: "whatsapp",
+          channel: "whatsapp",
+          externalId: message.id,
+          direction: "incoming",
+          counterpartyPhone: remotePhone,
+          businessPhone: config.from,
+          body: metaMessageBody(message),
+          status: "received",
+          media: metaMessageMedia(message),
+          occurredAt: /^\d+$/.test(message.timestamp || "") ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
+        });
+        scheduleMaterialShadowAssessment(communicationId);
+        await linkIncomingCommunicationToRequestState(remotePhone, communicationId, "whatsapp");
+      }
+      for (const receipt of value.statuses || []) {
+        const status = ["sent", "delivered", "read", "failed"].includes(receipt.status || "") ? receipt.status! : null;
+        if (!receipt.id || !status) continue;
+        const updated = await sql<{ id: string }[]>`
+          update public.aura_communications
+          set status = case
+            when status = 'read' then 'read'
+            when status = 'delivered' and ${status} <> 'read' then 'delivered'
+            when status = 'failed' and ${status} in ('sent', 'accepted') then 'failed'
+            else ${status}
+          end, last_event_at = now(), updated_at = now()
+          where provider = 'whatsapp' and external_activity_id = ${receipt.id}
+          returning id
+        `;
+        if (updated[0]?.id && ["delivered", "read", "failed"].includes(status))
+          await markRequestCommunicationDelivery(updated[0].id, status as "delivered" | "read" | "failed");
+      }
+    }
   }
   return json({ ok: true });
 }
@@ -6385,17 +6578,22 @@ async function handleQuoWebhook(req: Request) {
   return json({ ok: true, duplicate: false, accepted: true }, 202);
 }
 
-async function sendTwoChatWhatsApp(
+async function sendWhatsApp(
   toValue: unknown,
   bodyValue: unknown,
   mediaUrlValue?: unknown,
   sourceCommunicationIdValue?: unknown,
 ) {
-  const config = await activeTwoChatWhatsAppConfig();
-  if (!config)
-    throw new Error(
-      "Complete the official 2Chat Meta Coexistence connection for WhatsApp number ending 8665 first. Do not use WhatsApp Web QR.",
-    );
+  const [selectedProvider, metaConfig, twoChatConfig] = await Promise.all([
+    secret(secretNames.whatsappProvider),
+    metaWhatsAppConfig(),
+    activeTwoChatWhatsAppConfig(),
+  ]);
+  if (selectedProvider === "meta" && !metaConfig)
+    throw new Error("Direct Meta WhatsApp requires credential review.");
+  const useMeta = selectedProvider === "meta";
+  if (!useMeta && !twoChatConfig)
+    throw new Error("Connect Avantia's direct Meta WhatsApp number ending 1990 first.");
   const to = normalizePhone(toValue);
   const body =
     typeof bodyValue === "string" ? bodyValue.trim().slice(0, 4096) : "";
@@ -6414,41 +6612,72 @@ async function sendTwoChatWhatsApp(
   if (!to || (!body && !mediaUrl))
     throw new Error("Enter a valid WhatsApp number and message.");
 
-  const response = await fetch(
-    "https://api.p.2chat.io/open/whatsapp/send-message",
-    {
-      method: "POST",
-      headers: {
-        "X-User-API-Key": config.apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from_number: config.from,
-        to_number: to,
-        text: body || undefined,
-        url: mediaUrl || undefined,
-      }),
-    },
-  );
+  const response = useMeta
+    ? await fetch(
+        `https://graph.facebook.com/${metaConfig!.graphVersion}/${metaConfig!.phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${metaConfig!.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(mediaUrl
+            ? {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to.replace(/[^0-9]/g, ""),
+                type: mediaUrl.endsWith(".mp4") ? "video" : "document",
+                [mediaUrl.endsWith(".mp4") ? "video" : "document"]: {
+                  link: mediaUrl,
+                  ...(body ? { caption: body.slice(0, 1024) } : {}),
+                },
+              }
+            : {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: to.replace(/[^0-9]/g, ""),
+                type: "text",
+                text: { preview_url: true, body },
+              }),
+        },
+      )
+    : await fetch(
+        "https://api.p.2chat.io/open/whatsapp/send-message",
+        {
+          method: "POST",
+          headers: {
+            "X-User-API-Key": twoChatConfig!.apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from_number: twoChatConfig!.from,
+            to_number: to,
+            text: body || undefined,
+            url: mediaUrl || undefined,
+          }),
+        },
+      );
   const result = (await response.json()) as {
     success?: boolean;
     message_uuid?: string;
     message?: string;
+    messages?: Array<{ id?: string }>;
+    error?: { message?: string };
   };
-  if (!response.ok || !result.success || !result.message_uuid) {
+  const externalId = useMeta ? result.messages?.[0]?.id : result.message_uuid;
+  if (!response.ok || !externalId || (!useMeta && !result.success))
     throw new Error(
-      result.message || `2Chat returned HTTP ${response.status}.`,
+      result.error?.message || result.message || `WhatsApp returned HTTP ${response.status}.`,
     );
-  }
   const communicationId = await storeCommunication({
     provider: "whatsapp",
     channel: "whatsapp",
-    externalId: result.message_uuid,
+    externalId,
     direction: "outgoing",
     counterpartyPhone: to,
-    businessPhone: config.from,
+    businessPhone: useMeta ? metaConfig!.from : twoChatConfig!.from,
     body: body || null,
-    status: "queued",
+    status: useMeta ? "accepted" : "queued",
     media: mediaUrl
       ? [
           {
@@ -6464,7 +6693,7 @@ async function sendTwoChatWhatsApp(
     "whatsapp",
     sourceCommunicationId,
   );
-  return result.message_uuid;
+  return externalId;
 }
 
 async function subscribeTwoChatWebhook(
@@ -9940,6 +10169,15 @@ async function handlePublicStartByText(req: Request) {
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
+  if (url.searchParams.get("mode") === "meta-whatsapp-webhook") {
+    try {
+      if (req.method === "GET") return await handleMetaWhatsAppVerification(req);
+      if (req.method === "POST") return await handleMetaWhatsAppWebhook(req);
+      return json({ error: "Method not allowed" }, 405);
+    } catch {
+      return json({ error: "Processing failed" }, 500);
+    }
+  }
   if (
     req.method === "POST" &&
     url.searchParams.get("mode") === "start-by-text"
@@ -10554,7 +10792,9 @@ Deno.serve(async (req: Request) => {
       });
     }
     if (input.action === "status") {
-      const [twoChat, twoChatApi, sms, smsReceive] = await Promise.all([
+      const [selectedWhatsAppProvider, metaWhatsApp, twoChat, twoChatApi, sms, smsReceive] = await Promise.all([
+        secret(secretNames.whatsappProvider),
+        metaWhatsAppConfig(),
         activeTwoChatWhatsAppConfig(),
         twoChatApiConfig(),
         quoConfig(),
@@ -10563,10 +10803,12 @@ Deno.serve(async (req: Request) => {
       const voice = twoChatApi
         ? await twoChatVoiceStatus(twoChatApi.apiKey)
         : { ready: false, recording: false };
+      const directMetaSelected = selectedWhatsAppProvider === "meta";
+      const activeWhatsApp = directMetaSelected ? Boolean(metaWhatsApp) : Boolean(twoChat);
       return json({
         ok: true,
-        whatsapp: Boolean(twoChat),
-        whatsappProvider: twoChat ? "2chat" : null,
+        whatsapp: activeWhatsApp,
+        whatsappProvider: activeWhatsApp ? directMetaSelected ? "meta" : "2chat" : null,
         sms: Boolean(sms),
         smsReceive: Boolean(smsReceive),
         voice: voice.ready,
@@ -10576,7 +10818,13 @@ Deno.serve(async (req: Request) => {
       });
     }
     if (input.action === "dashboard") {
-      const activeTwoChat = await activeTwoChatWhatsAppConfig();
+      const [selectedWhatsAppProvider, activeMetaWhatsApp, activeTwoChat] = await Promise.all([
+        secret(secretNames.whatsappProvider),
+        metaWhatsAppConfig(),
+        activeTwoChatWhatsAppConfig(),
+      ]);
+      const directMetaSelected = selectedWhatsAppProvider === "meta";
+      const activeWhatsApp = directMetaSelected ? Boolean(activeMetaWhatsApp) : Boolean(activeTwoChat);
       const twoChatApi = await twoChatApiConfig();
       const voice = twoChatApi
         ? await twoChatVoiceStatus(twoChatApi.apiKey)
@@ -10621,9 +10869,9 @@ Deno.serve(async (req: Request) => {
             phone: voice.ready ? TWO_CHAT_BUSINESS_PHONE : null,
           },
           whatsapp: {
-            receive: Boolean(activeTwoChat),
-            send: Boolean(activeTwoChat),
-            provider: activeTwoChat ? "2chat" : null,
+            receive: activeWhatsApp,
+            send: activeWhatsApp,
+            provider: activeWhatsApp ? directMetaSelected ? "meta" : "2chat" : null,
           },
           email: {
             receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET")),
@@ -10726,7 +10974,93 @@ Deno.serve(async (req: Request) => {
           "Aura 2Chat webhook token",
         ),
       ]);
+      await saveSecret(secretNames.whatsappProvider, "2chat", "Aura active WhatsApp provider");
       return json({ ok: true, whatsapp: true, whatsappProvider: "2chat" });
+    }
+    if (input.action === "configure_meta_whatsapp") {
+      if (!manager.isOwner)
+        return json(
+          { error: "Only the owner can change provider credentials." },
+          403,
+        );
+      const accessToken =
+        typeof input.accessToken === "string" ? input.accessToken.trim() : "";
+      const appSecret =
+        typeof input.appSecret === "string" ? input.appSecret.trim() : "";
+      const graphVersion =
+        typeof input.graphVersion === "string" ? input.graphVersion.trim() : "";
+      if (accessToken.length < 40 || appSecret.length < 20 || !/^v\d+\.\d+$/.test(graphVersion))
+        return json({ error: "Enter valid permanent Meta credentials and Graph API version." }, 400);
+
+      const graphHeaders = { Authorization: `Bearer ${accessToken}` };
+      const [appResponse, phoneResponse, wabaResponse] = await Promise.all([
+        fetch(`https://graph.facebook.com/${graphVersion}/app?fields=id`, { headers: graphHeaders }),
+        fetch(`https://graph.facebook.com/${graphVersion}/${META_WHATSAPP_PHONE_NUMBER_ID}?fields=id,display_phone_number`, { headers: graphHeaders }),
+        fetch(`https://graph.facebook.com/${graphVersion}/${META_WHATSAPP_BUSINESS_ACCOUNT_ID}/phone_numbers?fields=id,display_phone_number`, { headers: graphHeaders }),
+      ]);
+      if (!appResponse.ok || !phoneResponse.ok || !wabaResponse.ok)
+        return json({ error: "Meta rejected these credentials or account permissions." }, 400);
+      const app = await appResponse.json() as { id?: string };
+      const phone = await phoneResponse.json() as { id?: string; display_phone_number?: string };
+      const waba = await wabaResponse.json() as { data?: Array<{ id?: string; display_phone_number?: string }> };
+      const wabaPhone = waba.data?.find((candidate) => candidate.id === META_WHATSAPP_PHONE_NUMBER_ID);
+      if (
+        app.id !== META_WHATSAPP_APP_ID ||
+        phone.id !== META_WHATSAPP_PHONE_NUMBER_ID ||
+        !wabaPhone ||
+        normalizePhone(phone.display_phone_number) !== META_WHATSAPP_BUSINESS_PHONE ||
+        normalizePhone(wabaPhone.display_phone_number) !== META_WHATSAPP_BUSINESS_PHONE
+      ) return json({ error: "The credentials do not match Avantia's approved Meta app, account, and number ending 1990." }, 400);
+
+      const subscriptionResponse = await fetch(
+        `https://graph.facebook.com/${graphVersion}/${META_WHATSAPP_BUSINESS_ACCOUNT_ID}/subscribed_apps`,
+        { method: "POST", headers: graphHeaders },
+      );
+      if (!subscriptionResponse.ok)
+        return json({ error: "Meta validated the number but did not allow the app subscription." }, 400);
+
+      const verifyToken = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
+      await Promise.all([
+        saveSecret(secretNames.metaAccessToken, accessToken, "Aura Meta WhatsApp permanent access token"),
+        saveSecret(secretNames.metaAppSecret, appSecret, "Aura Meta app secret"),
+        saveSecret(secretNames.metaVerifyToken, verifyToken, "Aura Meta webhook verification token"),
+        saveSecret(secretNames.metaAppId, META_WHATSAPP_APP_ID, "Aura Meta app ID"),
+        saveSecret(secretNames.metaBusinessAccountId, META_WHATSAPP_BUSINESS_ACCOUNT_ID, "Aura Meta WhatsApp business account ID"),
+        saveSecret(secretNames.metaPhoneNumberId, META_WHATSAPP_PHONE_NUMBER_ID, "Aura Meta WhatsApp phone number ID"),
+        saveSecret(secretNames.metaFrom, META_WHATSAPP_BUSINESS_PHONE, "Aura Meta WhatsApp sender"),
+        saveSecret(secretNames.metaGraphVersion, graphVersion, "Aura Meta Graph API version"),
+      ]);
+      return json({
+        ok: true,
+        whatsapp: false,
+        whatsappProvider: "meta",
+        callbackUrl: "https://build.avantiap.com/api/aura/whatsapp",
+        verifyToken,
+      });
+    }
+    if (input.action === "activate_meta_whatsapp") {
+      if (!manager.isOwner)
+        return json(
+          { error: "Only the owner can activate WhatsApp." },
+          403,
+        );
+      const config = await metaWhatsAppConfig(false);
+      if (!config)
+        return json({ error: "Save valid direct Meta credentials first." }, 400);
+      const verifiedTokenHash = await secret(secretNames.metaWebhookVerifiedTokenHash);
+      if (!verifiedTokenHash || !constantTimeEqual(verifiedTokenHash, await sha256Hex(config.verifyToken)))
+        return json({ error: "Verify the production webhook callback in Meta first." }, 400);
+      const subscriptions = await fetch(
+        `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps?fields=id`,
+        { headers: { Authorization: `Bearer ${config.accessToken}` } },
+      );
+      if (!subscriptions.ok)
+        return json({ error: "Meta did not confirm the WhatsApp app subscription." }, 400);
+      const payload = await subscriptions.json() as { data?: Array<{ id?: string }> };
+      if (!payload.data?.some((app) => app.id === META_WHATSAPP_APP_ID))
+        return json({ error: "Subscribe the messages webhook for the Avantia Build Communications app first." }, 400);
+      await saveSecret(secretNames.whatsappProvider, "meta", "Aura active WhatsApp provider");
+      return json({ ok: true, whatsapp: true, whatsappProvider: "meta" });
     }
     if (input.action === "activate_2chat_voice") {
       if (!manager.isOwner)
@@ -10872,7 +11206,7 @@ Deno.serve(async (req: Request) => {
         );
         return json({ ok: true, id: queued.outboxId, queued: true });
       }
-      const id = await sendTwoChatWhatsApp(
+      const id = await sendWhatsApp(
         input.to,
         input.message,
         input.mediaUrl,

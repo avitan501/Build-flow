@@ -118,6 +118,7 @@ export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
       send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
     },
     whatsapp: {
+      provider: brokerStatus?.whatsappProvider || null,
       receive:
         Boolean(brokerStatus?.whatsapp) ||
         Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
@@ -195,6 +196,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
         send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
       },
       whatsapp: {
+        provider: brokerStatus?.whatsappProvider || null,
         receive:
           Boolean(brokerStatus?.whatsapp) ||
           Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
