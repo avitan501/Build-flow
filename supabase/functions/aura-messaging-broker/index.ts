@@ -801,7 +801,21 @@ async function configureResendEmailWebhook() {
     },
   );
   if (!updated.ok) throw new Error("Unable to update the Resend webhook events");
-  return { webhookId, events: [...RESEND_EMAIL_EVENTS] };
+  const verified = await fetch(
+    `https://api.resend.com/webhooks/${encodeURIComponent(webhookId)}`,
+    { headers, signal: AbortSignal.timeout(15_000) },
+  );
+  if (!verified.ok) throw new Error("Unable to verify the Resend webhook events");
+  const verifiedPayload = await verified.json() as { events?: unknown };
+  const verifiedEvents = Array.isArray(verifiedPayload.events)
+    ? verifiedPayload.events.filter((event): event is string => typeof event === "string")
+    : [];
+  const missingEvents = RESEND_EMAIL_EVENTS.filter((event) =>
+    !verifiedEvents.includes(event)
+  );
+  if (missingEvents.length)
+    throw new Error(`Resend did not activate ${missingEvents.length} requested email events`);
+  return { webhookId, events: verifiedEvents };
 }
 
 async function validQuoSignature(
