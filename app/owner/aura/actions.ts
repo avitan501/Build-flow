@@ -202,34 +202,35 @@ export async function sendAuraMessageAction(input: {
           .eq("channel", "email")
           .eq("external_activity_id", providerId)
           .maybeSingle<{ id: string }>();
-        if (communication?.id) {
+        const emailLinks = [
+          ...(input.supplierId
+            ? [
+                {
+                  entity_type: "supplier" as const,
+                  entity_id: input.supplierId,
+                  entity_label: input.supplierName || email!,
+                  link_source: "manual" as const,
+                  confidence: 1,
+                },
+              ]
+            : []),
+          ...(input.materialRequestId
+            ? [
+                {
+                  entity_type: "material_request" as const,
+                  entity_id: input.materialRequestId,
+                  entity_label:
+                    input.materialRequestTitle || "Material request",
+                  link_source: "manual" as const,
+                  confidence: 1,
+                },
+              ]
+            : []),
+        ];
+        if (communication?.id && emailLinks.length) {
           await addAuraCommunicationLinks(
-            communication.id ? [communication.id] : [],
-            [
-              ...(input.supplierId
-                ? [
-                    {
-                      entity_type: "supplier" as const,
-                      entity_id: input.supplierId,
-                      entity_label: input.supplierName || email!,
-                      link_source: "manual" as const,
-                      confidence: 1,
-                    },
-                  ]
-                : []),
-              ...(input.materialRequestId
-                ? [
-                    {
-                      entity_type: "material_request" as const,
-                      entity_id: input.materialRequestId,
-                      entity_label:
-                        input.materialRequestTitle || "Material request",
-                      link_source: "manual" as const,
-                      confidence: 1,
-                    },
-                  ]
-                : []),
-            ],
+            [communication.id],
+            emailLinks,
           );
         }
       }
