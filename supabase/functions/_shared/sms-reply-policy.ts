@@ -1525,7 +1525,7 @@ export function smsBareOrderIntentReply(value: string) {
 }
 
 export function publicStartTextOpeningMessage() {
-  return "Hi, Carlos from Avantia Build. Send your material list, photo, plan, or current quote. We’ll check pricing, availability, and delivery. See how it works (20 sec): https://build.avantiap.com/videos/avantia-request-material-whatsapp-en-clear-20s.mp4";
+  return "Before you buy building materials, send us whatever you have—a list, photo, plan, or current quote. We’ll compare supplier prices for free and see if we can lower your cost. No obligation. See how it works: https://build.avantiap.com/videos/avantia-request-material-whatsapp-en-clear-20s.mp4";
 }
 
 export function isSmsBareGreeting(value: string) {

@@ -9633,7 +9633,7 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v7";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v8";
 const PUBLIC_START_TEXT_OPENING = publicStartTextOpeningMessage();
 
 type PublicStartLead = {
