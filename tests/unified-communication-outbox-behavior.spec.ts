@@ -63,7 +63,12 @@ test("manager sends enqueue all three channels with stable browser request keys"
   expect(broker).toContain("communication_outbox_dispatch_failed");
   expect(actions).toContain("sendAuraMessageWithAttachmentAction");
   expect(actions).toContain('storageBucket: "project-uploads"');
-  expect(actions).toContain("communication?.id && emailLinks.length");
+  expect(actions).toContain("outboxId && emailLinks.length");
+  expect(actions).toContain("let acceptedExternalId = \"\"");
+  expect(actions).toContain("if (acceptedExternalId)");
+  expect(actions.indexOf("outboxId && emailLinks.length")).toBeLessThan(
+    actions.indexOf("const admin = createAdminClient()"),
+  );
   expect(actions).toContain('.eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)');
   expect(actions).toContain('"delivered",');
   expect(actions).toContain('"read",');

@@ -157,6 +157,7 @@ export async function sendAuraMessageAction(input: {
   const startedAt = Date.now();
   const activityRecipient = email || phone || input.recipient.trim();
   const activityLabel = input.recipientLabel || input.supplierName || activityRecipient;
+  let acceptedExternalId = "";
   try {
     let externalId = "";
     if (channel === "sms") {
@@ -182,7 +183,7 @@ export async function sendAuraMessageAction(input: {
           ? `[AVB-${input.materialRequestId.slice(0, 8).toUpperCase()}] `
           : "";
       const emailSubject = `${requestReference}${input.subject || ""}`.trim();
-      const providerId =
+      const outboxId =
         (
           await invokeMessagingBroker(supabase, {
             action: "send_email",
@@ -193,43 +194,43 @@ export async function sendAuraMessageAction(input: {
             sourceCommunicationId: input.sourceCommunicationId,
           })
         ).id || null;
-      externalId = providerId || "";
-      if (providerId) {
+      externalId = outboxId || "";
+      acceptedExternalId = externalId;
+      const emailLinks = [
+        ...(input.supplierId
+          ? [
+              {
+                entity_type: "supplier" as const,
+                entity_id: input.supplierId,
+                entity_label: input.supplierName || email!,
+                link_source: "manual" as const,
+                confidence: 1,
+              },
+            ]
+          : []),
+        ...(input.materialRequestId
+          ? [
+              {
+                entity_type: "material_request" as const,
+                entity_id: input.materialRequestId,
+                entity_label:
+                  input.materialRequestTitle || "Material request",
+                link_source: "manual" as const,
+                confidence: 1,
+              },
+            ]
+          : []),
+      ];
+      if (outboxId && emailLinks.length) {
         const admin = createAdminClient();
-        const { data: communication } = await admin
-          .from("aura_communications")
-          .select("id")
-          .eq("channel", "email")
-          .eq("external_activity_id", providerId)
-          .maybeSingle<{ id: string }>();
-        const emailLinks = [
-          ...(input.supplierId
-            ? [
-                {
-                  entity_type: "supplier" as const,
-                  entity_id: input.supplierId,
-                  entity_label: input.supplierName || email!,
-                  link_source: "manual" as const,
-                  confidence: 1,
-                },
-              ]
-            : []),
-          ...(input.materialRequestId
-            ? [
-                {
-                  entity_type: "material_request" as const,
-                  entity_id: input.materialRequestId,
-                  entity_label:
-                    input.materialRequestTitle || "Material request",
-                  link_source: "manual" as const,
-                  confidence: 1,
-                },
-              ]
-            : []),
-        ];
-        if (communication?.id && emailLinks.length) {
+        const { data: outbox } = await admin
+          .from("aura_message_outbox")
+          .select("communication_id")
+          .eq("id", outboxId)
+          .maybeSingle<{ communication_id: string | null }>();
+        if (outbox?.communication_id) {
           await addAuraCommunicationLinks(
-            [communication.id],
+            [outbox.communication_id],
             emailLinks,
           );
         }
@@ -266,45 +267,69 @@ export async function sendAuraMessageAction(input: {
     revalidatePath("/admin/users");
     return { ok: true, externalId, occurredAt: new Date().toISOString() };
   } catch (error) {
+    // Once the broker has returned an outbox ID, delivery is accepted. Optional
+    // activity/link bookkeeping must never turn that accepted send into a 500
+    // or encourage the manager to send the same email twice.
+    if (acceptedExternalId) {
+      await recordAuraCommunicationActivity(supabase, user.id, {
+        channel,
+        recipient: activityRecipient,
+        label: activityLabel,
+        requestId: input.materialRequestId,
+        requestLabel: input.materialRequestTitle,
+        outcome: "sent",
+        startedAt,
+      });
+      return {
+        ok: true,
+        externalId: acceptedExternalId,
+        occurredAt: new Date().toISOString(),
+      };
+    }
     if (
       input.idempotencyKey &&
       /^[a-z0-9:/_.-]{10,160}$/i.test(input.idempotencyKey)
     ) {
-      const admin = createAdminClient();
-      const { data: accepted } = await admin
-        .from("aura_message_outbox")
-        .select("id,status")
-        .eq("created_by", user.id)
-        .eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)
-        .in("status", [
-          "pending",
-          "claimed",
-          "sending",
-          "retry_wait",
-          "accepted",
-          "sent",
-          "delivered",
-          "read",
-        ])
-        .maybeSingle<{ id: string; status: string }>();
-      if (accepted?.id) {
-        await recordAuraCommunicationActivity(supabase, user.id, {
-          channel,
-          recipient: activityRecipient,
-          label: activityLabel,
-          requestId: input.materialRequestId,
-          requestLabel: input.materialRequestTitle,
-          outcome: "sent",
-          startedAt,
-        });
-        revalidatePath("/owner/aura");
-        revalidatePath("/admin/communications");
-        revalidatePath("/admin/users");
-        return {
-          ok: true,
-          externalId: accepted.id,
-          occurredAt: new Date().toISOString(),
-        };
+      try {
+        const admin = createAdminClient();
+        const { data: accepted } = await admin
+          .from("aura_message_outbox")
+          .select("id,status")
+          .eq("created_by", user.id)
+          .eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)
+          .in("status", [
+            "pending",
+            "claimed",
+            "sending",
+            "retry_wait",
+            "accepted",
+            "sent",
+            "delivered",
+            "read",
+          ])
+          .maybeSingle<{ id: string; status: string }>();
+        if (accepted?.id) {
+          await recordAuraCommunicationActivity(supabase, user.id, {
+            channel,
+            recipient: activityRecipient,
+            label: activityLabel,
+            requestId: input.materialRequestId,
+            requestLabel: input.materialRequestTitle,
+            outcome: "sent",
+            startedAt,
+          });
+          revalidatePath("/owner/aura");
+          revalidatePath("/admin/communications");
+          revalidatePath("/admin/users");
+          return {
+            ok: true,
+            externalId: accepted.id,
+            occurredAt: new Date().toISOString(),
+          };
+        }
+      } catch {
+        // Recovery is best-effort. Never replace a safe user-facing result with
+        // a missing server-only credential or bookkeeping error.
       }
     }
     await recordAuraCommunicationActivity(supabase, user.id, {
