@@ -189,6 +189,19 @@ function comparisonModelCodes(value: string) {
   )
 }
 
+function normalizedComparisonCode(value: string | null | undefined) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
+function requestContainsExactItemCode(requestText: string, itemCode: string | null | undefined) {
+  const normalizedCode = normalizedComparisonCode(itemCode)
+  const isSafeCode = /[a-z]/.test(normalizedCode)
+    ? normalizedCode.length >= 3
+    : normalizedCode.length >= 5
+  if (!isSafeCode) return false
+  return normalizedComparisonCode(requestText).includes(normalizedCode)
+}
+
 function hasConflictingSpecifications(left: string, right: string) {
   const leftMeasures = comparisonMeasures(left)
   const rightMeasures = comparisonMeasures(right)
@@ -209,6 +222,9 @@ function comparisonMatchScore(
     `${quoteItem.item_code || ""} ${quoteItem.description} ${quoteItem.specification}`.trim()
   const requestText =
     `${requestItem.description} ${requestItem.specification}`.trim()
+  // An exact supplier SKU is stronger evidence than noisy dimensions copied
+  // from a second retailer's quote. Check it before rejecting size conflicts.
+  if (requestContainsExactItemCode(requestText, quoteItem.item_code)) return 10
   if (hasConflictingSpecifications(quoteText, requestText)) return 0
   const normalizedQuote = normalizedComparisonText(quoteText)
   const normalizedRequest = normalizedComparisonText(requestText)

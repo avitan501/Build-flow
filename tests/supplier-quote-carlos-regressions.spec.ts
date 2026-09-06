@@ -70,3 +70,22 @@ test("reads a wrapped Home Depot or Lowe's quote before importing client target 
   ])
   expect(matches.matches.map((match) => match.comparisonItemId)).toEqual(["siding", "fascia", "nails"])
 })
+
+test("an exact supplier SKU matches even when the request also contains another retailer SKU", () => {
+  const supplier = [
+    { id: "siding-q", item_code: "772-3301", description: "Vinyl Siding Panel, Double 4.5\" Clapboard", specification: "Colonial White, 12' panel" },
+    { id: "j-q", item_code: "772-3302", description: "Vinyl J-Channel", specification: "3/4\" x 12.5'" },
+    { id: "strip-q", item_code: "772-3303", description: "Vinyl Starter Strip", specification: "12.5'" },
+  ]
+  const request = [
+    { id: "j", description: "Vinyl J-channel", specification: "3/4 in x 12.5 ft · Home Depot SKU 101-4522; Lowe's SKU 772-3302" },
+    { id: "strip", description: "Vinyl starter strip", specification: "12.5 ft length · Home Depot SKU 101-4523; Lowe's SKU 772-3303" },
+    { id: "siding", description: "Vinyl siding panel", specification: "Double 4.5 in profile; 12 ft length · Clapboard; Colonial White; Home Depot SKU 101-4521; Lowe's SKU 772-3301" },
+  ]
+
+  expect(matchSupplierQuoteItems(supplier, request)).toEqual([
+    { item: supplier[0], comparisonItem: request[2] },
+    { item: supplier[1], comparisonItem: request[0] },
+    { item: supplier[2], comparisonItem: request[1] },
+  ])
+})
