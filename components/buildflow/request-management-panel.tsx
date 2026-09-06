@@ -7,7 +7,7 @@ import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { addRequestAttachmentsAction, deleteRequestClientDocumentAction, prepareRequestAttachmentUploadAction, previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type ExistingRequestUploadInput, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
+import { addRequestAttachmentsAction, deleteRequestClientDocumentAction, prepareRequestAttachmentUploadAction, previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type ExistingRequestUploadInput, type QuoteResult, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
 import { saveRequestSupplierProgressNoteAction } from "@/app/owner/materials/requests/supplier-progress-actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
@@ -647,6 +647,24 @@ export function RequestManagementPanel({
     }
   }
 
+  async function runDocumentActionWithApprovalWarning(
+    action: (input: RequestClientQuoteInput) => Promise<QuoteResult>,
+  ) {
+    const input = quoteInput()
+    let result = await action(input)
+    if (!result.ok && result.requiresAcceptedChangeConfirmation) {
+      const approvedChange = window.confirm(
+        `This ${documentLabel.toLowerCase()} was already approved by the client. Saving these changes creates a new version and the client must approve it again. Continue?`,
+      )
+      if (!approvedChange) {
+        setQuoteFeedback("No changes were saved. The existing client approval remains valid.")
+        return null
+      }
+      result = await action({ ...input, confirmAcceptedChange: true })
+    }
+    return result
+  }
+
   async function addDocumentAttachments(files: File[]) {
     if (!files.length || attachmentUploadPending) return
     const alreadySelected = new Set(documentAttachments.map((entry) => entry.id))
@@ -712,7 +730,8 @@ export function RequestManagementPanel({
   function textQuote() {
     setQuoteFeedback("")
     startTransition(async () => {
-      const saved = await saveRequestClientDocumentAction(quoteInput())
+      const saved = await runDocumentActionWithApprovalWarning(saveRequestClientDocumentAction)
+      if (!saved) return
       if (!saved.ok || !saved.shareUrl) return setQuoteFeedback(saved.ok ? "The live link could not be prepared." : saved.error)
       const message = `${quoteMessage.trim() || `Hello ${firstName}, your Avantia Build ${documentLabel.toLowerCase()} is ready.`}\n\nOpen or download the latest version: ${saved.shareUrl}`
       const sent = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message, materialRequestId: requestId, materialRequestTitle: requestTitle })
@@ -728,10 +747,13 @@ export function RequestManagementPanel({
   function saveDocument() {
     setQuoteFeedback("")
     startTransition(async () => {
-      const result = await saveRequestClientDocumentAction(quoteInput())
+      const result = await runDocumentActionWithApprovalWarning(saveRequestClientDocumentAction)
+      if (!result) return
       if (!result.ok || !result.shareUrl) return setQuoteFeedback(result.ok ? "The live link could not be saved." : result.error)
       setDocumentLinks((current) => ({ ...current, [documentType]: result.shareUrl }))
-      setQuoteFeedback(`${documentLabel} saved. The client link now shows this version.`)
+      setQuoteFeedback(result.documentChanged
+        ? `${documentLabel} saved. The client link now shows this version.`
+        : `${documentLabel} is already up to date. The existing version and approval were kept.`)
       router.refresh()
     })
   }
@@ -765,7 +787,8 @@ export function RequestManagementPanel({
   function sendQuote() {
     setQuoteFeedback("")
     startTransition(async () => {
-      const result = await sendRequestClientQuoteAction(quoteInput())
+      const result = await runDocumentActionWithApprovalWarning(sendRequestClientQuoteAction)
+      if (!result) return
       const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
       setQuoteFeedback(result.ok ? `${label} emailed to ${client.email}.` : result.error)
       if (result.ok) {

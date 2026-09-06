@@ -28,7 +28,31 @@ test("editing an existing document prefills the composer from its selected saved
   expect(panel).toContain("setQuoteNumber(saved?.documentNumber")
   expect(panel).toContain("setQuoteLines(saved?.documentData.lines?.length")
   expect(panel).toContain("setQuoteTerms(proposalTermsForEditor(saved?.documentData.terms")
-  expect(panel).toContain("saveRequestClientDocumentAction(quoteInput())")
+  expect(panel).toContain("runDocumentActionWithApprovalWarning(saveRequestClientDocumentAction)")
+})
+
+test("resending unchanged documents keeps the current version and approval", async () => {
+  const actions = await readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8")
+  const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
+  const migration = await readFile(path.join(root, "supabase/migrations/20260906172708_only_version_changed_client_documents.sql"), "utf8")
+
+  expect(actions).toContain("requestClientDocumentContentMatches(existing.document_data, prepared.pdfInput)")
+  expect(actions).toContain("documentChanged: false")
+  expect(actions).toContain('rpc("get_request_current_client_document_acceptances"')
+  expect(actions).toContain("requiresAcceptedChangeConfirmation: true")
+  expect(actions).toContain("input.confirmAcceptedChange === true")
+  expect(panel).toContain("runDocumentActionWithApprovalWarning")
+  expect(panel).toContain("the client must approve it again")
+  expect(panel).toContain("The existing client approval remains valid")
+  expect(migration).toContain("new.document_data is distinct from old.document_data")
+  expect(migration).toContain("new.version := old.version")
+  expect(migration).toContain("new.version := old.version + 1")
+})
+
+test("text activity does not claim delivery before provider confirmation", async () => {
+  const actions = await readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8")
+  expect(actions).toContain("Delivery is confirmed only when the messaging provider reports it.")
+  expect(actions).not.toContain("The client received the live document link.")
 })
 
 test("delete action verifies the exact version, protects accepted documents, and records activity", async () => {

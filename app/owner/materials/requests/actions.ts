@@ -12,6 +12,7 @@ import { buildProjectUploadStoragePath } from "@/lib/projects"
 import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyRequestAttachmentStorage } from "@/lib/request-attachment-upload"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
+import { requestClientDocumentContentMatches } from "@/lib/request-client-document-version"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
@@ -21,7 +22,9 @@ import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqu
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
-type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string; shareUrl?: string } | { ok: false; error: string }
+export type QuoteResult =
+  | { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string; shareUrl?: string; documentChanged?: boolean; version?: number }
+  | { ok: false; error: string; requiresAcceptedChangeConfirmation?: true }
 type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
@@ -287,6 +290,7 @@ export type RequestClientQuoteInput = {
   terms: string
   paymentRequest?: RequestClientPaymentRequest
   attachmentIds?: string[]
+  confirmAcceptedChange?: boolean
 }
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -919,8 +923,39 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   return { ok: true as const, supabase, user, request, client, pdf, quoteNumber, lines, pdfInput }
 }
 
-async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<typeof prepareRequestClientQuote>>, markSent = false) {
+async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<typeof prepareRequestClientQuote>>, confirmAcceptedChange = false) {
   if (!prepared.ok) return prepared
+  const { data: existing, error: existingError } = await prepared.supabase
+    .from("request_client_documents")
+    .select("public_token,document_number,version,document_data")
+    .eq("request_id", prepared.request.id)
+    .eq("document_type", prepared.pdfInput.documentType)
+    .maybeSingle<{ public_token: string; document_number: string; version: number; document_data: unknown }>()
+  if (existingError) return { ok: false as const, error: "The current client document could not be checked." }
+  if (existing && requestClientDocumentContentMatches(existing.document_data, prepared.pdfInput)) {
+    return {
+      ok: true as const,
+      shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${existing.public_token}`,
+      publicToken: existing.public_token,
+      documentNumber: existing.document_number,
+      version: existing.version,
+      documentChanged: false,
+    }
+  }
+  if (existing && !confirmAcceptedChange) {
+    const { data: acceptances, error: acceptanceError } = await prepared.supabase.rpc("get_request_current_client_document_acceptances", { p_request_id: prepared.request.id })
+    if (acceptanceError) return { ok: false as const, error: "Client approval could not be checked, so no changes were saved." }
+    const hasCurrentAcceptance = (Array.isArray(acceptances) ? acceptances : []).some((entry) => (
+      String((entry as { document_type?: unknown }).document_type || "") === prepared.pdfInput.documentType
+    ))
+    if (hasCurrentAcceptance) {
+      return {
+        ok: false as const,
+        error: "This document was already approved. Confirm before creating a new version that requires approval again.",
+        requiresAcceptedChangeConfirmation: true as const,
+      }
+    }
+  }
   const { data, error } = await prepared.supabase.from("request_client_documents").upsert({
     request_id: prepared.request.id,
     project_id: prepared.request.project_id,
@@ -931,19 +966,18 @@ async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<ty
     updated_by: prepared.user.id,
     created_by: prepared.user.id,
     updated_at: new Date().toISOString(),
-    ...(markSent ? { sent_at: new Date().toISOString() } : {}),
   }, { onConflict: "request_id,document_type" }).select("public_token,document_number,version").single<{ public_token: string; document_number: string; version: number }>()
   if (error || !data?.public_token) return { ok: false as const, error: "The client document could not be saved." }
-  return { ok: true as const, shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${data.public_token}`, publicToken: data.public_token, documentNumber: data.document_number, version: data.version }
+  return { ok: true as const, shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${data.public_token}`, publicToken: data.public_token, documentNumber: data.document_number, version: data.version, documentChanged: true }
 }
 
 export async function saveRequestClientDocumentAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
   const prepared = await prepareRequestClientQuote(input)
   if (!prepared.ok) return prepared
-  const saved = await savePreparedRequestClientDocument(prepared)
+  const saved = await savePreparedRequestClientDocument(prepared, input.confirmAcceptedChange === true)
   if (!saved.ok) return saved
   revalidatePath(`/owner/materials/requests/${prepared.request.id}`)
-  return { ok: true, providerId: null, shareUrl: saved.shareUrl }
+  return { ok: true, providerId: null, shareUrl: saved.shareUrl, documentChanged: saved.documentChanged, version: saved.version }
 }
 
 export async function deleteRequestClientDocumentAction(input: { requestId: string; documentType: RequestClientDocumentType; publicToken: string; version: number }) {
@@ -1018,7 +1052,7 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
   const documentType = prepared.pdfInput.documentType
   const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
   const fileName = `Avantia-Build-${label}-${prepared.quoteNumber}.pdf`
-  const saved = await savePreparedRequestClientDocument(prepared)
+  const saved = await savePreparedRequestClientDocument(prepared, input.confirmAcceptedChange === true)
   if (!saved.ok) return saved
   const baseMessage = String(input.message || `Please review the Avantia Build ${label.toLowerCase()}.`).trim().slice(0, 4600)
   const message = `${baseMessage}\n\nOpen or download the latest version: ${saved.shareUrl}`
@@ -1094,7 +1128,7 @@ export async function recordRequestClientDocumentSentAction(input: { requestId: 
     event_type: "status_changed",
     source: "admin",
     title: `${label} ${documentNumber} sent by ${input.channel === "sms" ? "text" : "WhatsApp"}`,
-    description: "The client received the live document link. Future saved edits remain available at the same link.",
+    description: `The live document link was sent by ${input.channel === "sms" ? "text" : "WhatsApp"}. Delivery is confirmed only when the messaging provider reports it.`,
     metadata: { quote_request_id: request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: receiptProof?.document_number ?? documentNumber, ...(receiptProof ? { document_public_token: receiptProof.public_token, document_version: receiptProof.version } : {}), delivery_channel: input.channel },
   })
   if (error) return { ok: false as const, error: "The document was sent, but its history could not be saved." }
