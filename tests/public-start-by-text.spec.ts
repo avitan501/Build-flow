@@ -59,13 +59,15 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(broker).toContain(
     "await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING)",
   );
+  expect(broker).toContain("EdgeRuntime.waitUntil(");
+  expect(broker).toContain(
+    'return json({ ok: true, delivery: "processing" }, 202)',
+  );
   expect(broker).toContain("interval '5 minutes'");
   expect(broker).toContain(
     'delivery: suppressed ? "already_sent" : "processing"',
   );
-  expect(broker).toContain(
-    "We couldn't send the text. Please try again shortly.",
-  );
+  expect(broker).toContain('partial ? "partial" : "failed"');
   expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v6"');
   const opening = publicStartTextOpeningMessage();
   expect(opening).toBe(
@@ -73,7 +75,6 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   );
   expect((broker.match(/sendQuoSms\(phone, PUBLIC_START_TEXT_OPENING\)/g) || [])).toHaveLength(1);
   expect(broker).not.toContain("sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE");
-  expect(broker).toContain('delivery: "partial"');
   expect(route).toContain('result.delivery || "processing"');
   expect(route).not.toContain('result.delivery || "sent"');
   expect(broker).toContain('req.headers.get("x-avantia-site-signature")');

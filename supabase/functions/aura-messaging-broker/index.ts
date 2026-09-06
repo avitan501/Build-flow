@@ -9791,30 +9791,29 @@ async function handlePublicStartByText(req: Request) {
   if (!claim.send) return json({ ok: true, delivery: claim.delivery });
   // One logical outbound message prevents an example from arriving after a
   // fast customer reply and keeps the opening copy in a guaranteed order.
-  try {
-    const providerId =
-      claim.welcomeProviderId ||
-      (await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING));
-    if (!claim.welcomeProviderId) {
-      await sql`update public.public_start_text_requests set provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
-    }
-    await sql`update public.public_start_text_requests set status = 'sent', last_error = null, updated_at = now() where id = ${claim.id}::uuid`;
-    return json({ ok: true, delivery: "sent" });
-  } catch (error) {
-    const partial =
-      Boolean(claim.welcomeProviderId) ||
-      (
-        await sql<
-          { provider_message_id: string | null }[]
-        >`select provider_message_id from public.public_start_text_requests where id = ${claim.id}::uuid`
-      )[0]?.provider_message_id;
-    await sql`update public.public_start_text_requests set status = ${partial ? "partial" : "failed"}, last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
-    if (partial) return json({ ok: true, delivery: "partial" });
-    return json(
-      { error: "We couldn't send the text. Please try again shortly." },
-      503,
-    );
-  }
+  EdgeRuntime.waitUntil(
+    (async () => {
+      try {
+        const providerId =
+          claim.welcomeProviderId ||
+          (await sendQuoSms(phone, PUBLIC_START_TEXT_OPENING));
+        if (!claim.welcomeProviderId) {
+          await sql`update public.public_start_text_requests set provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
+        }
+        await sql`update public.public_start_text_requests set status = 'sent', last_error = null, updated_at = now() where id = ${claim.id}::uuid`;
+      } catch (error) {
+        const partial =
+          Boolean(claim.welcomeProviderId) ||
+          (
+            await sql<
+              { provider_message_id: string | null }[]
+            >`select provider_message_id from public.public_start_text_requests where id = ${claim.id}::uuid`
+          )[0]?.provider_message_id;
+        await sql`update public.public_start_text_requests set status = ${partial ? "partial" : "failed"}, last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
+      }
+    })(),
+  );
+  return json({ ok: true, delivery: "processing" }, 202);
 }
 
 Deno.serve(async (req: Request) => {
