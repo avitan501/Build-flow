@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DeliveryLocation } from "@/lib/location-types";
 
 export const DELIVERY_TASK_PREFIX = "delivery-request:";
 export const DELIVERY_NOTES_PREFIX = "delivery_request_v1:";
@@ -15,9 +16,11 @@ export type SavedDeliveryRequest = {
   orderNumber: string;
   pickupAddress: string;
   pickupCoordinates: string;
+  pickupLocation?: DeliveryLocation | null;
   jobsiteName: string;
   jobsiteAddress: string;
   jobsiteCoordinates: string;
+  jobsiteLocation?: DeliveryLocation | null;
   pickupContactName?: string;
   pickupPhone?: string;
   dropoffContactName?: string;
@@ -25,6 +28,10 @@ export type SavedDeliveryRequest = {
   itemDescription?: string;
   packageQuantity?: number;
   weightPerPackage?: number;
+  lengthInches?: number | null;
+  widthInches?: number | null;
+  heightInches?: number | null;
+  loadUnloadRequired?: boolean;
   weightPounds?: number;
   scheduledPickupAt?: string | null;
   vehicle: string;
@@ -35,22 +42,33 @@ export type SavedDeliveryRequest = {
     serviceFee: number;
   };
   providerQuote?: {
-    provider: "Uber Direct";
+    provider: "Uber Direct" | "Curri";
     quoteId: string;
     total: number;
     currency: string;
     pickupMinutes: number | null;
     durationMinutes: number | null;
+    distanceMiles?: number | null;
+    baseFee?: number;
+    tolls?: number;
+    accessorialFees?: number;
+    deliveryMethod?: string;
+    deliveryMethodLabel?: string;
     expiresAt: string;
   };
   providerDelivery?: {
-    provider: "Uber Direct";
+    provider: "Uber Direct" | "Curri";
     deliveryId: string;
     trackingUrl: string | null;
     status: string;
     fee: number | null;
     currency: string;
     createdAt: string;
+    updatedAt?: string;
+    driverName?: string | null;
+    driverPhone?: string | null;
+    vehicleDescription?: string | null;
+    proofOfDeliveryUrls?: string[];
   };
   status: "new" | "quoted" | "dispatched" | "completed" | "cancelled";
   createdAt: string;

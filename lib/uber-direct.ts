@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { uberAddress } from "@/lib/delivery-address";
+import type { DeliveryLocation } from "@/lib/location-types";
 
 type Credentials = { customer_id: string | null; client_id: string | null; client_secret: string | null };
 
@@ -62,15 +64,23 @@ async function context() {
   return { ...account, token: await accessToken(account.clientId, account.clientSecret) };
 }
 
-export async function quoteUberDirect(input: { pickupAddress: string; dropoffAddress: string; scheduledPickupAt?: string | null }) {
+export async function quoteUberDirect(input: {
+  pickupAddress: string;
+  pickupLocation?: DeliveryLocation | null;
+  dropoffAddress: string;
+  dropoffLocation?: DeliveryLocation | null;
+  scheduledPickupAt?: string | null;
+}) {
   const account = await context();
   const readyAt = input.scheduledPickupAt ? new Date(input.scheduledPickupAt) : null;
   const response = await fetch(`https://api.uber.com/v1/customers/${encodeURIComponent(account.customerId)}/delivery_quotes`, {
     method: "POST",
     headers: { Authorization: `Bearer ${account.token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      pickup_address: input.pickupAddress,
-      dropoff_address: input.dropoffAddress,
+      pickup_address: uberAddress(input.pickupLocation || null, input.pickupAddress),
+      dropoff_address: uberAddress(input.dropoffLocation || null, input.dropoffAddress),
+      ...(input.pickupLocation ? { pickup_latitude: input.pickupLocation.latitude, pickup_longitude: input.pickupLocation.longitude } : {}),
+      ...(input.dropoffLocation ? { dropoff_latitude: input.dropoffLocation.latitude, dropoff_longitude: input.dropoffLocation.longitude } : {}),
       ...(readyAt ? {
         pickup_ready_dt: readyAt.toISOString(),
         pickup_deadline_dt: new Date(readyAt.getTime() + 60 * 60 * 1000).toISOString(),
@@ -101,9 +111,11 @@ export async function quoteUberDirect(input: { pickupAddress: string; dropoffAdd
 export async function createUberDirectDelivery(input: {
   quoteId: string;
   pickupAddress: string;
+  pickupLocation?: DeliveryLocation | null;
   pickupName: string;
   pickupPhone: string;
   dropoffAddress: string;
+  dropoffLocation?: DeliveryLocation | null;
   dropoffName: string;
   dropoffPhone: string;
   itemDescription: string;
@@ -120,11 +132,13 @@ export async function createUberDirectDelivery(input: {
     body: JSON.stringify({
       quote_id: input.quoteId,
       pickup_name: input.pickupName,
-      pickup_address: input.pickupAddress,
+      pickup_address: uberAddress(input.pickupLocation || null, input.pickupAddress),
       pickup_phone_number: input.pickupPhone,
       dropoff_name: input.dropoffName,
-      dropoff_address: input.dropoffAddress,
+      dropoff_address: uberAddress(input.dropoffLocation || null, input.dropoffAddress),
       dropoff_phone_number: input.dropoffPhone,
+      ...(input.pickupLocation ? { pickup_latitude: input.pickupLocation.latitude, pickup_longitude: input.pickupLocation.longitude } : {}),
+      ...(input.dropoffLocation ? { dropoff_latitude: input.dropoffLocation.latitude, dropoff_longitude: input.dropoffLocation.longitude } : {}),
       manifest_items: [{
         name: input.itemDescription,
         quantity: input.packageQuantity,

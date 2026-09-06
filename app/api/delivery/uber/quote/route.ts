@@ -4,9 +4,20 @@ import { z } from "zod";
 import { getSessionWithProfile } from "@/lib/auth";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
+import { quoteUberDirect, UberDirectError } from "@/lib/uber-direct";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
+
+const locationSchema = z.object({
+  label: z.string().trim().min(8).max(300),
+  name: z.string().trim().max(160),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  city: z.string().trim().max(120),
+  state: z.string().trim().min(2).max(40),
+  postalCode: z.string().trim().min(5).max(12),
+});
 
 const quoteSchema = z.object({
   pickupAddress: z.string().trim().min(8).max(300),
@@ -15,12 +26,14 @@ const quoteSchema = z.object({
   weightPerPackage: z.number().positive().max(50),
   vehicle: z.enum(["small", "car", "pickup", "van"]),
   scheduledPickupAt: z.string().datetime().nullable().optional(),
+  pickupLocation: locationSchema.nullable().optional(),
+  dropoffLocation: locationSchema.nullable().optional(),
 });
 
 export async function POST(request: Request) {
   try {
-    const { supabase, user, profile } = await getSessionWithProfile();
-    if (!user || !supabase) {
+    const { user, profile } = await getSessionWithProfile();
+    if (!user) {
       return NextResponse.json({ ok: false, code: "sign_in_required", error: "Sign in to request a live Uber price." }, { status: 401 });
     }
     const access = managerCapabilities({
@@ -45,24 +58,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data, error } = await supabase.functions.invoke<{
-      ok?: boolean;
-      code?: string;
-      providerCode?: string;
-      error?: string;
-      quote?: unknown;
-    }>("uber-direct-quote", { body: parsed.data });
-    if (error || !data?.ok || !data.quote) {
-      let payload = data;
-      const context = (error as { context?: Response } | null)?.context;
-      if (!payload && context) payload = await context.clone().json().catch(() => null);
-      return NextResponse.json(
-        payload || { ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." },
-        { status: context?.status || 502, headers: { "Cache-Control": "no-store, max-age=0" } },
-      );
-    }
+    const quote = await quoteUberDirect(parsed.data);
     return NextResponse.json(
-      data,
+      { ok: true, provider: "Uber Direct", quote: { ...quote, provider: "Uber Direct", baseFee: quote.total, tolls: 0, accessorialFees: 0, distanceMiles: null, deliveryMethod: "courier", deliveryMethodLabel: "Uber courier" } },
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   } catch (error) {
@@ -72,6 +70,9 @@ export async function POST(request: Request) {
       provider: "uber-direct",
       safeCode: "uber-quote-failed",
     });
+    if (error instanceof UberDirectError) {
+      return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status: error.code === "address_undeliverable" ? 422 : 502, headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }

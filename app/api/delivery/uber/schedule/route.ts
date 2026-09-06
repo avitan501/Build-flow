@@ -25,6 +25,7 @@ function e164(value: string) {
 }
 
 export async function POST(request: Request) {
+  let lockedTaskId: string | null = null;
   try {
     const { user, profile, supabase } = await getSessionWithProfile();
     if (!user || !supabase) return NextResponse.json({ ok: false, error: "Manager sign-in is required." }, { status: 401 });
@@ -48,8 +49,8 @@ export async function POST(request: Request) {
       .maybeSingle<{ id: string; notes: string | null; source_item_key: string | null }>();
     const deliveryRequest = parseDeliveryRequest(task?.notes || null);
     if (taskError || !task || !deliveryRequest) return NextResponse.json({ ok: false, error: "Delivery request not found." }, { status: 404 });
-    if (deliveryRequest.providerDelivery?.deliveryId) return NextResponse.json({ ok: false, error: "This request already has an Uber delivery." }, { status: 409 });
-    if (!deliveryRequest.providerQuote || new Date(deliveryRequest.providerQuote.expiresAt).getTime() <= Date.now()) {
+    if (deliveryRequest.providerDelivery?.deliveryId) return NextResponse.json({ ok: false, error: "This request already has a provider delivery." }, { status: 409 });
+    if (!deliveryRequest.providerQuote || deliveryRequest.providerQuote.provider !== "Uber Direct" || new Date(deliveryRequest.providerQuote.expiresAt).getTime() <= Date.now()) {
       return NextResponse.json({ ok: false, error: "The Uber quote expired. Get a new live price and save the request again." }, { status: 409 });
     }
 
@@ -68,12 +69,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Choose a scheduled pickup between 1 hour and 30 days from now, then get a new live quote." }, { status: 400 });
     }
     const scheduledPickupAt = scheduledTime === null ? null : deliveryRequest.scheduledPickupAt || null;
+    const { error: lockError } = await admin.from("delivery_booking_locks").insert({ task_id: task.id, provider: "Uber Direct", status: "booking" });
+    if (lockError) return NextResponse.json({ ok: false, error: "This request is already being booked or was previously sent to a provider." }, { status: 409 });
+    lockedTaskId = task.id;
     const delivery = await createUberDirectDelivery({
       quoteId: deliveryRequest.providerQuote.quoteId,
       pickupAddress: deliveryRequest.pickupAddress,
+      pickupLocation: deliveryRequest.pickupLocation,
       pickupName: deliveryRequest.pickupContactName,
       pickupPhone,
       dropoffAddress: deliveryRequest.jobsiteAddress,
+      dropoffLocation: deliveryRequest.jobsiteLocation,
       dropoffName: deliveryRequest.dropoffContactName,
       dropoffPhone,
       itemDescription: deliveryRequest.itemDescription,
@@ -98,6 +104,7 @@ export async function POST(request: Request) {
       notes: `${DELIVERY_NOTES_PREFIX}${JSON.stringify({ ...deliveryRequest, providerDelivery, status: "dispatched" })}`,
       status: "open",
     }).eq("id", task.id);
+    await admin.from("delivery_booking_locks").update({ status: "accepted", provider_delivery_id: delivery.deliveryId, updated_at: new Date().toISOString() }).eq("task_id", task.id);
     if (updateError) {
       await captureOperationalError(updateError, {
         feature: "delivery",
@@ -110,6 +117,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, delivery: providerDelivery }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
+    if (lockedTaskId) {
+      const admin = createAdminClient();
+      await admin.from("delivery_booking_locks").update({ status: "uncertain", updated_at: new Date().toISOString() }).eq("task_id", lockedTaskId);
+    }
     await captureOperationalError(error, {
       feature: "delivery",
       operation: "schedule-delivery",

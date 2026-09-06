@@ -7,22 +7,38 @@ import { requireManagerPortalProfile } from "@/lib/auth";
 import { DELIVERY_NOTES_PREFIX, DELIVERY_TASK_PREFIX, parseDeliveryRequest, type SavedDeliveryRequest } from "@/lib/delivery-requests";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const locationSchema = z.object({
+  label: z.string().trim().min(8).max(300),
+  name: z.string().trim().max(160),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  city: z.string().trim().max(120),
+  state: z.string().trim().min(2).max(40),
+  postalCode: z.string().trim().min(5).max(12),
+});
+
 const requestSchema = z.object({
   storeName: z.string().trim().min(2).max(160),
   orderNumber: z.string().trim().max(160),
   pickupAddress: z.string().trim().min(8).max(300),
   pickupCoordinates: z.string().trim().max(100),
+  pickupLocation: locationSchema.nullable().optional(),
   jobsiteName: z.string().trim().max(160),
   jobsiteAddress: z.string().trim().min(8).max(300),
   jobsiteCoordinates: z.string().trim().max(100),
+  jobsiteLocation: locationSchema.nullable().optional(),
   pickupContactName: z.string().trim().max(160),
   pickupPhone: z.string().trim().max(40),
   dropoffContactName: z.string().trim().max(160),
   dropoffPhone: z.string().trim().max(40),
   itemDescription: z.string().trim().max(300),
-  packageQuantity: z.number().int().positive().max(20),
-  weightPerPackage: z.number().positive().max(50),
-  weightPounds: z.number().positive().max(1000),
+  packageQuantity: z.number().int().positive().max(100),
+  weightPerPackage: z.number().positive().max(5000),
+  weightPounds: z.number().positive().max(500000),
+  lengthInches: z.number().positive().max(600).nullable().optional(),
+  widthInches: z.number().positive().max(600).nullable().optional(),
+  heightInches: z.number().positive().max(600).nullable().optional(),
+  loadUnloadRequired: z.boolean().optional(),
   scheduledPickupAt: z.iso.datetime().nullable(),
   vehicle: z.enum(["small", "car", "pickup", "van"]),
   speed: z.enum(["flexible", "same-day", "rush"]),
@@ -32,12 +48,18 @@ const requestSchema = z.object({
     serviceFee: z.number().nonnegative().max(10000),
   }),
   providerQuote: z.object({
-    provider: z.literal("Uber Direct"),
+    provider: z.enum(["Uber Direct", "Curri"]),
     quoteId: z.string().trim().min(3).max(200),
     total: z.number().nonnegative().max(100000),
     currency: z.string().trim().length(3),
     pickupMinutes: z.number().nonnegative().max(1440).nullable(),
     durationMinutes: z.number().nonnegative().max(1440).nullable(),
+    distanceMiles: z.number().nonnegative().max(10000).nullable().optional(),
+    baseFee: z.number().nonnegative().max(100000).optional(),
+    tolls: z.number().nonnegative().max(100000).optional(),
+    accessorialFees: z.number().nonnegative().max(100000).optional(),
+    deliveryMethod: z.string().trim().max(100).optional(),
+    deliveryMethodLabel: z.string().trim().max(160).optional(),
     expiresAt: z.iso.datetime(),
   }).optional(),
 });
@@ -60,7 +82,7 @@ export async function saveDeliveryRequestAction(input: DeliveryRequestInput) {
     customerEmail: user.email || profile?.email || "",
     customerPhone: profile?.phone || user.phone || "",
     ...parsed.data,
-    status: "new",
+    status: parsed.data.providerQuote ? "quoted" : "new",
     createdAt,
   };
 

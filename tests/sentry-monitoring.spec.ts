@@ -147,6 +147,8 @@ test("critical handled failures are flushed to Sentry before returning", async (
     "app/api/admin/client-requests/route.ts",
     "app/api/delivery/uber/quote/route.ts",
     "app/api/delivery/uber/schedule/route.ts",
+    "app/api/delivery/curri/quote/route.ts",
+    "app/api/delivery/curri/schedule/route.ts",
     "app/api/integrations/abc/accounts/route.ts",
     "app/api/integrations/abc/branches/route.ts",
     "app/api/integrations/abc/catalog/route.ts",

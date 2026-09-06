@@ -11,3 +11,8 @@ export type LocationSuggestion = {
   taxJurisdiction: string
   source: "US Census" | "OpenStreetMap"
 }
+
+export type DeliveryLocation = Pick<
+  LocationSuggestion,
+  "label" | "name" | "latitude" | "longitude" | "city" | "state" | "postalCode"
+>
