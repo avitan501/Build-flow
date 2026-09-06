@@ -9783,6 +9783,17 @@ async function handlePublicStartByText(req: Request) {
   const claim = await sql
     .begin(async (transaction) => {
       await transaction`select pg_advisory_xact_lock(hashtextextended(${`public-start:${phone}:${ipHash}`}, 0))`;
+      // `sms_ai_mode = 'off'` also means a manager took over the thread. It is
+      // not proof that the customer opted out of SMS. Only the deterministic
+      // STOP/UNSUBSCRIBE audit event may suppress a customer-requested text.
+      const optOutRows = await transaction<{ id: string }[]>`
+        select id from public.aura_audit_log
+        where action = 'sms_ai_customer_opted_out'
+          and details->>'phone' = ${phone}
+        order by created_at desc
+        limit 1
+      `;
+      const optedOut = Boolean(optOutRows[0]);
       const existing = await transaction<
         {
           id: string;
@@ -9802,14 +9813,26 @@ async function handlePublicStartByText(req: Request) {
           welcomeProviderId: existing[0].provider_message_id,
           exampleProviderId: existing[0].example_provider_message_id,
         };
-      if (existing[0]?.status === "suppressed")
+      if (existing[0]?.status === "suppressed") {
+        if (optedOut)
+          return {
+            id: existing[0].id,
+            send: false,
+            delivery: "already_sent",
+            welcomeProviderId: null,
+            exampleProviderId: null,
+          };
+        // Recover idempotently from requests suppressed by the former
+        // sms_ai_mode/off misclassification.
+        await transaction`update public.public_start_text_requests set status = 'processing', last_error = null, updated_at = now() where id = ${existing[0].id}::uuid`;
         return {
           id: existing[0].id,
-          send: false,
-          delivery: "already_sent",
+          send: true,
+          delivery: "processing",
           welcomeProviderId: null,
           exampleProviderId: null,
         };
+      }
       if (existing[0]?.status === "processing")
         return {
           id: existing[0].id,
@@ -9831,16 +9854,14 @@ async function handlePublicStartByText(req: Request) {
           exampleProviderId: existing[0].example_provider_message_id,
         };
       }
-      const optedOut = await transaction<{ id: string }[]>`
-      select id from public.aura_contacts where normalized_phone = ${phone} and sms_ai_mode = 'off' limit 1
-    `;
       const phoneRecent = await transaction<{ count: number }[]>`
       select count(*)::int as count from public.public_start_text_requests
       where normalized_phone = ${phone} and created_at >= now() - interval '5 minutes' and status in ('processing', 'sent', 'partial')
     `;
       const ipRecent = await transaction<{ count: number }[]>`
       select count(*)::int as count from public.public_start_text_requests
-      where ip_hash = ${ipHash} and created_at >= now() - interval '1 hour' and status in ('processing', 'sent', 'suppressed')
+      where ip_hash = ${ipHash} and created_at >= now() - interval '1 hour'
+        and (status in ('processing', 'sent') or (status = 'suppressed' and last_error = 'sms_opted_out'))
     `;
       const globalToday = await transaction<{ count: number }[]>`
       select count(*)::int as count from public.public_start_text_requests
@@ -9848,13 +9869,12 @@ async function handlePublicStartByText(req: Request) {
     `;
       if ((ipRecent[0]?.count || 0) >= 3 || (globalToday[0]?.count || 0) >= 200)
         throw new Error("public_start_rate_limited");
-      const suppressed = Boolean(
-        optedOut[0] || (phoneRecent[0]?.count || 0) >= 1,
-      );
+      const recentlyRequested = (phoneRecent[0]?.count || 0) >= 1;
+      const suppressed = optedOut || recentlyRequested;
       const inserted = await transaction<{ id: string }[]>`
       insert into public.public_start_text_requests
-        (normalized_phone, ip_hash, idempotency_key, template_version, user_agent, status)
-      values (${phone}, ${ipHash}, ${idempotencyKey}, ${PUBLIC_START_TEXT_TEMPLATE_VERSION}, ${userAgent || null}, ${suppressed ? "suppressed" : "processing"})
+        (normalized_phone, ip_hash, idempotency_key, template_version, user_agent, status, last_error)
+      values (${phone}, ${ipHash}, ${idempotencyKey}, ${PUBLIC_START_TEXT_TEMPLATE_VERSION}, ${userAgent || null}, ${suppressed ? "suppressed" : "processing"}, ${optedOut ? "sms_opted_out" : null})
       returning id
     `;
       return {

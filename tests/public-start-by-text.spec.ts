@@ -109,7 +109,13 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(broker).not.toContain("sendQuoSms(phone, input.message");
   expect(broker).toContain("interval '24 hours'");
   expect(broker).toContain("interval '1 hour'");
-  expect(broker).toContain("sms_ai_mode = 'off'");
+  expect(broker).toContain("action = 'sms_ai_customer_opted_out'");
+  expect(broker).toContain("details->>'phone' = ${phone}");
+  expect(broker).toContain("sms_ai_mode/off misclassification");
+  expect(broker).toContain("last_error = 'sms_opted_out'");
+  expect(broker).not.toContain(
+    "normalized_phone = ${phone} and sms_ai_mode = 'off'",
+  );
   expect(migration).toContain("enable row level security");
   expect(migration).toContain(
     "revoke all on table public.public_start_text_requests from public, anon, authenticated",
