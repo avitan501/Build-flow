@@ -113,6 +113,8 @@ const META_WHATSAPP_BUSINESS_PHONE = "+15169901990";
 const META_WHATSAPP_APP_ID = "2874339416276903";
 const META_WHATSAPP_BUSINESS_ACCOUNT_ID = "1609047970612779";
 const META_WHATSAPP_PHONE_NUMBER_ID = "1266268263238386";
+const META_WHATSAPP_DIRECT_CALLBACK =
+  "https://nprfhspwdflpqlopydmp.supabase.co/functions/v1/aura-messaging-broker?mode=meta-whatsapp-webhook";
 const TRUSTED_SMS_COMMAND_PHONES = new Set(["+13475675077", "+15169398484"]);
 
 function isTrustedSmsCommandPhone(phone: string | null | undefined) {
@@ -488,6 +490,19 @@ function stripEmailHtml(value: string) {
 const RESEND_ATTACHMENT_BUCKET = "supplier-quotes";
 const RESEND_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 const RESEND_ATTACHMENT_MAX_COUNT = 10;
+const RESEND_WEBHOOK_ENDPOINT =
+  "https://nprfhspwdflpqlopydmp.supabase.co/functions/v1/aura-messaging-broker?mode=resend-webhook";
+const RESEND_EMAIL_EVENTS = [
+  "email.received",
+  "email.sent",
+  "email.delivered",
+  "email.delivery_delayed",
+  "email.failed",
+  "email.bounced",
+  "email.complained",
+  "email.suppressed",
+  "email.opened",
+] as const;
 const RESEND_ATTACHMENT_TYPES = new Set([
   "application/pdf",
   "text/csv",
@@ -614,14 +629,36 @@ async function handleResendWebhook(req: Request) {
   const outboundStatuses: Record<string, string> = {
     "email.sent": "sent",
     "email.delivered": "delivered",
+    "email.delivery_delayed": "delayed",
+    "email.failed": "failed",
     "email.bounced": "bounced",
     "email.complained": "complained",
+    "email.suppressed": "suppressed",
+    "email.opened": "read",
   };
   const outboundStatus = event.type ? outboundStatuses[event.type] : null;
   if (outboundStatus) {
+    const eventAt = event.created_at && !Number.isNaN(Date.parse(event.created_at))
+      ? new Date(event.created_at).toISOString()
+      : new Date().toISOString();
     await sql`
       update public.aura_communications as communication
-      set status = ${outboundStatus}, last_event_at = now(), updated_at = now()
+      set status = case
+          when communication.status = 'read' then 'read'
+          when ${outboundStatus} = 'read' then 'read'
+          when communication.status in ('bounced', 'failed', 'complained', 'suppressed')
+            and ${outboundStatus} in ('sent', 'delivered', 'delayed')
+            then communication.status
+          when communication.status = 'delivered' and ${outboundStatus} = 'sent'
+            then 'delivered'
+          else ${outboundStatus}
+        end,
+        read_at = case
+          when ${outboundStatus} = 'read' then coalesce(communication.read_at, ${eventAt}::timestamptz)
+          else communication.read_at
+        end,
+        last_event_at = greatest(communication.last_event_at, ${eventAt}::timestamptz),
+        updated_at = now()
       from public.aura_message_outbox as outbox
       where outbox.provider = 'resend'
         and outbox.provider_message_id = ${event.data.email_id}
@@ -727,6 +764,44 @@ async function handleResendWebhook(req: Request) {
     `;
   }
   return json({ ok: true });
+}
+
+async function configureResendEmailWebhook() {
+  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
+  if (!apiKey) throw new Error("Resend is not configured");
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+  const listed = await fetch("https://api.resend.com/webhooks", {
+    headers,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!listed.ok) throw new Error("Unable to read the existing Resend webhook");
+  const payload = await listed.json() as {
+    data?: Array<{ id?: string; endpoint?: string; status?: string }>;
+  };
+  const matches = (payload.data || []).filter((webhook) =>
+    webhook.endpoint === RESEND_WEBHOOK_ENDPOINT && webhook.id
+  );
+  if (matches.length !== 1)
+    throw new Error("Expected exactly one existing Avantia Resend webhook");
+  const webhookId = matches[0].id!;
+  const updated = await fetch(
+    `https://api.resend.com/webhooks/${encodeURIComponent(webhookId)}`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        endpoint: RESEND_WEBHOOK_ENDPOINT,
+        events: RESEND_EMAIL_EVENTS,
+        status: "enabled",
+      }),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!updated.ok) throw new Error("Unable to update the Resend webhook events");
+  return { webhookId, events: [...RESEND_EMAIL_EVENTS] };
 }
 
 async function validQuoSignature(
@@ -1552,6 +1627,62 @@ async function handleMetaWhatsAppWebhook(req: Request) {
     }
   }
   return json({ ok: true });
+}
+
+async function optimizeMetaWhatsAppWebhook() {
+  const config = await metaWhatsAppConfig(false);
+  if (!config) throw new Error("Meta WhatsApp is not configured");
+  const appAccessToken = `${META_WHATSAPP_APP_ID}|${config.appSecret}`;
+  const response = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${appAccessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        object: "whatsapp_business_account",
+        callback_url: META_WHATSAPP_DIRECT_CALLBACK,
+        verify_token: config.verifyToken,
+        fields: "messages",
+      }),
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+  const responsePayload = await response.json().catch(() => ({})) as {
+    success?: boolean;
+  };
+  if (!response.ok || responsePayload.success !== true)
+    throw new Error("Meta did not accept the direct WhatsApp webhook");
+
+  const verified = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
+    {
+      headers: { Authorization: `Bearer ${appAccessToken}` },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!verified.ok) throw new Error("Meta did not confirm the direct WhatsApp webhook");
+  const subscriptions = await verified.json() as {
+    data?: Array<{
+      object?: string;
+      callback_url?: string;
+      active?: boolean;
+      fields?: Array<string | { name?: string }>;
+    }>;
+  };
+  const directMessagesWebhook = subscriptions.data?.some((subscription) =>
+    subscription.object === "whatsapp_business_account" &&
+    subscription.callback_url === META_WHATSAPP_DIRECT_CALLBACK &&
+    subscription.active !== false &&
+    subscription.fields?.some((field) =>
+      (typeof field === "string" ? field : field.name) === "messages"
+    )
+  ) === true;
+  if (!directMessagesWebhook)
+    throw new Error("Meta did not persist the direct WhatsApp webhook");
+  return { callbackUrl: META_WHATSAPP_DIRECT_CALLBACK };
 }
 
 type QuoWebhookPayload = {
@@ -11057,9 +11188,19 @@ Deno.serve(async (req: Request) => {
         ok: true,
         whatsapp: false,
         whatsappProvider: "meta",
-        callbackUrl: "https://build.avantiap.com/api/aura/whatsapp",
+        callbackUrl: META_WHATSAPP_DIRECT_CALLBACK,
         verifyToken,
       });
+    }
+    if (input.action === "optimize_meta_whatsapp_webhook") {
+      if (!manager.isOwner)
+        return json({ error: "Only the owner can optimize WhatsApp." }, 403);
+      return json({ ok: true, ...(await optimizeMetaWhatsAppWebhook()) });
+    }
+    if (input.action === "configure_resend_email_webhook") {
+      if (!manager.isOwner)
+        return json({ error: "Only the owner can configure email events." }, 403);
+      return json({ ok: true, ...(await configureResendEmailWebhook()) });
     }
     if (input.action === "activate_meta_whatsapp") {
       if (!manager.isOwner)
@@ -11112,10 +11253,13 @@ Deno.serve(async (req: Request) => {
             fields?: Array<string | { name?: string }>;
           }>;
         };
-        const expectedCallback = "https://build.avantiap.com/api/aura/whatsapp";
+        const expectedCallbacks = new Set([
+          META_WHATSAPP_DIRECT_CALLBACK,
+          "https://build.avantiap.com/api/aura/whatsapp",
+        ]);
         const hasActiveMessagesWebhook = appPayload.data?.some((subscription) =>
           subscription.object === "whatsapp_business_account" &&
-          subscription.callback_url === expectedCallback &&
+          Boolean(subscription.callback_url && expectedCallbacks.has(subscription.callback_url)) &&
           subscription.active !== false &&
           subscription.fields?.some((field) =>
             (typeof field === "string" ? field : field.name) === "messages"

@@ -137,7 +137,10 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(broker).toContain("wabaListsExpectedApp");
   expect(broker).toContain("hasActiveMessagesWebhook");
   expect(broker).toContain('subscription.object === "whatsapp_business_account"');
-  expect(broker).toContain('subscription.callback_url === expectedCallback');
+  expect(broker).toContain("META_WHATSAPP_DIRECT_CALLBACK");
+  expect(broker).toContain('input.action === "optimize_meta_whatsapp_webhook"');
+  expect(broker).toContain("expectedCallbacks.has(subscription.callback_url)");
+  expect(broker).toContain('fields: "messages"');
   expect(broker).toContain('(typeof field === "string" ? field : field.name) === "messages"');
   expect(broker).toContain('url.searchParams.get("mode") === "meta-whatsapp-webhook"');
   expect(broker).toContain("handleMetaWhatsAppVerification");
@@ -166,11 +169,15 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(actions).toContain('provider === "meta-whatsapp"');
   expect(actions).toContain('action: "configure_meta_whatsapp"');
   expect(actions).toContain('action: "activate_meta_whatsapp"');
+  expect(actions).toContain('action: "optimize_meta_whatsapp_webhook"');
+  expect(actions).toContain('action: "configure_resend_email_webhook"');
   expect(setup).toContain("Direct Meta WhatsApp");
   expect(setup).toContain('value="meta-whatsapp"');
   expect(setup).not.toContain('value="2chat"');
   expect(setup).toContain("2Chat remains only for the existing call and recording service");
   expect(setup).toContain("I verified and subscribed messages · Activate");
+  expect(setup).toContain("Optimize live WhatsApp speed");
+  expect(setup).toContain("Activate new email events");
   expect(setup).toContain('value="quo"');
   expect(dashboard).toContain("brokerStatus?.whatsappProvider");
   expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");

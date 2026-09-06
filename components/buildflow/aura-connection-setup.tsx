@@ -6,7 +6,9 @@ import { useState, useTransition } from "react";
 import {
   activateAuraMetaWhatsAppAction,
   activateAuraTwoChatChannelAction,
+  configureAuraEmailEventsAction,
   configureAuraProviderAction,
+  optimizeAuraMetaWhatsAppAction,
 } from "@/app/owner/aura/actions";
 
 type Props = {
@@ -76,6 +78,22 @@ export function AuraConnectionSetup({
     });
   }
 
+  function optimizeMetaWhatsApp() {
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await optimizeAuraMetaWhatsAppAction();
+      setFeedback(result.ok ? "WhatsApp now reaches Aura through the fastest direct webhook." : result.error);
+    });
+  }
+
+  function activateEmailEvents() {
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await configureAuraEmailEventsAction();
+      setFeedback(result.ok ? "New email delivery, failure, and open events are active." : result.error);
+    });
+  }
+
   return (
     <section id="phone-connections" className="scroll-mt-6 rounded-lg border-2 border-[#0071e3] bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -130,6 +148,11 @@ export function AuraConnectionSetup({
               <div className="rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">App 2874339416276903<br />WhatsApp account 1609047970612779<br />Phone ID 1266268263238386</div>
             </div>
             <button disabled={pending} className="min-h-11 w-fit rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-50">Validate and connect Meta</button>
+            {whatsappReady && whatsappProvider === "meta" ? (
+              <button type="button" onClick={optimizeMetaWhatsApp} disabled={pending} className="min-h-10 w-fit rounded-md border border-emerald-700 bg-white px-3 text-sm font-semibold text-emerald-800 disabled:opacity-50">
+                Optimize live WhatsApp speed
+              </button>
+            ) : null}
           </form>
 
           {metaSetup ? (
@@ -156,6 +179,10 @@ export function AuraConnectionSetup({
             <label className="grid gap-1 text-xs font-semibold">Business-line ID<input required name="phoneNumberId" autoComplete="off" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
             <button disabled={pending} className="min-h-11 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">Connect incoming calls & texts</button>
           </form>
+          <div className="grid gap-3 rounded-md border border-slate-200 p-4 lg:col-span-2">
+            <div><h3 className="font-semibold">Business email events</h3><p className="mt-1 text-xs leading-5 text-slate-500">Tracks only new delivery, failure, and open events. It does not import old Gmail messages.</p></div>
+            <button type="button" onClick={activateEmailEvents} disabled={pending} className="min-h-10 w-fit rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50">Activate new email events</button>
+          </div>
         </div>
       ) : null}
       {feedback ? <p role="status" className="mt-3 text-sm font-semibold text-slate-700">{feedback}</p> : null}

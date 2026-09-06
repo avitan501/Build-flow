@@ -75,8 +75,13 @@ test("delivery receipts flow back into the durable outbox history", async () => 
   ]);
 
   expect(broker).toContain('"email.delivered": "delivered"');
+  expect(broker).toContain('"email.delivery_delayed": "delayed"');
+  expect(broker).toContain('"email.failed": "failed"');
   expect(broker).toContain('"email.bounced": "bounced"');
   expect(broker).toContain('"email.complained": "complained"');
+  expect(broker).toContain('"email.suppressed": "suppressed"');
+  expect(broker).toContain('"email.opened": "read"');
+  expect(broker).toContain('input.action === "configure_resend_email_webhook"');
   expect(migration).toContain("sync_aura_message_outbox_from_communication");
   expect(migration).toContain("after update of status on public.aura_communications");
   expect(migration).toContain("idempotency key reused with a different payload");

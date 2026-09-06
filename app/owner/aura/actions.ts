@@ -713,6 +713,42 @@ export async function configureAuraProviderAction(
   };
 }
 
+export async function optimizeAuraMetaWhatsAppAction(): Promise<ConfigureAuraProviderResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura/connect");
+  try {
+    const setup = await invokeMessagingBroker(supabase, {
+      action: "optimize_meta_whatsapp_webhook",
+    });
+    revalidatePath("/owner/aura");
+    revalidatePath("/owner/aura/connect");
+    revalidatePath("/admin/communications");
+    return { ok: true, callbackUrl: setup.callbackUrl };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "WhatsApp could not be optimized.",
+    };
+  }
+}
+
+export async function configureAuraEmailEventsAction(): Promise<ConfigureAuraProviderResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura/connect");
+  try {
+    await invokeMessagingBroker(supabase, {
+      action: "configure_resend_email_webhook",
+    });
+    revalidatePath("/owner/aura");
+    revalidatePath("/owner/aura/connect");
+    revalidatePath("/admin/communications");
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Email events could not be activated.",
+    };
+  }
+}
+
 export async function confirmAuraIntakeAction(formData: FormData) {
   const { supabase } = await requireOwnerAccess("/owner/ai-inbox");
   const intakeId = requireUuid(formData.get("intakeId"));
