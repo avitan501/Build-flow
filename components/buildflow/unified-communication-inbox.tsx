@@ -11,6 +11,7 @@ import { CommunicationCallLauncher } from "@/components/buildflow/communication-
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { callerIdentityCandidateLabel, resolveCallerIdentity, type CallerIdentityCandidate, type CallerIdentityResolution } from "@/lib/aura/caller-identity"
 import { communicationHistoryCursor } from "@/lib/aura/communication-history-cursor"
+import { communicationTemplates, recommendCommunicationAction } from "@/lib/aura/communication-next-action"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
@@ -78,7 +79,6 @@ type CommunicationHistoryResponse = {
   error?: string
 }
 
-const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "A manager will confirm the next step."]
 const CORRECTION_REASON_LABELS: Record<SmsCorrectionReason, string> = {
   tone: "Tone",
   too_long: "Too long",
@@ -912,6 +912,23 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const requestCandidateId = activeConversation ? [...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null : null
   const activeSmsDraft = activeDraftId ? smsReplyDrafts.find((draft) => draft.id === activeDraftId) || null : null
   const activeDraftEdited = Boolean(activeSmsDraft && message.trim() !== activeSmsDraft.reply_text.trim())
+  const activeRequestLink = activeConversation?.messages.flatMap((item) => item.links ?? []).find((link) => link.entity_type === "material_request")
+  const activeRequest = activeRequestLink ? materialRequests.find((request) => request.id === activeRequestLink.entity_id) : undefined
+  const nextAction = activeConversation ? recommendCommunicationAction({
+    name: activeConversation.name,
+    kind: activeConversation.kind,
+    hasMaterialRequest: Boolean(activeRequestLink),
+    materialRequestStatus: activeRequest?.status,
+    messages: activeConversation.messages.map((item) => ({
+      direction: item.direction,
+      body: item.body,
+      summary: item.summary,
+      transcript: item.transcript,
+      status: item.status,
+      occurredAt: item.occurred_at,
+    })),
+  }) : null
+  const quickReplies = activeConversation ? communicationTemplates(activeConversation.name, activeConversation.kind) : []
 
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
@@ -946,7 +963,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
           <div className="mx-auto max-w-3xl">
             {activeSmsDraft ? <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft"><div className="flex items-start gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.safety_level === "green" ? "bg-emerald-100 text-emerald-800" : activeSmsDraft.safety_level === "red" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{activeSmsDraft.safety_level || "yellow"} safety</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>{activeDraftEdited ? <div className="mt-2"><p className="text-[9px] font-bold uppercase tracking-wide text-sky-900">Why did you edit it?</p><div className="mt-1 flex flex-wrap gap-1">{SMS_CORRECTION_REASONS.map((reason) => <button key={reason} type="button" onClick={() => setCorrectionReasons((current) => current.includes(reason) ? current.filter((item) => item !== reason) : [...current, reason])} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${correctionReasons.includes(reason) ? "border-sky-700 bg-sky-700 text-white" : "border-sky-200 bg-white text-sky-800"}`}>{CORRECTION_REASON_LABELS[reason]}</button>)}</div></div> : null}<label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950"><input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />Teach AI from my approved reply</label><p className="mt-0.5 text-[9px] text-sky-700">Nothing is learned unless you check this box and send. Customer details are redacted before reuse. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}{activeSmsDraft.latency_ms ? ` · ${activeSmsDraft.latency_ms} ms` : ""}.</p></div></div></section> : null}
-            <div className="flex gap-1.5 overflow-x-auto pb-2">{activeConversation?.phone ? <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40"><Sparkles className="h-3 w-3" />AI answer</button> : null}{QUICK_REPLIES.map((reply) => <button key={reply} type="button" onClick={() => setMessage(reply)} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply}</button>)}</div>
+            {nextAction ? <section className="mb-2 rounded-lg border border-slate-200 bg-slate-950 px-3 py-2 text-white" aria-label="Recommended next action"><div className="flex min-w-0 items-start gap-2"><span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-300 text-slate-950"><Sparkles className="h-3.5 w-3.5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><strong className="text-[11px]">{nextAction.action}</strong><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${nextAction.health === "Do Not Contact" ? "bg-rose-400/20 text-rose-200" : nextAction.health === "Needs Carlos" || nextAction.health === "At Risk" ? "bg-amber-300/20 text-amber-200" : "bg-white/10 text-slate-200"}`}>{nextAction.health}</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-300">{nextAction.reason}</p></div>{nextAction.action === "Call customer" && activeConversation?.phone ? <button type="button" onClick={() => setCallLauncher({ phone: activeConversation.phone, name: activeConversation.name })} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950"><Phone className="h-3 w-3" />Call</button> : nextAction.suggestedMessage ? <button type="button" onClick={() => setMessage(nextAction.suggestedMessage)} className="h-7 shrink-0 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950">Draft</button> : null}</div></section> : null}
+            <div className="flex gap-1.5 overflow-x-auto pb-2">{activeConversation?.phone ? <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40"><Sparkles className="h-3 w-3" />AI answer</button> : null}{quickReplies.map((reply) => <button key={reply.id} type="button" onClick={() => setMessage(reply.message)} title={`${reply.purpose} message`} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply.label}</button>)}</div>
             <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
               <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>
               <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
