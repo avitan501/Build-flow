@@ -132,6 +132,13 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(route).not.toContain("AURA_WHATSAPP_APP_SECRET");
   expect(broker).toContain('input.action === "configure_meta_whatsapp"');
   expect(broker).toContain('input.action === "activate_meta_whatsapp"');
+  expect(broker).toContain("storedVerifyToken && storedVerifyToken.length >= 40");
+  expect(broker).toContain("subscriptionWritePayload.success !== true");
+  expect(broker).toContain("wabaListsExpectedApp");
+  expect(broker).toContain("hasActiveMessagesWebhook");
+  expect(broker).toContain('subscription.object === "whatsapp_business_account"');
+  expect(broker).toContain('subscription.callback_url === expectedCallback');
+  expect(broker).toContain('(typeof field === "string" ? field : field.name) === "messages"');
   expect(broker).toContain('url.searchParams.get("mode") === "meta-whatsapp-webhook"');
   expect(broker).toContain("handleMetaWhatsAppVerification");
   expect(broker).toContain("handleMetaWhatsAppWebhook");

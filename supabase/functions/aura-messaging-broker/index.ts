@@ -11019,7 +11019,10 @@ Deno.serve(async (req: Request) => {
       if (!subscriptionResponse.ok)
         return json({ error: "Meta validated the number but did not allow the app subscription." }, 400);
 
-      const verifyToken = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
+      const storedVerifyToken = await secret(secretNames.metaVerifyToken);
+      const verifyToken = storedVerifyToken && storedVerifyToken.length >= 40
+        ? storedVerifyToken
+        : crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
       await Promise.all([
         saveSecret(secretNames.metaAccessToken, accessToken, "Aura Meta WhatsApp permanent access token"),
         saveSecret(secretNames.metaAppSecret, appSecret, "Aura Meta app secret"),
@@ -11050,15 +11053,57 @@ Deno.serve(async (req: Request) => {
       const verifiedTokenHash = await secret(secretNames.metaWebhookVerifiedTokenHash);
       if (!verifiedTokenHash || !constantTimeEqual(verifiedTokenHash, await sha256Hex(config.verifyToken)))
         return json({ error: "Verify the production webhook callback in Meta first." }, 400);
+      const graphHeaders = { Authorization: `Bearer ${config.accessToken}` };
+      const subscriptionWrite = await fetch(
+        `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps`,
+        { method: "POST", headers: graphHeaders },
+      );
+      if (!subscriptionWrite.ok)
+        return json({ error: "Meta did not allow the WhatsApp app subscription." }, 400);
+      const subscriptionWritePayload = await subscriptionWrite.json() as { success?: boolean };
+      if (subscriptionWritePayload.success !== true)
+        return json({ error: "Meta did not confirm the WhatsApp app subscription." }, 400);
+
       const subscriptions = await fetch(
         `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps?fields=id`,
-        { headers: { Authorization: `Bearer ${config.accessToken}` } },
+        { headers: graphHeaders },
       );
       if (!subscriptions.ok)
         return json({ error: "Meta did not confirm the WhatsApp app subscription." }, 400);
       const payload = await subscriptions.json() as { data?: Array<{ id?: string }> };
-      if (!payload.data?.some((app) => app.id === META_WHATSAPP_APP_ID))
-        return json({ error: "Subscribe the messages webhook for the Avantia Build Communications app first." }, 400);
+      const wabaListsExpectedApp = payload.data?.some((app) => app.id === META_WHATSAPP_APP_ID) === true;
+      if (!wabaListsExpectedApp) {
+        // Meta's Production Setup can show and successfully toggle the WABA subscription
+        // while this edge still returns an empty data array. Verify the other side of the
+        // same binding before activation instead of treating that inconsistent read as a
+        // missing subscription.
+        const appAccessToken = `${META_WHATSAPP_APP_ID}|${config.appSecret}`;
+        const appSubscriptions = await fetch(
+          `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
+          { headers: { Authorization: `Bearer ${appAccessToken}` } },
+        );
+        if (!appSubscriptions.ok)
+          return json({ error: "Meta did not confirm the app webhook configuration." }, 400);
+        const appPayload = await appSubscriptions.json() as {
+          data?: Array<{
+            object?: string;
+            callback_url?: string;
+            active?: boolean;
+            fields?: Array<string | { name?: string }>;
+          }>;
+        };
+        const expectedCallback = "https://build.avantiap.com/api/aura/whatsapp";
+        const hasActiveMessagesWebhook = appPayload.data?.some((subscription) =>
+          subscription.object === "whatsapp_business_account" &&
+          subscription.callback_url === expectedCallback &&
+          subscription.active !== false &&
+          subscription.fields?.some((field) =>
+            (typeof field === "string" ? field : field.name) === "messages"
+          )
+        ) === true;
+        if (!hasActiveMessagesWebhook)
+          return json({ error: "Subscribe the messages webhook for the Avantia Build Communications app first." }, 400);
+      }
       await saveSecret(secretNames.whatsappProvider, "meta", "Aura active WhatsApp provider");
       return json({ ok: true, whatsapp: true, whatsappProvider: "meta" });
     }
