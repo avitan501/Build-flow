@@ -103,6 +103,7 @@ test("a sole structured QA item keeps its saved quantity after AI normalization 
 test("the organizer preserves line breaks and grounds saved rows before replacing retry results", async () => {
   const source = await readFile(path.join(process.cwd(), "supabase/functions/client-material-list-ai/index.ts"), "utf8")
   expect(source).toContain("cleanMultiline(originalSource.metadata?.request_details")
+  expect(source).toContain('.replace(/\\\\n/g, "\\n")')
   expect(source).toContain("findExplicitQuantityUnitEvidence")
   expect(source).toContain("sourceText: groundedSourceText")
   expect(source).toContain("source_text: groundedSourceText")

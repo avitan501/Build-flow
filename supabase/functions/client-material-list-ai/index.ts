@@ -131,6 +131,9 @@ function clean(value: unknown, max: number) {
 
 function cleanMultiline(value: unknown, max: number) {
   return String(value ?? "")
+    // Phone and webhook payloads sometimes persist escaped line breaks. Treat
+    // them as real rows so quantities cannot bleed into the next material.
+    .replace(/\\n/g, "\n")
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => line.trim().replace(/\s+/g, " "))
