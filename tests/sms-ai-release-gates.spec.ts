@@ -63,6 +63,32 @@ test("attachment verification reads only the latest customer message", async () 
   expect(broker).not.toMatch(/accurateAttachmentReply\(\s*conversationText,/)
 })
 
+test("an unrelated attachment response can never auto-send", () => {
+  expect(evaluateSmsReplyGate({
+    message: "Can I order siding?",
+    reply: "I don't see an attachment here yet. Please resend it.",
+    intent: "material_request",
+    event: "message",
+    participantRole: "lead",
+    modelAutoSafe: true,
+  })).toMatchObject({ level: "red", gateAutoSafe: false })
+})
+
+test("direct Meta WhatsApp inbound uses the durable AI and outbox routes", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  const meta = broker.slice(
+    broker.indexOf("async function handleMetaWhatsAppWebhook"),
+    broker.indexOf("async function optimizeMetaWhatsAppWebhook"),
+  )
+  expect(meta).toContain("ensureIncomingSmsContact(remotePhone)")
+  expect(meta).toContain("enqueueSmsAutomation(communicationId)")
+  expect(meta).toContain("dispatchSmsAutomationWorker(communicationId)")
+  expect(broker).toContain("communication.channel in ('sms', 'whatsapp')")
+  expect(broker).toContain("enqueueWhatsAppAiReply")
+  expect(broker).toContain("public.enqueue_aura_message_outbox")
+  expect(broker).toContain('(sourceChannel === "sms" && isTrustedSmsCommandPhone(phone))')
+})
+
 test("an address missing only its street type gets one precise question", () => {
   expect(smsMissingStreetTypeQuestion("122 spruce cedarhurst ny 11516"))
     .toBe("Is that 122 Spruce Street, Avenue, Road, or another street type?")

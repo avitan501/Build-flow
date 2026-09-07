@@ -95,7 +95,13 @@ async function vaultSecret(name: string) {
   return rows[0]?.decrypted_secret || null;
 }
 
-async function claimNext(): Promise<OutboxRow | null> {
+async function claimNext(
+  preferredOutboxId: string | null = null,
+): Promise<OutboxRow | null> {
+  const preferred =
+    preferredOutboxId && /^[0-9a-f-]{36}$/i.test(preferredOutboxId)
+      ? preferredOutboxId
+      : null;
   const rows = await sql.begin(async (transaction) => {
     await transaction`
       update public.aura_message_outbox
@@ -122,7 +128,8 @@ async function claimNext(): Promise<OutboxRow | null> {
               and prior.package_index < candidate_outbox.package_index
               and prior.status not in ('accepted', 'sent', 'delivered', 'read')
           )
-        order by candidate_outbox.created_at, candidate_outbox.package_index nulls first, candidate_outbox.id
+        order by case when candidate_outbox.id = ${preferred}::uuid then 0 else 1 end,
+          candidate_outbox.created_at, candidate_outbox.package_index nulls first, candidate_outbox.id
         limit 1
         for update skip locked
       )
@@ -483,10 +490,10 @@ async function processOne(row: OutboxRow) {
     `;
 }
 
-async function drain() {
+async function drain(preferredOutboxId: string | null = null) {
   let processed = 0;
   for (; processed < 10; processed += 1) {
-    const row = await claimNext();
+    const row = await claimNext(processed === 0 ? preferredOutboxId : null);
     if (!row) break;
     await processOne(row);
   }
@@ -505,7 +512,14 @@ Deno.serve(async (request: Request) => {
   if (!expected || !constantTimeEqual(expected, supplied))
     return response({ error: "Invalid dispatch secret" }, 401);
   try {
-    return response({ ok: true, processed: await drain() });
+    const payload = await request.json().catch(() => ({})) as {
+      preferredOutboxId?: unknown;
+    };
+    const preferredOutboxId =
+      typeof payload.preferredOutboxId === "string"
+        ? payload.preferredOutboxId
+        : null;
+    return response({ ok: true, processed: await drain(preferredOutboxId) });
   } catch {
     return response({ error: "Outbox processing failed" }, 500);
   }

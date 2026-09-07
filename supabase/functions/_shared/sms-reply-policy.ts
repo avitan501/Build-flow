@@ -543,6 +543,17 @@ export function smsOutputSafetySignals(params: {
     /\b(?:you should use|the best (?:choice|option|solution) is|i (?:recommend|suggest) (?:using|choosing)|we (?:recommend|suggest) (?:using|choosing)|the right product is)\b|\b(?:debe usar|la mejor (?:opci[oó]n|soluci[oó]n) es|recomiendo (?:usar|elegir)|recomendamos (?:usar|elegir))\b/i.test(
       reply,
     );
+  const attachmentReply =
+    /\b(?:attachment|photo|image|picture|file)\b/i.test(reply) &&
+    /\b(?:don['’]?t\s+see|do\s+not\s+see|not\s+(?:received|attached)|resend|send\s+(?:it|that)\s+again|upload\s+again)\b/i.test(
+      reply,
+    );
+  const latestMessageReferencesAttachment =
+    /\[Attachment included(?::[^\]]+)?\]/i.test(params.message || "") ||
+    (/\b(?:attachment|photo|image|picture|file)\b/i.test(params.message || "") &&
+      /\b(?:sent|send|attach|attached|upload|uploaded|resend|receive|received|see|view|open|opened)\b/i.test(
+        params.message || "",
+      ));
   const question = inspectSmsQuestionStructure(reply, params.knownFields);
   const listCompletionQuestion =
     /\bdo you need anything else(?: on this list)?\b|\banything else(?: on this list)?\b|\b(?:necesita|quieres?) (?:agregar )?algo m[aá]s\b|(?:צריך|צריכה|צריכים) להוסיף עוד משהו|(?:האם )?צריך עוד משהו/i.test(
@@ -564,6 +575,8 @@ export function smsOutputSafetySignals(params: {
     signals.push("reply asserts an unsupported transactional status");
   if (unrequestedSolution)
     signals.push("reply proposes an unrequested product solution");
+  if (attachmentReply && !latestMessageReferencesAttachment)
+    signals.push("attachment reply is unrelated to the latest customer message");
   if (
     smsReplySuggestsOptionalItems(reply) &&
     !isApprovedSheetrockRelatedSuggestion(

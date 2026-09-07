@@ -1604,6 +1604,7 @@ async function handleMetaWhatsAppWebhook(req: Request) {
       for (const message of value.messages || []) {
         const remotePhone = normalizePhone(message.from);
         if (!message.id || !remotePhone) continue;
+        await ensureIncomingSmsContact(remotePhone);
         const communicationId = await storeCommunication({
           provider: "whatsapp",
           channel: "whatsapp",
@@ -1618,8 +1619,16 @@ async function handleMetaWhatsAppWebhook(req: Request) {
         });
         scheduleMaterialShadowAssessment(communicationId);
         EdgeRuntime.waitUntil(
-          linkIncomingCommunicationToRequestState(remotePhone, communicationId, "whatsapp").catch((error) =>
-            console.error("Aura WhatsApp request-state link failed", error),
+          (async () => {
+            await linkIncomingCommunicationToRequestState(
+              remotePhone,
+              communicationId,
+              "whatsapp",
+            );
+            await enqueueSmsAutomation(communicationId);
+            await dispatchSmsAutomationWorker(communicationId);
+          })().catch((error) =>
+            console.error("Aura WhatsApp AI dispatch failed", error),
           ),
         );
       }
@@ -3602,7 +3611,7 @@ async function activeSmsRequestSourceIds(
   const rows = await sql<{ id: string; body: string | null }[]>`
     select id, body
     from public.aura_communications
-    where channel = 'sms' and direction = 'incoming' and counterparty_phone = ${phone}
+    where channel in ('sms', 'whatsapp') and direction = 'incoming' and counterparty_phone = ${phone}
     order by occurred_at desc, created_at desc
     limit 30
   `;
@@ -5307,10 +5316,11 @@ async function processCustomerSmsAutomation(
     exact_list_only: boolean;
   } | null,
   media: TrustedSmsMedia[] = [],
+  sourceChannel: "sms" | "whatsapp" = "sms",
 ) {
   if (
     (!body.trim() && trustedImageMedia(media).length === 0) ||
-    isTrustedSmsCommandPhone(phone)
+    (sourceChannel === "sms" && isTrustedSmsCommandPhone(phone))
   )
     return;
   // A customer response always supersedes reminders from an older turn. Run
@@ -5380,7 +5390,7 @@ async function processCustomerSmsAutomation(
     settings.enabled && contact && contact.sms_ai_mode !== "off";
   const recentExactCustomerMessages = await sql<{ body: string }[]>`
     select body from public.aura_communications
-    where channel = 'sms' and counterparty_phone = ${phone} and direction = 'incoming'
+    where channel = ${sourceChannel} and counterparty_phone = ${phone} and direction = 'incoming'
       and id <> ${communicationId}::uuid and body is not null and trim(body) <> ''
       and occurred_at >= now() - interval '120 seconds'
     order by occurred_at desc, created_at desc
@@ -5388,7 +5398,7 @@ async function processCustomerSmsAutomation(
   `;
   const previousCustomerMessages = await sql<{ body: string }[]>`
     select body from public.aura_communications
-    where channel = 'sms' and counterparty_phone = ${phone} and direction = 'incoming'
+    where channel = ${sourceChannel} and counterparty_phone = ${phone} and direction = 'incoming'
       and id <> ${communicationId}::uuid and body is not null and trim(body) <> ''
       and occurred_at >= now() - interval '20 seconds'
     order by occurred_at desc, created_at desc
@@ -6086,7 +6096,7 @@ async function processCustomerSmsAutomation(
     from public.aura_communications as communication
     join public.aura_communication_links as link on link.communication_id = communication.id and link.entity_type = 'material_request'
     join public.quote_requests as request on request.id::text = link.entity_id and request.status <> 'closed'
-    where communication.channel = 'sms' and communication.counterparty_phone = ${phone}
+    where communication.channel in ('sms', 'whatsapp') and communication.counterparty_phone = ${phone}
     order by communication.occurred_at desc
     limit 1
   `
@@ -6173,7 +6183,7 @@ async function processCustomerSmsAutomation(
     safety.gateAutoSafe;
   const latestRows = await sql<{ id: string; direction: string }[]>`
     select id, direction from public.aura_communications
-    where channel = 'sms' and counterparty_phone = ${phone}
+    where channel in ('sms', 'whatsapp') and counterparty_phone = ${phone}
     order by occurred_at desc, created_at desc limit 1
   `;
   if (
@@ -6211,7 +6221,7 @@ async function processCustomerSmsAutomation(
     : [];
   const partHashes = await Promise.all(replyParts.map(sha256Hex));
   const followUpPrompt =
-    shouldAuto &&
+    sourceChannel === "sms" && shouldAuto &&
     smsUnansweredFollowUpEligible({
       originalMessage: body,
       questionReply: result.reply,
@@ -6237,7 +6247,7 @@ async function processCustomerSmsAutomation(
         ${metrics.inputTokens}, ${metrics.outputTokens}, ${metrics.estimatedCostUsd}, ${promptVersion}, ${followUpPrompt})
       on conflict (communication_id) do nothing returning id
     `;
-    if (!inserted[0] || !shouldAuto) return inserted;
+    if (!inserted[0] || !shouldAuto || sourceChannel === "whatsapp") return inserted;
     for (let index = 0; index < replyParts.length; index += 1) {
       await transaction`
         insert into public.aura_sms_outbox
@@ -6251,13 +6261,77 @@ async function processCustomerSmsAutomation(
     return inserted;
   });
   if (shouldAuto && replyDrafts[0]?.id) {
-    await dispatchSmsOutboxWorker().catch((error) =>
-      console.error(
-        "sms_outbox_dispatch_failed",
-        error instanceof Error ? error.message : "unknown error",
-      ),
-    );
+    if (sourceChannel === "whatsapp") {
+      await enqueueWhatsAppAiReply({
+        replyDraftId: replyDrafts[0].id,
+        sourceCommunicationId: communicationId,
+        phone,
+        body: result.reply,
+      });
+    } else {
+      await dispatchSmsOutboxWorker().catch((error) =>
+        console.error(
+          "sms_outbox_dispatch_failed",
+          error instanceof Error ? error.message : "unknown error",
+        ),
+      );
+    }
   }
+}
+
+async function enqueueWhatsAppAiReply(input: {
+  replyDraftId: string;
+  sourceCommunicationId: string;
+  phone: string;
+  body: string;
+}) {
+  const actorRows = await sql<{ id: string }[]>`
+    select id from public.profiles
+    where role = 'admin' and approval_status = 'approved' and is_active = true
+    order by case
+      when lower(email) = 'buildavantiap@gmail.com' then 0
+      when lower(email) = 'avitanneto@gmail.com' then 1
+      else 2
+    end, created_at
+    limit 1
+  `;
+  if (!actorRows[0]?.id) throw new Error("whatsapp_ai_actor_not_configured");
+  const dedupeKey = `ai-whatsapp/${input.replyDraftId}`;
+  const payloadHash = await sha256Hex(JSON.stringify({
+    channel: "whatsapp",
+    destination: input.phone,
+    body: input.body,
+    sourceCommunicationId: input.sourceCommunicationId,
+  }));
+  const queuedRows = await sql<{ result: {
+    outboxId: string;
+    status: string;
+    duplicate: boolean;
+  } }[]>`
+    select public.enqueue_aura_message_outbox(
+      ${dedupeKey}, ${payloadHash}, 'whatsapp', ${input.phone}, null,
+      ${input.body}, ${input.sourceCommunicationId}::uuid,
+      ${actorRows[0].id}::uuid, '[]'::jsonb
+    ) as result
+  `;
+  const queued = queuedRows[0]?.result;
+  if (!queued?.outboxId) throw new Error("whatsapp_ai_reply_not_queued");
+  await dispatchCommunicationOutboxWorker(queued.outboxId).catch((error) =>
+    console.error(
+      "whatsapp_ai_outbox_dispatch_failed",
+      error instanceof Error ? error.message : "unknown error",
+    ),
+  );
+  const statusRows = await sql<{ status: string }[]>`
+    select status from public.aura_message_outbox
+    where id = ${queued.outboxId}::uuid limit 1
+  `;
+  if (["accepted", "sent", "delivered", "read"].includes(statusRows[0]?.status || ""))
+    await sql`
+      update public.aura_sms_reply_drafts
+      set decision = 'auto_sent', updated_at = now()
+      where id = ${input.replyDraftId}::uuid and decision = 'auto_queued'
+    `;
 }
 
 async function enqueueSmsAutomation(communicationId: string) {
@@ -6268,7 +6342,9 @@ async function enqueueSmsAutomation(communicationId: string) {
   `;
 }
 
-async function dispatchSmsAutomationWorker() {
+async function dispatchSmsAutomationWorker(
+  preferredCommunicationId: string | null = null,
+) {
   const dispatchSecret = await secret(secretNames.smsAutomationDispatchSecret);
   if (!dispatchSecret)
     throw new Error("SMS automation worker is not configured");
@@ -6280,8 +6356,8 @@ async function dispatchSmsAutomationWorker() {
         "content-type": "application/json",
         "x-sms-automation-dispatch": dispatchSecret,
       },
-      body: JSON.stringify({ action: "drain" }),
-      signal: AbortSignal.timeout(5_000),
+      body: JSON.stringify({ action: "drain", preferredCommunicationId }),
+      signal: AbortSignal.timeout(20_000),
     },
   );
   if (!response.ok)
@@ -6300,7 +6376,7 @@ async function dispatchSmsOutboxWorker() {
         "x-sms-automation-dispatch": dispatchSecret,
       },
       body: JSON.stringify({ action: "drain" }),
-      signal: AbortSignal.timeout(5_000),
+      signal: AbortSignal.timeout(12_000),
     },
   );
   if (!response.ok)
@@ -6355,6 +6431,7 @@ async function drainSmsAutomationQueue(
           counterparty_phone: string;
           body: string | null;
           media: TrustedSmsMedia[];
+          channel: "sms" | "whatsapp";
           contact_id: string | null;
           full_name: string | null;
           notes: string | null;
@@ -6365,13 +6442,14 @@ async function drainSmsAutomationQueue(
         }>[number][]
       >`
         select communication.id, communication.counterparty_phone, communication.body,
+          communication.channel,
           communication.media, contact.id as contact_id, contact.full_name, contact.notes,
           contact.sms_ai_mode, contact.sms_ai_style, contact.auto_create_request_drafts,
           contact.exact_list_only
         from public.aura_communications as communication
         left join public.aura_contacts as contact on contact.id = communication.contact_id
         where communication.id = ${job.communication_id}::uuid
-          and communication.channel = 'sms' and communication.direction = 'incoming'
+          and communication.channel in ('sms', 'whatsapp') and communication.direction = 'incoming'
         limit 1
       `;
       const row = rows[0];
@@ -6393,6 +6471,7 @@ async function drainSmsAutomationQueue(
         row.body || "",
         contact,
         Array.isArray(row.media) ? row.media : [],
+        row.channel,
       );
       await sql`
         update public.aura_sms_automation_queue
@@ -6426,18 +6505,26 @@ async function handleSmsAutomationDispatch(req: Request) {
   const suppliedSecret = req.headers.get("x-sms-automation-dispatch") || "";
   if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret))
     return json({ error: "Invalid dispatch secret" }, 401);
-  EdgeRuntime.waitUntil(
-    drainSmsAutomationQueue(1).catch(async (error) => {
-      await sql`
-        insert into public.aura_audit_log (action, details)
-        values ('sms_automation_worker_failed', ${sql.json({
-          error_code:
-            error instanceof Error ? error.message : "automation_worker_failed",
-        })})
-      `;
-    }),
-  );
-  return json({ ok: true, accepted: true }, 202);
+  const payload = await req.json().catch(() => ({})) as {
+    preferredCommunicationId?: unknown;
+  };
+  const preferredCommunicationId =
+    typeof payload.preferredCommunicationId === "string"
+      ? payload.preferredCommunicationId
+      : null;
+  try {
+    const result = await drainSmsAutomationQueue(1, preferredCommunicationId);
+    return json({ ok: true, ...result });
+  } catch (error) {
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_automation_worker_failed', ${sql.json({
+        error_code:
+          error instanceof Error ? error.message : "automation_worker_failed",
+      })})
+    `;
+    return json({ error: "Automation processing failed" }, 500);
+  }
 }
 
 async function handleSmsOutboxDispatch(req: Request) {
@@ -6445,18 +6532,19 @@ async function handleSmsOutboxDispatch(req: Request) {
   const suppliedSecret = req.headers.get("x-sms-automation-dispatch") || "";
   if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret))
     return json({ error: "Invalid dispatch secret" }, 401);
-  EdgeRuntime.waitUntil(
-    processAuraSmsOutbox(1).catch(async (error) => {
-      await sql`
-        insert into public.aura_audit_log (action, details)
-        values ('sms_outbox_worker_failed', ${sql.json({
-          error_code:
-            error instanceof Error ? error.message : "sms_outbox_worker_failed",
-        })})
-      `;
-    }),
-  );
-  return json({ ok: true, accepted: true }, 202);
+  try {
+    const processed = await processAuraSmsOutbox(1);
+    return json({ ok: true, processed });
+  } catch (error) {
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_outbox_worker_failed', ${sql.json({
+        error_code:
+          error instanceof Error ? error.message : "sms_outbox_worker_failed",
+      })})
+    `;
+    return json({ error: "Outbox processing failed" }, 500);
+  }
 }
 
 async function handleQuoWebhook(req: Request) {
@@ -6701,7 +6789,7 @@ async function handleQuoWebhook(req: Request) {
         EdgeRuntime.waitUntil(
           // The durable worker owns AI and provider delivery. The webhook
           // isolate only persists and dispatches so acknowledgement stays fast.
-          dispatchSmsAutomationWorker().catch(async (automationError) => {
+          dispatchSmsAutomationWorker(stored[0].id).catch(async (automationError) => {
             await sql`
               update public.aura_webhook_events
               set error_message = ${`SMS automation: ${automationError instanceof Error ? automationError.message : "failed"}`.slice(0, 500)}
@@ -7486,7 +7574,7 @@ async function ingestPolledQuoMessage(
   if (!inserted[0]?.id) return false;
   scheduleMaterialShadowAssessment(inserted[0].id);
   await enqueueSmsAutomation(inserted[0].id);
-  await dispatchSmsAutomationWorker();
+  await dispatchSmsAutomationWorker(inserted[0].id);
   if (isTrustedIntake) {
     const explicitTrustedIntake = isExplicitTrustedPhoneAddCommand(body);
     if (explicitTrustedIntake || trustedImageMedia(media).length === 0)
@@ -7810,7 +7898,9 @@ function managerOutboxAttachments(value: unknown) {
   });
 }
 
-async function dispatchCommunicationOutboxWorker() {
+async function dispatchCommunicationOutboxWorker(
+  preferredOutboxId: string | null = null,
+) {
   const dispatchSecret = await secret(secretNames.smsAutomationDispatchSecret);
   if (!dispatchSecret) throw new Error("Communication outbox is not configured.");
   const result = await fetch(
@@ -7821,7 +7911,8 @@ async function dispatchCommunicationOutboxWorker() {
         "Content-Type": "application/json",
         "X-Communication-Outbox-Dispatch": dispatchSecret,
       },
-      body: JSON.stringify({ action: "drain" }),
+      body: JSON.stringify({ action: "drain", preferredOutboxId }),
+      signal: AbortSignal.timeout(15_000),
     },
   );
   if (!result.ok)

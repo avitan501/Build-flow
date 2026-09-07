@@ -26,7 +26,7 @@ test("live SMS automation prioritizes the new message without draining old backl
   expect(drain).toContain(
     "case when communication_id = ${preferred}::uuid then 0 else 1 end",
   );
-  expect(webhook).toContain("dispatchSmsAutomationWorker()");
+  expect(webhook).toContain("dispatchSmsAutomationWorker(stored[0].id)");
   expect(webhook).not.toContain("drainSmsAutomationQueue(1, stored[0].id)");
   expect(webhook).toContain("const processAcceptedEvent = async () =>");
   expect(webhook).toContain("EdgeRuntime.waitUntil(");
@@ -34,16 +34,16 @@ test("live SMS automation prioritizes the new message without draining old backl
   expect(webhook).toContain("${sql.json(payload)}");
   expect(polled).toMatch(/select id, body, media from public\.aura_communications/);
   expect(polled).toContain("if (existing[0]?.id)");
-  expect(polled).toContain("dispatchSmsAutomationWorker()");
+  expect(polled).toContain("dispatchSmsAutomationWorker(inserted[0].id)");
   expect(polled).not.toContain("canonical[0]?.external_event_id");
   expect(polled).not.toContain("drainSmsAutomationQueue(1, inserted[0].id)");
   const dispatch = broker.slice(
     broker.indexOf("async function handleSmsAutomationDispatch"),
     broker.indexOf("async function handleQuoWebhook"),
   );
-  expect(dispatch).toContain("EdgeRuntime.waitUntil(");
-  expect(dispatch).toContain("drainSmsAutomationQueue(1)");
-  expect(dispatch).toContain("accepted: true }, 202");
+  expect(dispatch).not.toContain("EdgeRuntime.waitUntil(");
+  expect(dispatch).toContain("drainSmsAutomationQueue(1, preferredCommunicationId)");
+  expect(dispatch).toContain("Automation processing failed");
 });
 
 test("Quo acknowledgement and SMS AI run in separate workers", async () => {
