@@ -3,6 +3,8 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { supplierFollowUpAction } from "../lib/supplier-follow-up-policy"
+
 const root = process.cwd()
 
 test("request timelines distinguish client replies from supplier replies", async () => {
@@ -41,9 +43,24 @@ test("supplier reminders count only post-status messages and cannot starve after
   expect(notifications).toContain('.eq("should_contact", true)')
   expect(notifications).toContain('.range(from, from + pageSize - 1)')
   expect(notifications).toContain('.in("channel", ["email", "sms", "whatsapp"])')
-  expect(notifications).toContain('.filter((occurredAt) => occurredAt > row.updated_at)')
-  expect(notifications).toContain('followUpActivity.length >= 2')
+  expect(notifications).toContain('.eq("tag", "supplier-follow-up")')
+  expect(notifications).toContain('reminderCreatedAtByKey')
+  expect(notifications).toContain('supplierFollowUpAction')
+  expect(notifications).not.toContain('occurredAt > row.updated_at')
   expect(notifications).not.toContain('.limit(50)')
+})
+
+test("follow-up policy advances only after a real post-reminder supplier message", () => {
+  const cutoff = "2026-09-07T12:00:00.000Z"
+  const firstReminderAt = "2026-09-04T12:00:00.000Z"
+  const secondReminderAt = "2026-09-05T12:00:00.000Z"
+
+  expect(supplierFollowUpAction({ cutoff, outboundActivity: [] })).toBe("follow_up_1")
+  expect(supplierFollowUpAction({ cutoff, firstReminderAt, outboundActivity: [] })).toBeNull()
+  expect(supplierFollowUpAction({ cutoff, firstReminderAt, outboundActivity: ["2026-09-03T12:00:00.000Z"] })).toBeNull()
+  expect(supplierFollowUpAction({ cutoff, firstReminderAt, outboundActivity: ["2026-09-04T13:00:00.000Z"] })).toBe("follow_up_2")
+  expect(supplierFollowUpAction({ cutoff, firstReminderAt, secondReminderAt, outboundActivity: ["2026-09-05T13:00:00.000Z"] })).toBe("no_response")
+  expect(supplierFollowUpAction({ cutoff, firstReminderAt, secondReminderAt, outboundActivity: ["2026-09-07T13:00:00.000Z"] })).toBeNull()
 })
 
 test("supplier PDF review and supplier AI blocking remain review-only", async () => {

@@ -8,6 +8,7 @@ import { normalizeAuraPhone } from "@/lib/aura/identity";
 import { withManagerCallerIdentity, type ManagerNotificationEvent } from "@/lib/manager-notification-feed";
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { supplierFollowUpAction } from "@/lib/supplier-follow-up-policy";
 
 type QueueRow = Omit<ManagerNotificationEvent, "read_at">;
 type ReadRow = { notification_id: number; read_at: string };
@@ -53,6 +54,21 @@ async function queueOverdueSupplierFollowUps() {
     if ((page.data?.length ?? 0) < pageSize) break;
   }
   if (!overdue?.length) return;
+  type ReminderRow = { dedupe_key: string; created_at: string };
+  const priorReminders: ReminderRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const page = await admin
+      .from("manager_push_queue")
+      .select("dedupe_key,created_at")
+      .eq("tag", "supplier-follow-up")
+      .order("created_at", { ascending: true })
+      .range(from, from + pageSize - 1)
+      .returns<ReminderRow[]>();
+    if (page.error) return;
+    priorReminders.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < pageSize) break;
+  }
+  const reminderCreatedAtByKey = new Map(priorReminders.map((reminder) => [reminder.dedupe_key, reminder.created_at]));
   const requestIds = [...new Set(overdue.map((row) => row.request_id))];
   const supplierIds = [...new Set(overdue.map((row) => row.supplier_id))];
   const { data: requests } = await admin
@@ -91,13 +107,38 @@ async function queueOverdueSupplierFollowUps() {
   const notificationRows: Array<Record<string, string>> = [];
   const noResponseMarker = "No response after two follow-ups. Try an alternative supplier.";
   for (const row of overdue) {
-    const followUpActivity = (outboundByPair.get(`${row.request_id}:${row.supplier_id}`) ?? [])
-      .filter((occurredAt) => occurredAt > row.updated_at)
-      .sort();
-    const latestFollowUpAt = followUpActivity.at(-1);
-    if (latestFollowUpAt && latestFollowUpAt >= cutoff) continue;
     const title = requestTitleById.get(row.request_id) || "Material request";
-    if (followUpActivity.length >= 2) {
+    const firstReminderKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:1`.slice(0, 240);
+    const secondReminderKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:2`.slice(0, 240);
+    const firstReminderAt = reminderCreatedAtByKey.get(firstReminderKey);
+    const secondReminderAt = reminderCreatedAtByKey.get(secondReminderKey);
+    const outboundActivity = (outboundByPair.get(`${row.request_id}:${row.supplier_id}`) ?? []).sort();
+    const nextAction = supplierFollowUpAction({ cutoff, firstReminderAt, secondReminderAt, outboundActivity });
+    if (nextAction === "follow_up_1") {
+      notificationRows.push({
+        event_type: "supplier_update",
+        title: `Supplier follow-up 1/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
+        body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
+        href: `/owner/materials/requests/${row.request_id}`,
+        tag: "supplier-follow-up",
+        dedupe_key: firstReminderKey,
+        processed_at: new Date().toISOString(),
+      });
+      continue;
+    }
+    if (nextAction === "follow_up_2") {
+      notificationRows.push({
+        event_type: "supplier_update",
+        title: `Supplier follow-up 2/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
+        body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
+        href: `/owner/materials/requests/${row.request_id}`,
+        tag: "supplier-follow-up",
+        dedupe_key: secondReminderKey,
+        processed_at: new Date().toISOString(),
+      });
+      continue;
+    }
+    if (nextAction === "no_response") {
       const notes = row.notes.includes(noResponseMarker) ? row.notes : [row.notes.trim(), noResponseMarker].filter(Boolean).join("\n");
       await admin.from("quote_request_supplier_recommendations").update({
         should_contact: false,
@@ -115,16 +156,6 @@ async function queueOverdueSupplierFollowUps() {
       });
       continue;
     }
-    const followUpNumber = followUpActivity.length + 1;
-    notificationRows.push({
-      event_type: "supplier_update",
-      title: `Supplier follow-up ${followUpNumber}/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
-      body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
-      href: `/owner/materials/requests/${row.request_id}`,
-      tag: "supplier-follow-up",
-      dedupe_key: `supplier-follow-up:${row.request_id}:${row.supplier_id}:${followUpNumber}`.slice(0, 240),
-      processed_at: new Date().toISOString(),
-    });
   }
   if (notificationRows.length) {
     await admin.from("manager_push_queue").upsert(notificationRows, { onConflict: "dedupe_key", ignoreDuplicates: true });
