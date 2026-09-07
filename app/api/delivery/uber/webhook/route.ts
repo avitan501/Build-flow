@@ -6,16 +6,17 @@ export const runtime = "nodejs";
 
 async function loadSigningKey() {
   const fromEnvironment = process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY?.trim() || "";
-  if (fromEnvironment) return fromEnvironment;
 
   try {
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("get_uber_direct_webhook_signing_key");
-    if (error) return "";
-    return typeof data === "string" ? data.trim() : "";
+    const fromVault = !error && typeof data === "string" ? data.trim() : "";
+    if (fromVault) return fromVault;
   } catch {
-    return "";
+    // Keep the environment value as an emergency fallback if Vault is unavailable.
   }
+
+  return fromEnvironment;
 }
 
 export async function POST(request: Request) {

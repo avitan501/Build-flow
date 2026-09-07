@@ -114,6 +114,7 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(uberDirect).toContain("provider_unreachable")
   expect(quoteApi).toContain('["account_disabled", "credentials_unavailable"].includes(error.code) ? 503')
   expect(uberWebhookApi).toContain("get_uber_direct_webhook_signing_key")
+  expect(uberWebhookApi.indexOf("get_uber_direct_webhook_signing_key")).toBeLessThan(uberWebhookApi.indexOf("return fromEnvironment"))
   expect(uberWebhookApi).toContain("verifyUberWebhookSignature")
   expect(uberWebhookMigration).toContain("uber_direct_webhook_signing_key")
   expect(uberWebhookMigration).toContain("grant execute on function public.get_uber_direct_webhook_signing_key() to service_role")
