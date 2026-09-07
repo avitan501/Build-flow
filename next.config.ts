@@ -7,7 +7,8 @@ const pdfRuntimeAssets = [
 
 const nextConfig: NextConfig = {
   deploymentId:
-    process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_DEPLOYMENT_ID,
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 32) ||
+    process.env.NEXT_DEPLOYMENT_ID,
   allowedDevOrigins: ["127.0.0.1"],
   env: {
     NEXT_PUBLIC_SENTRY_ENVIRONMENT:

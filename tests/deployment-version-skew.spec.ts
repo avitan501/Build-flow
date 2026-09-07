@@ -9,6 +9,7 @@ test("production assets and Server Actions use the Vercel commit as deployment I
 
   expect(config).toContain("deploymentId:")
   expect(config).toContain("process.env.VERCEL_GIT_COMMIT_SHA")
+  expect(config).toContain(".slice(0, 32)")
   expect(config).toContain("process.env.NEXT_DEPLOYMENT_ID")
 })
 
