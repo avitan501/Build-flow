@@ -1,4 +1,4 @@
-import { SupplierRoutingManager, type SupplierProfileDocumentSummary } from "@/components/buildflow/supplier-routing-manager";
+import { SupplierRoutingManager, type SupplierProfileCommunicationSummary, type SupplierProfileDocumentSummary } from "@/components/buildflow/supplier-routing-manager";
 import { requireStaffProfile } from "@/lib/auth";
 import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons";
 import { managerDocumentStatusLabel, type ManagerDocumentRecord } from "@/lib/manager-documents";
@@ -33,6 +33,33 @@ export default async function AdminVendorsPage() {
     statusLabel: managerDocumentStatusLabel(document.status),
     updatedLabel: formatSiteDate(document.updated_at),
   }] : []);
+  const { data: supplierCommunicationLinks } = await supabase
+    .from("aura_communication_links")
+    .select("communication_id,entity_id")
+    .eq("entity_type", "supplier")
+    .order("created_at", { ascending: false })
+    .limit(1000)
+    .returns<Array<{ communication_id: string; entity_id: string }>>();
+  const communicationIds = [...new Set((supplierCommunicationLinks ?? []).map((link) => link.communication_id))];
+  const { data: supplierCommunicationRows } = communicationIds.length
+    ? await supabase
+        .from("aura_communications")
+        .select("id,channel,direction,counterparty_phone,counterparty_email,subject,body,status,occurred_at,read_at")
+        .in("id", communicationIds)
+        .order("occurred_at", { ascending: false })
+        .limit(500)
+        .returns<Array<Omit<SupplierProfileCommunicationSummary, "supplierId">>>()
+    : { data: [] as Array<Omit<SupplierProfileCommunicationSummary, "supplierId">> };
+  const supplierIdsByCommunicationId = new Map<string, Set<string>>();
+  for (const link of supplierCommunicationLinks ?? []) {
+    const ids = supplierIdsByCommunicationId.get(link.communication_id) ?? new Set<string>();
+    ids.add(link.entity_id);
+    supplierIdsByCommunicationId.set(link.communication_id, ids);
+  }
+  const supplierCommunications: SupplierProfileCommunicationSummary[] = (supplierCommunicationRows ?? []).flatMap((communication) => {
+    const supplierIds = [...(supplierIdsByCommunicationId.get(communication.id) ?? [])];
+    return supplierIds.length === 1 ? [{ ...communication, supplierId: supplierIds[0] }] : [];
+  });
 
   return (
     <SupplierRoutingManager
@@ -43,6 +70,7 @@ export default async function AdminVendorsPage() {
       initialAddOns={managerStateRow?.state?.addOns ?? null}
       catalogDepartments={catalogDepartments}
       initialSupplierDocuments={supplierDocuments}
+      initialSupplierCommunications={supplierCommunications}
     />
   );
 }

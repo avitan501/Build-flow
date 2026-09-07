@@ -11,7 +11,7 @@ import { QuoCallButton } from "@/components/buildflow/quo-call-button"
 import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
 import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS } from "@/components/buildflow/supplier-program-badges"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
-import { siteBusinessDateKey } from "@/lib/site-date-time"
+import { formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time"
 
 import {
   buildManagerDepartmentOverride,
@@ -68,6 +68,7 @@ type SupplierRoutingManagerProps = {
   supplierDirectoryOnly?: boolean
   catalogDepartments?: string[]
   initialSupplierDocuments?: SupplierProfileDocumentSummary[]
+  initialSupplierCommunications?: SupplierProfileCommunicationSummary[]
 }
 
 export type SupplierProfileDocumentSummary = {
@@ -77,6 +78,20 @@ export type SupplierProfileDocumentSummary = {
   fileName: string
   statusLabel: string
   updatedLabel: string
+}
+
+export type SupplierProfileCommunicationSummary = {
+  id: string
+  supplierId: string
+  channel: "call" | "sms" | "whatsapp" | "email" | "note"
+  direction: "incoming" | "outgoing" | "internal"
+  counterparty_phone: string | null
+  counterparty_email: string | null
+  subject: string | null
+  body: string | null
+  status: string | null
+  occurred_at: string
+  read_at: string | null
 }
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
@@ -195,6 +210,7 @@ export function SupplierRoutingManager({
   supplierDirectoryOnly = false,
   catalogDepartments = [],
   initialSupplierDocuments = [],
+  initialSupplierCommunications = [],
 }: SupplierRoutingManagerProps) {
   const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
   const [deletedSupplierIds, setDeletedSupplierIds] = useState<string[]>(initialDeletedSupplierIds)
@@ -302,6 +318,10 @@ export function SupplierRoutingManager({
   const selectedSupplierDocuments = useMemo(
     () => initialSupplierDocuments.filter((document) => document.supplierId === selectedSupplier?.id),
     [initialSupplierDocuments, selectedSupplier?.id],
+  )
+  const selectedSupplierCommunications = useMemo(
+    () => initialSupplierCommunications.filter((communication) => communication.supplierId === selectedSupplier?.id).slice(0, 30),
+    [initialSupplierCommunications, selectedSupplier?.id],
   )
   const trialSuppliers = useMemo(() => settings.suppliers.filter((supplier) => !["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
   const verifiedSuppliers = useMemo(() => settings.suppliers.filter((supplier) => ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
@@ -1366,7 +1386,7 @@ export function SupplierRoutingManager({
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
+                        <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} />
                         {selectedSupplier.email ? <Link href={`/admin/communications?channel=email&q=${encodeURIComponent(selectedSupplier.email)}&thread=${encodeURIComponent(selectedSupplier.email)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-semibold text-sky-800"><Mail className="h-4 w-4" />Emails</Link> : null}
                         <SupplierQuoteRequestDialog
                           supplierId={selectedSupplier.id}
@@ -1468,6 +1488,24 @@ export function SupplierRoutingManager({
                         Sales & supplier information <span className="text-xs font-normal text-slate-500">How to work with this supplier or salesperson</span>
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
+                      <section className="sm:col-span-2 rounded-lg border border-sky-200 bg-sky-50/40 p-3" aria-label="Automatic supplier activity">
+                        <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Automatic activity</p><p className="text-[11px] text-slate-500">Email, text, WhatsApp, and calls linked to this supplier.</p></div><Link href={`/admin/communications?q=${encodeURIComponent(selectedSupplier.email || selectedSupplier.phone || selectedSupplier.name)}`} className="text-xs font-bold text-[#0066cc]">Open inbox</Link></div>
+                        {selectedSupplierCommunications.length ? <div className="mt-2 max-h-64 overflow-y-auto rounded-md border border-sky-100 bg-white">{selectedSupplierCommunications.map((communication) => {
+                          const incoming = communication.direction === "incoming"
+                          const failed = ["failed", "bounced", "complained", "suppressed"].includes(communication.status ?? "")
+                          const opened = communication.status === "read" || Boolean(communication.read_at)
+                          const state = communication.channel === "call"
+                            ? { label: "Call started", tone: "bg-emerald-50 text-emerald-800" }
+                            : incoming
+                            ? { label: communication.body?.includes("?") ? "Needs information" : "Received", tone: communication.body?.includes("?") ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800" }
+                            : failed
+                              ? { label: "Failed", tone: "bg-rose-50 text-rose-800" }
+                              : opened
+                                ? { label: "Opened", tone: "bg-sky-50 text-sky-800" }
+                                : { label: "Not opened", tone: "bg-slate-100 text-slate-700" }
+                          return <Link key={communication.id} href={`/admin/communications?communication=${encodeURIComponent(communication.id)}`} className="block border-b border-slate-100 px-3 py-2.5 last:border-0 hover:bg-sky-50"><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] font-black uppercase text-slate-500">{communication.channel}</span><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${state.tone}`}>{state.label}</span><time className="ml-auto text-[10px] text-slate-400">{formatSiteDateTime(communication.occurred_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div><p className="mt-1 truncate text-xs font-bold text-slate-800">{communication.subject || communication.body || `${incoming ? "Incoming" : "Outgoing"} ${communication.channel}`}</p>{communication.subject && communication.body ? <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{communication.body}</p> : null}</Link>
+                        })}</div> : <p className="mt-2 rounded-md bg-white px-3 py-4 text-xs text-slate-500">No linked activity yet. Messages sent through Aura will appear here automatically.</p>}
+                      </section>
                       <section className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3" aria-label="Supplier relationship updates">
                         <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Relationship updates</p><p className="text-[11px] text-slate-500">Record when you spoke and what happened.</p></div><span className="text-[10px] font-bold uppercase text-emerald-700">{selectedSupplier.relationshipUpdates?.length ?? 0} updates</span></div>
                         <div className="mt-2 flex gap-2"><input value={supplierUpdateDraft} onChange={(event) => setSupplierUpdateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSupplierRelationshipUpdate(selectedSupplier) } }} placeholder="Spoke to John — send the next lumber list by email" className="h-10 min-w-0 flex-1 rounded-md border border-emerald-200 bg-white px-3 text-xs" /><button type="button" onClick={() => addSupplierRelationshipUpdate(selectedSupplier)} className="h-10 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white">Add update</button></div>

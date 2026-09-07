@@ -42,12 +42,17 @@ export async function autoLinkAuraEmail(input: { communicationId: string; counte
     const [{ data: clients }, { data: leads }, { data: settingsRow }] = await Promise.all([
       admin.from("profiles").select("id,full_name,company_name,email").eq("role", "client").ilike("email", email).limit(5),
       admin.from("manager_outreach_leads").select("id,full_name,company_name,email").ilike("email", email).limit(5),
-      admin.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: Array<{ id?: string; name?: string; email?: string }> } } }>(),
+      admin.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: Array<{ id?: string; name?: string; email?: string; additionalContacts?: Array<{ email?: string }> }> } } }>(),
     ])
     for (const client of clients ?? []) links.push({ entity_type: "client", entity_id: client.id, entity_label: client.full_name || client.company_name || client.email || "Client", link_source: "automatic", confidence: 1 })
     for (const lead of leads ?? []) links.push({ entity_type: "lead", entity_id: lead.id, entity_label: lead.full_name || lead.company_name || lead.email || "Lead", link_source: "automatic", confidence: 1 })
-    for (const supplier of settingsRow?.state?.qualificationSettings?.suppliers ?? []) {
-      if (normalizeAuraEmail(supplier.email) === email && supplier.id) links.push({ entity_type: "supplier", entity_id: supplier.id, entity_label: supplier.name || email, link_source: "automatic", confidence: 1 })
+    const supplierMatches = (settingsRow?.state?.qualificationSettings?.suppliers ?? []).filter((supplier) =>
+      [supplier.email, ...(supplier.additionalContacts ?? []).map((contact) => contact.email)]
+        .some((candidate) => normalizeAuraEmail(candidate) === email),
+    )
+    const supplier = supplierMatches.length === 1 ? supplierMatches[0] : null
+    if (supplier?.id) {
+      links.push({ entity_type: "supplier", entity_id: supplier.id, entity_label: supplier.name || email, link_source: "automatic", confidence: 1 })
     }
   }
 
@@ -76,6 +81,58 @@ export async function autoLinkAuraEmail(input: { communicationId: string; counte
   }
 
   await addAuraCommunicationLinks(input.communicationId ? [input.communicationId] : [], [...new Map(links.map((link) => [`${link.entity_type}:${link.entity_id}`, link])).values()])
+}
+
+export async function recordSupplierEmailResponse(
+  communicationId: string,
+  responseKind: "quote_pdf" | "needs_information" | "reply",
+) {
+  const admin = createAdminClient()
+  const { data: links } = await admin
+    .from("aura_communication_links")
+    .select("entity_type,entity_id,entity_label")
+    .eq("communication_id", communicationId)
+    .in("entity_type", ["supplier", "material_request"])
+    .returns<Array<{ entity_type: "supplier" | "material_request"; entity_id: string; entity_label: string }>>()
+  const suppliers = (links ?? []).filter((link) => link.entity_type === "supplier")
+  const requests = (links ?? []).filter((link) => link.entity_type === "material_request")
+  if (suppliers.length !== 1 || requests.length !== 1) return
+  const supplier = suppliers[0]
+  const request = requests[0]
+  const { data: existingProgress } = await admin
+    .from("quote_request_supplier_recommendations")
+    .select("contact_status")
+    .eq("request_id", request.entity_id)
+    .eq("supplier_id", supplier.entity_id)
+    .maybeSingle<{ contact_status: string }>()
+  const contactStatus = responseKind === "quote_pdf" || existingProgress?.contact_status === "quote_received" ? "quote_received" : "supplier_replied"
+  const progressUpdate = {
+    supplier_name_snapshot: supplier.entity_label,
+    should_contact: true,
+    contact_status: contactStatus,
+    updated_at: new Date().toISOString(),
+  }
+  if (existingProgress) {
+    await admin.from("quote_request_supplier_recommendations").update(progressUpdate)
+      .eq("request_id", request.entity_id)
+      .eq("supplier_id", supplier.entity_id)
+  } else {
+    await admin.from("quote_request_supplier_recommendations").insert({
+      request_id: request.entity_id,
+      supplier_id: supplier.entity_id,
+      ...progressUpdate,
+      is_recommended: false,
+      notes: "",
+    })
+  }
+  await admin.from("manager_push_queue").upsert({
+    event_type: "supplier_update",
+    title: responseKind === "quote_pdf" ? `Supplier quote to review · ${supplier.entity_label}` : responseKind === "needs_information" ? `Supplier needs information · ${supplier.entity_label}` : `Supplier replied · ${supplier.entity_label}`,
+    body: responseKind === "quote_pdf" ? `${request.entity_label} · Review the PDF before adding prices to the comparison.` : `${request.entity_label} · Review the supplier reply.`,
+    href: `/owner/materials/requests/${request.entity_id}`,
+    tag: responseKind === "quote_pdf" ? "supplier-quote-review" : responseKind === "needs_information" ? "supplier-needs-information" : "supplier-replied",
+    dedupe_key: `supplier-email-response:${communicationId}`,
+  }, { onConflict: "dedupe_key", ignoreDuplicates: true })
 }
 
 type AuraCommunicationLinkReader = Pick<ReturnType<typeof createAdminClient>, "from">

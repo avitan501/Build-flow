@@ -24,6 +24,7 @@ import {
   type SmsCorrectionReason,
 } from "@/lib/ai/sms-training-privacy";
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation";
+import { canonicalSupplierId } from "@/lib/supplier-canonical";
 
 type ContactKind = "customer" | "lead" | "supplier";
 type Result = { ok: true } | { ok: false; error: string };
@@ -861,6 +862,69 @@ export async function quickTagPhoneContactAction(input: {
   revalidatePath("/admin/vendors");
   revalidatePath("/admin/goals-progress");
   return { ok: true as const, sourceId };
+}
+
+export async function quickTagEmailSupplierAction(input: {
+  email: string;
+  name?: string;
+}) {
+  const { supabase, access } = await requireManagerPortalProfile();
+  const email = normalizeAuraEmail(input.email);
+  if (!access.customers || !access.suppliers || !email)
+    return { ok: false as const, error: "Choose a valid supplier email conversation." };
+
+  const snapshot = await supabase.rpc("staff_load_supplier_directory_snapshot");
+  const suppliers = ((snapshot.data as {
+    settings?: { suppliers?: Array<{ id: string; name: string; email?: string; additionalContacts?: Array<{ email?: string }> }> };
+  } | null)?.settings?.suppliers ?? []);
+  const matches = suppliers.filter((supplier) =>
+    [supplier.email, ...(supplier.additionalContacts ?? []).map((contact) => contact.email)]
+      .some((candidate) => normalizeAuraEmail(candidate || "") === email),
+  );
+  if (matches.length > 1)
+    return { ok: false as const, error: "This email matches more than one supplier. Link it to the correct supplier." };
+
+  let supplier = matches[0] ?? null;
+  if (!supplier) {
+    const suggestedName = input.name?.trim().slice(0, 160) || email.split("@")[0].replace(/[._-]+/g, " ");
+    const sourceId = canonicalSupplierId(suggestedName || email);
+    const saved = await supabase.rpc("staff_upsert_supplier_directory_entry", {
+      p_supplier: {
+        id: sourceId,
+        name: suggestedName || email,
+        email,
+        phone: "",
+        whatsapp: "",
+        contactLabel: "Supplier email",
+        contactName: "",
+        trustLevel: "not-reviewed",
+        catalogDepartments: [],
+        catalogEnabledDepartments: [],
+        portalUrl: "",
+        deliveryNotes: "",
+        notes: "Added from Aura email",
+        address: "",
+        materials: "",
+      },
+      p_create: true,
+    });
+    if (saved.error)
+      return { ok: false as const, error: "The supplier could not be added." };
+    supplier = { id: sourceId, name: suggestedName || email, email };
+  }
+
+  const linked = await linkCommunicationContactAction({
+    kind: "supplier",
+    sourceId: supplier.id,
+    name: supplier.name,
+    company: supplier.name,
+    email,
+    conversationEmail: email,
+  });
+  if (!linked.ok) return linked;
+  revalidatePath("/admin/vendors");
+  revalidatePath("/admin/communications");
+  return { ok: true as const, sourceId: supplier.id };
 }
 
 export async function saveCommunicationLogAction(input: {

@@ -698,6 +698,10 @@ async function handleResendWebhook(req: Request) {
   const attachmentNames = attachments
     .map((item) => item.filename)
     .filter(Boolean);
+  const clearQuotePdf = attachments.some((item) =>
+    item.content_type === "application/pdf" &&
+    /\b(quote|estimate|proposal|pricing)\b/i.test(`${item.filename ?? ""} ${event.data.subject ?? ""}`)
+  );
   const body = (
     email.text?.trim() || (email.html ? stripEmailHtml(email.html) : "")
   ).slice(0, 20_000);
@@ -729,6 +733,7 @@ async function handleResendWebhook(req: Request) {
     mailboxAddress: event.data.to?.[0] || email.to?.[0] || null,
     messageId,
     inReplyTo,
+    supplierResponseKind: clearQuotePdf ? "quote_pdf" : body.includes("?") ? "needs_information" : "reply",
   });
   if (counterpartyEmail) {
     await sql`
@@ -737,16 +742,6 @@ async function handleResendWebhook(req: Request) {
         coalesce(nullif(profile.full_name, ''), nullif(profile.company_name, ''), profile.email, 'Client'), 'automatic', 1
       from public.profiles as profile
       where profile.role = 'client' and lower(profile.email) = lower(${counterpartyEmail})
-      on conflict (communication_id, entity_type, entity_id) do nothing
-    `;
-    await sql`
-      insert into public.aura_communication_links (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
-      select ${communicationId}::uuid, 'supplier', supplier ->> 'id', coalesce(supplier ->> 'name', ${counterpartyEmail}), 'automatic', 1
-      from public.workflow_manager_settings as setting,
-        lateral jsonb_array_elements(coalesce(setting.state #> '{qualificationSettings,suppliers}', '[]'::jsonb)) as supplier
-      where setting.id = 'singleton'
-        and lower(coalesce(supplier ->> 'email', '')) = lower(${counterpartyEmail})
-        and coalesce(supplier ->> 'id', '') <> ''
       on conflict (communication_id, entity_type, entity_id) do nothing
     `;
   }
@@ -761,6 +756,10 @@ async function handleResendWebhook(req: Request) {
     where left(lower(request.id::text), 8) = ${requestPrefix}
     on conflict (communication_id, entity_type, entity_id) do nothing
   `;
+  await recordLinkedSupplierResponse(
+    communicationId,
+    clearQuotePdf ? "quote_pdf" : body.includes("?") ? "needs_information" : "reply",
+  );
   if (attachments.length) {
     const media = await persistResendAttachments({
       apiKey,
@@ -1138,6 +1137,124 @@ async function ensureIncomingSmsContact(phone: string) {
   return rows[0]?.id || (await contactId(phone));
 }
 
+type SupplierIdentityRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  additional_contacts: Array<{ email?: string; phone?: string }> | null;
+};
+
+async function recordLinkedSupplierResponse(
+  communicationId: string,
+  responseKind: "quote_pdf" | "needs_information" | "reply",
+) {
+  const links = await sql<{ entity_type: string; entity_id: string; entity_label: string }[]>`
+    select entity_type, entity_id, entity_label
+    from public.aura_communication_links
+    where communication_id = ${communicationId}::uuid
+      and entity_type in ('supplier', 'material_request')
+  `;
+  const suppliers = links.filter((link) => link.entity_type === "supplier");
+  const requests = links.filter((link) => link.entity_type === "material_request");
+  if (suppliers.length !== 1 || requests.length !== 1) return;
+  const supplier = suppliers[0];
+  const request = requests[0];
+  const contactStatus = responseKind === "quote_pdf" ? "quote_received" : "supplier_replied";
+  await sql`
+    insert into public.quote_request_supplier_recommendations
+      (request_id, supplier_id, supplier_name_snapshot, is_recommended, should_contact, notes, contact_status)
+    values (${request.entity_id}::uuid, ${supplier.entity_id}, ${supplier.entity_label}, false, true, '', ${contactStatus})
+    on conflict (request_id, supplier_id) do update
+      set supplier_name_snapshot = excluded.supplier_name_snapshot,
+          should_contact = true,
+          contact_status = case
+            when public.quote_request_supplier_recommendations.contact_status = 'quote_received' then 'quote_received'
+            else ${contactStatus}
+          end,
+          updated_at = now()
+  `;
+  await sql`
+    select public.queue_manager_push_event(
+      'supplier_update',
+      ${responseKind === "quote_pdf" ? `Supplier quote to review · ${supplier.entity_label}` : responseKind === "needs_information" ? `Supplier needs information · ${supplier.entity_label}` : `Supplier replied · ${supplier.entity_label}`},
+      ${responseKind === "quote_pdf" ? `${request.entity_label} · Review the PDF before adding prices to the comparison.` : `${request.entity_label} · Review the supplier reply.`},
+      ${`/owner/materials/requests/${request.entity_id}`},
+      ${`supplier-reply:${communicationId}`},
+      ${responseKind === "quote_pdf" ? "supplier-quote-review" : responseKind === "needs_information" ? "supplier-needs-information" : "supplier-replied"}
+    )
+  `;
+}
+
+async function autoLinkSupplierCommunication(input: {
+  communicationId: string;
+  direction: "incoming" | "outgoing";
+  phone?: string | null;
+  email?: string | null;
+  responseKind?: "quote_pdf" | "needs_information" | "reply";
+}) {
+  const phone = normalizePhone(input.phone);
+  const email = emailAddress(input.email);
+  if (!phone && !email) return;
+  const supplierRows = await sql<SupplierIdentityRow[]>`
+    select supplier ->> 'id' as id,
+      coalesce(nullif(supplier ->> 'name', ''), 'Supplier') as name,
+      nullif(supplier ->> 'email', '') as email,
+      nullif(supplier ->> 'phone', '') as phone,
+      nullif(supplier ->> 'whatsapp', '') as whatsapp,
+      case when jsonb_typeof(supplier -> 'additionalContacts') = 'array'
+        then supplier -> 'additionalContacts' else '[]'::jsonb end as additional_contacts
+    from public.workflow_manager_settings as setting,
+      lateral jsonb_array_elements(coalesce(setting.state #> '{qualificationSettings,suppliers}', '[]'::jsonb)) as supplier
+    where setting.id = 'singleton' and coalesce(supplier ->> 'id', '') <> ''
+  `;
+  const matches = supplierRows.filter((supplier) => {
+    const emails = [supplier.email, ...(supplier.additional_contacts ?? []).map((contact) => contact.email)]
+      .map((candidate) => emailAddress(candidate))
+      .filter((candidate): candidate is string => Boolean(candidate));
+    const phones = [supplier.phone, supplier.whatsapp, ...(supplier.additional_contacts ?? []).map((contact) => contact.phone)]
+      .map((candidate) => normalizePhone(candidate))
+      .filter((candidate): candidate is string => Boolean(candidate));
+    return Boolean((email && emails.includes(email)) || (phone && phones.includes(phone)));
+  });
+  const uniqueMatches = [...new Map(matches.map((supplier) => [supplier.id, supplier])).values()];
+  if (uniqueMatches.length !== 1) return;
+  const supplier = uniqueMatches[0];
+  await sql`
+    insert into public.aura_communication_links
+      (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+    values (${input.communicationId}::uuid, 'supplier', ${supplier.id}, ${supplier.name}, 'automatic', 1)
+    on conflict (communication_id, entity_type, entity_id) do nothing
+  `;
+
+  if (input.direction !== "incoming") return;
+  const recentRequests = await sql<{ entity_id: string; entity_label: string }[]>`
+    select distinct link.entity_id, link.entity_label
+    from public.aura_communications as communication
+    join public.aura_communication_links as link
+      on link.communication_id = communication.id and link.entity_type = 'material_request'
+    where communication.id <> ${input.communicationId}::uuid
+      and communication.direction = 'outgoing'
+      and communication.occurred_at >= now() - interval '30 days'
+      and (
+        (${phone}::text is not null and communication.counterparty_phone = ${phone})
+        or (${email}::text is not null and lower(communication.counterparty_email) = lower(${email}))
+      )
+    order by link.entity_id
+    limit 2
+  `;
+  if (recentRequests.length !== 1) return;
+  const request = recentRequests[0];
+  await sql`
+    insert into public.aura_communication_links
+      (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+    values (${input.communicationId}::uuid, 'material_request', ${request.entity_id}, ${request.entity_label}, 'thread', .9)
+    on conflict (communication_id, entity_type, entity_id) do nothing
+  `;
+  await recordLinkedSupplierResponse(input.communicationId, input.responseKind ?? "reply");
+}
+
 async function storeCommunication(input: {
   provider: "whatsapp" | "quo" | "manual";
   channel: "whatsapp" | "sms" | "email" | "call";
@@ -1158,6 +1275,7 @@ async function storeCommunication(input: {
   mailboxAddress?: string | null;
   messageId?: string | null;
   inReplyTo?: string | null;
+  supplierResponseKind?: "quote_pdf" | "needs_information" | "reply";
 }) {
   const now =
     input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt))
@@ -1203,6 +1321,17 @@ async function storeCommunication(input: {
       updated_at = now()
     returning id
   `;
+  await autoLinkSupplierCommunication({
+    communicationId: rows[0].id,
+    direction: input.direction,
+    phone: input.counterpartyPhone,
+    email: input.counterpartyEmail,
+    responseKind: input.supplierResponseKind ?? (
+      (input.media ?? []).some((file) => file.type === "application/pdf" && /\b(quote|estimate|proposal|pricing)\b/i.test(`${file.name ?? ""} ${input.subject ?? ""}`))
+        ? "quote_pdf"
+        : input.body?.includes("?") ? "needs_information" : "reply"
+    ),
+  });
   return rows[0].id;
 }
 
@@ -5719,6 +5848,21 @@ async function processCustomerSmsAutomation(
       and source_communication_id <> ${communicationId}::uuid
       and status in ('pending', 'processing')
   `;
+  const supplierLink = await sql<{ linked: boolean }[]>`
+    select exists(
+      select 1
+      from public.aura_communication_links
+      where communication_id = ${communicationId}::uuid
+        and entity_type = 'supplier'
+    ) as linked
+  `;
+  if (supplierLink[0]?.linked) {
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('supplier_ai_auto_reply_blocked', ${sql.json({ communicationId, phone, sourceChannel, route: "supplier-review-only" })})
+    `;
+    return;
+  }
   const explicitlyStartsNewRequest = smsStartsNewMaterialRequest(body);
   if (isSmsOptOutMessage(body)) {
     await supersedeSmsConfirmationForCustomerChange(
@@ -7129,6 +7273,19 @@ async function handleQuoWebhook(req: Request) {
       updated_at = now()
     returning id
   `;
+    if (storedCommunications[0]?.id) {
+      await autoLinkSupplierCommunication({
+        communicationId: storedCommunications[0].id,
+        direction,
+        phone: counterpartyPhone,
+        responseKind: media.some((file) =>
+          file.type === "application/pdf" &&
+          /\b(quote|estimate|proposal|pricing)\b/i.test(`${file.name ?? ""} ${body ?? ""}`)
+        )
+          ? "quote_pdf"
+          : body?.includes("?") ? "needs_information" : "reply",
+      });
+    }
     if (channel === "sms" && direction === "outgoing" && counterpartyPhone && !current) {
       await sql`update public.aura_contacts set sms_ai_mode = 'off', updated_at = now() where normalized_phone = ${counterpartyPhone}`;
       await sql`

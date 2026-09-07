@@ -1,14 +1,16 @@
 "use client"
 
 import { Phone } from "lucide-react"
+import { recordSupplierCallOpenedAction } from "@/app/admin/vendors/actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 
-export function QuoCallButton({ phone, supplierName }: { phone: string | null; supplierName: string }) {
+export function QuoCallButton({ phone, supplierId, supplierName }: { phone: string | null; supplierId: string; supplierName: string }) {
   const number = normalizeAuraPhone(phone) || ""
   const enabled = Boolean(number)
 
   function callSupplier() {
     if (!enabled) return
+    void recordSupplierCallOpenedAction({ supplierId, supplierName, phone: number }).catch(() => undefined)
     const isAppleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent)
     const href = isAppleMobile
       ? `openphone://dial?number=${encodeURIComponent(number)}&action=call`

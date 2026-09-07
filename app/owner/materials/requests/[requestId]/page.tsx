@@ -544,7 +544,7 @@ export default async function OwnerMaterialRequestPage({
     ? await supabase
         .from("aura_communications")
         .select(
-          "id,direction,counterparty_email,subject,body,occurred_at,status",
+          "id,direction,counterparty_email,subject,body,occurred_at,status,media",
         )
         .in("id", linkedEmailIds)
         .eq("channel", "email")
@@ -553,7 +553,8 @@ export default async function OwnerMaterialRequestPage({
     : { data: [] as RelatedEmailItem[] };
   const supplierEmailAddresses = new Set(
     suppliers
-      .map((supplier) => supplier.email?.trim().toLowerCase())
+      .flatMap((supplier) => [supplier.email, ...(supplier.additionalContacts ?? []).map((contact) => contact.email)])
+      .map((email) => email?.trim().toLowerCase())
       .filter((email): email is string => Boolean(email)),
   );
   const normalizedClientEmail = clientEmail.trim().toLowerCase();
@@ -564,6 +565,9 @@ export default async function OwnerMaterialRequestPage({
       (!supplierEmailAddresses.has(counterpart) && email.direction !== "incoming")
     );
   });
+  const supplierEmails = (linkedEmails ?? []).filter((email) =>
+    supplierEmailAddresses.has(email.counterparty_email?.trim().toLowerCase() || ""),
+  );
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
@@ -733,6 +737,7 @@ export default async function OwnerMaterialRequestPage({
             requestAttachments={(attachments ?? []).flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
+            supplierEmails={supplierEmails}
           />
         </div>
         <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

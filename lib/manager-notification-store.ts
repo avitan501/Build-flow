@@ -7,6 +7,7 @@ import { loadAuraCommunicationLinks } from "@/lib/aura/email-links";
 import { normalizeAuraPhone } from "@/lib/aura/identity";
 import { withManagerCallerIdentity, type ManagerNotificationEvent } from "@/lib/manager-notification-feed";
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type QueueRow = Omit<ManagerNotificationEvent, "read_at">;
 type ReadRow = { notification_id: number; read_at: string };
@@ -27,6 +28,94 @@ function communicationIdFromHref(href: string) {
 
 function identityRecordCandidate(record: IdentityRecord, source: CallerIdentityCandidate["source"] = "directory"): CallerIdentityCandidate {
   return { ...record, source };
+}
+
+async function queueOverdueSupplierFollowUps() {
+  const admin = createAdminClient();
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: overdue } = await admin
+    .from("quote_request_supplier_recommendations")
+    .select("request_id,supplier_id,supplier_name_snapshot,contact_status,notes,updated_at")
+    .in("contact_status", ["request_sent", "awaiting_supplier_reply"])
+    .lt("updated_at", cutoff)
+    .order("updated_at", { ascending: true })
+    .limit(50)
+    .returns<Array<{ request_id: string; supplier_id: string; supplier_name_snapshot: string; contact_status: string; notes: string; updated_at: string }>>();
+  if (!overdue?.length) return;
+  const requestIds = [...new Set(overdue.map((row) => row.request_id))];
+  const supplierIds = [...new Set(overdue.map((row) => row.supplier_id))];
+  const { data: requests } = await admin
+    .from("quote_requests")
+    .select("id,title")
+    .in("id", requestIds)
+    .returns<Array<{ id: string; title: string }>>();
+  const requestTitleById = new Map((requests ?? []).map((request) => [request.id, request.title]));
+  const { data: supplierLinks } = await admin.from("aura_communication_links")
+    .select("communication_id,entity_id")
+    .eq("entity_type", "supplier")
+    .in("entity_id", supplierIds)
+    .returns<Array<{ communication_id: string; entity_id: string }>>();
+  const linkedCommunicationIds = [...new Set((supplierLinks ?? []).map((link) => link.communication_id))];
+  const [{ data: requestLinks }, { data: outgoing }] = linkedCommunicationIds.length
+    ? await Promise.all([
+      admin.from("aura_communication_links").select("communication_id,entity_id")
+        .eq("entity_type", "material_request").in("entity_id", requestIds).in("communication_id", linkedCommunicationIds)
+        .returns<Array<{ communication_id: string; entity_id: string }>>(),
+      admin.from("aura_communications").select("id,occurred_at").eq("direction", "outgoing").in("id", linkedCommunicationIds)
+        .returns<Array<{ id: string; occurred_at: string }>>(),
+    ])
+    : [{ data: [] }, { data: [] }];
+  const requestByCommunication = new Map((requestLinks ?? []).map((link) => [link.communication_id, link.entity_id]));
+  const outgoingAtByCommunication = new Map((outgoing ?? []).map((communication) => [communication.id, communication.occurred_at]));
+  const outboundByPair = new Map<string, { count: number; latestAt: string }>();
+  for (const link of supplierLinks ?? []) {
+    const requestId = requestByCommunication.get(link.communication_id);
+    const occurredAt = outgoingAtByCommunication.get(link.communication_id);
+    if (!requestId || !occurredAt) continue;
+    const key = `${requestId}:${link.entity_id}`;
+    const current = outboundByPair.get(key);
+    outboundByPair.set(key, {
+      count: (current?.count ?? 0) + 1,
+      latestAt: !current || occurredAt > current.latestAt ? occurredAt : current.latestAt,
+    });
+  }
+
+  const notificationRows: Array<Record<string, string>> = [];
+  const noResponseMarker = "No response after two follow-ups. Try an alternative supplier.";
+  for (const row of overdue) {
+    const activity = outboundByPair.get(`${row.request_id}:${row.supplier_id}`);
+    if (activity?.latestAt && activity.latestAt >= cutoff) continue;
+    const title = requestTitleById.get(row.request_id) || "Material request";
+    if ((activity?.count ?? 0) >= 3) {
+      const notes = row.notes.includes(noResponseMarker) ? row.notes : [row.notes.trim(), noResponseMarker].filter(Boolean).join("\n");
+      await admin.from("quote_request_supplier_recommendations").update({
+        should_contact: false,
+        notes,
+        updated_at: new Date().toISOString(),
+      }).eq("request_id", row.request_id).eq("supplier_id", row.supplier_id);
+      notificationRows.push({
+        event_type: "supplier_update",
+        title: `Supplier no response · ${row.supplier_name_snapshot}`.slice(0, 160),
+        body: `${title} · Carlos: try an alternative supplier. David can see this update.`.slice(0, 500),
+        href: `/owner/materials/requests/${row.request_id}`,
+        tag: "supplier-no-response",
+        dedupe_key: `supplier-no-response:${row.request_id}:${row.supplier_id}`.slice(0, 240),
+      });
+      continue;
+    }
+    const followUpNumber = Math.max(1, activity?.count ?? 1);
+    notificationRows.push({
+      event_type: "supplier_update",
+      title: `Carlos follow-up ${followUpNumber}/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
+      body: `${title} · Supplier has not replied in 24 hours. David can see this reminder.`.slice(0, 500),
+      href: `/owner/materials/requests/${row.request_id}`,
+      tag: "supplier-follow-up",
+      dedupe_key: `supplier-follow-up:${row.request_id}:${row.supplier_id}:${followUpNumber}`.slice(0, 240),
+    });
+  }
+  if (notificationRows.length) {
+    await admin.from("manager_push_queue").upsert(notificationRows, { onConflict: "dedupe_key", ignoreDuplicates: true });
+  }
 }
 
 async function enrichManagerCallerIdentities(
@@ -120,6 +209,11 @@ export async function loadManagerNotificationFeed(
   limit = 100,
   enrichCallerIdentity = false,
 ) {
+  try {
+    await queueOverdueSupplierFollowUps();
+  } catch {
+    // Notifications remain available if optional follow-up generation is temporarily unavailable.
+  }
   const { data: queueRows, error: queueError } = await supabase
     .from("manager_push_queue")
     .select(queueSelection)

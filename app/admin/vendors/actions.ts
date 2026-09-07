@@ -8,6 +8,8 @@ import { canonicalSupplierId, findCanonicalSupplier } from "@/lib/supplier-canon
 import { confirmSupplierDirectoryPersistence, parseSupplierDirectorySnapshot } from "@/lib/supplier-directory-persistence"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 import { siteBusinessDateKey } from "@/lib/site-date-time"
+import { storeAuraCommunication } from "@/lib/aura/communications"
+import { addAuraCommunicationLinks } from "@/lib/aura/email-links"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -39,6 +41,30 @@ type DeleteSupplierResult =
 type LoadSupplierDirectoryResult =
   | { ok: true; settings: ShopQualificationSettings; deletedSupplierIds: string[] }
   | { ok: false; error: string }
+
+export async function recordSupplierCallOpenedAction(input: { supplierId: string; supplierName: string; phone: string }) {
+  await requireStaffProfile("suppliers")
+  const supplierId = input.supplierId.trim().slice(0, 160)
+  const supplierName = input.supplierName.trim().slice(0, 160)
+  const phone = input.phone.trim().slice(0, 80)
+  if (!supplierId || !supplierName || !phone) return { ok: false as const }
+  try {
+    const communicationId = await storeAuraCommunication({
+      provider: "manual",
+      channel: "call",
+      externalActivityId: `supplier-call-${crypto.randomUUID()}`,
+      direction: "outgoing",
+      counterpartyPhone: phone,
+      body: `Call opened for ${supplierName}`,
+      status: "opened_on_device",
+    })
+    await addAuraCommunicationLinks([communicationId], [{ entity_type: "supplier", entity_id: supplierId, entity_label: supplierName, link_source: "manual", confidence: 1 }])
+    revalidatePath("/admin/vendors")
+    return { ok: true as const }
+  } catch {
+    return { ok: false as const }
+  }
+}
 
 function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | null {
   const name = input.name.trim().slice(0, 160)

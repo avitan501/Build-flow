@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraMessageWithAttachmentAction } from "@/app/owner/aura/actions"
-import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
+import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagEmailSupplierAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { CommunicationCallLauncher } from "@/components/buildflow/communication-call-launcher"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { callerIdentityCandidateLabel, resolveCallerIdentity, type CallerIdentityCandidate, type CallerIdentityResolution } from "@/lib/aura/caller-identity"
@@ -876,6 +876,22 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     })
   }
 
+  function addEmailAsSupplier() {
+    if (!activeConversation?.email) return
+    startTransition(async () => {
+      const result = await quickTagEmailSupplierAction({
+        email: activeConversation.email,
+        name: activeConversation.name === activeConversation.email ? undefined : activeConversation.name,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      setFeedback({ tone: "success", text: "Supplier added and the email conversation was linked." })
+      router.refresh()
+    })
+  }
+
   function newConversation() {
     setActiveKey("__new__")
     setMobileThreadOpen(true)
@@ -1464,6 +1480,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   </Link>
                 ))}
                 {!activeEmailLinks.length ? <span className="text-[10px] font-semibold text-slate-500">Not linked yet</span> : null}
+                {!activeEmailLinks.some((link) => link.entity_type === "supplier") ? <button type="button" onClick={addEmailAsSupplier} disabled={pending} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800 disabled:opacity-50">Add as new supplier</button> : null}
               </div>
               <div className="mt-2 flex gap-2">
                 <select value={emailLinkTarget} onChange={(event) => setEmailLinkTarget(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold">
@@ -1733,7 +1750,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                     {attachments.map((file, index) => (
                       <span key={`${file.name}-${file.size}-${index}`} className="inline-flex max-w-full items-center gap-1 rounded bg-white px-1.5 py-1">
                         <span className="max-w-48 truncate">{file.name}</span>
-                        <button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
+                        <button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove attachment" title={`Remove ${file.name}`}>
                           <X className="h-3 w-3" />
                         </button>
                       </span>

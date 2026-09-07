@@ -92,7 +92,8 @@ function taxPresetForRate(rate: number) {
   return TAX_LOCATION_PRESETS.find((option) => option.rate !== null && Math.abs(option.rate - rate) < 0.0001)?.value || "custom"
 }
 
-function supplierContactStatusClass(status: RequestSupplierContactStatus) {
+function supplierContactStatusClass(status: RequestSupplierContactStatus | "no_response") {
+  if (status === "no_response") return "border-rose-200 bg-rose-50 text-rose-800"
   if (status === "quote_received") return "border-emerald-200 bg-emerald-50 text-emerald-800"
   if (status === "awaiting_supplier_reply") return "border-amber-200 bg-amber-50 text-amber-900"
   if (status === "supplier_replied") return "border-violet-200 bg-violet-50 text-violet-800"
@@ -177,6 +178,7 @@ export function RequestManagementPanel({
   initialClientDocuments,
   initialSupplierRecommendations,
   clientEmails,
+  supplierEmails,
   requestAttachments,
 }: {
   requestId: string
@@ -199,6 +201,7 @@ export function RequestManagementPanel({
   initialClientDocuments: RequestClientDocumentSnapshot[]
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean; contactStatus: RequestSupplierContactStatus; note: string }>
   clientEmails: RelatedEmailItem[]
+  supplierEmails: RelatedEmailItem[]
   requestAttachments: RequestClientDocumentAttachment[]
 }) {
   const router = useRouter()
@@ -925,7 +928,12 @@ export function RequestManagementPanel({
             <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
           </div>
 
-          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+          <details className="mb-3 rounded-lg border border-slate-200 bg-white">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-bold text-slate-800"><span>Supplier messages</span><span className="rounded-full bg-sky-50 px-2 py-1 text-[10px] text-sky-800">{supplierEmails.length}</span></summary>
+            <div className="border-t border-slate-200 px-2 pb-2"><RelatedEmailTimeline title="Supplier replies" emails={supplierEmails} /></div>
+          </details>
+
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
             const persistedContactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] : undefined
             const statusOverride = row.supplier ? supplierContactStatusOverrides[row.supplier.id] : undefined
             const contactStatus = row.supplier
@@ -935,12 +943,15 @@ export function RequestManagementPanel({
                 ? statusOverride.value
                 : persistedContactStatus || (row.supplierPackage ? "request_sent" : "not_contacted")
               : "not_contacted"
+            const displayContactStatus = ["request_sent", "awaiting_supplier_reply"].includes(contactStatus) && row.note?.includes("No response after two follow-ups")
+              ? "no_response"
+              : contactStatus
             return <article role="row" key={row.name} className="grid min-h-16 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem] sm:items-center">
               <div role="cell" className="flex min-w-0 items-start justify-between gap-2">
                 <div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
                 <div className="flex shrink-0 justify-end gap-1.5 sm:hidden">{renderSupplierRouteActions(row)}</div>
               </div>
-              <div role="cell" className="grid gap-1.5"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
+              <div role="cell" className="grid gap-1.5"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={displayContactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(displayContactStatus)}`}>{displayContactStatus === "no_response" ? <option value="no_response" disabled>No response</option> : null}{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
               <div role="cell" className="hidden justify-end gap-1.5 sm:flex">{renderSupplierRouteActions(row)}</div>
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}

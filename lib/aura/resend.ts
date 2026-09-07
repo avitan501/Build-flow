@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { storeAuraCommunication, updateAuraCommunicationMedia } from "@/lib/aura/communications";
-import { autoLinkAuraEmail } from "@/lib/aura/email-links";
+import { autoLinkAuraEmail, recordSupplierEmailResponse } from "@/lib/aura/email-links";
 import { persistAuraResendAttachments } from "@/lib/aura/resend-attachments";
 
 type ResendReceivedEvent = {
@@ -119,5 +119,10 @@ export async function storeAuraResendEvent(payload: unknown) {
     });
     await updateAuraCommunicationMedia(communicationId, media);
   }
+  const clearQuotePdf = attachments.some((attachment) =>
+    attachment.content_type === "application/pdf" &&
+    /\b(quote|estimate|proposal|pricing)\b/i.test(`${attachment.filename ?? ""} ${event.data?.subject ?? ""}`),
+  );
+  await recordSupplierEmailResponse(communicationId, clearQuotePdf ? "quote_pdf" : body.includes("?") ? "needs_information" : "reply");
   return true;
 }
