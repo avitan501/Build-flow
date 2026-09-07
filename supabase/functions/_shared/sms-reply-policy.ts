@@ -313,7 +313,7 @@ export function smsMissingStreetTypeQuestion(value: string) {
 export function smsSidingFirstStepReply(value: string) {
   const normalized = value.trim();
   if (!/\bsiding\b/i.test(normalized)) return null;
-  if (!/\b(?:i|we)\s+(?:need|want)|\bcan\s+you\s+help|\bhelp\b/i.test(normalized)) return null;
+  if (!/\b(?:i|we)\s+(?:need|want)|\b(?:can|could)\s+(?:i|we)\s+(?:order|buy|get|source)|\bcan\s+you\s+help|\bhelp\b/i.test(normalized)) return null;
   if (/\b\d+(?:\.\d+)?\s*(?:sq(?:uare)?s?|sq\.?\s*ft|panels?|pieces?|pcs?|boxes?|rolls?|ft|feet)\b/i.test(normalized)) return null;
   return "Yes, we can help with siding. Please send a few photos of each side of the house.";
 }

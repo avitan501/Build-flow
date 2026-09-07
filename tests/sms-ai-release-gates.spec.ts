@@ -52,7 +52,15 @@ const root = process.cwd()
 test("real siding intake asks for photos before delivery details", () => {
   expect(smsSidingFirstStepReply("I need siding to my house? Can you help"))
     .toBe("Yes, we can help with siding. Please send a few photos of each side of the house.")
+  expect(smsSidingFirstStepReply("Can I order siding?"))
+    .toBe("Yes, we can help with siding. Please send a few photos of each side of the house.")
   expect(smsSidingFirstStepReply("Need 40 squares siding")).toBeNull()
+})
+
+test("attachment verification reads only the latest customer message", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toMatch(/accurateAttachmentReply\(\s*latestCustomerMessage,/)
+  expect(broker).not.toMatch(/accurateAttachmentReply\(\s*conversationText,/)
 })
 
 test("an address missing only its street type gets one precise question", () => {

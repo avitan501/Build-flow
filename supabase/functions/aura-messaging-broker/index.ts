@@ -3999,7 +3999,7 @@ async function analyzeCustomerSms(
       /[?？]/.test(String(parsed.reply || ""));
     const modelResult: CustomerSmsAutomation = {
       reply: accurateAttachmentReply(
-        conversationText,
+        latestCustomerMessage,
         String(parsed.reply || "")
           .trim()
           .slice(0, 1600) ||
