@@ -21,7 +21,10 @@ export function EmployeeActivityReporter({ owner, compact = false }: { owner: bo
         area: analyticsArea(context.route),
         actor_type: "staff",
       })
-      void recordEmployeeActivityAction(pathname, managerActivityPageLabel(pathname))
+      void recordEmployeeActivityAction(
+        pathname,
+        managerActivityPageLabel(pathname),
+      ).catch(() => undefined)
     }
     report()
     const timer = window.setInterval(report, 60_000)
