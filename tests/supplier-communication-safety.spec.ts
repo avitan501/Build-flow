@@ -58,3 +58,13 @@ test("supplier PDF review and supplier AI blocking remain review-only", async ()
   expect(broker).toContain('entity_type = \'supplier\'')
   expect(broker).toContain('if (supplierLink[0]?.linked)')
 })
+
+test("supplier profiles expose one-tap mobile sharing with a clipboard fallback", async () => {
+  const directory = await readFile(path.join(root, "components/buildflow/supplier-routing-manager.tsx"), "utf8")
+
+  expect(directory).toContain("async function shareSupplier")
+  expect(directory).toContain("navigator.share")
+  expect(directory).toContain("navigator.clipboard.writeText")
+  expect(directory).toContain("void shareSupplier(selectedSupplier)")
+  expect(directory).toContain("<Share2")
+})

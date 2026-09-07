@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, FileText, Mail, Plus, RefreshCw, Search, ShieldCheck, Star, StickyNote, Trash2, X } from "lucide-react"
+import { Check, FileText, Mail, Plus, RefreshCw, Search, Share2, ShieldCheck, Star, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
@@ -379,6 +379,34 @@ export function SupplierRoutingManager({
     const serviceItems = SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === selectedDepartment && isManagerItemHidden(addOns, target.id)).map((target) => ({ id: target.id, label: target.serviceLabel, type: "Sub-item" }))
     return [...catalogItems, ...serviceItems]
   }, [addOns, catalogProducts, selectedDepartment])
+
+  async function shareSupplier(supplier: SupplierRoutingOption) {
+    const phoneLines = [...new Set([supplier.phone, supplier.whatsapp].map((value) => value?.trim()).filter(Boolean))]
+    const shareText = [
+      supplier.name,
+      supplier.contactName ? `Contact: ${supplier.contactName}` : "",
+      supplier.email ? `Email: ${supplier.email}` : "",
+      ...phoneLines.map((phone) => `Phone: ${phone}`),
+      supplier.address ? `Address: ${supplier.address}` : "",
+      supplier.portalUrl ? `Website: ${supplier.portalUrl}` : "",
+    ].filter(Boolean).join("\n")
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: supplier.name, text: shareText })
+        return
+      }
+      await navigator.clipboard.writeText(shareText)
+      setDirectoryNotice(`${supplier.name} contact details copied.`)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return
+      try {
+        await navigator.clipboard.writeText(shareText)
+        setDirectoryNotice(`${supplier.name} contact details copied.`)
+      } catch {
+        setDirectoryNotice("Sharing is unavailable on this device.")
+      }
+    }
+  }
   const parsedBulkItems = useMemo(() => parseDepartmentItemList(bulkItemText), [bulkItemText])
   const selectedDepartmentShopHref = departmentShopHref(selectedDepartment)
   const departmentSummaries = useMemo(() => {
@@ -1395,6 +1423,7 @@ export function SupplierRoutingManager({
                           directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
                           directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
+                        <button type="button" onClick={() => void shareSupplier(selectedSupplier)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Share2 className="h-4 w-4" />Share</button>
                         {selectedSupplier.trustLevel === "first-time" ? <button type="button" onClick={() => keepSupplier(selectedSupplier)} disabled={supplierDirty || supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50"><Check className="h-4 w-4" />Verify supplier</button> : null}
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 disabled:cursor-wait disabled:opacity-50"><Trash2 className="h-4 w-4" />{supplierSavePending ? "Working..." : "Delete supplier"}</button>
                         <button type="button" onClick={() => setSupplierProfileOpen(false)} disabled={supplierSavePending} aria-label="Close supplier profile" className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-600"><X className="h-5 w-5" /></button>
