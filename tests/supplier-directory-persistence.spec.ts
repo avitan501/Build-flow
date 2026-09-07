@@ -98,6 +98,7 @@ test("the supplier network is compact on phones and can share a supplier", async
   expect(source).toContain("grid-cols-[minmax(0,1fr)_6rem_3rem]")
   expect(source).toContain("navigator.share")
   expect(source).toContain("navigator.clipboard.writeText")
+  expect(source).toContain('document.execCommand("copy")')
   expect(source).toContain("Paste it into WhatsApp, SMS, or email")
 })
 

@@ -303,18 +303,33 @@ export function SupplierNetworkWorkspace({
     ].filter(Boolean);
     const text = details.join("\n");
     setShareNotice(null);
-    try {
-      if (navigator.share) {
+    if (navigator.share) {
+      try {
         await navigator.share({ title: row.name, text });
         setShareNotice(`${row.name} was shared.`);
         return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
       }
-      await navigator.clipboard.writeText(text);
-      setShareNotice(`${row.name} was copied. Paste it into WhatsApp, SMS, or email.`);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      setShareNotice("This supplier could not be shared. Please try again.");
     }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const copyField = document.createElement("textarea");
+      copyField.value = text;
+      copyField.setAttribute("readonly", "");
+      copyField.style.position = "fixed";
+      copyField.style.opacity = "0";
+      document.body.appendChild(copyField);
+      copyField.select();
+      const copied = document.execCommand("copy");
+      copyField.remove();
+      if (!copied) {
+        setShareNotice("This supplier could not be copied. Please try again.");
+        return;
+      }
+    }
+    setShareNotice(`${row.name} was copied. Paste it into WhatsApp, SMS, or email.`);
   }
 
   const stageCounts = useMemo(
