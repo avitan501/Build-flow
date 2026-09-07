@@ -79,8 +79,14 @@ export function resolveCallerIdentity(
     .filter((candidate): candidate is CallerIdentityCandidate => candidate !== null)
     .sort(compareCandidates)
   const canonical = [...new Map(exact.map((candidate) => [candidate.canonicalKey, candidate])).values()]
+  const explicit = [...new Map(
+    exact
+      .filter((candidate) => candidate.source === "contact-link")
+      .map((candidate) => [candidate.canonicalKey, candidate]),
+  ).values()]
 
   if (!canonical.length) return { phone, status: "unknown", primary: null, candidates: [] }
+  if (explicit.length === 1) return { phone, status: "verified", primary: explicit[0], candidates: explicit }
   if (canonical.length === 1) return { phone, status: "verified", primary: canonical[0], candidates: canonical }
   return { phone, status: "ambiguous", primary: canonical[0], candidates: canonical }
 }

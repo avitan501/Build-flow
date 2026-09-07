@@ -90,11 +90,10 @@ export default async function CommunicationsPage({
       : Promise.resolve(null),
     historyPromise,
     access.customers && exactCommunicationId
-      ? supabase
-          .from("aura_communications")
-          .select("id,contact_id,provider,channel,direction,counterparty_phone,counterparty_email,subject,body,summary,transcript,next_steps,media,status,duration_seconds,occurred_at,last_event_at,mailbox_address,message_id,in_reply_to,read_at")
-          .eq("id", exactCommunicationId)
-          .maybeSingle()
+      ? supabase.functions.invoke<{ ok?: boolean; communication?: unknown }>(
+          "aura-messaging-broker",
+          { body: { action: "load_communication_by_id", communicationId: exactCommunicationId } },
+        )
       : Promise.resolve({ data: null, error: null }),
   ])
   const customers = (clientsResult.data ?? []).map((client) => ({
@@ -109,7 +108,7 @@ export default async function CommunicationsPage({
   const communications = mergeCommunicationHistory(
     initialHistory?.communications ?? [],
     contextualHistory?.communications ?? [],
-    normalizeAuraCommunications(exactCommunicationResult.data ? [exactCommunicationResult.data] : []),
+    normalizeAuraCommunications(exactCommunicationResult.data?.communication ? [exactCommunicationResult.data.communication] : []),
   )
   const liveAura = initialHistory && aura?.contacts && aura.connections
     ? {

@@ -66,6 +66,22 @@ test("duplicate exact matches stay ambiguous and deterministic regardless of inp
   expect(second.candidates).toEqual(first.candidates)
 })
 
+test("an explicit contact link resolves duplicate records without deleting them", () => {
+  const selected = candidate({ source: "contact-link" })
+  const other = candidate({
+    canonicalKey: "supplier:two",
+    id: "two",
+    kind: "supplier",
+    name: "Maria at Supply Co",
+    company: "Supply Co",
+  })
+  const result = resolveCallerIdentity("+15197429188", [other, selected])
+
+  expect(result.status).toBe("verified")
+  expect(result.primary?.canonicalKey).toBe("customer:one")
+  expect(result.candidates).toEqual([selected])
+})
+
 test("unknown calls and texts keep the normalized phone visible", () => {
   const resolution = resolveCallerIdentity("(519) 742-9188", [
     candidate({ name: "Unnamed customer", company: "" }),

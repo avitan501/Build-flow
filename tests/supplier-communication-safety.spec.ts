@@ -53,16 +53,20 @@ test("quick supplier creation is collision-safe and verified before linking", as
 })
 
 test("supplier reminders count only post-status messages and cannot starve after 50 rows", async () => {
-  const notifications = await readFile(path.join(root, "lib/manager-notification-store.ts"), "utf8")
+  const [notifications, broker] = await Promise.all([
+    readFile(path.join(root, "lib/manager-notification-store.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ])
 
-  expect(notifications).toContain('.eq("should_contact", true)')
-  expect(notifications).toContain('.range(from, from + pageSize - 1)')
-  expect(notifications).toContain('.in("channel", ["email", "sms", "whatsapp"])')
-  expect(notifications).toContain('.eq("tag", "supplier-follow-up")')
-  expect(notifications).toContain('reminderCreatedAtByKey')
-  expect(notifications).toContain('supplierFollowUpAction')
-  expect(notifications).not.toContain('occurredAt > row.updated_at')
-  expect(notifications).not.toContain('.limit(50)')
+  expect(notifications).toContain('action: "queue_supplier_followups"')
+  expect(notifications).not.toContain("createAdminClient")
+  expect(broker).toContain('input.action === "queue_supplier_followups"')
+  expect(broker).toContain("recommendation.should_contact = true")
+  expect(broker).toContain("communication.channel in ('email', 'sms', 'whatsapp')")
+  expect(broker).toContain("where tag = 'supplier-follow-up'")
+  expect(broker).toContain("limit 5000")
+  expect(broker).toContain("hasAfter(firstAt)")
+  expect(broker).toContain("hasAfter(secondAt)")
 })
 
 test("follow-up policy advances only after a real post-reminder supplier message", () => {
@@ -99,4 +103,17 @@ test("supplier profiles expose one-tap mobile sharing with a clipboard fallback"
   expect(directory).toContain("navigator.clipboard.writeText")
   expect(directory).toContain("void shareSupplier(selectedSupplier)")
   expect(directory).toContain("<Share2")
+})
+
+test("supplier profiles load linked activity through the authenticated broker", async () => {
+  const [page, broker] = await Promise.all([
+    readFile(path.join(root, "app/admin/vendors/page.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ])
+  expect(page).toContain('action: "load_supplier_communications"')
+  expect(page).toContain("Could not load supplier activity")
+  expect(page).not.toContain('.from("aura_communications")')
+  expect(broker).toContain('input.action === "load_supplier_communications"')
+  expect(broker).toContain("supplier_link.entity_type = 'supplier'")
+  expect(broker).toContain("having count(distinct supplier_link.entity_id) = 1")
 })

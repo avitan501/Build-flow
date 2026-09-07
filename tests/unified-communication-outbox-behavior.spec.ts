@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   attachmentCapability,
   classifyProviderOutcome,
+  safeWhatsAppProviderFailure,
   safeRetryDelaySeconds,
 } from "../supabase/functions/_shared/communication-outbox-policy";
 
@@ -45,6 +46,24 @@ test("attachment capabilities match the actual provider APIs", () => {
   expect(attachmentCapability("email", 3)).toEqual({ supported: true });
 });
 
+test("Meta WhatsApp failures are sanitized and explain the 24-hour window", () => {
+  expect(safeWhatsAppProviderFailure({
+    error: {
+      code: 131047,
+      message: "Re-engagement message",
+      error_data: { details: "outside the 24 hour window" },
+    },
+  })).toEqual({
+    errorCode: "meta_131047",
+    message: "This WhatsApp conversation is outside the 24-hour reply window. Ask the recipient to message Avantia first or use an approved WhatsApp template.",
+  });
+  const other = safeWhatsAppProviderFailure({
+    error: { code: 131026, message: "private provider detail" },
+  });
+  expect(other.errorCode).toBe("meta_131026");
+  expect(other.message).not.toContain("private provider detail");
+});
+
 test("worker claims atomically, resolves real attachments, and preserves unknown outcomes", async () => {
   const worker = await read(
     "supabase/functions/aura-communication-outbox-worker/index.ts",
@@ -59,6 +78,8 @@ test("worker claims atomically, resolves real attachments, and preserves unknown
   expect(worker).toContain("attachments: attachments.length");
   expect(worker).toContain("url: mediaUrl");
   expect(worker).toContain("status = 'needs_review'");
+  expect(worker).toContain("safeWhatsAppProviderFailure(payload)");
+  expect(worker).toContain("next_steps = case");
   expect(worker).not.toMatch(
     /console\.log\([^)]*(?:message_body|apiKey|dispatchSecret)/,
   );
@@ -96,6 +117,8 @@ test("manager sends enqueue all three channels with stable browser request keys"
   expect(actions).toContain('.getAll("attachments")');
   expect(actions).toContain('"send_whatsapp_batch"');
   expect(broker).toContain("enqueueManagerWhatsAppBatch(");
+  expect(broker).toContain("requireOpenMetaWhatsAppWindow(destination)");
+  expect(broker).toContain('throw new Error("whatsapp_template_required")');
   expect(broker).toContain("package_index");
   expect(inbox).toContain('multiple={channel !== "sms"}');
 });

@@ -7,8 +7,6 @@ import { loadAuraCommunicationLinks } from "@/lib/aura/email-links";
 import { normalizeAuraPhone } from "@/lib/aura/identity";
 import { withManagerCallerIdentity, type ManagerNotificationEvent } from "@/lib/manager-notification-feed";
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { supplierFollowUpAction } from "@/lib/supplier-follow-up-policy";
 
 type QueueRow = Omit<ManagerNotificationEvent, "read_at">;
 type ReadRow = { notification_id: number; read_at: string };
@@ -31,135 +29,11 @@ function identityRecordCandidate(record: IdentityRecord, source: CallerIdentityC
   return { ...record, source };
 }
 
-async function queueOverdueSupplierFollowUps() {
-  const admin = createAdminClient();
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  type OverdueSupplierRow = { request_id: string; supplier_id: string; supplier_name_snapshot: string; contact_status: string; notes: string; updated_at: string };
-  const overdue: OverdueSupplierRow[] = [];
-  const pageSize = 500;
-  for (let from = 0; ; from += pageSize) {
-    const page = await admin
-      .from("quote_request_supplier_recommendations")
-      .select("request_id,supplier_id,supplier_name_snapshot,contact_status,notes,updated_at")
-      .in("contact_status", ["request_sent", "awaiting_supplier_reply"])
-      .eq("should_contact", true)
-      .lt("updated_at", cutoff)
-      .order("updated_at", { ascending: true })
-      .order("request_id", { ascending: true })
-      .order("supplier_id", { ascending: true })
-      .range(from, from + pageSize - 1)
-      .returns<OverdueSupplierRow[]>();
-    if (page.error) return;
-    overdue.push(...(page.data ?? []));
-    if ((page.data?.length ?? 0) < pageSize) break;
-  }
-  if (!overdue?.length) return;
-  type ReminderRow = { dedupe_key: string; created_at: string };
-  const priorReminders: ReminderRow[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const page = await admin
-      .from("manager_push_queue")
-      .select("dedupe_key,created_at")
-      .eq("tag", "supplier-follow-up")
-      .order("created_at", { ascending: true })
-      .range(from, from + pageSize - 1)
-      .returns<ReminderRow[]>();
-    if (page.error) return;
-    priorReminders.push(...(page.data ?? []));
-    if ((page.data?.length ?? 0) < pageSize) break;
-  }
-  const reminderCreatedAtByKey = new Map(priorReminders.map((reminder) => [reminder.dedupe_key, reminder.created_at]));
-  const requestIds = [...new Set(overdue.map((row) => row.request_id))];
-  const supplierIds = [...new Set(overdue.map((row) => row.supplier_id))];
-  const { data: requests } = await admin
-    .from("quote_requests")
-    .select("id,title")
-    .in("id", requestIds)
-    .returns<Array<{ id: string; title: string }>>();
-  const requestTitleById = new Map((requests ?? []).map((request) => [request.id, request.title]));
-  const { data: supplierLinks } = await admin.from("aura_communication_links")
-    .select("communication_id,entity_id")
-    .eq("entity_type", "supplier")
-    .in("entity_id", supplierIds)
-    .returns<Array<{ communication_id: string; entity_id: string }>>();
-  const linkedCommunicationIds = [...new Set((supplierLinks ?? []).map((link) => link.communication_id))];
-  const [{ data: requestLinks }, { data: outgoing }] = linkedCommunicationIds.length
-    ? await Promise.all([
-      admin.from("aura_communication_links").select("communication_id,entity_id")
-        .eq("entity_type", "material_request").in("entity_id", requestIds).in("communication_id", linkedCommunicationIds)
-        .returns<Array<{ communication_id: string; entity_id: string }>>(),
-      admin.from("aura_communications").select("id,channel,occurred_at").eq("direction", "outgoing").in("id", linkedCommunicationIds)
-        .in("channel", ["email", "sms", "whatsapp"])
-        .returns<Array<{ id: string; channel: string; occurred_at: string }>>(),
-    ])
-    : [{ data: [] }, { data: [] }];
-  const requestByCommunication = new Map((requestLinks ?? []).map((link) => [link.communication_id, link.entity_id]));
-  const outgoingAtByCommunication = new Map((outgoing ?? []).map((communication) => [communication.id, communication.occurred_at]));
-  const outboundByPair = new Map<string, string[]>();
-  for (const link of supplierLinks ?? []) {
-    const requestId = requestByCommunication.get(link.communication_id);
-    const occurredAt = outgoingAtByCommunication.get(link.communication_id);
-    if (!requestId || !occurredAt) continue;
-    const key = `${requestId}:${link.entity_id}`;
-    outboundByPair.set(key, [...(outboundByPair.get(key) ?? []), occurredAt]);
-  }
-
-  const notificationRows: Array<Record<string, string>> = [];
-  const noResponseMarker = "No response after two follow-ups. Try an alternative supplier.";
-  for (const row of overdue) {
-    const title = requestTitleById.get(row.request_id) || "Material request";
-    const firstReminderKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:1`.slice(0, 240);
-    const secondReminderKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:2`.slice(0, 240);
-    const firstReminderAt = reminderCreatedAtByKey.get(firstReminderKey);
-    const secondReminderAt = reminderCreatedAtByKey.get(secondReminderKey);
-    const outboundActivity = (outboundByPair.get(`${row.request_id}:${row.supplier_id}`) ?? []).sort();
-    const nextAction = supplierFollowUpAction({ cutoff, firstReminderAt, secondReminderAt, outboundActivity });
-    if (nextAction === "follow_up_1") {
-      notificationRows.push({
-        event_type: "supplier_update",
-        title: `Supplier follow-up 1/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
-        body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
-        href: `/owner/materials/requests/${row.request_id}`,
-        tag: "supplier-follow-up",
-        dedupe_key: firstReminderKey,
-        processed_at: new Date().toISOString(),
-      });
-      continue;
-    }
-    if (nextAction === "follow_up_2") {
-      notificationRows.push({
-        event_type: "supplier_update",
-        title: `Supplier follow-up 2/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
-        body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
-        href: `/owner/materials/requests/${row.request_id}`,
-        tag: "supplier-follow-up",
-        dedupe_key: secondReminderKey,
-        processed_at: new Date().toISOString(),
-      });
-      continue;
-    }
-    if (nextAction === "no_response") {
-      const notes = row.notes.includes(noResponseMarker) ? row.notes : [row.notes.trim(), noResponseMarker].filter(Boolean).join("\n");
-      await admin.from("quote_request_supplier_recommendations").update({
-        should_contact: false,
-        notes,
-        updated_at: new Date().toISOString(),
-      }).eq("request_id", row.request_id).eq("supplier_id", row.supplier_id);
-      notificationRows.push({
-        event_type: "supplier_update",
-        title: `Supplier no response · ${row.supplier_name_snapshot}`.slice(0, 160),
-        body: `${title} · Try an alternative supplier.`.slice(0, 500),
-        href: `/owner/materials/requests/${row.request_id}`,
-        tag: "supplier-no-response",
-        dedupe_key: `supplier-no-response:${row.request_id}:${row.supplier_id}`.slice(0, 240),
-        processed_at: new Date().toISOString(),
-      });
-      continue;
-    }
-  }
-  if (notificationRows.length) {
-    await admin.from("manager_push_queue").upsert(notificationRows, { onConflict: "dedupe_key", ignoreDuplicates: true });
-  }
+async function queueOverdueSupplierFollowUps(supabase: SupabaseClient) {
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean }>("aura-messaging-broker", {
+    body: { action: "queue_supplier_followups" },
+  });
+  if (error || !data?.ok) throw new Error("supplier_followup_queue_unavailable");
 }
 
 async function enrichManagerCallerIdentities(
@@ -254,7 +128,7 @@ export async function loadManagerNotificationFeed(
   enrichCallerIdentity = false,
 ) {
   try {
-    await queueOverdueSupplierFollowUps();
+    await queueOverdueSupplierFollowUps(supabase);
   } catch {
     // Notifications remain available if optional follow-up generation is temporarily unavailable.
   }

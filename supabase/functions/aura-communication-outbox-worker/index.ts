@@ -5,6 +5,7 @@ import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 import {
   attachmentCapability,
   classifyProviderOutcome,
+  safeWhatsAppProviderFailure,
   safeRetryDelaySeconds,
   type CommunicationOutboxChannel,
 } from "../_shared/communication-outbox-policy.ts";
@@ -470,21 +471,32 @@ async function processOne(row: OutboxRow) {
     return;
   }
 
+  const metaFailure = row.channel === "whatsapp" &&
+      await vaultSecret("aura_whatsapp_provider") === "meta"
+    ? safeWhatsAppProviderFailure(payload)
+    : null;
+  const failureCode = outcome.kind === "ambiguous"
+    ? outcome.errorCode || "provider_outcome_unknown"
+    : metaFailure?.errorCode || outcome.errorCode || "provider_rejected";
+  const failureMessage = outcome.kind === "ambiguous"
+    ? "The provider outcome is unknown; no duplicate will be sent."
+    : metaFailure?.message || "The provider rejected the message before acceptance.";
+
   await sql`
     update public.aura_message_outbox
     set status = ${outcome.status}, lock_token = null, locked_at = null,
         failed_at = case when ${outcome.status} = 'failed' then now() else failed_at end,
         last_http_status = ${providerResponse.status},
-        last_error_code = ${outcome.errorCode || "provider_rejected"},
-        last_error = ${outcome.kind === "ambiguous"
-          ? "The provider outcome is unknown; no duplicate will be sent."
-          : "The provider rejected the message before acceptance."}
+        last_error_code = ${failureCode},
+        last_error = ${failureMessage}
     where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid
   `;
   if (row.communication_id)
     await sql`
       update public.aura_communications
       set status = ${outcome.status === "failed" ? "failed" : "needs_review"},
+          next_steps = case when ${outcome.status === "failed"}
+            then ${sql.json([failureMessage])} else next_steps end,
           last_event_at = now(), updated_at = now()
       where id = ${row.communication_id}::uuid
     `;

@@ -1291,6 +1291,112 @@ async function autoLinkSupplierCommunication(input: {
   await recordLinkedSupplierResponse(input.communicationId, input.responseKind ?? "reply");
 }
 
+async function queueSupplierFollowUps() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const overdue = await sql<Array<{
+    request_id: string;
+    supplier_id: string;
+    supplier_name_snapshot: string;
+    notes: string;
+    title: string;
+  }>>`
+    select recommendation.request_id, recommendation.supplier_id,
+      recommendation.supplier_name_snapshot, recommendation.notes,
+      coalesce(request.title, 'Material request') as title
+    from public.quote_request_supplier_recommendations as recommendation
+    join public.quote_requests as request on request.id = recommendation.request_id
+    where recommendation.contact_status in ('request_sent', 'awaiting_supplier_reply')
+      and recommendation.should_contact = true
+      and recommendation.updated_at < ${cutoff}::timestamptz
+    order by recommendation.updated_at, recommendation.request_id, recommendation.supplier_id
+    limit 5000
+  `;
+  if (!overdue.length) return 0;
+  const reminders = await sql<Array<{ dedupe_key: string; created_at: string }>>`
+    select dedupe_key, created_at
+    from public.manager_push_queue
+    where tag = 'supplier-follow-up'
+    order by created_at
+  `;
+  const outbound = await sql<Array<{ request_id: string; supplier_id: string; occurred_at: string }>>`
+    select distinct request_link.entity_id as request_id,
+      supplier_link.entity_id as supplier_id, communication.occurred_at
+    from public.aura_communications as communication
+    join public.aura_communication_links as request_link
+      on request_link.communication_id = communication.id
+     and request_link.entity_type = 'material_request'
+    join public.aura_communication_links as supplier_link
+      on supplier_link.communication_id = communication.id
+     and supplier_link.entity_type = 'supplier'
+    where communication.direction = 'outgoing'
+      and communication.channel in ('email', 'sms', 'whatsapp')
+      and request_link.entity_id in ${sql(overdue.map((row) => row.request_id))}
+      and supplier_link.entity_id in ${sql(overdue.map((row) => row.supplier_id))}
+  `;
+  const reminderAt = new Map(reminders.map((row) => [row.dedupe_key, row.created_at]));
+  const outboundByPair = new Map<string, string[]>();
+  for (const row of outbound) {
+    const key = `${row.request_id}:${row.supplier_id}`;
+    outboundByPair.set(key, [...(outboundByPair.get(key) ?? []), row.occurred_at]);
+  }
+  let queued = 0;
+  const noResponseMarker = "No response after two follow-ups. Try an alternative supplier.";
+  for (const row of overdue) {
+    const firstKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:1`.slice(0, 240);
+    const secondKey = `supplier-follow-up:${row.request_id}:${row.supplier_id}:2`.slice(0, 240);
+    const firstAt = reminderAt.get(firstKey);
+    const secondAt = reminderAt.get(secondKey);
+    const activity = (outboundByPair.get(`${row.request_id}:${row.supplier_id}`) ?? []).sort();
+    const hasAfter = (timestamp: string) => activity.some((occurredAt) => occurredAt > timestamp);
+    if (!firstAt) {
+      await sql`
+        insert into public.manager_push_queue
+          (event_type, title, body, href, dedupe_key, tag, processed_at)
+        values ('supplier_update', ${`Supplier follow-up 1/2 · ${row.supplier_name_snapshot}`.slice(0, 160)},
+          ${`${row.title} · Supplier has not replied in 24 hours.`.slice(0, 500)},
+          ${`/owner/materials/requests/${row.request_id}`}, ${firstKey}, 'supplier-follow-up', now())
+        on conflict (dedupe_key) do nothing
+      `;
+      queued += 1;
+      continue;
+    }
+    if (!hasAfter(firstAt)) continue;
+    if (!secondAt) {
+      await sql`
+        insert into public.manager_push_queue
+          (event_type, title, body, href, dedupe_key, tag, processed_at)
+        values ('supplier_update', ${`Supplier follow-up 2/2 · ${row.supplier_name_snapshot}`.slice(0, 160)},
+          ${`${row.title} · Supplier has not replied in 24 hours.`.slice(0, 500)},
+          ${`/owner/materials/requests/${row.request_id}`}, ${secondKey}, 'supplier-follow-up', now())
+        on conflict (dedupe_key) do nothing
+      `;
+      queued += 1;
+      continue;
+    }
+    if (!hasAfter(secondAt)) continue;
+    const notes = row.notes.includes(noResponseMarker)
+      ? row.notes
+      : [row.notes.trim(), noResponseMarker].filter(Boolean).join("\n");
+    await sql`
+      update public.quote_request_supplier_recommendations
+      set should_contact = false, notes = ${notes}, updated_at = now()
+      where request_id = ${row.request_id}::uuid and supplier_id = ${row.supplier_id}
+    `;
+    await sql`
+      insert into public.manager_push_queue
+        (event_type, title, body, href, dedupe_key, tag, processed_at)
+      values ('supplier_update', ${`Supplier no response · ${row.supplier_name_snapshot}`.slice(0, 160)},
+        ${`${row.title} · Try an alternative supplier.`.slice(0, 500)},
+        ${`/owner/materials/requests/${row.request_id}`},
+        ${`supplier-no-response:${row.request_id}:${row.supplier_id}`.slice(0, 240)},
+        'supplier-no-response', now())
+      on conflict (dedupe_key) do nothing
+    `;
+    queued += 1;
+  }
+  return queued;
+}
+
 async function storeCommunication(input: {
   provider: "whatsapp" | "quo" | "manual";
   channel: "whatsapp" | "sms" | "email" | "call";
@@ -7467,6 +7573,7 @@ async function sendWhatsApp(
       : null;
   if (!to || (!body && !mediaUrl))
     throw new Error("Enter a valid WhatsApp number and message.");
+  if (useMeta) await requireOpenMetaWhatsAppWindow(to);
 
   const response = useMeta
     ? await fetch(
@@ -8501,6 +8608,173 @@ async function dispatchCommunicationOutboxWorker(
     throw new Error(`Communication outbox dispatch failed: ${result.status}`);
 }
 
+async function requireOpenMetaWhatsAppWindow(destination: string) {
+  const selectedProvider = await secret(secretNames.whatsappProvider);
+  if (selectedProvider !== "meta") return;
+  const digits = destination.replace(/\D/g, "");
+  const inbound = await sql<{ occurred_at: string }[]>`
+    select occurred_at
+    from public.aura_communications
+    where channel = 'whatsapp'
+      and direction = 'incoming'
+      and regexp_replace(coalesce(counterparty_phone, ''), '[^0-9]', '', 'g') = ${digits}
+      and occurred_at > now() - interval '24 hours'
+    order by occurred_at desc
+    limit 1
+  `;
+  if (!inbound[0]) throw new Error("whatsapp_template_required");
+}
+
+type ManagerContactLinkKind = "customer" | "lead" | "supplier";
+
+async function managerContactLinkTarget(
+  kindValue: unknown,
+  sourceIdValue: unknown,
+) {
+  const kind = typeof kindValue === "string" ? kindValue : "";
+  const sourceId = typeof sourceIdValue === "string"
+    ? sourceIdValue.trim()
+    : "";
+  if (
+    !new Set<ManagerContactLinkKind>(["customer", "lead", "supplier"]).has(
+      kind as ManagerContactLinkKind,
+    ) ||
+    !/^[A-Za-z0-9_-]{1,160}$/.test(sourceId)
+  ) throw new Error("Choose a valid contact.");
+
+  if (kind === "customer") {
+    if (!/^[0-9a-f-]{36}$/i.test(sourceId))
+      throw new Error("Choose a valid customer.");
+    const rows = await sql<{ name: string; company: string }[]>`
+      select coalesce(nullif(trim(full_name), ''), nullif(trim(company_name), ''), nullif(trim(email), ''), 'Customer') as name,
+        coalesce(nullif(trim(company_name), ''), '') as company
+      from public.profiles
+      where id = ${sourceId}::uuid and role = 'client'
+      limit 1
+    `;
+    if (!rows[0]) throw new Error("That customer could not be found.");
+    return { kind: kind as ManagerContactLinkKind, sourceId, ...rows[0] };
+  }
+  if (kind === "lead") {
+    if (!/^[0-9a-f-]{36}$/i.test(sourceId))
+      throw new Error("Choose a valid lead.");
+    const rows = await sql<{ name: string; company: string }[]>`
+      select coalesce(nullif(trim(full_name), ''), nullif(trim(company_name), ''), nullif(trim(email), ''), 'Lead') as name,
+        coalesce(nullif(trim(company_name), ''), '') as company
+      from public.manager_outreach_leads
+      where id = ${sourceId}::uuid
+      limit 1
+    `;
+    if (!rows[0]) throw new Error("That lead could not be found.");
+    return { kind: kind as ManagerContactLinkKind, sourceId, ...rows[0] };
+  }
+  const rows = await sql<{ name: string; company: string }[]>`
+    select coalesce(nullif(trim(supplier ->> 'contactName'), ''), nullif(trim(supplier ->> 'name'), ''), 'Supplier') as name,
+      coalesce(nullif(trim(supplier ->> 'name'), ''), '') as company
+    from public.workflow_manager_settings as setting,
+      lateral jsonb_array_elements(coalesce(setting.state #> '{qualificationSettings,suppliers}', '[]'::jsonb)) as supplier
+    where setting.id = 'singleton' and supplier ->> 'id' = ${sourceId}
+    limit 1
+  `;
+  if (!rows[0]) throw new Error("That supplier could not be found.");
+  return { kind: kind as ManagerContactLinkKind, sourceId, ...rows[0] };
+}
+
+async function linkManagerConversationContact(
+  managerId: string,
+  input: Record<string, unknown>,
+) {
+  const target = await managerContactLinkTarget(input.kind, input.sourceId);
+  const phone = normalizePhone(input.conversationPhone);
+  const email = validEmail(input.conversationEmail);
+  if (!phone && !email)
+    throw new Error("This conversation has no phone or email to link.");
+  const digits = phone?.replace(/\D/g, "") || "";
+  const notes = `Avantia link:${target.kind}:${target.sourceId}`;
+
+  return await sql.begin(async (transaction) => {
+    await transaction`select pg_advisory_xact_lock(hashtextextended(${`manager-contact-link:${phone || email}`}, 0))`;
+    const existing = phone
+      ? await transaction<{ id: string }[]>`
+          select id from public.aura_contacts
+          where normalized_phone = ${phone}
+          order by created_at asc limit 1
+        `
+      : await transaction<{ id: string }[]>`
+          select id from public.aura_contacts
+          where lower(email) = lower(${email!})
+          order by created_at asc limit 1
+        `;
+    const contactId = existing[0]?.id || crypto.randomUUID();
+    if (existing[0]) {
+      await transaction`
+        update public.aura_contacts
+        set full_name = ${target.name.slice(0, 160)},
+          company = ${target.company.slice(0, 160) || null},
+          notes = ${notes}, updated_at = now()
+        where id = ${contactId}::uuid
+      `;
+    } else {
+      await transaction`
+        insert into public.aura_contacts
+          (id, full_name, company, normalized_phone, email, notes)
+        values (
+          ${contactId}::uuid, ${target.name.slice(0, 160)},
+          ${target.company.slice(0, 160) || null}, ${phone}, ${email}, ${notes}
+        )
+      `;
+    }
+
+    const communications = phone && email
+      ? await transaction<{ id: string }[]>`
+          update public.aura_communications
+          set contact_id = ${contactId}::uuid, updated_at = now()
+          where regexp_replace(coalesce(counterparty_phone, ''), '[^0-9]', '', 'g') = ${digits}
+            or lower(counterparty_email) = lower(${email})
+          returning id
+        `
+      : phone
+        ? await transaction<{ id: string }[]>`
+            update public.aura_communications
+            set contact_id = ${contactId}::uuid, updated_at = now()
+            where regexp_replace(coalesce(counterparty_phone, ''), '[^0-9]', '', 'g') = ${digits}
+            returning id
+          `
+        : await transaction<{ id: string }[]>`
+            update public.aura_communications
+            set contact_id = ${contactId}::uuid, updated_at = now()
+            where lower(counterparty_email) = lower(${email!})
+            returning id
+          `;
+    if (!communications.length)
+      throw new Error("No messages were found in this conversation.");
+    const entityType = target.kind === "customer" ? "client" : target.kind;
+    for (const communication of communications) {
+      await transaction`
+        insert into public.aura_communication_links
+          (communication_id, entity_type, entity_id, entity_label, link_source, confidence, created_by)
+        values (
+          ${communication.id}::uuid, ${entityType}, ${target.sourceId},
+          ${target.name.slice(0, 240)}, 'manual', 1, ${managerId}::uuid
+        )
+        on conflict (communication_id, entity_type, entity_id) do update
+          set entity_label = excluded.entity_label, link_source = 'manual',
+            confidence = 1, created_by = excluded.created_by
+      `;
+    }
+    await transaction`
+      insert into public.aura_audit_log (actor_user_id, action, details)
+      values (${managerId}::uuid, 'manager_conversation_contact_linked', ${sql.json({
+        kind: target.kind,
+        sourceId: target.sourceId,
+        contactId,
+        communicationCount: communications.length,
+      })})
+    `;
+    return { contactId, linkedCount: communications.length };
+  });
+}
+
 async function enqueueManagerMessage(
   managerId: string,
   channel: "sms" | "whatsapp" | "email",
@@ -8524,6 +8798,7 @@ async function enqueueManagerMessage(
     : "";
   if (!destination || !body)
     throw new Error("Enter a valid recipient and message.");
+  if (channel === "whatsapp") await requireOpenMetaWhatsAppWindow(destination);
   const sourceCommunicationId =
     typeof sourceCommunicationIdValue === "string" &&
     /^[0-9a-f-]{36}$/i.test(sourceCommunicationIdValue)
@@ -11264,6 +11539,23 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Invalid JSON" }, 400);
   }
   try {
+    if (input.action === "ensure_phone_customer") {
+      const phone = normalizePhone(input.phone);
+      const name = typeof input.name === "string"
+        ? input.name.trim().slice(0, 160)
+        : "";
+      if (!phone) return json({ error: "Choose a valid phone number." }, 400);
+      const sourceId = await smsCustomerProfile(phone, name || phone);
+      return json({ ok: true, sourceId });
+    }
+    if (input.action === "link_communication_contact") {
+      const linked = await linkManagerConversationContact(manager.user.id, input);
+      return json({ ok: true, ...linked });
+    }
+    if (input.action === "queue_supplier_followups") {
+      const queued = await queueSupplierFollowUps();
+      return json({ ok: true, queued });
+    }
     if (input.action === "load_request_communications") {
       const requestId =
         typeof input.requestId === "string" &&
@@ -11315,6 +11607,111 @@ Deno.serve(async (req: Request) => {
           and link.entity_type in ('client', 'supplier')
       `;
       return json({ ok: true, communications, links });
+    }
+    if (input.action === "load_supplier_communications") {
+      const communications = await sql<Array<{
+        id: string;
+        supplier_id: string;
+        channel: string;
+        direction: string;
+        counterparty_phone: string | null;
+        counterparty_email: string | null;
+        subject: string | null;
+        body: string | null;
+        status: string | null;
+        occurred_at: string;
+        read_at: string | null;
+      }>>`
+        select communication.id, min(supplier_link.entity_id) as supplier_id,
+          communication.channel, communication.direction,
+          communication.counterparty_phone, communication.counterparty_email,
+          communication.subject, communication.body, communication.status,
+          communication.occurred_at, communication.read_at
+        from public.aura_communications as communication
+        join public.aura_communication_links as supplier_link
+          on supplier_link.communication_id = communication.id
+         and supplier_link.entity_type = 'supplier'
+        group by communication.id
+        having count(distinct supplier_link.entity_id) = 1
+        order by communication.occurred_at desc, communication.id desc
+        limit 1000
+      `;
+      return json({ ok: true, communications });
+    }
+    if (input.action === "load_communication_by_id") {
+      const communicationId = typeof input.communicationId === "string" &&
+          /^[0-9a-f-]{36}$/i.test(input.communicationId)
+        ? input.communicationId
+        : "";
+      if (!communicationId)
+        return json({ error: "Choose a valid communication." }, 400);
+      const communications = await sql<Array<Record<string, unknown>>>`
+        select communication.id, communication.contact_id, communication.provider,
+          communication.channel, communication.direction,
+          communication.counterparty_phone, communication.counterparty_email,
+          communication.subject, communication.body, communication.summary,
+          communication.transcript, communication.next_steps, communication.media,
+          communication.status, communication.duration_seconds,
+          communication.occurred_at, communication.last_event_at,
+          communication.mailbox_address, communication.message_id,
+          communication.in_reply_to, communication.read_at,
+          coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'communication_id', link.communication_id,
+              'entity_type', link.entity_type,
+              'entity_id', link.entity_id,
+              'entity_label', link.entity_label,
+              'link_source', link.link_source,
+              'confidence', link.confidence
+            ) order by link.created_at)
+            from public.aura_communication_links as link
+            where link.communication_id = communication.id
+          ), '[]'::jsonb) as links
+        from public.aura_communications as communication
+        where communication.id = ${communicationId}::uuid
+          and communication.channel in ('sms', 'whatsapp', 'email', 'call')
+        limit 1
+      `;
+      return json({ ok: true, communication: communications[0] ?? null });
+    }
+    if (input.action === "load_communication_updates") {
+      const afterValue = typeof input.after === "string" ? input.after : "";
+      const afterTime = Date.parse(afterValue);
+      if (!Number.isFinite(afterTime))
+        return json({ error: "Choose a valid update cursor." }, 400);
+      const after = new Date(Math.max(
+        afterTime,
+        Date.now() - 24 * 60 * 60 * 1000,
+      )).toISOString();
+      const communications = await sql<Array<Record<string, unknown>>>`
+        select communication.id, communication.contact_id, communication.provider,
+          communication.channel, communication.direction,
+          communication.counterparty_phone, communication.counterparty_email,
+          communication.subject, communication.body, communication.summary,
+          communication.transcript, communication.next_steps, communication.media,
+          communication.status, communication.duration_seconds,
+          communication.occurred_at, communication.last_event_at,
+          communication.mailbox_address, communication.message_id,
+          communication.in_reply_to, communication.read_at,
+          coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'communication_id', link.communication_id,
+              'entity_type', link.entity_type,
+              'entity_id', link.entity_id,
+              'entity_label', link.entity_label,
+              'link_source', link.link_source,
+              'confidence', link.confidence
+            ) order by link.created_at)
+            from public.aura_communication_links as link
+            where link.communication_id = communication.id
+          ), '[]'::jsonb) as links
+        from public.aura_communications as communication
+        where communication.channel in ('sms', 'whatsapp', 'email', 'call')
+          and communication.last_event_at > ${after}::timestamptz
+        order by communication.last_event_at asc, communication.id asc
+        limit 250
+      `;
+      return json({ ok: true, communications });
     }
     if (input.action === "delete_request_client_document") {
       const requestId = typeof input.requestId === "string" ? input.requestId : "";

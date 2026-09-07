@@ -32,105 +32,6 @@ type Result = { ok: true } | { ok: false; error: string };
 type SmsAiMode = "off" | "draft" | "auto_safe";
 type SmsAiStyle = "professional" | "friendly" | "brief";
 
-async function findPhoneAuthUser(
-  admin: ReturnType<typeof createAdminClient>,
-  phone: string,
-) {
-  for (let page = 1; page <= 100; page += 1) {
-    const result = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (result.error) return { user: null, error: result.error };
-    const user = result.data.users.find(
-      (candidate) => normalizeAuraPhone(candidate.phone || "") === phone,
-    );
-    if (user || result.data.users.length < 1000)
-      return { user: user || null, error: null };
-  }
-  return { user: null, error: new Error("customer_directory_scan_limit") };
-}
-
-async function ensureSmsPhoneCustomer(phone: string, name: string) {
-  const admin = createAdminClient();
-  const authLookup = await findPhoneAuthUser(admin, phone);
-  if (authLookup.error)
-    return {
-      ok: false as const,
-      error: "The secure customer directory could not be checked.",
-    };
-  let authUser = authLookup.user;
-  const profiles = await admin
-    .from("profiles")
-    .select("id,email,full_name,phone")
-    .eq("role", "client")
-    .not("phone", "is", null)
-    .limit(1000)
-    .returns<
-      Array<{
-        id: string;
-        email: string;
-        full_name: string | null;
-        phone: string | null;
-      }>
-    >();
-  if (profiles.error)
-    return {
-      ok: false as const,
-      error: "The customer directory could not be checked.",
-    };
-  const profile = (profiles.data || []).find(
-    (candidate) => normalizeAuraPhone(candidate.phone || "") === phone,
-  );
-  if (!authUser && profile) {
-    const linked = await admin.auth.admin.updateUserById(profile.id, {
-      phone,
-      phone_confirm: true,
-      user_metadata: {
-        full_name: profile.full_name || name,
-        phone,
-        login_type: "sms_request",
-      },
-    });
-    if (!linked.error) authUser = linked.data.user;
-    else authUser = (await findPhoneAuthUser(admin, phone)).user;
-  }
-  if (!authUser) {
-    const created = await admin.auth.admin.createUser({
-      phone,
-      phone_confirm: true,
-      user_metadata: { full_name: name, phone, login_type: "sms_request" },
-    });
-    if (created.error || !created.data.user)
-      return {
-        ok: false as const,
-        error: "The secure phone customer could not be added.",
-      };
-    authUser = created.data.user;
-  }
-  const currentName =
-    profile?.id === authUser.id ? profile.full_name?.trim() || "" : "";
-  const fullName =
-    currentName && currentName !== phone && !/^\+?[0-9 ()-]+$/.test(currentName)
-      ? currentName
-      : name;
-  const saved = await admin.from("profiles").upsert(
-    {
-      id: authUser.id,
-      email: authUser.email || profile?.email || "",
-      full_name: fullName,
-      phone,
-      role: "client",
-      approval_status: "pending",
-      is_active: true,
-    },
-    { onConflict: "id" },
-  );
-  if (saved.error)
-    return {
-      ok: false as const,
-      error: "The customer profile could not be saved.",
-    };
-  return { ok: true as const, customerId: authUser.id };
-}
-
 export type SmsRequestProposal = {
   communicationId: string;
   phone: string;
@@ -765,9 +666,21 @@ export async function quickTagPhoneContactAction(input: {
   const name = input.name?.trim().slice(0, 160) || phone;
   let sourceId = "";
   if (input.kind === "customer") {
-    const customer = await ensureSmsPhoneCustomer(phone, name);
-    if (!customer.ok) return customer;
-    sourceId = customer.customerId;
+    const customer = await supabase.functions.invoke<{
+      ok?: boolean;
+      sourceId?: string;
+      error?: string;
+    }>("aura-messaging-broker", {
+      body: { action: "ensure_phone_customer", phone, name },
+    });
+    if (customer.error || !customer.data?.ok || !customer.data.sourceId)
+      return {
+        ok: false as const,
+        error:
+          customer.data?.error ||
+          "The secure phone customer could not be added.",
+      };
+    sourceId = customer.data.sourceId;
   } else if (input.kind === "lead") {
     const existing = await supabase
       .from("manager_outreach_leads")
@@ -1031,7 +944,7 @@ export async function linkCommunicationContactAction(input: {
   conversationPhone?: string;
   conversationEmail?: string;
 }) {
-  const { user, access } = await requireManagerPortalProfile();
+  const { supabase, access } = await requireManagerPortalProfile();
   if (!access.customers)
     return {
       ok: false as const,
@@ -1050,122 +963,24 @@ export async function linkCommunicationContactAction(input: {
       ok: false as const,
       error: "This conversation has no phone or email to link.",
     };
-  const safeConversationPhone = conversationPhone || "";
-  const safeConversationEmail = conversationEmail || "";
-
-  const admin = createAdminClient();
-  const existingResult = conversationPhone
-    ? await admin
-        .from("aura_contacts")
-        .select("id,full_name,company,normalized_phone,email,notes")
-        .eq("normalized_phone", safeConversationPhone)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle<{
-          id: string;
-          full_name: string | null;
-          company: string | null;
-          normalized_phone: string | null;
-          email: string | null;
-          notes: string | null;
-        }>()
-    : await admin
-        .from("aura_contacts")
-        .select("id,full_name,company,normalized_phone,email,notes")
-        .ilike("email", safeConversationEmail)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle<{
-          id: string;
-          full_name: string | null;
-          company: string | null;
-          normalized_phone: string | null;
-          email: string | null;
-          notes: string | null;
-        }>();
-  if (existingResult.error)
-    return { ok: false as const, error: "The contact could not be checked." };
-
-  const existing = existingResult.data;
-  const contactId = existing?.id || crypto.randomUUID();
-  const contactValues = {
-    full_name:
-      input.name.trim().slice(0, 160) ||
-      existing?.full_name ||
-      safeConversationPhone ||
-      safeConversationEmail,
-    company: input.company?.trim().slice(0, 160) || existing?.company || null,
-    normalized_phone: conversationPhone || existing?.normalized_phone || null,
-    email: conversationEmail || existing?.email || null,
-  };
-  const contactResult = existing
-    ? await admin
-        .from("aura_contacts")
-        .update(contactValues)
-        .eq("id", contactId)
-    : await admin
-        .from("aura_contacts")
-        .insert({ id: contactId, ...contactValues, notes: null });
-  if (contactResult.error)
+  const linked = await supabase.functions.invoke<{
+    ok?: boolean;
+    error?: string;
+  }>("aura-messaging-broker", {
+    body: {
+      action: "link_communication_contact",
+      kind: input.kind,
+      sourceId: input.sourceId,
+      conversationPhone,
+      conversationEmail,
+    },
+  });
+  if (linked.error || !linked.data?.ok) {
     return {
       ok: false as const,
-      error: "The contact link could not be saved.",
-    };
-
-  const communicationIds = new Set<string>();
-  const communicationUpdates = [
-    ...(conversationPhone
-      ? [
-          admin
-            .from("aura_communications")
-            .update({ contact_id: contactId })
-            .eq("counterparty_phone", conversationPhone)
-            .select("id"),
-        ]
-      : []),
-    ...(conversationEmail
-      ? [
-          admin
-            .from("aura_communications")
-            .update({ contact_id: contactId })
-            .ilike("counterparty_email", conversationEmail)
-            .select("id"),
-        ]
-      : []),
-  ];
-  const updated = await Promise.all(communicationUpdates);
-  if (updated.some((result) => result.error))
-    return {
-      ok: false as const,
-      error: "The conversation could not be linked.",
-    };
-  for (const result of updated)
-    for (const row of result.data ?? []) communicationIds.add(String(row.id));
-  if (!communicationIds.size)
-    return {
-      ok: false as const,
-      error: "No messages were found in this conversation.",
-    };
-
-  try {
-    await addAuraCommunicationLinks(
-      [...communicationIds],
-      [
-        {
-          entity_type: input.kind === "customer" ? "client" : input.kind,
-          entity_id: input.sourceId,
-          entity_label:
-            input.name.trim() || safeConversationPhone || safeConversationEmail,
-          link_source: "manual",
-          confidence: 1,
-        },
-      ],
-      user.id,
-    );
-  } catch {
-    return {
-      ok: false as const,
-      error: "The structured conversation link could not be saved.",
+      error:
+        linked.data?.error ||
+        "The conversation could not be linked. Please try again.",
     };
   }
 

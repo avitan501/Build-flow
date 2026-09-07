@@ -426,8 +426,9 @@ export async function sendAuraWelcomePackageAction(input: {
     });
     return {
       ok: false,
-      error:
-        error instanceof Error
+      error: input.channel === "whatsapp"
+        ? whatsappSendError(error)
+        : error instanceof Error
           ? error.message
           : "Welcome Package could not be queued.",
     };
@@ -566,7 +567,9 @@ export async function sendAuraMessageWithAttachmentAction(
       error:
         error instanceof Error && error.message === "upload_failed"
           ? "One or more attachments could not be saved."
-          : "The message could not be queued for delivery.",
+          : channel === "whatsapp"
+            ? whatsappSendError(error)
+            : "The message could not be queued for delivery.",
     };
   }
 }

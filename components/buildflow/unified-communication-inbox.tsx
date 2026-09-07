@@ -1308,25 +1308,6 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         </aside>
 
         <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-[#f5f5f7]`}>
-          {activeKey !== "__new__" && activeConversation?.phone && activeConversation.identityStatus === "unknown" ? (
-            <section className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-2" aria-label="Add contact">
-              <div className="flex min-w-0 items-center gap-2">
-                <UserRound className="h-4 w-4 shrink-0 text-sky-700" />
-                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{activeConversation.latest.channel === "call" ? "Unknown caller" : "Unknown sender"} · save this number</span>
-                {(
-                  [
-                    ["customer", "Customer"],
-                    ["lead", "Lead"],
-                    ["supplier", "Supplier"],
-                  ] as const
-                ).map(([kind, label]) => (
-                  <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending} className="h-7 shrink-0 rounded-full border border-sky-200 bg-white px-2 text-[10px] font-bold text-sky-900 disabled:opacity-50">
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
           {activeKey === "__new__" ? (
             <header className="shrink-0 border-b border-slate-200 bg-white p-3">
               <div className="flex items-center gap-2">
@@ -1384,7 +1365,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   </button>
                 ) : null}
               </div>
-              {activeConversation.phone ? (
+              {activeConversation.phone && activeConversation.identityStatus === "unknown" ? (
                 <details className="mt-2 rounded-md border border-slate-200 bg-white">
                   <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700">
                     <UserRound className="h-3.5 w-3.5 text-sky-700" />
@@ -1549,7 +1530,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                             <strong>Summary:</strong> {item.summary}
                           </p>
                         ) : null}
-                        {item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}
+                        {item.next_steps?.length ? <p className={`mt-1 text-xs font-semibold ${item.status === "failed" ? "text-rose-700" : "text-[#0066cc]"}`}>{item.status === "failed" ? item.next_steps.join(" · ") : `Next: ${item.next_steps.join(" · ")}`}</p> : null}
                         {media.length ? (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {media.map((attachment, index) =>
