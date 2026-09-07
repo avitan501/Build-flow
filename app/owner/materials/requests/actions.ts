@@ -86,49 +86,17 @@ export async function updateRequestSupplierContactStatusAction(input: { requestI
   const status = String(input.status || "") as RequestSupplierContactStatus
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !supplierId || supplierId.length > 180 || !REQUEST_SUPPLIER_CONTACT_STATUSES.has(status)) return { ok: false as const, error: "Choose a valid supplier status." }
 
-  const { supabase, user } = await requireStaffProfile("customers")
-  const admin = createAdminClient()
-  const [{ data: request, error: requestError }, { data: supplierData, error: supplierError }, { data: previous, error: previousError }] = await Promise.all([
+  const { supabase } = await requireStaffProfile("customers")
+  const [{ data: request, error: requestError }, { data: supplierData, error: supplierError }] = await Promise.all([
     supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>(),
     supabase.rpc("staff_load_catalog_suppliers"),
-    admin.from("quote_request_supplier_recommendations").select("contact_status").eq("request_id", requestId).eq("supplier_id", supplierId).maybeSingle<{ contact_status: RequestSupplierContactStatus }>(),
   ])
   const supplier = (Array.isArray(supplierData) ? supplierData : []).find((entry) => String((entry as { id?: unknown }).id || "") === supplierId) as { id?: string; name?: string } | undefined
-  if (requestError || supplierError || previousError || !request || !supplier?.name) return { ok: false as const, error: "The supplier could not be found for this request." }
-  if (previous?.contact_status === status) return { ok: true as const }
-
-  const { data: savedStatus, error: statusError } = await admin.from("quote_request_supplier_recommendations").upsert({
-    request_id: requestId,
-    supplier_id: supplierId,
-    supplier_name_snapshot: supplier.name,
-    is_recommended: true,
-    should_contact: true,
-    contact_status: status,
-    updated_by: user.id,
-    created_by: user.id,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "request_id,supplier_id" }).select("contact_status").single<{ contact_status: RequestSupplierContactStatus }>()
-  if (statusError || savedStatus?.contact_status !== status) return { ok: false as const, error: "The supplier status could not be saved." }
-
-  const labels: Record<RequestSupplierContactStatus, string> = {
-    not_contacted: "Not contacted",
-    request_sent: "Request sent",
-    supplier_replied: "Supplier replied",
-    awaiting_supplier_reply: "Replied · waiting for supplier",
-    quote_received: "Quote received",
-  }
-  const { error: eventError } = await admin.from("project_events").insert({
-    project_id: request.project_id,
-    owner_id: request.owner_id,
-    event_type: "status_changed",
-    source: "admin",
-    title: `${supplier.name}: ${labels[status]}`,
-    description: `Supplier progress changed from ${labels[previous?.contact_status || "not_contacted"]} to ${labels[status]}.`,
-    metadata: { quote_request_id: requestId, supplier_id: supplierId, supplier_name: supplier.name, manager_action: "supplier_contact_status", previous_status: previous?.contact_status || "not_contacted", supplier_contact_status: status },
+  if (requestError || supplierError || !request || !supplier?.name) return { ok: false as const, error: "The supplier could not be found for this request." }
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", {
+    body: { action: "save_request_supplier_status", requestId, supplierId, status },
   })
-  if (eventError) {
-    console.error("Supplier status history could not be recorded", { requestId, supplierId, status, reason: eventError.message })
-  }
+  if (error || !data?.ok) return { ok: false as const, error: data?.error || "The supplier status could not be saved." }
 
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
@@ -1005,23 +973,10 @@ export async function deleteRequestClientDocumentAction(input: { requestId: stri
   }
   if (saved.version !== version) return { ok: false as const, error: "This document changed after you opened the page. Refresh before deleting it." }
 
-  let admin: ReturnType<typeof createAdminClient>
-  try {
-    admin = createAdminClient()
-  } catch {
-    return { ok: false as const, error: "Document deletion is not available right now. Please try again later." }
-  }
-  const { data: deleted, error: deleteError } = await admin.from("request_client_documents")
-    .delete()
-    .eq("id", saved.id)
-    .eq("request_id", requestId)
-    .eq("document_type", documentType)
-    .eq("public_token", publicToken)
-    .eq("version", version)
-    .select("id")
-    .maybeSingle<{ id: string }>()
-  if (deleteError?.code === "23503") return { ok: false as const, error: "This document has a recorded client acceptance and cannot be deleted. Save a corrected version instead." }
-  if (deleteError || !deleted) return { ok: false as const, error: "The document was not deleted. Refresh and try again." }
+  const { data: deleted, error: deleteError } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", {
+    body: { action: "delete_request_client_document", requestId, documentType, publicToken, version },
+  })
+  if (deleteError || !deleted?.ok) return { ok: false as const, error: deleted?.error || "The document was not deleted. Refresh and try again." }
 
   const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
   const { error: eventError } = await supabase.from("project_events").insert({

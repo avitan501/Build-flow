@@ -19,14 +19,27 @@ test("request timelines distinguish client replies from supplier replies", async
 })
 
 test("request supplier activity uses structured links across all communication channels", async () => {
-  const page = await readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8")
+  const [page, broker] = await Promise.all([
+    readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ])
 
-  expect(page).toContain('"id,channel,direction,counterparty_email,counterparty_phone,subject,body,occurred_at,status,media"')
+  expect(page).toContain('action: "load_request_communications"')
   expect(page).toContain('structuredSupplierCommunicationIds')
-  expect(page).toContain('.in("entity_type", ["client", "supplier"])')
-  expect(page).toContain('const communicationsAdmin = createAdminClient()')
   expect(page).toContain('Could not load request communications')
   expect(page).not.toContain('.eq("channel", "email")')
+  expect(page).not.toContain("createAdminClient")
+  expect(broker).toContain('input.action === "load_request_communications"')
+  expect(broker).toContain("request_link.entity_type = 'material_request'")
+  expect(broker).toContain("link.entity_type in ('client', 'supplier')")
+})
+
+test("supplier updates suppress generic phone pushes and use the website workflow", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toContain('Handled in supplier communication workflow')
+  expect(broker).toContain('call_message:${input.communicationId}')
+  expect(broker).toContain('missed_call:${input.communicationId}')
+  expect(broker.indexOf('Handled in supplier communication workflow')).toBeLessThan(broker.indexOf('if (input.direction !== "incoming") return;'))
 })
 
 test("quick supplier creation is collision-safe and verified before linking", async () => {

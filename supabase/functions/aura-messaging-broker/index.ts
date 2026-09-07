@@ -1232,6 +1232,20 @@ async function autoLinkSupplierCommunication(input: {
     on conflict (communication_id, entity_type, entity_id) do nothing
   `;
 
+  // Supplier updates stay in the website's supplier/client notification lanes.
+  // Suppress the generic push before its dispatcher can send a duplicate,
+  // context-free phone notification.
+  await sql`
+    update public.manager_push_queue
+    set processed_at = coalesce(processed_at, now()),
+        last_error = coalesce(last_error, 'Handled in supplier communication workflow')
+    where processed_at is null
+      and dedupe_key in (
+        ${`call_message:${input.communicationId}`},
+        ${`missed_call:${input.communicationId}`}
+      )
+  `;
+
   if (input.direction !== "incoming") return;
   const recentRequests = await sql<{ entity_id: string; entity_label: string }[]>`
     select distinct link.entity_id, link.entity_label
@@ -11250,6 +11264,138 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Invalid JSON" }, 400);
   }
   try {
+    if (input.action === "load_request_communications") {
+      const requestId =
+        typeof input.requestId === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId)
+          ? input.requestId
+          : "";
+      if (!requestId) return json({ error: "Choose a valid material request." }, 400);
+      const requestRows = await sql<{ id: string }[]>`
+        select id from public.quote_requests where id = ${requestId}::uuid limit 1
+      `;
+      if (!requestRows[0]) return json({ error: "Material request not found." }, 404);
+      const communications = await sql<Array<{
+        id: string;
+        channel: string;
+        direction: string;
+        counterparty_email: string | null;
+        counterparty_phone: string | null;
+        subject: string | null;
+        body: string | null;
+        occurred_at: string;
+        status: string | null;
+        media: unknown;
+      }>>`
+        select communication.id, communication.channel, communication.direction,
+          communication.counterparty_email, communication.counterparty_phone,
+          communication.subject, communication.body, communication.occurred_at,
+          communication.status, communication.media
+        from public.aura_communications as communication
+        join public.aura_communication_links as request_link
+          on request_link.communication_id = communication.id
+         and request_link.entity_type = 'material_request'
+         and request_link.entity_id = ${requestId}
+        order by communication.occurred_at desc, communication.id desc
+        limit 500
+      `;
+      const links = await sql<Array<{
+        communication_id: string;
+        entity_type: string;
+        entity_id: string;
+      }>>`
+        select link.communication_id, link.entity_type, link.entity_id
+        from public.aura_communication_links as link
+        where link.communication_id in (
+          select request_link.communication_id
+          from public.aura_communication_links as request_link
+          where request_link.entity_type = 'material_request'
+            and request_link.entity_id = ${requestId}
+        )
+          and link.entity_type in ('client', 'supplier')
+      `;
+      return json({ ok: true, communications, links });
+    }
+    if (input.action === "delete_request_client_document") {
+      const requestId = typeof input.requestId === "string" ? input.requestId : "";
+      const documentType = typeof input.documentType === "string" ? input.documentType : "";
+      const publicToken = typeof input.publicToken === "string" ? input.publicToken : "";
+      const version = Number(input.version);
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) ||
+        !["estimate", "invoice", "receipt"].includes(documentType) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(publicToken) ||
+        !Number.isSafeInteger(version) || version < 1
+      ) return json({ error: "The selected client document is invalid." }, 400);
+      const rows = await sql<Array<{ id: string; document_number: string }>>`
+        delete from public.request_client_documents as document
+        where document.request_id = ${requestId}::uuid
+          and document.document_type = ${documentType}
+          and document.public_token = ${publicToken}::uuid
+          and document.version = ${version}
+          and not exists (
+            select 1 from public.request_client_document_acceptances as acceptance
+            where acceptance.client_document_id = document.id
+              and acceptance.document_version = document.version
+          )
+        returning document.id, document.document_number
+      `;
+      if (!rows[0]) return json({ error: "The document was not deleted. Refresh and confirm that it has not been accepted." }, 409);
+      return json({ ok: true, id: rows[0].id, documentNumber: rows[0].document_number });
+    }
+    if (input.action === "save_request_supplier_status") {
+      const requestId = typeof input.requestId === "string" ? input.requestId : "";
+      const supplierId = typeof input.supplierId === "string" ? input.supplierId.trim().slice(0, 180) : "";
+      const status = typeof input.status === "string" ? input.status : "";
+      const allowedStatuses = new Set(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"]);
+      if (!/^[0-9a-f-]{36}$/i.test(requestId) || !supplierId || !allowedStatuses.has(status)) {
+        return json({ error: "Choose a valid supplier status." }, 400);
+      }
+      const requests = await sql<Array<{ project_id: string; owner_id: string }>>`
+        select project_id, owner_id from public.quote_requests where id = ${requestId}::uuid limit 1
+      `;
+      const suppliers = await sql<Array<{ name: string }>>`
+        select coalesce(nullif(supplier ->> 'name', ''), 'Supplier') as name
+        from public.workflow_manager_settings as setting,
+          lateral jsonb_array_elements(coalesce(setting.state #> '{qualificationSettings,suppliers}', '[]'::jsonb)) as supplier
+        where setting.id = 'singleton' and supplier ->> 'id' = ${supplierId}
+        limit 1
+      `;
+      if (!requests[0] || !suppliers[0]) return json({ error: "The supplier could not be found for this request." }, 404);
+      const previousRows = await sql<Array<{ contact_status: string }>>`
+        select contact_status from public.quote_request_supplier_recommendations
+        where request_id = ${requestId}::uuid and supplier_id = ${supplierId}
+        limit 1
+      `;
+      const previousStatus = previousRows[0]?.contact_status || "not_contacted";
+      if (previousStatus === status) return json({ ok: true, unchanged: true });
+      await sql`
+        insert into public.quote_request_supplier_recommendations
+          (request_id, supplier_id, supplier_name_snapshot, is_recommended, should_contact,
+           contact_status, updated_by, created_by, updated_at)
+        values (${requestId}::uuid, ${supplierId}, ${suppliers[0].name}, true, true,
+          ${status}, ${manager.user.id}::uuid, ${manager.user.id}::uuid, now())
+        on conflict (request_id, supplier_id) do update set
+          supplier_name_snapshot = excluded.supplier_name_snapshot,
+          is_recommended = true, should_contact = true,
+          contact_status = excluded.contact_status,
+          updated_by = excluded.updated_by, updated_at = now()
+      `;
+      const labels: Record<string, string> = {
+        not_contacted: "Not contacted", request_sent: "Request sent",
+        supplier_replied: "Supplier replied", awaiting_supplier_reply: "Replied · waiting for supplier",
+        quote_received: "Quote received",
+      };
+      await sql`
+        insert into public.project_events
+          (project_id, owner_id, event_type, source, title, description, metadata)
+        values (${requests[0].project_id}::uuid, ${requests[0].owner_id}::uuid,
+          'status_changed', 'admin', ${`${suppliers[0].name}: ${labels[status]}`},
+          ${`Supplier progress changed from ${labels[previousStatus] || "Not contacted"} to ${labels[status]}.`},
+          ${sql.json({ quote_request_id: requestId, supplier_id: supplierId, supplier_name: suppliers[0].name, manager_action: "supplier_contact_status", previous_status: previousStatus, supplier_contact_status: status })})
+      `;
+      return json({ ok: true });
+    }
     if (input.action === "confirm_trusted_sms_intake") {
       if (!manager.isOwner)
         return json(
