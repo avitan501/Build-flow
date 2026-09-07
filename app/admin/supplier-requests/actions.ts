@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
+import { PERMANENT_DELETION_BLOCKED_MESSAGE, permanentDeletionIsEnabled } from "@/lib/permanent-deletion"
 
 type DeleteSupplierRequestResult =
   | { ok: true }
   | { ok: false; error: string }
 
 export async function deleteSupplierQuoteRequestAction(requestId: string): Promise<DeleteSupplierRequestResult> {
+  if (!permanentDeletionIsEnabled()) return { ok: false, error: PERMANENT_DELETION_BLOCKED_MESSAGE }
   const { supabase } = await requireStaffProfile("suppliers")
   const normalizedId = requestId.trim()
 

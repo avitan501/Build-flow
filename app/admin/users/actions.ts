@@ -7,6 +7,7 @@ import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization";
+import { PERMANENT_DELETION_BLOCKED_MESSAGE, permanentDeletionIsEnabled } from "@/lib/permanent-deletion";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects";
 
@@ -444,6 +445,7 @@ export async function createRequestForClientAction(input: {
 }
 
 export async function deleteOpenRequestAction(requestId: string): Promise<DeleteManagerRecordResult> {
+  if (!permanentDeletionIsEnabled()) return { ok: false, error: PERMANENT_DELETION_BLOCKED_MESSAGE };
   const { supabase } = await requireStaffProfile("customers");
   const normalizedId = requestId.trim();
   if (!validUuid(normalizedId)) return { ok: false, error: "This request could not be identified." };
@@ -464,6 +466,7 @@ export async function deleteOpenRequestAction(requestId: string): Promise<Delete
 }
 
 export async function deleteProjectAction(projectId: string): Promise<DeleteManagerRecordResult> {
+  if (!permanentDeletionIsEnabled()) return { ok: false, error: PERMANENT_DELETION_BLOCKED_MESSAGE };
   const { supabase } = await requireStaffProfile("customers");
   const normalizedId = projectId.trim();
   if (!validUuid(normalizedId)) return { ok: false, error: "This project could not be identified." };
@@ -485,6 +488,7 @@ export async function deleteProjectAction(projectId: string): Promise<DeleteMana
 }
 
 export async function deleteCustomerAction(customerId: string): Promise<DeleteManagerRecordResult> {
+  if (!permanentDeletionIsEnabled()) return { ok: false, error: PERMANENT_DELETION_BLOCKED_MESSAGE };
   const { supabase } = await requireAdminProfile();
   const normalizedId = customerId.trim();
   if (!validUuid(normalizedId)) return { ok: false, error: "This customer could not be identified." };
