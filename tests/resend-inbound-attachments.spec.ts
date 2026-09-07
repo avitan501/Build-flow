@@ -58,6 +58,7 @@ test("verified inbound email attachments are durable, private, and review-only",
 
   expect(resend.indexOf("verifyAuraResendWebhook")).toBeLessThan(resend.indexOf("storeAuraResendEvent"));
   expect(resend).toContain("persistAuraResendAttachments");
+  expect(resend).toContain("email.attachments?.length ? email.attachments : event.data.attachments || []");
   expect(attachmentStore).toContain("/emails/receiving/${emailId}/attachments/${encodeURIComponent(attachmentId)}");
   expect(attachmentStore).toContain("attachmentIds: string[]");
   expect(attachmentStore).toContain('storage.from(AURA_EMAIL_ATTACHMENT_BUCKET)');
@@ -68,6 +69,7 @@ test("verified inbound email attachments are durable, private, and review-only",
   expect(downloadRoute).toContain('Cache-Control": "private, no-store"');
   expect(downloadRoute).toContain("session.supabase.storage.from(AURA_EMAIL_ATTACHMENT_BUCKET).download(storagePath)");
   expect(broker).toContain("persistResendAttachments");
+  expect(broker).toContain("email.attachments?.length");
   expect(broker).toContain("attachmentIds: attachments.flatMap");
   expect(broker).toContain("/attachments/${encodeURIComponent(attachmentId)}");
   expect(broker).toContain("inbound-email/${params.communicationId}");

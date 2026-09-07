@@ -687,8 +687,13 @@ async function handleResendWebhook(req: Request) {
     to?: string[];
     message_id?: string | null;
     headers?: Record<string, string>;
+    attachments?: Array<{ id?: string; filename?: string; content_type?: string }>;
   };
-  const attachments = event.data.attachments || [];
+  // The received-email API is the durable source of truth. A webhook can carry
+  // attachment names without the IDs needed by the attachment download API.
+  const attachments = email.attachments?.length
+    ? email.attachments
+    : event.data.attachments || [];
   const attachmentNames = attachments
     .map((item) => item.filename)
     .filter(Boolean);

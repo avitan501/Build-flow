@@ -74,8 +74,19 @@ export async function storeAuraResendEvent(payload: unknown) {
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`Unable to retrieve received email: HTTP ${response.status}.`);
-  const email = (await response.json()) as { text?: string | null; html?: string | null; to?: string[]; message_id?: string | null; headers?: Record<string, string> };
-  const attachmentNames = (event.data.attachments || []).map((attachment) => attachment.filename).filter(Boolean);
+  const email = (await response.json()) as {
+    text?: string | null;
+    html?: string | null;
+    to?: string[];
+    message_id?: string | null;
+    headers?: Record<string, string>;
+    attachments?: Array<{ id?: string; filename?: string; content_type?: string }>;
+  };
+  // Resend's received-email record is the durable source of truth. Some webhook
+  // deliveries contain attachment names but omit the attachment IDs required by
+  // the download endpoint, so prefer the retrieved email metadata when present.
+  const attachments = email.attachments?.length ? email.attachments : event.data.attachments || [];
+  const attachmentNames = attachments.map((attachment) => attachment.filename).filter(Boolean);
   const body = (email.text?.trim() || (email.html ? stripHtml(email.html) : "")).slice(0, 20_000);
 
   const counterpartyEmail = event.data.from;
@@ -97,12 +108,12 @@ export async function storeAuraResendEvent(payload: unknown) {
     inReplyTo,
   });
   await autoLinkAuraEmail({ communicationId, counterpartyEmail, subject: event.data.subject, inReplyTo });
-  if (event.data.attachments?.length) {
+  if (attachments.length) {
     const media = await persistAuraResendAttachments({
       apiKey,
       emailId: event.data.email_id,
       communicationId,
-      attachmentIds: event.data.attachments.flatMap((attachment) =>
+      attachmentIds: attachments.flatMap((attachment) =>
         typeof attachment.id === "string" ? [attachment.id] : []
       ),
     });
