@@ -39,6 +39,7 @@ export type AuraWhatsAppUtilityTemplateName =
   | "service_request_received"
   | "quote_ready"
   | "order_received";
+export type AuraWhatsAppMarketingTemplateName = "carlos_welcome_package";
 export type PrepareQuoAttachmentResult =
   | { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string }
   | { ok: false; error: string };
@@ -456,6 +457,91 @@ export async function sendAuraWhatsAppUtilityTemplateAction(input: {
       return {
         ok: false,
         error: "This WhatsApp template is still waiting for Meta approval.",
+      };
+    }
+    return { ok: false, error: whatsappSendError(error) };
+  }
+}
+
+export async function sendAuraWhatsAppWelcomeTemplateAction(input: {
+  recipient: string;
+  recipientLabel?: string;
+  customerFirstName: string;
+  consentConfirmed: boolean;
+}): Promise<SendAuraMessageResult> {
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.customers)
+    return { ok: false, error: "Customer communication access is required." };
+
+  const phone = normalizeAuraPhone(input.recipient);
+  const customerFirstName = String(input.customerFirstName || "").trim();
+  if (!phone) return { ok: false, error: "Enter a valid customer phone number." };
+  if (
+    !customerFirstName ||
+    customerFirstName.length > 80 ||
+    /[\n\r\t]/.test(customerFirstName)
+  ) {
+    return { ok: false, error: "Enter the customer's first name." };
+  }
+  if (input.consentConfirmed !== true) {
+    return {
+      ok: false,
+      error: "Confirm that this customer agreed to receive WhatsApp messages from Avantia Build.",
+    };
+  }
+
+  const startedAt = Date.now();
+  const templateName: AuraWhatsAppMarketingTemplateName = "carlos_welcome_package";
+  const label = input.recipientLabel || phone;
+  try {
+    const result = await invokeMessagingBroker(supabase, {
+      action: "send_whatsapp_marketing_template",
+      to: phone,
+      templateName,
+      parameters: [customerFirstName],
+      consentConfirmed: true,
+      consentSource: "manager_confirmed_customer_opt_in",
+    });
+    if (!result.id)
+      return {
+        ok: false,
+        error: "Meta did not confirm this WhatsApp template message. Check the conversation before trying again.",
+      };
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: "whatsapp",
+      recipient: phone,
+      label,
+      outcome: "sent",
+      startedAt,
+      subject: `WhatsApp marketing template: ${templateName}`,
+    });
+    revalidatePath("/admin/communications");
+    revalidatePath("/admin/users");
+    return {
+      ok: true,
+      externalId: result.id,
+      occurredAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: "whatsapp",
+      recipient: phone,
+      label,
+      outcome: "failed",
+      startedAt,
+      subject: `WhatsApp marketing template: ${templateName}`,
+    });
+    const detail = error instanceof Error ? error.message : "";
+    if (/template.*pending|not approved|whatsapp_template_not_approved/i.test(detail)) {
+      return {
+        ok: false,
+        error: "The Carlos Welcome Package is still waiting for Meta approval.",
+      };
+    }
+    if (/recipient.*opted.out|whatsapp_recipient_opted_out/i.test(detail)) {
+      return {
+        ok: false,
+        error: "This customer asked to stop WhatsApp updates. Do not send a marketing message.",
       };
     }
     return { ok: false, error: whatsappSendError(error) };

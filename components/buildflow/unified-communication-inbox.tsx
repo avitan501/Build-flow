@@ -75,7 +75,7 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<AuraWhatsAppUtilityTemplateName, {
     fields: [
       { label: "Customer first name", placeholder: "John" },
       { label: "Quote number", placeholder: "Q-1042" },
-      { label: "Secure quote URL", placeholder: "https://build.avantiap.com/client-document/..." },
+      { label: "Secure quote URL", placeholder: "https://avantiabuild.com/client-document/..." },
     ],
     render: ([name, quote, url]) => `Hi ${name}, your Avantia Build quote ${quote} is ready. Review the details here: ${url}. Reply here if you have any questions.`,
   },

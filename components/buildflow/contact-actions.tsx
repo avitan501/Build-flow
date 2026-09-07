@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction, sendAuraWelcomePackageAction } from "@/app/owner/aura/actions"
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction, sendAuraWelcomePackageAction, sendAuraWhatsAppWelcomeTemplateAction } from "@/app/owner/aura/actions"
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
@@ -32,6 +32,13 @@ function welcomePackageMessages(name: string) {
     `Hi ${firstName(name)}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery. See how it works: ${PRODUCTION_SITE_ORIGIN}`,
     "Send me whatever you have—a material list, photo, plan, or another supplier’s quote. We’ll work from there.",
   ] as const
+}
+
+const WHATSAPP_WELCOME_HEADER = "Construction material pricing"
+const WHATSAPP_WELCOME_FOOTER = "Reply STOP to stop promotional updates."
+
+function welcomePackageWhatsAppBody(name: string) {
+  return `Hi ${firstName(name)}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery.\n\nSend me whatever you have—a material list, photo, plan, or another supplier’s quote. We’ll work from there.\n\nSee how it works: ${PRODUCTION_SITE_ORIGIN}`
 }
 
 function templateMessage(template: TemplateKey, name: string, senderName: string) {
@@ -63,6 +70,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   const [subject, setSubject] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState("")
+  const [marketingConsentConfirmed, setMarketingConsentConfirmed] = useState(false)
   const [contactMenuOpen, setContactMenuOpen] = useState(false)
   const [videoMenuOpen, setVideoMenuOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState<AuraShareVideoId | null>(null)
@@ -78,6 +86,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setAttachment(null)
     setFeedback("")
     setIsWelcomePackage(false)
+    setMarketingConsentConfirmed(false)
   }
 
   function close() {
@@ -101,6 +110,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   }
 
   function chooseTemplate(value: TemplateKey) {
+    setMarketingConsentConfirmed(false)
     setTemplate(value)
     setIsWelcomePackage(value === "welcome")
     setMessage(templateMessage(value, name, senderName))
@@ -110,6 +120,11 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     else if (value === "quote_follow_up") setSubject("Your Avantia Build estimate")
     else if (value === "order_follow_up") setSubject("Your Avantia Build order")
     else setSubject("Message from Avantia Build")
+  }
+
+  function chooseChannel(value: Channel) {
+    if (value !== channel) setMarketingConsentConfirmed(false)
+    setChannel(value)
   }
 
   function send() {
@@ -140,8 +155,10 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
       const welcomeIdempotencyKey = isWelcomePackage && channel !== "email" && normalizedPhone
         ? `welcome/${normalizedPhone.replace(/\D/g, "")}`
         : undefined
-      const result = isWelcomePackage && channel !== "email"
-        ? await sendAuraWelcomePackageAction({ channel, recipient, recipientLabel: name, messages: [message, welcomeFollowUp], idempotencyKey: welcomeIdempotencyKey! })
+      const result = isWelcomePackage && channel === "whatsapp"
+        ? await sendAuraWhatsAppWelcomeTemplateAction({ recipient, recipientLabel: name, customerFirstName: firstName(name), consentConfirmed: marketingConsentConfirmed })
+        : isWelcomePackage && channel === "sms"
+          ? await sendAuraWelcomePackageAction({ channel, recipient, recipientLabel: name, messages: [message, welcomeFollowUp], idempotencyKey: welcomeIdempotencyKey! })
         : await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message, idempotencyKey: welcomeIdempotencyKey })
       if (!result.ok) { setFeedback(result.error); return }
       resetComposer()
@@ -180,19 +197,25 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     </div>
 
     {channel && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-compose-title" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
-      <section className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-2xl">
+      <section className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase text-[#0066cc]">{channel === "sms" ? "Q U O text" : channel === "email" ? "Email" : "WhatsApp"}</p><h2 id="contact-compose-title" className="mt-0.5 font-semibold">{name}</h2></div><button type="button" onClick={close} aria-label="Close" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200"><X className="h-4 w-4" /></button></header>
-        <div className="grid gap-3 p-4">
+        <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
           <label className="grid gap-1 text-xs font-semibold">Template<select value={template} onChange={(event) => chooseTemplate(event.target.value as TemplateKey)} className="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">{(Object.keys(templateLabels) as TemplateKey[]).map((key) => <option key={key} value={key}>{templateLabels[key]}</option>)}</select></label>
-          <fieldset><legend className="text-xs font-semibold">Channel</legend><div className="mt-1 grid grid-cols-3 gap-1">{([['sms', 'Text', Smartphone], ['whatsapp', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={value === "email" ? !email || isWelcomePackage : !normalizedPhone} onClick={() => setChannel(value)} className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold disabled:opacity-30 ${channel === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div></fieldset>
+          <fieldset><legend className="text-xs font-semibold">Channel</legend><div className="mt-1 grid grid-cols-3 gap-1">{([['sms', 'Text', Smartphone], ['whatsapp', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={value === "email" ? !email || isWelcomePackage : !normalizedPhone} onClick={() => chooseChannel(value)} className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold disabled:opacity-30 ${channel === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div></fieldset>
           {channel === "email" ? <label className="grid gap-1 text-xs font-semibold">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
-          <label className="grid gap-1 text-xs font-semibold">{isWelcomePackage ? "Message 1 of 2" : "Exact message preview"}<textarea autoFocus value={message} onChange={(event) => { setMessage(event.target.value); setTemplate("custom") }} maxLength={1600} rows={isWelcomePackage ? 5 : 7} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label>
-          {isWelcomePackage ? <label className="grid gap-1 text-xs font-semibold">Message 2 of 2<textarea value={welcomeFollowUp} onChange={(event) => { setWelcomeFollowUp(event.target.value); setTemplate("custom") }} maxLength={1600} rows={4} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label> : null}
+          {isWelcomePackage && channel === "whatsapp" ? <>
+            <div className="grid gap-1 text-xs font-semibold">One WhatsApp template preview<div className="overflow-hidden rounded-xl border border-emerald-200 bg-[#effcf5] shadow-sm"><div className="border-b border-emerald-200/80 bg-emerald-100/70 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-emerald-950">{WHATSAPP_WELCOME_HEADER}</div><div className="whitespace-pre-wrap px-3 py-3 text-sm font-normal leading-5 text-slate-800">{welcomePackageWhatsAppBody(name)}</div><div className="border-t border-emerald-200/80 px-3 py-2 text-[11px] font-medium text-slate-500">{WHATSAPP_WELCOME_FOOTER}</div></div></div>
+            <p className="rounded-md bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">This sends one Meta-approved marketing template. Normal WhatsApp replies are available after the customer responds.</p>
+            <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-950"><input type="checkbox" checked={marketingConsentConfirmed} onChange={(event) => setMarketingConsentConfirmed(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-emerald-700" />I confirm this customer agreed to receive WhatsApp messages from Avantia Build.</label>
+          </> : <>
+            <label className="grid gap-1 text-xs font-semibold">{isWelcomePackage ? "Message 1 of 2" : "Exact message preview"}<textarea autoFocus value={message} onChange={(event) => { setMessage(event.target.value); setTemplate("custom") }} maxLength={1600} rows={isWelcomePackage ? 5 : 7} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label>
+            {isWelcomePackage ? <label className="grid gap-1 text-xs font-semibold">Message 2 of 2<textarea value={welcomeFollowUp} onChange={(event) => { setWelcomeFollowUp(event.target.value); setTemplate("custom") }} maxLength={1600} rows={4} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label> : null}
+          </>}
           {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Paperclip className="h-4 w-4" />{attachment ? attachment.name : "Add attachment"}<input type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
           {channel === "sms" && attachment ? <p className="text-xs text-slate-500">The Q U O app opens with the file ready. Review it and press Send. Maximum 5 MB.</p> : null}
           {feedback ? <p role="alert" className="text-sm font-semibold text-rose-700">{feedback}</p> : null}
         </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim() || (isWelcomePackage && !welcomeFollowUp.trim())} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && attachment ? "Open Q U O with file" : isWelcomePackage ? "Send 2 messages" : "Send"}</button></footer>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim() || (isWelcomePackage && channel === "sms" && !welcomeFollowUp.trim()) || (isWelcomePackage && channel === "whatsapp" && !marketingConsentConfirmed)} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && attachment ? "Open Q U O with file" : isWelcomePackage && channel === "whatsapp" ? "Send WhatsApp template" : isWelcomePackage ? "Send 2 messages" : "Send"}</button></footer>
       </section>
     </div>, document.body) : null}
 

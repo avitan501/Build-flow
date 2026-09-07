@@ -7589,7 +7589,7 @@ async function sendWhatsAppUtilityTemplate(
   ) throw new Error("Complete every approved WhatsApp template field.");
   if (
     templateName === "quote_ready" &&
-    !/^https:\/\/build\.avantiap\.com\/client-document\/[a-z0-9-]+(?:\?verify=\d+)?$/i.test(parameters[2])
+    !/^https:\/\/(?:build\.avantiap\.com|(?:www\.)?avantiabuild\.com)\/client-document\/[a-z0-9-]+(?:\?verify=\d+)?$/i.test(parameters[2])
   ) throw new Error("Use a valid Avantia client-document link for the quote.");
 
   const templatesUrl = new URL(
@@ -7656,6 +7656,146 @@ async function sendWhatsAppUtilityTemplate(
     summary: `Approved utility template: ${templateName}`,
     status: "accepted",
   });
+  return externalId;
+}
+
+const META_MARKETING_TEMPLATES = {
+  carlos_welcome_package: {
+    parameterCount: 1,
+    render: ([name]: string[]) =>
+      `Hi ${name}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery.\n\nSend me whatever you have—a material list, photo, plan, or another supplier’s quote. We’ll work from there.\n\nSee how it works: https://avantiabuild.com`,
+  },
+} as const;
+
+type MetaMarketingTemplateName = keyof typeof META_MARKETING_TEMPLATES;
+
+function isWhatsAppMarketingOptOutMessage(value: string) {
+  return isSmsOptOutMessage(value) ||
+    /^\s*(?:stop\s*all|remove\s+me|do\s+not\s+contact(?:\s+me)?|don['’]?t\s+contact(?:\s+me)?|no\s+more\s+messages?|no\s+me\s+escriba|no\s+contactar|detener|\u05d0\u05dc\s+\u05ea\u05d9\u05e6\u05d5\u05e8\s+\u05e7\u05e9\u05e8|\u05ea\u05e4\u05e1\u05d9\u05e7)\s*[.!?\u00bf\u00a1。！？]?\s*$/iu.test(value);
+}
+
+async function sendWhatsAppMarketingTemplate(
+  managerId: string,
+  toValue: unknown,
+  templateNameValue: unknown,
+  parametersValue: unknown,
+  consentConfirmedValue: unknown,
+  consentSourceValue: unknown,
+) {
+  const config = await metaWhatsAppConfig();
+  if (!config)
+    throw new Error("Direct Meta WhatsApp requires credential review.");
+  const to = normalizePhone(toValue);
+  const templateName = typeof templateNameValue === "string" &&
+      Object.prototype.hasOwnProperty.call(META_MARKETING_TEMPLATES, templateNameValue)
+    ? templateNameValue as MetaMarketingTemplateName
+    : null;
+  const parameters = Array.isArray(parametersValue)
+    ? parametersValue.map((value) => typeof value === "string" ? value.trim() : "")
+    : [];
+  const definition = templateName ? META_MARKETING_TEMPLATES[templateName] : null;
+  const consentSource = typeof consentSourceValue === "string"
+    ? consentSourceValue.trim().slice(0, 160)
+    : "";
+  if (
+    !to || !templateName || !definition || consentConfirmedValue !== true ||
+    consentSource !== "manager_confirmed_customer_opt_in" ||
+    parameters.length !== definition.parameterCount ||
+    parameters.some((value) => !value || value.length > 80 || /[\n\r\t]/.test(value))
+  ) throw new Error("Confirm the customer's WhatsApp marketing permission and first name.");
+
+  const digits = to.replace(/\D/g, "");
+  const [incoming, optOutAudit] = await Promise.all([
+    sql<{ body: string | null }[]>`
+      select body from public.aura_communications
+      where channel = 'whatsapp' and direction = 'incoming'
+        and regexp_replace(coalesce(counterparty_phone, ''), '[^0-9]', '', 'g') = ${digits}
+      order by occurred_at desc limit 100
+    `,
+    sql<{ id: string }[]>`
+      select id from public.aura_audit_log
+      where action = 'sms_ai_customer_opted_out'
+        and regexp_replace(coalesce(details->>'phone', ''), '[^0-9]', '', 'g') = ${digits}
+      order by created_at desc limit 1
+    `,
+  ]);
+  if (optOutAudit[0] || incoming.some((message) => isWhatsAppMarketingOptOutMessage(message.body || "")))
+    throw new Error("whatsapp_recipient_opted_out");
+
+  const templatesUrl = new URL(
+    `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/message_templates`,
+  );
+  templatesUrl.searchParams.set("name", templateName);
+  templatesUrl.searchParams.set("fields", "name,status,language,category");
+  templatesUrl.searchParams.set("limit", "20");
+  const templateResponse = await fetch(templatesUrl, {
+    headers: { Authorization: `Bearer ${config.accessToken}` },
+  });
+  const templateResult = await templateResponse.json() as {
+    data?: Array<{ name?: string; status?: string; language?: string; category?: string }>;
+    error?: { message?: string };
+  };
+  if (!templateResponse.ok)
+    throw new Error(templateResult.error?.message || "WhatsApp template review could not be checked.");
+  const approved = templateResult.data?.find((candidate) =>
+    candidate.name === templateName && candidate.status === "APPROVED" &&
+    candidate.category === "MARKETING" && typeof candidate.language === "string"
+  );
+  if (!approved?.language) throw new Error("whatsapp_template_not_approved");
+
+  const response = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: digits,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: approved.language },
+          components: [{
+            type: "body",
+            parameters: parameters.map((text) => ({ type: "text", text })),
+          }],
+        },
+      }),
+    },
+  );
+  const result = await response.json() as {
+    messages?: Array<{ id?: string }>;
+    error?: { message?: string };
+  };
+  const externalId = result.messages?.[0]?.id;
+  if (!response.ok || !externalId)
+    throw new Error(result.error?.message || `WhatsApp returned HTTP ${response.status}.`);
+
+  await Promise.all([
+    storeCommunication({
+      provider: "whatsapp",
+      channel: "whatsapp",
+      externalId,
+      direction: "outgoing",
+      counterpartyPhone: to,
+      businessPhone: config.from,
+      body: definition.render(parameters),
+      summary: `Approved marketing template: ${templateName}`,
+      status: "accepted",
+    }),
+    sql`
+      insert into public.aura_audit_log (action, actor_user_id, details)
+      values ('whatsapp_marketing_template_sent', ${managerId}::uuid, ${sql.json({
+        phone: to,
+        templateName,
+        consentSource,
+      })})
+    `,
+  ]);
   return externalId;
 }
 
@@ -12952,6 +13092,17 @@ Deno.serve(async (req: Request) => {
         input.to,
         input.templateName,
         input.parameters,
+      );
+      return json({ ok: true, id });
+    }
+    if (input.action === "send_whatsapp_marketing_template") {
+      const id = await sendWhatsAppMarketingTemplate(
+        manager.user.id,
+        input.to,
+        input.templateName,
+        input.parameters,
+        input.consentConfirmed,
+        input.consentSource,
       );
       return json({ ok: true, id });
     }
