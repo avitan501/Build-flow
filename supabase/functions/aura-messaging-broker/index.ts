@@ -526,7 +526,8 @@ function trustedResendAttachmentUrl(value: unknown) {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "inbound-cdn.resend.com";
+    return url.protocol === "https:" &&
+      ["cdn.resend.app", "inbound-cdn.resend.com"].includes(url.hostname);
   } catch {
     return false;
   }
@@ -828,6 +829,139 @@ async function configureResendEmailWebhook() {
   if (missingEvents.length)
     throw new Error(`Resend did not activate ${missingEvents.length} requested email events`);
   return { webhookId, events: verifiedEvents };
+}
+
+async function repairResendEmailAttachments(communicationId: string) {
+  const rows = await sql<Array<{
+    external_activity_id: string | null;
+    channel: string;
+    direction: string;
+  }>>`
+    select external_activity_id, channel, direction
+    from public.aura_communications
+    where id = ${communicationId}::uuid
+    limit 1
+  `;
+  const communication = rows[0];
+  if (
+    !communication ||
+    communication.channel !== "email" ||
+    communication.direction !== "incoming" ||
+    !communication.external_activity_id
+  ) throw new Error("Choose a valid incoming Aura email.");
+
+  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
+  if (!apiKey) throw new Error("Email receiving is not configured.");
+  const response = await fetch(
+    `https://api.resend.com/emails/receiving/${encodeURIComponent(communication.external_activity_id)}`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!response.ok) throw new Error("The received email could not be retrieved.");
+  const email = await response.json() as {
+    attachments?: Array<{ id?: string; filename?: string; content_type?: string }>;
+  };
+  const attachmentIds = (email.attachments || []).flatMap((item) =>
+    typeof item.id === "string" ? [item.id] : []
+  );
+  if (!attachmentIds.length) {
+    return {
+      attachmentCount: email.attachments?.length || 0,
+      storedCount: 0,
+      reason: "attachment_ids_unavailable",
+    };
+  }
+
+  try {
+    const media = await persistResendAttachments({
+      apiKey,
+      emailId: communication.external_activity_id,
+      communicationId,
+      attachmentIds,
+    });
+    await sql`
+      update public.aura_communications
+      set media = ${sql.json(media)}, updated_at = now()
+      where id = ${communicationId}::uuid
+    `;
+    if (!media.length) {
+      const metadataResponse = await fetch(
+        `https://api.resend.com/emails/receiving/${encodeURIComponent(communication.external_activity_id)}/attachments/${encodeURIComponent(attachmentIds[0])}`,
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+      let diagnostic: Record<string, unknown> = {
+        metadataStatus: metadataResponse.status,
+      };
+      if (metadataResponse.ok) {
+        const payload = await metadataResponse.json() as { data?: unknown } & Record<string, unknown>;
+        const item = (payload.data && typeof payload.data === "object" ? payload.data : payload) as Record<string, unknown>;
+        let downloadHost: string | null = null;
+        try {
+          downloadHost = typeof item.download_url === "string" ? new URL(item.download_url).hostname : null;
+        } catch {
+          downloadHost = "invalid";
+        }
+        diagnostic = {
+          ...diagnostic,
+          idPresent: typeof item.id === "string" && item.id.length > 0,
+          contentType: typeof item.content_type === "string" ? item.content_type : null,
+          sizeValid: Number.isSafeInteger(Number(item.size)) && Number(item.size) > 0,
+          downloadHost,
+        };
+      }
+      return {
+        attachmentCount: email.attachments?.length || 0,
+        storedCount: 0,
+        reason: "attachment_metadata_rejected",
+        diagnostic,
+      };
+    }
+    return {
+      attachmentCount: email.attachments?.length || 0,
+      storedCount: media.length,
+      reason: null,
+    };
+  } catch (error) {
+    const firstId = attachmentIds[0];
+    const metadataResponse = await fetch(
+      `https://api.resend.com/emails/receiving/${encodeURIComponent(communication.external_activity_id)}/attachments/${encodeURIComponent(firstId)}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    let diagnostic: Record<string, unknown> = {
+      metadataStatus: metadataResponse.status,
+    };
+    if (metadataResponse.ok) {
+      const payload = await metadataResponse.json() as { data?: unknown } & Record<string, unknown>;
+      const item = (payload.data && typeof payload.data === "object" ? payload.data : payload) as Record<string, unknown>;
+      let downloadHost: string | null = null;
+      try {
+        downloadHost = typeof item.download_url === "string" ? new URL(item.download_url).hostname : null;
+      } catch {
+        downloadHost = "invalid";
+      }
+      diagnostic = {
+        ...diagnostic,
+        idPresent: typeof item.id === "string" && item.id.length > 0,
+        contentType: typeof item.content_type === "string" ? item.content_type : null,
+        sizeValid: Number.isSafeInteger(Number(item.size)) && Number(item.size) > 0,
+        downloadHost,
+      };
+    }
+    return {
+      attachmentCount: email.attachments?.length || 0,
+      storedCount: 0,
+      reason: error instanceof Error ? error.message : "Attachment repair failed.",
+      diagnostic,
+    };
+  }
 }
 
 async function validQuoSignature(
@@ -11670,6 +11804,18 @@ Deno.serve(async (req: Request) => {
           error: error instanceof Error ? error.message : "Email events could not be configured.",
         }, 400);
       }
+    }
+    if (input.action === "repair_resend_email_attachments") {
+      const communicationId = typeof input.communicationId === "string" &&
+          /^[0-9a-f-]{36}$/i.test(input.communicationId)
+        ? input.communicationId
+        : "";
+      if (!communicationId)
+        return json({ error: "Choose a valid incoming Aura email." }, 400);
+      return json({
+        ok: true,
+        ...(await repairResendEmailAttachments(communicationId)),
+      });
     }
     if (input.action === "activate_meta_whatsapp") {
       if (!manager.isOwner)

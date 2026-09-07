@@ -40,7 +40,9 @@ test("accepts only bounded supplier quote attachments from the trusted Resend CD
 });
 
 test("rejects SSRF-shaped attachment links and sanitizes download names", () => {
+  expect(isTrustedResendAttachmentDownloadUrl("https://cdn.resend.app/attachments/file")).toBe(true);
   expect(isTrustedResendAttachmentDownloadUrl("https://inbound-cdn.resend.com/file")).toBe(true);
+  expect(isTrustedResendAttachmentDownloadUrl("https://cdn.resend.app.evil.test/file")).toBe(false);
   expect(isTrustedResendAttachmentDownloadUrl("http://inbound-cdn.resend.com/file")).toBe(false);
   expect(isTrustedResendAttachmentDownloadUrl("https://inbound-cdn.resend.com.evil.test/file")).toBe(false);
   expect(isTrustedResendAttachmentDownloadUrl("https://127.0.0.1/file")).toBe(false);

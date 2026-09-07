@@ -9,6 +9,10 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/png",
   "image/webp",
 ]);
+const TRUSTED_RESEND_ATTACHMENT_HOSTS = new Set([
+  "cdn.resend.app",
+  "inbound-cdn.resend.com",
+]);
 
 export function safeAuraEmailAttachmentName(value: unknown) {
   return (typeof value === "string" ? value.trim().slice(0, 255) : "")
@@ -30,7 +34,7 @@ export function isTrustedResendAttachmentDownloadUrl(value: unknown) {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname === "inbound-cdn.resend.com";
+    return url.protocol === "https:" && TRUSTED_RESEND_ATTACHMENT_HOSTS.has(url.hostname);
   } catch {
     return false;
   }
