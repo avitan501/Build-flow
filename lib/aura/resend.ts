@@ -16,7 +16,7 @@ type ResendReceivedEvent = {
     from?: string;
     to?: string[];
     subject?: string;
-    attachments?: Array<{ filename?: string; content_type?: string }>;
+    attachments?: Array<{ id?: string; filename?: string; content_type?: string }>;
   };
 };
 
@@ -102,6 +102,9 @@ export async function storeAuraResendEvent(payload: unknown) {
       apiKey,
       emailId: event.data.email_id,
       communicationId,
+      attachmentIds: event.data.attachments.flatMap((attachment) =>
+        typeof attachment.id === "string" ? [attachment.id] : []
+      ),
     });
     await updateAuraCommunicationMedia(communicationId, media);
   }

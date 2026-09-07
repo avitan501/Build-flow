@@ -29,19 +29,26 @@ export async function persistAuraResendAttachments(input: {
   apiKey: string;
   emailId: string;
   communicationId: string;
+  attachmentIds: string[];
   fetcher?: typeof fetch;
 }) {
   const fetcher = input.fetcher ?? fetch;
   const emailId = encodeURIComponent(input.emailId);
-  const response = await fetcher(`https://api.resend.com/emails/receiving/${emailId}/attachments`, {
-    headers: { Authorization: `Bearer ${input.apiKey}` },
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`Unable to retrieve received email attachments: HTTP ${response.status}.`);
-
-  const payload = (await response.json()) as ResendAttachmentList;
-  const rawAttachments = Array.isArray(payload.data) ? payload.data.slice(0, AURA_EMAIL_ATTACHMENT_MAX_COUNT) : [];
+  const attachmentIds = [...new Set(input.attachmentIds)]
+    .map((value) => value.trim())
+    .filter((value) => /^[a-zA-Z0-9_-]{1,160}$/.test(value))
+    .slice(0, AURA_EMAIL_ATTACHMENT_MAX_COUNT);
+  const rawAttachments: unknown[] = [];
+  for (const attachmentId of attachmentIds) {
+    const response = await fetcher(`https://api.resend.com/emails/receiving/${emailId}/attachments/${encodeURIComponent(attachmentId)}`, {
+      headers: { Authorization: `Bearer ${input.apiKey}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`Unable to retrieve received email attachment: HTTP ${response.status}.`);
+    const payload = (await response.json()) as ResendAttachmentList & Record<string, unknown>;
+    rawAttachments.push(payload.data && typeof payload.data === "object" ? payload.data : payload);
+  }
   const attachments = rawAttachments.map(parseSafeResendAttachment).filter((item): item is NonNullable<typeof item> => Boolean(item));
   if (!attachments.length) return [] as AuraStoredEmailAttachment[];
   const totalSize = attachments.reduce((sum, item) => sum + item.size, 0);

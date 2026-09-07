@@ -536,19 +536,25 @@ async function persistResendAttachments(params: {
   apiKey: string;
   emailId: string;
   communicationId: string;
+  attachmentIds: string[];
 }) {
-  const response = await fetch(
-    `https://api.resend.com/emails/receiving/${encodeURIComponent(params.emailId)}/attachments`,
-    {
-      headers: { Authorization: `Bearer ${params.apiKey}` },
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
-  if (!response.ok) throw new Error("Unable to retrieve received email attachments");
-  const payload = await response.json() as { data?: unknown };
-  const candidates = Array.isArray(payload.data)
-    ? payload.data.slice(0, RESEND_ATTACHMENT_MAX_COUNT)
-    : [];
+  const ids = [...new Set(params.attachmentIds)]
+    .map((value) => value.trim())
+    .filter((value) => /^[a-zA-Z0-9_-]{1,160}$/.test(value))
+    .slice(0, RESEND_ATTACHMENT_MAX_COUNT);
+  const candidates: unknown[] = [];
+  for (const attachmentId of ids) {
+    const response = await fetch(
+      `https://api.resend.com/emails/receiving/${encodeURIComponent(params.emailId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      {
+        headers: { Authorization: `Bearer ${params.apiKey}` },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (!response.ok) throw new Error("Unable to retrieve received email attachment");
+    const payload = await response.json() as { data?: unknown } & Record<string, unknown>;
+    candidates.push(payload.data && typeof payload.data === "object" ? payload.data : payload);
+  }
   const attachments = candidates.map((value) => {
     const item = (value || {}) as Record<string, unknown>;
     const id = typeof item.id === "string" ? item.id.trim().slice(0, 160) : "";
@@ -613,7 +619,7 @@ async function handleResendWebhook(req: Request) {
       created_at?: string;
       from?: string;
       subject?: string;
-      attachments?: Array<{ filename?: string; content_type?: string }>;
+      attachments?: Array<{ id?: string; filename?: string; content_type?: string }>;
       to?: string[];
       message_id?: string;
     };
@@ -754,6 +760,9 @@ async function handleResendWebhook(req: Request) {
       apiKey,
       emailId: event.data.email_id,
       communicationId,
+      attachmentIds: attachments.flatMap((item) =>
+        typeof item.id === "string" ? [item.id] : []
+      ),
     });
     await sql`
       update public.aura_communications
