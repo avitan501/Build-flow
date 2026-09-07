@@ -100,6 +100,7 @@ async function queueOverdueSupplierFollowUps() {
         href: `/owner/materials/requests/${row.request_id}`,
         tag: "supplier-no-response",
         dedupe_key: `supplier-no-response:${row.request_id}:${row.supplier_id}`.slice(0, 240),
+        processed_at: new Date().toISOString(),
       });
       continue;
     }
@@ -111,6 +112,7 @@ async function queueOverdueSupplierFollowUps() {
       href: `/owner/materials/requests/${row.request_id}`,
       tag: "supplier-follow-up",
       dedupe_key: `supplier-follow-up:${row.request_id}:${row.supplier_id}:${followUpNumber}`.slice(0, 240),
+      processed_at: new Date().toISOString(),
     });
   }
   if (notificationRows.length) {

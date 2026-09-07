@@ -132,6 +132,7 @@ export async function recordSupplierEmailResponse(
     href: `/owner/materials/requests/${request.entity_id}`,
     tag: responseKind === "quote_pdf" ? "supplier-quote-review" : responseKind === "needs_information" ? "supplier-needs-information" : "supplier-replied",
     dedupe_key: `supplier-email-response:${communicationId}`,
+    processed_at: new Date().toISOString(),
   }, { onConflict: "dedupe_key", ignoreDuplicates: true })
 }
 

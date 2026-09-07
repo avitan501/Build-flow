@@ -1176,14 +1176,18 @@ async function recordLinkedSupplierResponse(
           updated_at = now()
   `;
   await sql`
-    select public.queue_manager_push_event(
+    insert into public.manager_push_queue
+      (event_type, title, body, href, dedupe_key, tag, processed_at)
+    values (
       'supplier_update',
       ${responseKind === "quote_pdf" ? `Supplier quote to review · ${supplier.entity_label}` : responseKind === "needs_information" ? `Supplier needs information · ${supplier.entity_label}` : `Supplier replied · ${supplier.entity_label}`},
       ${responseKind === "quote_pdf" ? `${request.entity_label} · Review the PDF before adding prices to the comparison.` : `${request.entity_label} · Review the supplier reply.`},
       ${`/owner/materials/requests/${request.entity_id}`},
       ${`supplier-reply:${communicationId}`},
-      ${responseKind === "quote_pdf" ? "supplier-quote-review" : responseKind === "needs_information" ? "supplier-needs-information" : "supplier-replied"}
+      ${responseKind === "quote_pdf" ? "supplier-quote-review" : responseKind === "needs_information" ? "supplier-needs-information" : "supplier-replied"},
+      now()
     )
+    on conflict (dedupe_key) do nothing
   `;
 }
 
@@ -1244,7 +1248,25 @@ async function autoLinkSupplierCommunication(input: {
     order by link.entity_id
     limit 2
   `;
-  if (recentRequests.length !== 1) return;
+  if (recentRequests.length !== 1) {
+    if (recentRequests.length > 1) {
+      await sql`
+        insert into public.manager_push_queue
+          (event_type, title, body, href, dedupe_key, tag, processed_at)
+        values (
+          'supplier_update',
+          ${`Choose request · ${supplier.name}`},
+          'Carlos: this supplier has more than one recent client request. Choose the correct request; Aura did not guess.',
+          ${`/admin/communications?communication=${input.communicationId}`},
+          ${`supplier-request-ambiguous:${input.communicationId}`},
+          'supplier-needs-link',
+          now()
+        )
+        on conflict (dedupe_key) do nothing
+      `;
+    }
+    return;
+  }
   const request = recentRequests[0];
   await sql`
     insert into public.aura_communication_links
