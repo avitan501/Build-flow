@@ -39,7 +39,7 @@ test("Uber webhooks accept only a valid HMAC of the untouched request body", () 
 })
 
 test("jobsite delivery remains a protected Manager-only internal route", async () => {
-  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, uberWebhookApi, uberWebhookMigration, curriQuoteApi, curriScheduleApi, curri, curriMigration, goShareQuoteApi, goShareScheduleApi, goShareWebhookApi, goShare, goShareMigration] = await Promise.all([
+  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, uberWebhookApi, uberWebhookMigration, curriQuoteApi, curriScheduleApi, curri, curriMigration, goShareQuoteApi, goShareScheduleApi, goShareWebhookApi, goShare, goShareMigration, adminClient] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -63,6 +63,7 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
     readFile(path.join(root, "app/api/delivery/goshare/webhook/route.ts"), "utf8"),
     readFile(path.join(root, "lib/goshare.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260907024151_add_goshare_delivery_provider.sql"), "utf8"),
+    readFile(path.join(root, "lib/supabase/admin.ts"), "utf8"),
   ])
   expect(header).not.toContain('href: "/delivery"')
   expect(shopNavigation).not.toContain('label: "Jobsite Delivery"')
@@ -142,6 +143,7 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(goShareMigration).toContain("get_goshare_credentials")
   expect(goShareMigration).toContain("goshare_webhook_token")
   expect(goShareMigration).toContain("'GoShare'")
+  expect(adminClient).toContain("process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()")
 })
 
 test("legacy public delivery URL forwards into the protected Manager tool", async ({ page }) => {

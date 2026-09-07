@@ -14,12 +14,12 @@ function requireEnv(name: string, value: string | undefined) {
 
 export function createAdminClient() {
   const url = getSupabasePublicEnv().url;
-  const serviceRoleKey = requireEnv(
-    "SUPABASE_SERVICE_ROLE_KEY",
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  const serverSecret = requireEnv(
+    "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY",
+    process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
   );
 
-  return createClient(url, serviceRoleKey, {
+  return createClient(url, serverSecret, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
