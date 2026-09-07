@@ -566,8 +566,8 @@ export function ConciergeVideoLibrary() {
               <Volume2 aria-hidden="true" /> Call (516) 990-1990
             </a>
           </div>
-          <a href="mailto:office@build.avantiap.com" className={styles.email}>
-            office@build.avantiap.com
+          <a href="mailto:office@avantiabuild.com" className={styles.email}>
+            office@avantiabuild.com
           </a>
         </div>
       </section>

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { Resend } from "npm:resend@6.26.0";
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 import {
   applyAvantiaMaterialDefaults,
@@ -488,6 +489,8 @@ function stripEmailHtml(value: string) {
 const RESEND_ATTACHMENT_BUCKET = "supplier-quotes";
 const RESEND_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 const RESEND_ATTACHMENT_MAX_COUNT = 10;
+const AVANTIA_OFFICE_EMAIL = "office@avantiabuild.com";
+const AVANTIA_EMAIL_FORWARD_TO = "Buildavantiap@gmail.com";
 const RESEND_WEBHOOK_ENDPOINT =
   "https://nprfhspwdflpqlopydmp.supabase.co/functions/v1/aura-messaging-broker?mode=resend-webhook";
 const RESEND_EMAIL_EVENTS = [
@@ -774,6 +777,24 @@ async function handleResendWebhook(req: Request) {
       set media = ${sql.json(media)}, updated_at = now()
       where id = ${communicationId}::uuid
     `;
+  }
+  const receivedByOffice = [...(event.data.to || []), ...(email.to || [])]
+    .map(emailAddress)
+    .includes(AVANTIA_OFFICE_EMAIL);
+  if (
+    receivedByOffice &&
+    counterpartyEmail !== AVANTIA_EMAIL_FORWARD_TO.toLowerCase()
+  ) {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.receiving.forward(
+      {
+        emailId: event.data.email_id,
+        to: AVANTIA_EMAIL_FORWARD_TO,
+        from: `Avantia Build <${AVANTIA_OFFICE_EMAIL}>`,
+      },
+      { idempotencyKey: `avantia-office-forward/${event.data.email_id}` },
+    );
+    if (error) throw new Error("Unable to forward the received Avantia email");
   }
   return json({ ok: true });
 }
@@ -1102,7 +1123,13 @@ async function validTwilioSignature(
   supplied: string | null,
   token: string,
 ) {
-  if (!supplied || !url.startsWith("https://build.avantiap.com/")) return false;
+  if (
+    !supplied ||
+    ![
+      "https://avantiabuild.com/",
+      "https://build.avantiap.com/",
+    ].some((origin) => url.startsWith(origin))
+  ) return false;
   const entries = [...params.entries()].sort(([left], [right]) =>
     left.localeCompare(right),
   );
@@ -1712,7 +1739,7 @@ async function subscribeTwoChatCallWebhook(
   channelUuid: string,
   webhookToken: string,
 ) {
-  const hookUrl = `https://build.avantiap.com/api/aura/2chat/calls?token=${encodeURIComponent(webhookToken)}`;
+  const hookUrl = `https://avantiabuild.com/api/aura/2chat/calls?token=${encodeURIComponent(webhookToken)}`;
   const response = await fetch(
     "https://api.p.2chat.io/open/webhooks/subscribe/call.status.update",
     {
@@ -7923,7 +7950,7 @@ async function subscribeTwoChatWebhook(
   from: string,
   webhookToken: string,
 ) {
-  const hookUrl = `https://build.avantiap.com/api/aura/whatsapp/2chat?token=${encodeURIComponent(webhookToken)}`;
+  const hookUrl = `https://avantiabuild.com/api/aura/whatsapp/2chat?token=${encodeURIComponent(webhookToken)}`;
   const events = [
     "whatsapp.message.received",
     "whatsapp.message.sent",
@@ -8772,12 +8799,12 @@ async function sendEmail(
     body: JSON.stringify({
       from:
         Deno.env.get("RESEND_FROM_EMAIL") ||
-        "Avantia Build <office@build.avantiap.com>",
+        "Avantia Build <office@avantiabuild.com>",
       to: [to],
-      reply_to: "office@build.avantiap.com",
+      reply_to: "office@avantiabuild.com",
       subject,
       text: body,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (347) 937-8665</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (516) 990-1990</p></div>`,
     }),
   });
   const result = (await response.json()) as { id?: string; message?: string };

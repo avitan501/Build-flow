@@ -15,7 +15,7 @@ test("Aura broker routes email through Supabase with the business mailbox as rep
     readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
   ]);
   expect(broker).toContain('input.action === "send_email"');
-  expect(broker).toContain('reply_to: "office@build.avantiap.com"');
+  expect(broker).toContain('reply_to: "office@avantiabuild.com"');
   expect(broker).toContain('Deno.env.get("RESEND_API_KEY")');
   expect(actions).toContain('action: "send_email"');
 });
@@ -30,6 +30,11 @@ test("Aura receives signed Resend email events through the secure broker", async
   expect(broker).toContain('channel: "email"');
   expect(broker).toContain('direction: "incoming"');
   expect(broker).toContain('receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
+  expect(broker).toContain('AVANTIA_OFFICE_EMAIL = "office@avantiabuild.com"');
+  expect(broker).toContain('AVANTIA_EMAIL_FORWARD_TO = "Buildavantiap@gmail.com"');
+  expect(broker).toContain("resend.emails.receiving.forward");
+  expect(broker).toContain("avantia-office-forward/");
+  expect(broker).toContain("counterpartyEmail !== AVANTIA_EMAIL_FORWARD_TO.toLowerCase()");
 });
 
 test("Aura normalizes legacy JSON strings before rendering communications", async () => {
@@ -39,7 +44,7 @@ test("Aura normalizes legacy JSON strings before rendering communications", asyn
 
   expect(dashboard).toContain("normalizeAuraCommunications");
   expect(dashboard).toContain("JSON.parse(value)");
-  expect(managerPage).toContain("normalizeAuraCommunications(exactCommunicationResult.data ? [exactCommunicationResult.data] : [])");
+  expect(managerPage).toContain("normalizeAuraCommunications(exactCommunicationResult.data?.communication ? [exactCommunicationResult.data.communication] : [])");
   expect(broker).toContain("sql.json(input.nextSteps || [])");
   expect(broker).toContain("sql.json(input.media || [])");
 });

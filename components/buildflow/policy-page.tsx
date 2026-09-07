@@ -25,7 +25,7 @@ export function PolicyPage({ eyebrow, title, updated, introduction, sections }: 
             ))}
           </div>
           <aside className="mt-8 rounded-lg border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-slate-700">
-            Questions? Contact <a className="font-semibold text-[#0066cc]" href="mailto:office@build.avantiap.com">office@build.avantiap.com</a> or call <a className="font-semibold text-[#0066cc]" href="tel:+15169901990">(516) 990-1990</a>.
+            Questions? Contact <a className="font-semibold text-[#0066cc]" href="mailto:office@avantiabuild.com">office@avantiabuild.com</a> or call <a className="font-semibold text-[#0066cc]" href="tel:+15169901990">(516) 990-1990</a>.
           </aside>
         </div>
       </article>

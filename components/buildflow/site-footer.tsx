@@ -8,7 +8,7 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
-const BUSINESS_WHATSAPP_URL = "https://wa.me/15169901990?text=Hi%2C%20I%27d%20like%20help%20pricing%20my%20building%20material%20list.%20Can%20you%20tell%20me%20how%20it%20works%3F"
+const BUSINESS_WHATSAPP_URL = "https://wa.me/15169901990?text=Hi%2C%20I%27d%20like%20to%20send%20my%20material%20list%20or%20current%20quote%20so%20you%20can%20check%20if%20there%27s%20a%20better%20price."
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password", "/homepage-preview"])
 
 export function SiteFooter() {
@@ -30,8 +30,8 @@ export function SiteFooter() {
                 <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Plans · Pricing · Ordering · Delivery</p>
               </div>
               <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
-                <a href="mailto:office@build.avantiap.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
-                  <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">office@build.avantiap.com</span></span><span aria-hidden="true">↗</span>
+                <a href="mailto:office@avantiabuild.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                  <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">office@avantiabuild.com</span></span><span aria-hidden="true">↗</span>
                 </a>
                   <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
                     <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 990-1990</span>
@@ -74,8 +74,8 @@ export function SiteFooter() {
           </div>
         </div>
         <nav aria-label="Avantia contact" className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 border-t border-slate-200 pt-3 sm:flex sm:border-t-0 sm:pt-0">
-          <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
-            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@build.avantiap.com</span>
+          <a href="mailto:office@avantiabuild.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
+            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@avantiabuild.com</span>
           </a>
           <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
             <Phone className="h-4 w-4" aria-hidden="true" /><span className="whitespace-nowrap text-[11px] font-semibold sm:text-sm">(516) 990-1990</span>

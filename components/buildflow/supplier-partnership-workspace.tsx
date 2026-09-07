@@ -112,7 +112,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
           return;
         }
         setProgress((current) => ({ ...current, [partner.slug]: result.progress }));
-        setNotice(`Email sent to ${destination}. Replies return to office@build.avantiap.com.`);
+        setNotice(`Email sent to ${destination}. Replies return to office@avantiabuild.com.`);
       });
       return;
     }
@@ -150,7 +150,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
         </header>
 
         <section className={`rounded-2xl border px-4 py-3 text-sm ${emailSendingReady ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
-          {emailSendingReady ? <><strong>AvantiaBuild email is connected.</strong> Messages send from the website and replies return to office@build.avantiap.com.</> : <><strong>Email provider needs attention.</strong> The button will open a prepared draft in the computer’s email app until website sending is restored.</>}
+          {emailSendingReady ? <><strong>AvantiaBuild email is connected.</strong> Messages send from the website and replies return to office@avantiabuild.com.</> : <><strong>Email provider needs attention.</strong> The button will open a prepared draft in the computer’s email app until website sending is restored.</>}
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(26rem,0.85fr)]">

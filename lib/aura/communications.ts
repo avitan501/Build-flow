@@ -138,7 +138,7 @@ export async function sendAuraQuoText(toValue: string, contentValue: string) {
 
 function emailConfig() {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "Avantia Build <office@build.avantiap.com>";
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || "Avantia Build <office@avantiabuild.com>";
   if (!apiKey) return null;
   return { apiKey, from };
 }
@@ -176,8 +176,8 @@ export async function sendAuraEmail(toValue: string, subjectValue: string, bodyV
       to: [to],
       subject,
       text: body,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (347) 937-8665</p></div>`,
-      reply_to: "office@build.avantiap.com",
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (516) 990-1990</p></div>`,
+      reply_to: "office@avantiabuild.com",
     }),
     cache: "no-store",
   });

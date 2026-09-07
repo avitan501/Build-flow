@@ -84,7 +84,7 @@ export async function sendManagerPushNotification(input: {
   const preferenceKey = preferenceByEvent[input.eventType];
   const selected = rows.filter((row) => !preferenceKey || (preferencesByUser.get(row.user_id) ?? defaultPreferences)[preferenceKey]);
 
-  webPush.setVapidDetails("mailto:office@build.avantiap.com", publicKey, privateKey);
+  webPush.setVapidDetails("mailto:office@avantiabuild.com", publicKey, privateKey);
   const payload = JSON.stringify({
     title: input.title.slice(0, 100),
     body: input.body.slice(0, 240),

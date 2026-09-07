@@ -70,7 +70,7 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
     rightText(page, bold, "MATERIAL QUOTE", 570, 750, 13, navy);
     rightText(page, regular, input.comparison.quote_number, 570, 732, 10, slate);
     page.drawLine({ start: { x: 42, y: 700 }, end: { x: 570, y: 700 }, thickness: 1, color: border });
-    page.drawText("Avantia Build  |  avantiabuild.com  |  office@build.avantiap.com  |  (516) 990-1990", {
+    page.drawText("Avantia Build  |  avantiabuild.com  |  office@avantiabuild.com  |  (516) 990-1990", {
       x: 42,
       y: 30,
       size: 7.5,

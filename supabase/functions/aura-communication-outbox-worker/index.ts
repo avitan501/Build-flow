@@ -293,9 +293,9 @@ async function providerRequest(row: OutboxRow, attachments: AttachmentRow[]) {
     body: JSON.stringify({
       from:
         Deno.env.get("RESEND_FROM_EMAIL") ||
-        "Avantia Build <office@build.avantiap.com>",
+        "Avantia Build <office@avantiabuild.com>",
       to: [row.destination],
-      reply_to: "office@build.avantiap.com",
+      reply_to: "office@avantiabuild.com",
       subject: row.subject || "Message from Avantia Build",
       text: row.message_body,
       attachments: attachments.length

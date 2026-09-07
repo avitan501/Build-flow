@@ -187,10 +187,10 @@ test("footer has the complete Avantia Build contact lockup", async ({ page }) =>
 
   const footer = page.locator("footer")
   await expect(footer.getByText("You build. We handle the materials.", { exact: true })).toBeVisible()
-  await expect(footer.getByRole("link", { name: "office@build.avantiap.com" })).toHaveAttribute("href", "mailto:office@build.avantiap.com")
+  await expect(footer.getByRole("link", { name: "office@avantiabuild.com" })).toHaveAttribute("href", "mailto:office@avantiabuild.com")
   await expect(footer.getByRole("link", { name: "(516) 990-1990" })).toHaveAttribute("href", "tel:+15169901990")
   const whatsappLink = footer.getByRole("link", { name: "WhatsApp us" })
-  await expect(whatsappLink).toHaveAttribute("href", "https://wa.me/15169901990?text=Hi%2C%20I%27d%20like%20help%20pricing%20my%20building%20material%20list.%20Can%20you%20tell%20me%20how%20it%20works%3F")
+  await expect(whatsappLink).toHaveAttribute("href", "https://wa.me/15169901990?text=Hi%2C%20I%27d%20like%20to%20send%20my%20material%20list%20or%20current%20quote%20so%20you%20can%20check%20if%20there%27s%20a%20better%20price.")
   await expect(whatsappLink).toHaveAttribute("target", "_blank")
   await expect(footer.locator('[data-icon="whatsapp"]')).toHaveCount(1)
   await expect(footer.getByTestId("avantia-build-lockup")).toBeVisible()

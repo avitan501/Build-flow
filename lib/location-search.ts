@@ -66,7 +66,7 @@ function photonSuggestion(feature: PhotonFeature): LocationSuggestion | null {
 
 async function fetchJson(url: URL) {
   const response = await fetch(url, {
-    headers: { "User-Agent": "AvantiaBuild/1.0 (office@build.avantiap.com)" },
+    headers: { "User-Agent": "AvantiaBuild/1.0 (office@avantiabuild.com)" },
     cache: "no-store",
     signal: AbortSignal.timeout(5000),
   })

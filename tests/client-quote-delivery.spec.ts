@@ -43,8 +43,8 @@ test("client quote email is branded and excludes internal pricing", async () => 
     expect(result).toEqual({ status: "sent", providerId: "email-test-id" });
     expect(requestBody).not.toBeNull();
     const body = requestBody as unknown as Record<string, unknown>;
-    expect(body.from).toContain("office@build.avantiap.com");
-    expect(body.reply_to).toBe("office@build.avantiap.com");
+    expect(body.from).toContain("office@avantiabuild.com");
+    expect(body.reply_to).toBe("office@avantiabuild.com");
     expect(body.subject).toContain("ABQ-TEST");
     expect(String(body.html)).toContain("avantia-build-lockup-share.png");
     expect(String(body.html)).toContain("(516) 990-1990");

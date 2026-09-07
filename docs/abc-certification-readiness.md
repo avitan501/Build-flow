@@ -31,7 +31,7 @@ AvantiaBuild’s service area is Cedarhurst, New York 11516. The interface can s
 
 - Primary integration contact: David Avitan
 - Company: AvantiaBuild
-- Email: office@build.avantiap.com
+- Email: office@avantiabuild.com
 - AvantiaBuild supports connection and workflow issues.
 - ABC Supply controls customer-account access, branch authorization, availability, final prices, delivery, and purchasing.
 

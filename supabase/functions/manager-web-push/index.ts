@@ -106,7 +106,7 @@ async function deliver(event: { eventType: EventType; title: string; body: strin
     tag: clean(event.tag || `avantia-${event.eventType}`, 120),
   })
 
-  webPush.setVapidDetails("mailto:office@build.avantiap.com", vapidPublicKey, privateKey)
+  webPush.setVapidDetails("mailto:office@avantiabuild.com", vapidPublicKey, privateKey)
   let delivered = 0
   let failed = 0
   let retryableFailed = 0

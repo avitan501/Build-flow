@@ -1,10 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
-const companyEmail = "office@build.avantiap.com"
+const companyEmail = "office@avantiabuild.com"
 const ownerEmail = "avitanneto@gmail.com"
 const corsHeaders = {
-  "access-control-allow-origin": "https://build.avantiap.com",
+  "access-control-allow-origin": "https://avantiabuild.com",
   "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
   "access-control-allow-methods": "POST, OPTIONS",
 }
