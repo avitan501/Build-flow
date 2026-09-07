@@ -44,6 +44,15 @@ test("Aura normalizes legacy JSON strings before rendering communications", asyn
   expect(broker).toContain("sql.json(input.media || [])");
 });
 
+test("Aura reads nested broker connection readiness returned by the edge function", async () => {
+  const dashboard = await readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8");
+
+  expect(dashboard).toContain("status?.connections");
+  expect(dashboard).toContain("connections?.email?.receive");
+  expect(dashboard).toContain("connections?.email?.send");
+  expect(dashboard).toContain("brokerConnections.email.receive");
+});
+
 test("Aura webhook rejects unverified requests", async ({ request }) => {
   const verification = await request.get("/api/aura/whatsapp", {
     params: {
@@ -179,8 +188,8 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(setup).toContain("Optimize live WhatsApp speed");
   expect(setup).toContain("Activate new email events");
   expect(setup).toContain('value="quo"');
-  expect(dashboard).toContain("brokerStatus?.whatsappProvider");
-  expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");
+  expect(dashboard).toContain("connections?.whatsapp?.provider ?? status?.whatsappProvider");
+  expect(dashboard).toContain("connections?.whatsapp?.receive ?? status?.whatsapp");
 });
 
 test("legacy Twilio webhooks remain verified but cannot become the active WhatsApp fallback", async () => {

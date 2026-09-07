@@ -101,33 +101,86 @@ export function normalizeAuraCommunications(rows: unknown[] | null | undefined):
   });
 }
 
+type AuraBrokerConnectionStatus = {
+  receive?: boolean;
+  send?: boolean;
+  recording?: boolean;
+  phone?: string | null;
+  provider?: string | null;
+};
+
+type AuraBrokerStatus = {
+  ok?: boolean;
+  connections?: {
+    voice?: AuraBrokerConnectionStatus;
+    quo?: AuraBrokerConnectionStatus;
+    whatsapp?: AuraBrokerConnectionStatus;
+    email?: AuraBrokerConnectionStatus;
+  };
+  // Keep compatibility with broker deployments that returned flat readiness flags.
+  whatsapp?: boolean;
+  whatsappProvider?: string | null;
+  sms?: boolean;
+  smsReceive?: boolean;
+  voice?: boolean;
+  voiceRecording?: boolean;
+  voicePhone?: string | null;
+  email?: boolean;
+};
+
+function normalizeBrokerConnections(status: AuraBrokerStatus | null) {
+  const connections = status?.connections;
+  return {
+    voice: {
+      receive: Boolean(connections?.voice?.receive ?? status?.voice),
+      send: Boolean(connections?.voice?.send ?? status?.voice),
+      recording: Boolean(connections?.voice?.recording ?? status?.voiceRecording),
+      phone: connections?.voice?.phone ?? status?.voicePhone ?? null,
+    },
+    quo: {
+      receive: Boolean(connections?.quo?.receive ?? status?.smsReceive),
+      send: Boolean(connections?.quo?.send ?? status?.sms),
+    },
+    whatsapp: {
+      receive: Boolean(connections?.whatsapp?.receive ?? status?.whatsapp),
+      send: Boolean(connections?.whatsapp?.send ?? status?.whatsapp),
+      provider: connections?.whatsapp?.provider ?? status?.whatsappProvider ?? null,
+    },
+    email: {
+      receive: Boolean(connections?.email?.receive),
+      send: Boolean(connections?.email?.send ?? status?.email),
+    },
+  };
+}
+
 export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
-  const brokerResult = await brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; smsReceive?: boolean; voice?: boolean; voiceRecording?: boolean; voicePhone?: string | null; email?: boolean }>("aura-messaging-broker", {
+  const brokerResult = await brokerClient.functions.invoke<AuraBrokerStatus>("aura-messaging-broker", {
     body: { action: "status" },
   }).catch(() => ({ data: null }));
   const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
+  const brokerConnections = normalizeBrokerConnections(brokerStatus);
   return {
     voice: {
-      receive: Boolean(brokerStatus?.voice),
-      send: Boolean(brokerStatus?.voice),
-      recording: Boolean(brokerStatus?.voiceRecording),
-      phone: brokerStatus?.voicePhone || null,
+      receive: brokerConnections.voice.receive,
+      send: brokerConnections.voice.send,
+      recording: brokerConnections.voice.recording,
+      phone: brokerConnections.voice.phone,
     },
     quo: {
-      receive: Boolean(brokerStatus?.smsReceive) || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
-      send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
+      receive: brokerConnections.quo.receive || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
+      send: brokerConnections.quo.send || canSendAuraQuoText(),
     },
     whatsapp: {
-      provider: brokerStatus?.whatsappProvider || null,
+      provider: brokerConnections.whatsapp.provider,
       receive:
-        Boolean(brokerStatus?.whatsapp) ||
+        brokerConnections.whatsapp.receive ||
         Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
         canUseTwilioWhatsApp(),
-      send: Boolean(brokerStatus?.whatsapp) || canSendAuraWhatsApp(),
+      send: brokerConnections.whatsapp.send || canSendAuraWhatsApp(),
     },
     email: {
-      receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
-      send: Boolean(brokerStatus?.email) || canSendAuraEmail(),
+      receive: brokerConnections.email.receive || Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
+      send: brokerConnections.email.send || canSendAuraEmail(),
     },
   };
 }
@@ -168,7 +221,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .eq("role", "client")
       .eq("is_active", true)
       .limit(500),
-    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; smsReceive?: boolean; voice?: boolean; voiceRecording?: boolean; voicePhone?: string | null; email?: boolean }>("aura-messaging-broker", {
+    brokerClient.functions.invoke<AuraBrokerStatus>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
@@ -176,6 +229,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
   const firstError = intakesResult.error || contactsResult.error || leadsResult.error || tasksResult.error || communicationsResult.error || customersResult.error;
   if (firstError) throw new Error(`Failed to load Aura dashboard: ${firstError.message}`);
   const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
+  const brokerConnections = normalizeBrokerConnections(brokerStatus);
 
   return {
     intakes: (intakesResult.data || []) as AuraIntakeRow[],
@@ -186,26 +240,26 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
     customers: (customersResult.data || []) as AuraCustomerIdentity[],
     connections: {
       voice: {
-        receive: Boolean(brokerStatus?.voice),
-        send: Boolean(brokerStatus?.voice),
-        recording: Boolean(brokerStatus?.voiceRecording),
-        phone: brokerStatus?.voicePhone || null,
+        receive: brokerConnections.voice.receive,
+        send: brokerConnections.voice.send,
+        recording: brokerConnections.voice.recording,
+        phone: brokerConnections.voice.phone,
       },
       quo: {
-        receive: Boolean(brokerStatus?.smsReceive) || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
-        send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
+        receive: brokerConnections.quo.receive || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
+        send: brokerConnections.quo.send || canSendAuraQuoText(),
       },
       whatsapp: {
-        provider: brokerStatus?.whatsappProvider || null,
+        provider: brokerConnections.whatsapp.provider,
         receive:
-          Boolean(brokerStatus?.whatsapp) ||
+          brokerConnections.whatsapp.receive ||
           Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
           canUseTwilioWhatsApp(),
-        send: Boolean(brokerStatus?.whatsapp) || canSendAuraWhatsApp(),
+        send: brokerConnections.whatsapp.send || canSendAuraWhatsApp(),
       },
       email: {
-        receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
-        send: Boolean(brokerStatus?.email) || canSendAuraEmail(),
+        receive: brokerConnections.email.receive || Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
+        send: brokerConnections.email.send || canSendAuraEmail(),
       },
     },
   };
