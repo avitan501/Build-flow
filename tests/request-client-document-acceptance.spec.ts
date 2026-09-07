@@ -142,6 +142,7 @@ test("new estimates use one compact client-friendly terms block without appended
   expect(DEFAULT_PROPOSAL_TERMS).toContain("Please confirm the items, quantities, and delivery details above are correct.")
   expect(DEFAULT_PROPOSAL_TERMS).toContain("All sales are final unless stated otherwise.")
   expect(DEFAULT_PROPOSAL_TERMS.length).toBeLessThan(600)
+  expect(DEFAULT_PROPOSAL_TERMS.trim().split(/\s+/).length).toBeLessThanOrEqual(80)
   expect(includeRequiredProposalTerms(DEFAULT_PROPOSAL_TERMS)).toBe(DEFAULT_PROPOSAL_TERMS)
 })
 

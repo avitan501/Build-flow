@@ -35,6 +35,7 @@ import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type RequestDetails = {
   id: string;
@@ -532,17 +533,19 @@ export default async function OwnerMaterialRequestPage({
   ) ?? supplierComparisonTables.find((comparison) => comparison.suppliers.length > 0)
     ?? supplierComparisonTables[0]
     ?? null;
-  const { data: requestCommunicationLinks } = await supabase
+  const communicationsAdmin = createAdminClient();
+  const { data: requestCommunicationLinks, error: requestCommunicationLinksError } = await communicationsAdmin
     .from("aura_communication_links")
     .select("communication_id")
     .eq("entity_type", "material_request")
     .eq("entity_id", request.id);
+  if (requestCommunicationLinksError) throw new Error(`Could not load request communication links: ${requestCommunicationLinksError.message}`);
   const linkedCommunicationIds = (requestCommunicationLinks ?? []).map(
     (link) => link.communication_id,
   );
-  const [{ data: linkedCommunications }, { data: relatedEntityLinks }] = linkedCommunicationIds.length
+  const [linkedCommunicationsResult, relatedEntityLinksResult] = linkedCommunicationIds.length
     ? await Promise.all([
-      supabase
+      communicationsAdmin
         .from("aura_communications")
         .select(
           "id,channel,direction,counterparty_email,counterparty_phone,subject,body,occurred_at,status,media",
@@ -550,14 +553,21 @@ export default async function OwnerMaterialRequestPage({
         .in("id", linkedCommunicationIds)
         .order("occurred_at", { ascending: false })
         .returns<RelatedEmailItem[]>(),
-      supabase
+      communicationsAdmin
         .from("aura_communication_links")
         .select("communication_id,entity_type,entity_id")
         .in("communication_id", linkedCommunicationIds)
         .in("entity_type", ["client", "supplier"])
         .returns<Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }>>(),
     ])
-    : [{ data: [] as RelatedEmailItem[] }, { data: [] as Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }> }];
+    : [
+      { data: [] as RelatedEmailItem[], error: null },
+      { data: [] as Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }>, error: null },
+    ];
+  if (linkedCommunicationsResult.error) throw new Error(`Could not load request communications: ${linkedCommunicationsResult.error.message}`);
+  if (relatedEntityLinksResult.error) throw new Error(`Could not classify request communications: ${relatedEntityLinksResult.error.message}`);
+  const linkedCommunications = linkedCommunicationsResult.data;
+  const relatedEntityLinks = relatedEntityLinksResult.data;
   const structuredSupplierCommunicationIds = new Set(
     (relatedEntityLinks ?? [])
       .filter((link) => link.entity_type === "supplier")

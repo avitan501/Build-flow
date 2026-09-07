@@ -24,6 +24,8 @@ test("request supplier activity uses structured links across all communication c
   expect(page).toContain('"id,channel,direction,counterparty_email,counterparty_phone,subject,body,occurred_at,status,media"')
   expect(page).toContain('structuredSupplierCommunicationIds')
   expect(page).toContain('.in("entity_type", ["client", "supplier"])')
+  expect(page).toContain('const communicationsAdmin = createAdminClient()')
+  expect(page).toContain('Could not load request communications')
   expect(page).not.toContain('.eq("channel", "email")')
 })
 
