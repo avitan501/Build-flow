@@ -11,10 +11,22 @@ import {
 const read = (file: string) => readFile(path.join(process.cwd(), file), "utf8");
 
 test("provider outcomes never blindly retry an ambiguous send", () => {
-  expect(classifyProviderOutcome(202)).toEqual({ kind: "accepted", status: "accepted" });
-  expect(classifyProviderOutcome(429)).toMatchObject({ kind: "retry", status: "retry_wait" });
-  expect(classifyProviderOutcome(422)).toMatchObject({ kind: "terminal", status: "failed" });
-  expect(classifyProviderOutcome(503)).toMatchObject({ kind: "ambiguous", status: "ambiguous" });
+  expect(classifyProviderOutcome(202)).toEqual({
+    kind: "accepted",
+    status: "accepted",
+  });
+  expect(classifyProviderOutcome(429)).toMatchObject({
+    kind: "retry",
+    status: "retry_wait",
+  });
+  expect(classifyProviderOutcome(422)).toMatchObject({
+    kind: "terminal",
+    status: "failed",
+  });
+  expect(classifyProviderOutcome(503)).toMatchObject({
+    kind: "ambiguous",
+    status: "ambiguous",
+  });
   expect(safeRetryDelaySeconds(1)).toBe(10);
   expect(safeRetryDelaySeconds(20)).toBe(640);
   expect(safeRetryDelaySeconds(2, 45)).toBe(45);
@@ -34,7 +46,9 @@ test("attachment capabilities match the actual provider APIs", () => {
 });
 
 test("worker claims atomically, resolves real attachments, and preserves unknown outcomes", async () => {
-  const worker = await read("supabase/functions/aura-communication-outbox-worker/index.ts");
+  const worker = await read(
+    "supabase/functions/aura-communication-outbox-worker/index.ts",
+  );
 
   expect(worker).toContain("for update skip locked");
   expect(worker).toContain("worker_stopped_during_send");
@@ -43,9 +57,11 @@ test("worker claims atomically, resolves real attachments, and preserves unknown
   expect(worker).toContain(".download(attachment.storage_path)");
   expect(worker).toContain('"Idempotency-Key": `avantia-outbox/${row.id}`');
   expect(worker).toContain("attachments: attachments.length");
-  expect(worker).toContain('url: mediaUrl');
-  expect(worker).toContain('status = \'needs_review\'');
-  expect(worker).not.toMatch(/console\.log\([^)]*(?:message_body|apiKey|dispatchSecret)/);
+  expect(worker).toContain("url: mediaUrl");
+  expect(worker).toContain("status = 'needs_review'");
+  expect(worker).not.toMatch(
+    /console\.log\([^)]*(?:message_body|apiKey|dispatchSecret)/,
+  );
 });
 
 test("manager sends enqueue all three channels with stable browser request keys", async () => {
@@ -64,23 +80,32 @@ test("manager sends enqueue all three channels with stable browser request keys"
   expect(actions).toContain("sendAuraMessageWithAttachmentAction");
   expect(actions).toContain('storageBucket: "project-uploads"');
   expect(actions).toContain("outboxId && emailLinks.length");
-  expect(actions).toContain("let acceptedExternalId = \"\"");
+  expect(actions).toContain('let acceptedExternalId = ""');
   expect(actions).toContain("if (acceptedExternalId)");
   expect(actions.indexOf("outboxId && emailLinks.length")).toBeLessThan(
     actions.indexOf("const admin = createAdminClient()"),
   );
-  expect(actions).toContain('.eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)');
+  expect(actions).toContain(
+    '.eq("dedupe_key", `manager/${user.id}/${input.idempotencyKey}`)',
+  );
   expect(actions).toContain('"delivered",');
   expect(actions).toContain('"read",');
   expect(inbox).toContain("const idempotencyKey = crypto.randomUUID()");
   expect(inbox).toContain("sendAuraMessageWithAttachmentAction(formData)");
   expect(inbox).toContain('status: "queued"');
+  expect(actions).toContain('.getAll("attachments")');
+  expect(actions).toContain('"send_whatsapp_batch"');
+  expect(broker).toContain("enqueueManagerWhatsAppBatch(");
+  expect(broker).toContain("package_index");
+  expect(inbox).toContain('multiple={channel !== "sms"}');
 });
 
 test("delivery receipts flow back into the durable outbox history", async () => {
   const [broker, migration] = await Promise.all([
     read("supabase/functions/aura-messaging-broker/index.ts"),
-    read("supabase/migrations/20260902142525_add_unified_communication_outbox_routines.sql"),
+    read(
+      "supabase/migrations/20260902142525_add_unified_communication_outbox_routines.sql",
+    ),
   ]);
 
   expect(broker).toContain('"email.delivered": "delivered"');
@@ -92,7 +117,11 @@ test("delivery receipts flow back into the durable outbox history", async () => 
   expect(broker).toContain('"email.opened": "read"');
   expect(broker).toContain('input.action === "configure_resend_email_webhook"');
   expect(migration).toContain("sync_aura_message_outbox_from_communication");
-  expect(migration).toContain("after update of status on public.aura_communications");
-  expect(migration).toContain("idempotency key reused with a different payload");
+  expect(migration).toContain(
+    "after update of status on public.aura_communications",
+  );
+  expect(migration).toContain(
+    "idempotency key reused with a different payload",
+  );
   expect(migration).toContain("pg_advisory_xact_lock");
 });

@@ -105,10 +105,18 @@ async function recordAuraCommunicationActivity(
       metadata: {
         channel: input.channel,
         recipient: input.recipient.slice(0, 320),
-        label: String(input.label || input.recipient || "Contact").trim().slice(0, 160),
-        ...(input.requestId ? { request_id: input.requestId.slice(0, 80) } : {}),
-        ...(input.requestLabel ? { request: input.requestLabel.trim().slice(0, 160) } : {}),
-        ...(input.subject ? { subject: input.subject.trim().slice(0, 160) } : {}),
+        label: String(input.label || input.recipient || "Contact")
+          .trim()
+          .slice(0, 160),
+        ...(input.requestId
+          ? { request_id: input.requestId.slice(0, 80) }
+          : {}),
+        ...(input.requestLabel
+          ? { request: input.requestLabel.trim().slice(0, 160) }
+          : {}),
+        ...(input.subject
+          ? { subject: input.subject.trim().slice(0, 160) }
+          : {}),
         outcome: input.outcome,
         duration_ms: Math.max(0, Date.now() - input.startedAt),
       },
@@ -156,26 +164,33 @@ export async function sendAuraMessageAction(input: {
 
   const startedAt = Date.now();
   const activityRecipient = email || phone || input.recipient.trim();
-  const activityLabel = input.recipientLabel || input.supplierName || activityRecipient;
+  const activityLabel =
+    input.recipientLabel || input.supplierName || activityRecipient;
   let acceptedExternalId = "";
   try {
     let externalId = "";
     if (channel === "sms") {
-      externalId = (await invokeMessagingBroker(supabase, {
-        action: "send_sms",
-        to: phone,
-        message,
-        idempotencyKey: input.idempotencyKey,
-        sourceCommunicationId: input.sourceCommunicationId,
-      })).id || "";
+      externalId =
+        (
+          await invokeMessagingBroker(supabase, {
+            action: "send_sms",
+            to: phone,
+            message,
+            idempotencyKey: input.idempotencyKey,
+            sourceCommunicationId: input.sourceCommunicationId,
+          })
+        ).id || "";
     } else if (channel === "whatsapp") {
-      externalId = (await invokeMessagingBroker(supabase, {
-        action: "send_whatsapp",
-        to: phone,
-        message,
-        sourceCommunicationId: input.sourceCommunicationId,
-        idempotencyKey: input.idempotencyKey,
-      })).id || "";
+      externalId =
+        (
+          await invokeMessagingBroker(supabase, {
+            action: "send_whatsapp",
+            to: phone,
+            message,
+            sourceCommunicationId: input.sourceCommunicationId,
+            idempotencyKey: input.idempotencyKey,
+          })
+        ).id || "";
     } else if (channel === "email") {
       const requestReference =
         input.materialRequestId &&
@@ -213,8 +228,7 @@ export async function sendAuraMessageAction(input: {
               {
                 entity_type: "material_request" as const,
                 entity_id: input.materialRequestId,
-                entity_label:
-                  input.materialRequestTitle || "Material request",
+                entity_label: input.materialRequestTitle || "Material request",
                 link_source: "manual" as const,
                 confidence: 1,
               },
@@ -250,7 +264,8 @@ export async function sendAuraMessageAction(input: {
       });
       return {
         ok: false,
-        error: "The provider did not confirm this message. Check the conversation before trying again.",
+        error:
+          "The provider did not confirm this message. Check the conversation before trying again.",
       };
     }
     await recordAuraCommunicationActivity(supabase, user.id, {
@@ -368,7 +383,10 @@ export async function sendAuraWelcomePackageAction(input: {
   if (!access.customers)
     return { ok: false, error: "Customer communication access is required." };
   const phone = normalizeAuraPhone(input.recipient);
-  const messages = input.messages.map((message) => message.trim()) as [string, string];
+  const messages = input.messages.map((message) => message.trim()) as [
+    string,
+    string,
+  ];
   if (!phone || messages.some((message) => !message || message.length > 1_600))
     return { ok: false, error: "Review both Welcome Package messages." };
   const startedAt = Date.now();
@@ -392,7 +410,11 @@ export async function sendAuraWelcomePackageAction(input: {
       });
     revalidatePath("/admin/communications");
     revalidatePath("/admin/users");
-    return { ok: true, externalId: result.id, occurredAt: new Date().toISOString() };
+    return {
+      ok: true,
+      externalId: result.id,
+      occurredAt: new Date().toISOString(),
+    };
   } catch (error) {
     await recordAuraCommunicationActivity(supabase, user.id, {
       channel: input.channel,
@@ -404,7 +426,10 @@ export async function sendAuraWelcomePackageAction(input: {
     });
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Welcome Package could not be queued.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Welcome Package could not be queued.",
     };
   }
 }
@@ -417,20 +442,36 @@ export async function sendAuraMessageWithAttachmentAction(
     return { ok: false, error: "Customer communication access is required." };
   const channel = String(formData.get("channel") || "");
   if (channel !== "whatsapp" && channel !== "email")
-    return { ok: false, error: "Choose WhatsApp or email for automatic file delivery." };
+    return {
+      ok: false,
+      error: "Choose WhatsApp or email for automatic file delivery.",
+    };
   const recipient = String(formData.get("recipient") || "").trim();
   const message = String(formData.get("message") || "").trim();
   const subject = String(formData.get("subject") || "").trim();
-  const sourceCommunicationId = String(formData.get("sourceCommunicationId") || "").trim();
+  const sourceCommunicationId = String(
+    formData.get("sourceCommunicationId") || "",
+  ).trim();
   const idempotencyKey = String(formData.get("idempotencyKey") || "").trim();
-  const attachment = formData.get("attachment");
+  const legacyAttachment = formData.get("attachment");
+  const attachments = formData
+    .getAll("attachments")
+    .filter((item): item is File => item instanceof File && item.size > 0);
+  if (
+    !attachments.length &&
+    legacyAttachment instanceof File &&
+    legacyAttachment.size > 0
+  )
+    attachments.push(legacyAttachment);
   const phone = channel === "whatsapp" ? normalizeAuraPhone(recipient) : null;
   const email = channel === "email" ? normalizeAuraEmail(recipient) : null;
   if (channel === "email" ? !email : !phone)
     return { ok: false, error: "Enter a valid recipient." };
   if (!message) return { ok: false, error: "Enter a message." };
-  if (!(attachment instanceof File) || attachment.size < 1)
-    return { ok: false, error: "Choose a file." };
+  if (!attachments.length)
+    return { ok: false, error: "Choose at least one file." };
+  if (attachments.length > 10)
+    return { ok: false, error: "Choose up to 10 files." };
   const maxBytes = channel === "whatsapp" ? 16 * 1024 * 1024 : 25 * 1024 * 1024;
   const allowedTypes = new Set([
     "application/pdf",
@@ -438,26 +479,61 @@ export async function sendAuraMessageWithAttachmentAction(
     "image/png",
     "image/webp",
   ]);
-  if (attachment.size > maxBytes || !allowedTypes.has(attachment.type))
+  if (
+    attachments.some(
+      (attachment) =>
+        attachment.size > maxBytes || !allowedTypes.has(attachment.type),
+    )
+  )
     return {
       ok: false,
       error: `Attach a PDF, JPG, PNG, or WebP file under ${channel === "whatsapp" ? "16" : "25"} MB.`,
     };
-  const extension = attachment.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
-  const storagePath = `${user.id}/communications/${crypto.randomUUID()}.${extension}`;
-  const uploaded = await supabase.storage.from("project-uploads").upload(
-    storagePath,
-    attachment,
-    { contentType: attachment.type, upsert: false },
-  );
-  if (uploaded.error)
-    return { ok: false, error: "The attachment could not be saved for delivery." };
+  if (
+    attachments.reduce((total, item) => total + item.size, 0) >
+    25 * 1024 * 1024
+  )
+    return { ok: false, error: "Attachments must be 25 MB total or less." };
+  const uploadedPaths: string[] = [];
   try {
-    const digest = await crypto.subtle.digest("SHA-256", await attachment.arrayBuffer());
-    const contentSha256 = Array.from(new Uint8Array(digest))
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-    const action = channel === "email" ? "send_email" : "send_whatsapp";
+    const descriptors = [];
+    for (const attachment of attachments) {
+      const extension =
+        attachment.name
+          .split(".")
+          .pop()
+          ?.toLowerCase()
+          .replace(/[^a-z0-9]/g, "") || "bin";
+      const storagePath = `${user.id}/communications/${crypto.randomUUID()}.${extension}`;
+      const uploaded = await supabase.storage
+        .from("project-uploads")
+        .upload(storagePath, attachment, {
+          contentType: attachment.type,
+          upsert: false,
+        });
+      if (uploaded.error) throw new Error("upload_failed");
+      uploadedPaths.push(storagePath);
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        await attachment.arrayBuffer(),
+      );
+      descriptors.push({
+        storageBucket: "project-uploads",
+        storagePath,
+        filename: attachment.name.slice(0, 180),
+        contentType: attachment.type,
+        byteSize: attachment.size,
+        contentSha256: Array.from(new Uint8Array(digest))
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join(""),
+      });
+    }
+    const action =
+      channel === "email"
+        ? "send_email"
+        : attachments.length > 1
+          ? "send_whatsapp_batch"
+          : "send_whatsapp";
     const result = await invokeMessagingBroker(supabase, {
       action,
       to: email || phone,
@@ -467,14 +543,7 @@ export async function sendAuraMessageWithAttachmentAction(
       sourceCommunicationId: /^[0-9a-f-]{36}$/i.test(sourceCommunicationId)
         ? sourceCommunicationId
         : undefined,
-      attachments: [{
-        storageBucket: "project-uploads",
-        storagePath,
-        filename: attachment.name.slice(0, 180),
-        contentType: attachment.type,
-        byteSize: attachment.size,
-        contentSha256,
-      }],
+      attachments: descriptors,
     });
     revalidatePath("/owner/aura");
     revalidatePath("/admin/communications");
@@ -483,10 +552,22 @@ export async function sendAuraMessageWithAttachmentAction(
       externalId: result.id,
       occurredAt: new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
     // The enqueue request can time out after the database committed. Keep the
     // private object so a possibly queued delivery never loses its attachment.
-    return { ok: false, error: "The message could not be queued for delivery." };
+    if (
+      error instanceof Error &&
+      error.message === "upload_failed" &&
+      uploadedPaths.length
+    )
+      await supabase.storage.from("project-uploads").remove(uploadedPaths);
+    return {
+      ok: false,
+      error:
+        error instanceof Error && error.message === "upload_failed"
+          ? "One or more attachments could not be saved."
+          : "The message could not be queued for delivery.",
+    };
   }
 }
 
@@ -793,7 +874,10 @@ export async function optimizeAuraMetaWhatsAppAction(): Promise<ConfigureAuraPro
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "WhatsApp could not be optimized.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "WhatsApp could not be optimized.",
     };
   }
 }
@@ -811,7 +895,10 @@ export async function configureAuraEmailEventsAction(): Promise<ConfigureAuraPro
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Email events could not be activated.",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Email events could not be activated.",
     };
   }
 }

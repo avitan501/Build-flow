@@ -8120,6 +8120,7 @@ async function enqueueManagerMessage(
   idempotencyValue: unknown,
   sourceCommunicationIdValue: unknown,
   attachmentValue: unknown,
+  deferDispatch = false,
 ) {
   const destination = channel === "email"
     ? validEmail(destinationValue)
@@ -8183,15 +8184,71 @@ async function enqueueManagerMessage(
   `;
   const queued = rows[0]?.result;
   if (!queued?.outboxId) throw new Error("The message could not be queued.");
+  if (!deferDispatch)
+    EdgeRuntime.waitUntil(
+      dispatchCommunicationOutboxWorker().catch((error) =>
+        console.error(
+          "communication_outbox_dispatch_failed",
+          error instanceof Error ? error.message : "unknown error",
+        )
+      ),
+    );
+  return queued;
+}
+
+async function enqueueManagerWhatsAppBatch(
+  managerId: string,
+  destinationValue: unknown,
+  bodyValue: unknown,
+  idempotencyValue: unknown,
+  sourceCommunicationIdValue: unknown,
+  attachmentValue: unknown,
+) {
+  const attachments = managerOutboxAttachments(attachmentValue);
+  if (!Array.isArray(attachmentValue) || attachments.length < 2 || attachments.length !== attachmentValue.length)
+    throw new Error("Choose between 2 and 10 valid WhatsApp attachments.");
+  const requestKey =
+    typeof idempotencyValue === "string" && /^[a-z0-9:/_.-]{10,160}$/i.test(idempotencyValue)
+      ? idempotencyValue
+      : crypto.randomUUID();
+  const packageKey = `manager-files/${managerId}/${requestKey}`.slice(0, 250);
+  const queuedParts: Array<{ outboxId: string; duplicate: boolean }> = [];
+  for (const [index, attachment] of attachments.entries()) {
+    const partBody = index === 0
+      ? bodyValue
+      : `Attachment ${index + 1} of ${attachments.length}: ${attachment.filename}`;
+    const queued = await enqueueManagerMessage(
+      managerId,
+      "whatsapp",
+      destinationValue,
+      null,
+      partBody,
+      `${requestKey}/${index}`,
+      sourceCommunicationIdValue,
+      [attachment],
+      true,
+    );
+    queuedParts.push(queued);
+    await sql`
+      update public.aura_message_outbox
+      set package_key = ${packageKey}, package_index = ${index}
+      where id = ${queued.outboxId}::uuid
+        and (package_key is null or package_key = ${packageKey})
+    `;
+  }
   EdgeRuntime.waitUntil(
-    dispatchCommunicationOutboxWorker().catch((error) =>
+    dispatchCommunicationOutboxWorker(queuedParts[0]?.outboxId || null).catch((error) =>
       console.error(
-        "communication_outbox_dispatch_failed",
+        "communication_package_dispatch_failed",
         error instanceof Error ? error.message : "unknown error",
       )
     ),
   );
-  return queued;
+  return {
+    outboxId: queuedParts[0]?.outboxId,
+    duplicate: queuedParts.every((part) => part.duplicate),
+    partCount: queuedParts.length,
+  };
 }
 
 async function enqueueManagerWelcomePackage(
@@ -11820,6 +11877,17 @@ Deno.serve(async (req: Request) => {
         input.sourceCommunicationId,
       );
       return json({ ok: true, id });
+    }
+    if (input.action === "send_whatsapp_batch") {
+      const queued = await enqueueManagerWhatsAppBatch(
+        manager.user.id,
+        input.to,
+        input.message,
+        input.idempotencyKey,
+        input.sourceCommunicationId,
+        input.attachments,
+      );
+      return json({ ok: true, id: queued.outboxId, queued: true, duplicate: queued.duplicate, partCount: queued.partCount });
     }
     if (input.action === "send_sms") {
       const queued = await enqueueManagerMessage(

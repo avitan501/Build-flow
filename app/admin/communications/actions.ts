@@ -109,20 +109,18 @@ async function ensureSmsPhoneCustomer(phone: string, name: string) {
     currentName && currentName !== phone && !/^\+?[0-9 ()-]+$/.test(currentName)
       ? currentName
       : name;
-  const saved = await admin
-    .from("profiles")
-    .upsert(
-      {
-        id: authUser.id,
-        email: authUser.email || profile?.email || "",
-        full_name: fullName,
-        phone,
-        role: "client",
-        approval_status: "pending",
-        is_active: true,
-      },
-      { onConflict: "id" },
-    );
+  const saved = await admin.from("profiles").upsert(
+    {
+      id: authUser.id,
+      email: authUser.email || profile?.email || "",
+      full_name: fullName,
+      phone,
+      role: "client",
+      approval_status: "pending",
+      is_active: true,
+    },
+    { onConflict: "id" },
+  );
   if (saved.error)
     return {
       ok: false as const,
@@ -196,14 +194,15 @@ export async function completeSmsReplyDraftAction(input: {
 
   const { data: communication, error: communicationError } = await supabase
     .from("aura_communications")
-    .select("id,body,contact_id")
+    .select("id,body,contact_id,channel")
     .eq("id", draft.communication_id)
-    .eq("channel", "sms")
+    .in("channel", ["sms", "whatsapp"])
     .eq("direction", "incoming")
     .maybeSingle<{
       id: string;
       body: string | null;
       contact_id: string | null;
+      channel: "sms" | "whatsapp";
     }>();
   if (communicationError || !communication?.body?.trim())
     return {
@@ -547,28 +546,24 @@ export async function createSmsMaterialRequestAction(input: {
       .select("public_number")
       .eq("id", existing.data.request_id)
       .maybeSingle<{ public_number: number }>();
-    await admin
-      .from("customer_request_portal_access")
-      .upsert(
-        {
-          request_id: existing.data.request_id,
-          normalized_phone: phone,
-          delivery_address: customerAddress,
-        },
-        { onConflict: "request_id" },
-      );
-    await admin
-      .from("customer_request_portal_invite_outbox")
-      .upsert(
-        {
-          request_id: existing.data.request_id,
-          normalized_phone: phone,
-          message: "Secure request status invitation generated at send time.",
-          status: "pending",
-          next_attempt_at: new Date().toISOString(),
-        },
-        { onConflict: "request_id", ignoreDuplicates: true },
-      );
+    await admin.from("customer_request_portal_access").upsert(
+      {
+        request_id: existing.data.request_id,
+        normalized_phone: phone,
+        delivery_address: customerAddress,
+      },
+      { onConflict: "request_id" },
+    );
+    await admin.from("customer_request_portal_invite_outbox").upsert(
+      {
+        request_id: existing.data.request_id,
+        normalized_phone: phone,
+        message: "Secure request status invitation generated at send time.",
+        status: "pending",
+        next_attempt_at: new Date().toISOString(),
+      },
+      { onConflict: "request_id", ignoreDuplicates: true },
+    );
     await supabase.functions.invoke("aura-messaging-broker", {
       body: {
         action: "send_customer_request_invite",
@@ -936,7 +931,10 @@ export async function saveCommunicationLogAction(input: {
     metadata: {
       channel: input.channel,
       direction: input.direction,
-      recipient: String(client.data.phone || client.data.email || "").slice(0, 320),
+      recipient: String(client.data.phone || client.data.email || "").slice(
+        0,
+        320,
+      ),
       label: clientName,
       outcome: input.direction === "inbound" ? "received" : "completed",
       duration_seconds: 0,
@@ -1014,48 +1012,84 @@ export async function linkCommunicationContactAction(input: {
   const existing = existingResult.data;
   const contactId = existing?.id || crypto.randomUUID();
   const contactValues = {
-    full_name: input.name.trim().slice(0, 160) || existing?.full_name || safeConversationPhone || safeConversationEmail,
+    full_name:
+      input.name.trim().slice(0, 160) ||
+      existing?.full_name ||
+      safeConversationPhone ||
+      safeConversationEmail,
     company: input.company?.trim().slice(0, 160) || existing?.company || null,
     normalized_phone: conversationPhone || existing?.normalized_phone || null,
     email: conversationEmail || existing?.email || null,
   };
   const contactResult = existing
-    ? await admin.from("aura_contacts").update(contactValues).eq("id", contactId)
-    : await admin.from("aura_contacts").insert({ id: contactId, ...contactValues, notes: null });
+    ? await admin
+        .from("aura_contacts")
+        .update(contactValues)
+        .eq("id", contactId)
+    : await admin
+        .from("aura_contacts")
+        .insert({ id: contactId, ...contactValues, notes: null });
   if (contactResult.error)
-    return { ok: false as const, error: "The contact link could not be saved." };
+    return {
+      ok: false as const,
+      error: "The contact link could not be saved.",
+    };
 
   const communicationIds = new Set<string>();
   const communicationUpdates = [
     ...(conversationPhone
-      ? [admin.from("aura_communications").update({ contact_id: contactId }).eq("counterparty_phone", conversationPhone).select("id")]
+      ? [
+          admin
+            .from("aura_communications")
+            .update({ contact_id: contactId })
+            .eq("counterparty_phone", conversationPhone)
+            .select("id"),
+        ]
       : []),
     ...(conversationEmail
-      ? [admin.from("aura_communications").update({ contact_id: contactId }).ilike("counterparty_email", conversationEmail).select("id")]
+      ? [
+          admin
+            .from("aura_communications")
+            .update({ contact_id: contactId })
+            .ilike("counterparty_email", conversationEmail)
+            .select("id"),
+        ]
       : []),
   ];
   const updated = await Promise.all(communicationUpdates);
   if (updated.some((result) => result.error))
-    return { ok: false as const, error: "The conversation could not be linked." };
+    return {
+      ok: false as const,
+      error: "The conversation could not be linked.",
+    };
   for (const result of updated)
     for (const row of result.data ?? []) communicationIds.add(String(row.id));
   if (!communicationIds.size)
-    return { ok: false as const, error: "No messages were found in this conversation." };
+    return {
+      ok: false as const,
+      error: "No messages were found in this conversation.",
+    };
 
   try {
     await addAuraCommunicationLinks(
       [...communicationIds],
-      [{
-        entity_type: input.kind === "customer" ? "client" : input.kind,
-        entity_id: input.sourceId,
-        entity_label: input.name.trim() || safeConversationPhone || safeConversationEmail,
-        link_source: "manual",
-        confidence: 1,
-      }],
+      [
+        {
+          entity_type: input.kind === "customer" ? "client" : input.kind,
+          entity_id: input.sourceId,
+          entity_label:
+            input.name.trim() || safeConversationPhone || safeConversationEmail,
+          link_source: "manual",
+          confidence: 1,
+        },
+      ],
       user.id,
     );
   } catch {
-    return { ok: false as const, error: "The structured conversation link could not be saved." };
+    return {
+      ok: false as const,
+      error: "The structured conversation link could not be saved.",
+    };
   }
 
   revalidatePath("/admin/communications");
@@ -1180,7 +1214,10 @@ export async function markCommunicationConversationReadAction(input: {
     p_email: email || null,
   });
   if (result.error)
-    return { ok: false, error: "The conversation could not be marked as read." };
+    return {
+      ok: false,
+      error: "The conversation could not be marked as read.",
+    };
   revalidatePath("/admin/communications");
   return { ok: true };
 }

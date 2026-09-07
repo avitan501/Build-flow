@@ -32,7 +32,12 @@ export type AuraLeadRecipient = {
 type MaterialRequestRecipient = { id: string; title: string; status: string }
 
 type Connections = {
-  voice?: { receive: boolean; send: boolean; recording: boolean; phone: string | null }
+  voice?: {
+    receive: boolean
+    send: boolean
+    recording: boolean
+    phone: string | null
+  }
   quo: { receive: boolean; send: boolean }
   whatsapp: { receive: boolean; send: boolean }
   email: { receive: boolean; send: boolean }
@@ -41,6 +46,8 @@ type Connections = {
 type Channel = "call" | "sms" | "whatsapp" | "email"
 type ContactKind = "customer" | "lead" | "supplier" | "contact"
 type ContactFilter = "all" | ContactKind
+type WorkFilter = "all" | "needs_reply" | "unread" | "ai_review" | "failed" | "duplicate"
+type LiveSyncState = "connecting" | "live" | "fallback"
 
 type DirectoryEntry = {
   key: string
@@ -106,7 +113,14 @@ function formatMessageTime(value: string) {
 }
 
 function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?"
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "?"
+  )
 }
 
 function contactKindLabel(kind: ContactKind) {
@@ -134,6 +148,33 @@ function statusIcon(status: string | null) {
   return <Clock3 className="h-3 w-3 text-slate-400" />
 }
 
+function statusLabel(status: string | null) {
+  const normalized = String(status || "queued").toLowerCase()
+  if (normalized === "read") return "Read"
+  if (normalized === "delivered") return "Delivered"
+  if (["failed", "undelivered", "bounced", "complained", "suppressed"].includes(normalized)) return normalized === "undelivered" ? "Not delivered" : normalized[0].toUpperCase() + normalized.slice(1)
+  if (normalized === "accepted") return "Accepted"
+  if (normalized === "sent") return "Sent"
+  if (normalized === "sending") return "Sending"
+  return "Queued"
+}
+
+function hasUnresolvedTemplatePlaceholder(value: string) {
+  return /\[(?:add|insert|choose|select|enter|client|name|address|date|time|amount|item)[^\]]*\]/i.test(value)
+}
+
+function responseMetric(messages: AuraCommunicationRow[]) {
+  const lastIncomingIndex = messages.findLastIndex((item) => item.direction === "incoming")
+  if (lastIncomingIndex < 0) return null
+  const incoming = messages[lastIncomingIndex]
+  const reply = messages.slice(lastIncomingIndex + 1).find((item) => item.direction === "outgoing")
+  if (!reply) return `Waiting since ${formatTime(incoming.occurred_at)}`
+  const minutes = Math.max(0, Math.round((Date.parse(reply.occurred_at) - Date.parse(incoming.occurred_at)) / 60_000))
+  if (minutes < 1) return "Replied in under 1 min"
+  if (minutes < 60) return `Replied in ${minutes} min`
+  return `Replied in ${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
 function safeText(value: unknown) {
   if (typeof value === "string") return value
   if (typeof value === "number" || typeof value === "boolean") return String(value)
@@ -156,42 +197,37 @@ function messageText(message: AuraCommunicationRow) {
 }
 
 function messageCanStartMaterialRequest(message: AuraCommunicationRow) {
-  if (
-    message.direction === "incoming" &&
-    ["sms", "whatsapp"].includes(message.channel) &&
-    message.media?.some((item) =>
-      item.processingStatus === "ready" &&
-      /^(?:image\/|audio\/|application\/pdf$)/i.test(item.type || ""),
-    )
-  ) return true
+  if (message.direction === "incoming" && ["sms", "whatsapp"].includes(message.channel) && message.media?.some((item) => item.processingStatus === "ready" && /^(?:image\/|audio\/|application\/pdf$)/i.test(item.type || ""))) return true
   return looksLikeMaterialRequestMessage(message.channel, message.direction, messageText(message))
 }
 
 function ExpandableMessage({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
   const long = text.length > 520 || text.split("\n").length > 8
-  return <div><p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>{long ? <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">{expanded ? "Show less" : "Show more"}<ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}</div>
+  return (
+    <div>
+      <p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>
+      {long ? (
+        <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">
+          {expanded ? "Show less" : "Show more"}
+          <ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} />
+        </button>
+      ) : null}
+    </div>
+  )
 }
 
 function initialCommunicationForQuery(communications: AuraCommunicationRow[], query: string, channelFilter: string) {
   const available = channelFilter === "all" ? communications : communications.filter((communication) => communication.channel === channelFilter)
   const needle = query.trim().toLowerCase()
   if (!needle) return available[0]
-  return available.find((communication) => [
-    communication.counterparty_phone || "",
-    communication.counterparty_email || "",
-    communication.subject || "",
-    messageText(communication),
-  ].some((value) => value.toLowerCase().includes(needle))) || available[0]
+  return available.find((communication) => [communication.counterparty_phone || "", communication.counterparty_email || "", communication.subject || "", messageText(communication)].some((value) => value.toLowerCase().includes(needle))) || available[0]
 }
 
 function initialCommunicationForThread(communications: AuraCommunicationRow[], thread: string, channelFilter: string) {
   const threadKey = normalizeCommunicationThread(thread)?.key
   if (!threadKey) return undefined
-  return communications.find((communication) =>
-    (channelFilter === "all" || communication.channel === channelFilter)
-    && identityKey(communication.counterparty_phone, communication.counterparty_email) === threadKey,
-  )
+  return communications.find((communication) => (channelFilter === "all" || communication.channel === channelFilter) && identityKey(communication.counterparty_phone, communication.counterparty_email) === threadKey)
 }
 
 function mergeCommunicationRows(current: AuraCommunicationRow[], incoming: AuraCommunicationRow[]) {
@@ -218,12 +254,8 @@ function attachmentLabel(attachment: { url?: string | null; name?: string | null
   return `Attachment ${index + 1}`
 }
 
-function pendingAttachmentLabel(
-  attachment: { processingStatus?: "processing" | "ready" | "failed" },
-) {
-  return attachment.processingStatus === "failed"
-    ? "Attachment unavailable — ask the customer to resend"
-    : "Attachment processing…"
+function pendingAttachmentLabel(attachment: { processingStatus?: "processing" | "ready" | "failed" }) {
+  return attachment.processingStatus === "failed" ? "Attachment unavailable — ask the customer to resend" : "Attachment processing…"
 }
 
 function initialConversationKey(communication: AuraCommunicationRow | undefined, contacts: AuraContactRow[]) {
@@ -236,27 +268,9 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "", initialThread = "", initialHistoryCursor = null, initialHistoryHasMore = false }: {
-  communications: AuraCommunicationRow[]
-  contacts: AuraContactRow[]
-  customers: AuraCustomerIdentity[]
-  leads?: AuraLeadRecipient[]
-  suppliers?: SupplierRoutingOption[]
-  materialRequests?: MaterialRequestRecipient[]
-  smsReplyDrafts?: SmsReplyDraft[]
-  connections: Connections
-  initialChannelFilter?: string
-  initialCommunicationId?: string
-  initialQuery?: string
-  initialDraft?: string
-  initialThread?: string
-  initialHistoryCursor?: string | null
-  initialHistoryHasMore?: boolean
-}) {
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "", initialThread = "", initialHistoryCursor = null, initialHistoryHasMore = false }: { communications: AuraCommunicationRow[]; contacts: AuraContactRow[]; customers: AuraCustomerIdentity[]; leads?: AuraLeadRecipient[]; suppliers?: SupplierRoutingOption[]; materialRequests?: MaterialRequestRecipient[]; smsReplyDrafts?: SmsReplyDraft[]; connections: Connections; initialChannelFilter?: string; initialCommunicationId?: string; initialQuery?: string; initialDraft?: string; initialThread?: string; initialHistoryCursor?: string | null; initialHistoryHasMore?: boolean }) {
   const router = useRouter()
-  const initialCommunication = communications.find((communication) => communication.id === initialCommunicationId)
-    || initialCommunicationForThread(communications, initialThread, initialChannelFilter)
-    || initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
+  const initialCommunication = communications.find((communication) => communication.id === initialCommunicationId) || initialCommunicationForThread(communications, initialThread, initialChannelFilter) || initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
   const initialStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const exactCommunicationRef = useRef<HTMLElement>(null)
@@ -270,23 +284,30 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
-  const [activeKey, setActiveKey] = useState(() => initialDraft ? "__new__" : initialConversationKey(initialCommunication, contacts))
+  const [activeKey, setActiveKey] = useState(() => (initialDraft ? "__new__" : initialConversationKey(initialCommunication, contacts)))
   const [mobileThreadOpen, setMobileThreadOpen] = useState(Boolean(initialDraft || ((initialCommunicationId || initialThread) && initialCommunication)))
   const [channel, setChannel] = useState<Channel>(() => {
     if (initialDraft && ["sms", "whatsapp", "email"].includes(initialChannelFilter)) return initialChannelFilter as Channel
+    if (initialStoredDraft && initialCommunication?.channel === "whatsapp") return "whatsapp"
     if (initialStoredDraft) return "sms"
     const initial = initialCommunication?.channel
     return initial === "email" || initial === "sms" || initial === "whatsapp" ? initial : "whatsapp"
   })
   const [recipientType, setRecipientType] = useState<Exclude<ContactKind, "contact">>("customer")
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
-  const [recipient, setRecipient] = useState(() => initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || "")
-  const [subject, setSubject] = useState(() => initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : "")
+  const [recipient, setRecipient] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || ""))
+  const [subject, setSubject] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : ""))
   const [message, setMessage] = useState(initialDraft || initialStoredDraft?.reply_text || "")
-  const [attachment, setAttachment] = useState<File | null>(null)
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null)
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error"
+    text: string
+  } | null>(null)
   const [pending, startTransition] = useTransition()
-  const [callLauncher, setCallLauncher] = useState<{ phone: string; name: string } | null>(null)
+  const [callLauncher, setCallLauncher] = useState<{
+    phone: string
+    name: string
+  } | null>(null)
   const [linkTarget, setLinkTarget] = useState("")
   const [emailLinkTarget, setEmailLinkTarget] = useState("")
   const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "auto_safe")
@@ -301,6 +322,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState("")
   const [threadHistory, setThreadHistory] = useState<Record<string, { cursor: string | null; hasMore: boolean }>>({})
+  const [workFilter, setWorkFilter] = useState<WorkFilter>("all")
+  const [liveSyncState, setLiveSyncState] = useState<LiveSyncState>("connecting")
 
   useEffect(() => {
     let stopped = false
@@ -309,14 +332,18 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const controller = new AbortController()
     const supabase = createSupabaseClient()
 
+    let realtimeReady = false
     const schedule = () => {
       if (stopped) return
-      const delay = failures ? Math.min(30_000, 5_000 * 2 ** Math.min(failures, 3)) : 5_000
+      const delay = failures ? Math.min(30_000, 3_000 * 2 ** Math.min(failures, 3)) : realtimeReady ? 15_000 : 3_000
       timer = window.setTimeout(sync, delay)
     }
     const sync = async () => {
       if (stopped) return
-      if (document.visibilityState !== "visible") { schedule(); return }
+      if (document.visibilityState !== "visible") {
+        schedule()
+        return
+      }
       const startedAt = performance.now()
       try {
         const response = await fetch(`/api/admin/communications/updates?after=${encodeURIComponent(updatesCursorRef.current)}`, {
@@ -324,7 +351,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
           signal: controller.signal,
         })
         if (!response.ok) throw new Error(`communication-sync-${response.status}`)
-        const result = await response.json() as CommunicationUpdatesResponse
+        const result = (await response.json()) as CommunicationUpdatesResponse
         const updates = result.communications ?? []
         if (result.cursor) updatesCursorRef.current = result.cursor
         if (updates.length) {
@@ -332,12 +359,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
             const merged = new Map(current.map((item) => [item.id, item]))
             for (const item of updates) merged.set(item.id, item)
             for (const optimistic of current.filter((item) => item.id.startsWith("optimistic:"))) {
-              const matched = updates.some((item) =>
-                item.direction === "outgoing" &&
-                item.channel === optimistic.channel &&
-                item.body === optimistic.body &&
-                identityKey(item.counterparty_phone, item.counterparty_email) === identityKey(optimistic.counterparty_phone, optimistic.counterparty_email),
-              )
+              const matched = updates.some((item) => item.direction === "outgoing" && item.channel === optimistic.channel && item.body === optimistic.body && identityKey(item.counterparty_phone, item.counterparty_email) === identityKey(optimistic.counterparty_phone, optimistic.counterparty_email))
               if (matched) merged.delete(optimistic.id)
             }
             return [...merged.values()]
@@ -365,19 +387,22 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         schedule()
       }
     }
-    const onFocus = () => { if (timer) window.clearTimeout(timer); void sync() }
+    const onFocus = () => {
+      if (timer) window.clearTimeout(timer)
+      void sync()
+    }
     const liveChannel = supabase
       .channel("aura-communications-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "aura_communications" },
-        () => {
-          if (timer) window.clearTimeout(timer)
-          void sync()
-        },
-      )
-      .subscribe()
-    timer = window.setTimeout(sync, 1_500)
+      .on("postgres_changes", { event: "*", schema: "public", table: "aura_communications" }, () => {
+        if (timer) window.clearTimeout(timer)
+        void sync()
+      })
+      .subscribe((status: string) => {
+        realtimeReady = status === "SUBSCRIBED"
+        if (status === "SUBSCRIBED") setLiveSyncState("live")
+        else if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) setLiveSyncState("fallback")
+      })
+    timer = window.setTimeout(sync, 1_000)
     window.addEventListener("focus", onFocus)
     return () => {
       stopped = true
@@ -401,12 +426,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
           signal: controller.signal,
         })
         if (!response.ok) return
-        const result = await response.json() as CommunicationHistoryResponse
-        if (result.communications?.length)
-          setLiveCommunications((current) => mergeCommunicationRows(current, result.communications || []))
+        const result = (await response.json()) as CommunicationHistoryResponse
+        if (result.communications?.length) setLiveCommunications((current) => mergeCommunicationRows(current, result.communications || []))
       } catch (cause) {
         if (!(cause instanceof DOMException && cause.name === "AbortError"))
-          captureAvantiaEvent("avantia_communications_history_search", { success: false })
+          captureAvantiaEvent("avantia_communications_history_search", {
+            success: false,
+          })
       }
     }, 350)
     return () => {
@@ -417,10 +443,46 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const directory = useMemo(() => {
     const entries: DirectoryEntry[] = [
-      ...customers.map((item) => ({ key: `customer:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed customer", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "customer" as const })),
-      ...leads.map((item) => ({ key: `lead:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed lead", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "lead" as const })),
-      ...suppliers.map((item) => ({ key: `supplier:${item.id}`, id: item.id, name: item.contactName || item.name || item.email || item.phone || "Unnamed supplier", company: item.name || "", phone: item.phone || "", whatsapp: item.whatsapp || "", email: item.email || "", kind: "supplier" as const })),
-      ...contacts.map((item) => ({ key: `contact:${item.id}`, id: item.id, name: item.full_name || item.company || item.email || item.normalized_phone || "Unnamed contact", company: item.company || "", phone: item.normalized_phone || "", whatsapp: item.normalized_phone || "", email: item.email || "", kind: "contact" as const })),
+      ...customers.map((item) => ({
+        key: `customer:${item.id}`,
+        id: item.id,
+        name: item.full_name || item.company_name || item.email || item.phone || "Unnamed customer",
+        company: item.company_name || "",
+        phone: item.phone || "",
+        whatsapp: item.phone || "",
+        email: item.email || "",
+        kind: "customer" as const,
+      })),
+      ...leads.map((item) => ({
+        key: `lead:${item.id}`,
+        id: item.id,
+        name: item.full_name || item.company_name || item.email || item.phone || "Unnamed lead",
+        company: item.company_name || "",
+        phone: item.phone || "",
+        whatsapp: item.phone || "",
+        email: item.email || "",
+        kind: "lead" as const,
+      })),
+      ...suppliers.map((item) => ({
+        key: `supplier:${item.id}`,
+        id: item.id,
+        name: item.contactName || item.name || item.email || item.phone || "Unnamed supplier",
+        company: item.name || "",
+        phone: item.phone || "",
+        whatsapp: item.whatsapp || "",
+        email: item.email || "",
+        kind: "supplier" as const,
+      })),
+      ...contacts.map((item) => ({
+        key: `contact:${item.id}`,
+        id: item.id,
+        name: item.full_name || item.company || item.email || item.normalized_phone || "Unnamed contact",
+        company: item.company || "",
+        phone: item.normalized_phone || "",
+        whatsapp: item.normalized_phone || "",
+        email: item.email || "",
+        kind: "contact" as const,
+      })),
     ]
     const entryByKey = new Map(entries.map((entry) => [entry.key, entry]))
     const contactTarget = new Map<string, DirectoryEntry>()
@@ -465,7 +527,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       if (!phone) continue
       for (const link of communication.links ?? []) {
         if (!["client", "lead", "supplier"].includes(link.entity_type)) continue
-        const kind = link.entity_type === "client" ? "customer" : link.entity_type as ContactKind
+        const kind = link.entity_type === "client" ? "customer" : (link.entity_type as ContactKind)
         const canonicalKey = `${kind}:${link.entity_id}`
         const target = entryByKey.get(canonicalKey)
         phoneCandidates.push({
@@ -519,45 +581,51 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       const canonical = directory.alias.get(rawKey)?.key || rawKey
       grouped.set(canonical, [...(grouped.get(canonical) || []), communication])
     }
-    return [...grouped.entries()].map(([key, items]) => {
-      const ordered = [...items].sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
-      const latest = ordered[ordered.length - 1]
-      const rawKey = identityKey(latest.counterparty_phone, latest.counterparty_email)
-      const entry = directory.entries.find((item) => item.key === key) || directory.alias.get(rawKey)
-      const phone = normalizeAuraPhone(latest.counterparty_phone)
-      const resolution = phone ? directory.phoneResolutions.get(phone) || resolveCallerIdentity(phone, []) : null
-      const verified = resolution?.status === "verified" ? resolution.primary : null
-      const unknownName = latest.channel === "call" ? "Unknown caller" : latest.direction === "incoming" ? "Unknown sender" : "Unknown contact"
-      const ambiguousName = latest.channel === "call" ? "Ambiguous caller" : "Ambiguous sender"
-      return {
-        key,
-        name: resolution?.status === "ambiguous" ? ambiguousName : verified?.name || entry?.name || latest.counterparty_email || unknownName,
-        company: resolution?.status === "ambiguous" ? `${resolution.candidates.length} exact matches` : verified?.company || entry?.company || "",
-        phone: phone || entry?.phone || latest.counterparty_phone || "",
-        email: entry?.email || latest.counterparty_email || "",
-        kind: verified?.kind || entry?.kind || "contact",
-        messages: ordered,
-        latest,
-        channels: [...new Set(ordered.map((item) => item.channel))],
-        unread: ordered.filter((item) => item.direction === "incoming" && !item.read_at).length,
-        identityStatus: resolution?.status || "unknown",
-        identityCandidates: resolution?.candidates || [],
-      } satisfies Conversation
-    }).sort((left, right) => Date.parse(right.latest.occurred_at) - Date.parse(left.latest.occurred_at))
+    return [...grouped.entries()]
+      .map(([key, items]) => {
+        const ordered = [...items].sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
+        const latest = ordered[ordered.length - 1]
+        const rawKey = identityKey(latest.counterparty_phone, latest.counterparty_email)
+        const entry = directory.entries.find((item) => item.key === key) || directory.alias.get(rawKey)
+        const phone = normalizeAuraPhone(latest.counterparty_phone)
+        const resolution = phone ? directory.phoneResolutions.get(phone) || resolveCallerIdentity(phone, []) : null
+        const verified = resolution?.status === "verified" ? resolution.primary : null
+        const unknownName = latest.channel === "call" ? "Unknown caller" : latest.direction === "incoming" ? "Unknown sender" : "Unknown contact"
+        const ambiguousName = latest.channel === "call" ? "Ambiguous caller" : "Ambiguous sender"
+        return {
+          key,
+          name: resolution?.status === "ambiguous" ? ambiguousName : verified?.name || entry?.name || latest.counterparty_email || unknownName,
+          company: resolution?.status === "ambiguous" ? `${resolution.candidates.length} exact matches` : verified?.company || entry?.company || "",
+          phone: phone || entry?.phone || latest.counterparty_phone || "",
+          email: entry?.email || latest.counterparty_email || "",
+          kind: verified?.kind || entry?.kind || "contact",
+          messages: ordered,
+          latest,
+          channels: [...new Set(ordered.map((item) => item.channel))],
+          unread: ordered.filter((item) => item.direction === "incoming" && !item.read_at).length,
+          identityStatus: resolution?.status || "unknown",
+          identityCandidates: resolution?.candidates || [],
+        } satisfies Conversation
+      })
+      .sort((left, right) => Date.parse(right.latest.occurred_at) - Date.parse(left.latest.occurred_at))
   }, [channelFilter, liveCommunications, directory])
 
   const filteredConversations = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return conversations.filter((conversation) => {
       if (contactFilter !== "all" && conversation.kind !== contactFilter) return false
+      const hasAiDraft = smsReplyDrafts.some((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
+      if (workFilter === "needs_reply" && conversation.latest.direction !== "incoming") return false
+      if (workFilter === "unread" && conversation.unread < 1) return false
+      if (workFilter === "ai_review" && !hasAiDraft) return false
+      if (workFilter === "failed" && !conversation.messages.some((item) => ["failed", "undelivered", "bounced"].includes(item.status || ""))) return false
+      if (workFilter === "duplicate" && conversation.identityStatus !== "ambiguous") return false
       if (!needle) return true
       return [conversation.name, conversation.company, conversation.phone, conversation.email, ...conversation.identityCandidates.map(callerIdentityCandidateLabel), ...conversation.messages.map(messageText)].some((value) => value.toLowerCase().includes(needle))
     })
-  }, [contactFilter, conversations, query])
+  }, [contactFilter, conversations, query, smsReplyDrafts, workFilter])
 
-  const activeConversation = conversations.find((conversation) => conversation.key === activeKey)
-    || (initialCommunicationId ? conversations.find((conversation) => conversation.messages.some((message) => message.id === initialCommunicationId)) : undefined)
-    || (activeKey !== "__new__" ? conversations[0] : undefined)
+  const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (initialCommunicationId ? conversations.find((conversation) => conversation.messages.some((message) => message.id === initialCommunicationId)) : undefined) || (activeKey !== "__new__" ? conversations[0] : undefined)
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
   const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
@@ -585,11 +653,12 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     if (historyLoading) return
     const conversation = scope === "thread" ? activeConversation : undefined
     const oldest = conversation?.messages[0]
-    const cursor = scope === "all"
-      ? historyCursor
-      : activeThreadHistory?.cursor ?? (oldest ? communicationHistoryCursor(oldest) : null)
+    const cursor = scope === "all" ? historyCursor : (activeThreadHistory?.cursor ?? (oldest ? communicationHistoryCursor(oldest) : null))
     if (!cursor) return
-    const parameters = new URLSearchParams({ cursor, limit: scope === "all" ? "80" : "60" })
+    const parameters = new URLSearchParams({
+      cursor,
+      limit: scope === "all" ? "80" : "60",
+    })
     if (conversation?.phone) parameters.set("phone", conversation.phone)
     if (conversation?.email) parameters.set("email", conversation.email)
     setHistoryLoading(true)
@@ -597,7 +666,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const startedAt = performance.now()
     try {
       const response = await fetch(`/api/admin/communications/history?${parameters}`, { cache: "no-store" })
-      const result = await response.json() as CommunicationHistoryResponse
+      const result = (await response.json()) as CommunicationHistoryResponse
       if (!response.ok) throw new Error(result.error || `communication-history-${response.status}`)
       setLiveCommunications((current) => mergeCommunicationRows(current, result.communications || []))
       if (scope === "all") {
@@ -606,7 +675,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       } else if (conversation) {
         setThreadHistory((current) => ({
           ...current,
-          [conversation.key]: { cursor: result.cursor || null, hasMore: Boolean(result.hasMore) },
+          [conversation.key]: {
+            cursor: result.cursor || null,
+            hasMore: Boolean(result.hasMore),
+          },
         }))
       }
       captureAvantiaEvent("avantia_communications_history_page", {
@@ -643,7 +715,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setActiveDraftId(storedDraft?.id || null)
     setTeachAi(false)
     setCorrectionReasons([])
-    if (storedDraft) setChannel("sms")
+    if (storedDraft) {
+      const draftSource = conversation.messages.find((item) => item.id === storedDraft.communication_id)
+      setChannel(draftSource?.channel === "whatsapp" ? "whatsapp" : "sms")
+    }
     setFeedback(null)
     updateConversationDeepLink(conversation)
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
@@ -652,16 +727,22 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const unreadIds = new Set(conversation.messages.filter((item) => item.direction === "incoming" && !item.read_at).map((item) => item.id))
     if (unreadIds.size) {
       const readAt = new Date().toISOString()
-      setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: readAt } : item))
+      setLiveCommunications((current) => current.map((item) => (unreadIds.has(item.id) ? { ...item, read_at: readAt } : item)))
       startTransition(async () => {
         try {
-          const result = await markCommunicationConversationReadAction({ conversationPhone: conversation.phone, conversationEmail: conversation.email })
+          const result = await markCommunicationConversationReadAction({
+            conversationPhone: conversation.phone,
+            conversationEmail: conversation.email,
+          })
           if (result.ok) return
-          setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: null } : item))
+          setLiveCommunications((current) => current.map((item) => (unreadIds.has(item.id) ? { ...item, read_at: null } : item)))
           setFeedback({ tone: "error", text: result.error })
         } catch {
-          setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: null } : item))
-          setFeedback({ tone: "error", text: "The conversation opened, but its unread status could not be updated." })
+          setLiveCommunications((current) => current.map((item) => (unreadIds.has(item.id) ? { ...item, read_at: null } : item)))
+          setFeedback({
+            tone: "error",
+            text: "The conversation opened, but its unread status could not be updated.",
+          })
         }
       })
     }
@@ -673,9 +754,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const nextCommunication = currentMatch || initialCommunicationForQuery(liveCommunications, query, nextFilter)
     if (!nextCommunication) return
     setActiveKey(initialConversationKey(nextCommunication, contacts))
-    const nextChannel = nextCommunication.channel === "email" || nextCommunication.channel === "sms" || nextCommunication.channel === "whatsapp"
-      ? nextCommunication.channel
-      : "whatsapp"
+    const nextChannel = nextCommunication.channel === "email" || nextCommunication.channel === "sms" || nextCommunication.channel === "whatsapp" ? nextCommunication.channel : "whatsapp"
     setChannel(nextChannel)
     setRecipient(nextChannel === "email" ? nextCommunication.counterparty_email || "" : nextCommunication.counterparty_phone || "")
     setSubject(nextChannel === "email" ? replySubject(nextCommunication.subject) : "")
@@ -692,24 +771,49 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function saveSmsAiSettings() {
     if (!activeConversation?.phone) return
     startTransition(async () => {
-      const result = await saveSmsAutomationAction({ phone: activeConversation.phone, mode: smsAiMode, style: smsAiStyle, autoCreateRequestDrafts: true })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
-      setFeedback({ tone: "success", text: smsAiMode === "off" ? "AI replies are off for this contact." : smsAiMode === "draft" ? "AI will prepare drafts for this contact." : "AI will answer only safe, simple messages; everything else stays a draft." })
+      const result = await saveSmsAutomationAction({
+        phone: activeConversation.phone,
+        mode: smsAiMode,
+        style: smsAiStyle,
+        autoCreateRequestDrafts: true,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      setFeedback({
+        tone: "success",
+        text: smsAiMode === "off" ? "AI replies are off for this contact." : smsAiMode === "draft" ? "AI will prepare drafts for this contact." : "AI will answer only safe, simple messages; everything else stays a draft.",
+      })
       router.refresh()
     })
   }
 
   function prepareAiReply() {
-    const incoming = activeConversation ? [...activeConversation.messages].reverse().find((item) => item.channel === "sms" && item.direction === "incoming" && item.body) : null
-    if (!incoming) { setFeedback({ tone: "error", text: "Choose a conversation with an incoming text message." }); return }
+    const incoming = activeConversation ? [...activeConversation.messages].reverse().find((item) => ["sms", "whatsapp"].includes(item.channel) && item.direction === "incoming" && item.body) : null
+    if (!incoming) {
+      setFeedback({
+        tone: "error",
+        text: "Choose a conversation with an incoming text or WhatsApp message.",
+      })
+      return
+    }
     startTransition(async () => {
       setFeedback(null)
-      const result = await generateSmsReplyAction({ communicationId: incoming.id })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
-      setChannel("sms")
+      const result = await generateSmsReplyAction({
+        communicationId: incoming.id,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      setChannel(incoming.channel === "whatsapp" ? "whatsapp" : "sms")
       setRecipient(activeConversation?.phone || "")
       setMessage(result.reply)
-      setFeedback({ tone: "success", text: `${result.safetyReason}${result.requestDetected ? " A material-request draft was also added to the request queue." : ""}` })
+      setFeedback({
+        tone: "success",
+        text: `${result.safetyReason}${result.requestDetected ? " A material-request draft was also added to the request queue." : ""}`,
+      })
     })
   }
 
@@ -717,7 +821,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     startTransition(async () => {
       setFeedback(null)
       const result = await reviewSmsRequestAction({ communicationId })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
       setRequestReview(result.proposal)
       const confirmationIndex = result.proposal.sourceMessages.findLastIndex((source) => isExplicitCustomerRequestConfirmation(source))
       setConfirmationCommunicationId(confirmationIndex >= 0 ? result.proposal.sourceCommunicationIds[confirmationIndex] || "" : "")
@@ -728,14 +835,23 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     if (!requestReview) return
     startTransition(async () => {
       setFeedback(null)
-      const result = await createSmsMaterialRequestAction({ ...requestReview, confirmationCommunicationId })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      const result = await createSmsMaterialRequestAction({
+        ...requestReview,
+        confirmationCommunicationId,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
       setRequestReview(null)
       setConfirmationCommunicationId("")
       setChannel("sms")
       setRecipient(requestReview.phone)
       setMessage(result.invitation)
-      setFeedback({ tone: "success", text: `Request #${result.publicNumber || "created"} is assigned to Carlos. The secure portal invitation is ready for review and sending.` })
+      setFeedback({
+        tone: "success",
+        text: `Request #${result.publicNumber || "created"} is assigned to Carlos. The secure portal invitation is ready for review and sending.`,
+      })
       router.refresh()
     })
   }
@@ -743,9 +859,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function quickTag(kind: Exclude<ContactKind, "contact">) {
     if (!activeConversation?.phone) return
     startTransition(async () => {
-      const result = await quickTagPhoneContactAction({ phone: activeConversation.phone, kind, name: activeConversation.name === activeConversation.phone ? undefined : activeConversation.name })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
-      setFeedback({ tone: "success", text: `Added to ${kind === "customer" ? "Customers" : kind === "lead" ? "Leads" : "Suppliers"} and linked to this conversation.` })
+      const result = await quickTagPhoneContactAction({
+        phone: activeConversation.phone,
+        kind,
+        name: activeConversation.name === activeConversation.phone ? undefined : activeConversation.name,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      setFeedback({
+        tone: "success",
+        text: `Added to ${kind === "customer" ? "Customers" : kind === "lead" ? "Leads" : "Suppliers"} and linked to this conversation.`,
+      })
       router.refresh()
     })
   }
@@ -784,7 +910,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function openConversationCall(conversation: Conversation) {
     const phone = normalizeCommunicationCallPhone(conversation.phone)
     if (!phone) {
-      setFeedback({ tone: "error", text: "This conversation does not have a valid phone number." })
+      setFeedback({
+        tone: "error",
+        text: "This conversation does not have a valid phone number.",
+      })
       return
     }
     setCallLauncher({ phone, name: conversation.name })
@@ -796,39 +925,49 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const sentText = message.trim()
     const sentRecipient = recipient.trim()
     const sentSubject = subject.trim()
+    const sentAttachments = [...attachments]
     const selectedEntry = recipientOptions.find((entry) => entry.id === selectedRecipientId)
     const recipientLabel = activeConversation?.name || selectedEntry?.name || sentRecipient
-    const requestLink = activeConversation?.messages
-      .flatMap((item) => item.links ?? [])
-      .find((link) => link.entity_type === "material_request")
-    const sentDraftId = messageChannel === "sms" ? activeDraftId : null
+    const requestLink = activeConversation?.messages.flatMap((item) => item.links ?? []).find((link) => link.entity_type === "material_request")
+    const sentDraftId = ["sms", "whatsapp"].includes(messageChannel) ? activeDraftId : null
     const teachSentReply = Boolean(sentDraftId && teachAi)
     const idempotencyKey = crypto.randomUUID()
-    const sourceCommunicationId = activeConversation
-      ? [...activeConversation.messages].reverse().find((item) => item.direction === "incoming" && (item.channel === "sms" || item.channel === "whatsapp"))?.id
-      : undefined
+    const sourceCommunicationId = activeConversation ? [...activeConversation.messages].reverse().find((item) => item.direction === "incoming" && (item.channel === "sms" || item.channel === "whatsapp"))?.id : undefined
     setFeedback(null)
     startTransition(async () => {
-      if (messageChannel === "sms" && attachment) {
+      if (messageChannel === "sms" && sentAttachments.length) {
+        if (sentAttachments.length > 1) {
+          setFeedback({
+            tone: "error",
+            text: "Text messages can prepare one attachment at a time. Use WhatsApp or email for several files.",
+          })
+          return
+        }
         const formData = new FormData()
         formData.set("phone", recipient)
         formData.set("message", message)
-        formData.set("attachment", attachment)
+        formData.set("attachment", sentAttachments[0])
         const prepared = await prepareQuoAttachmentMessageAction(formData)
-        if (!prepared.ok) { setFeedback({ tone: "error", text: prepared.error }); return }
+        if (!prepared.ok) {
+          setFeedback({ tone: "error", text: prepared.error })
+          return
+        }
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) window.location.href = prepared.deepLink
         else {
           await navigator.clipboard?.writeText(message).catch(() => undefined)
           window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer")
           window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer")
-          setFeedback({ tone: "success", text: "Q U O opened. Attach the prepared file from the second tab." })
+          setFeedback({
+            tone: "success",
+            text: "Q U O opened. Attach the prepared file from the second tab.",
+          })
         }
-        setAttachment(null)
+        setAttachments([])
         if (attachmentInputRef.current) attachmentInputRef.current.value = ""
         return
       }
       const startedAt = performance.now()
-      const result = attachment
+      const result = sentAttachments.length
         ? await (() => {
             const formData = new FormData()
             formData.set("channel", messageChannel)
@@ -837,10 +976,20 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
             formData.set("message", sentText)
             formData.set("sourceCommunicationId", sourceCommunicationId || "")
             formData.set("idempotencyKey", idempotencyKey)
-            formData.set("attachment", attachment)
+            for (const file of sentAttachments) formData.append("attachments", file)
             return sendAuraMessageWithAttachmentAction(formData)
           })()
-        : await sendAuraMessageAction({ channel: messageChannel, recipient: sentRecipient, recipientLabel, subject: sentSubject, message: sentText, sourceCommunicationId, materialRequestId: requestLink?.entity_id, materialRequestTitle: requestLink?.entity_label, idempotencyKey })
+        : await sendAuraMessageAction({
+            channel: messageChannel,
+            recipient: sentRecipient,
+            recipientLabel,
+            subject: sentSubject,
+            message: sentText,
+            sourceCommunicationId,
+            materialRequestId: requestLink?.entity_id,
+            materialRequestTitle: requestLink?.entity_label,
+            idempotencyKey,
+          })
       if (!result.ok) {
         captureAvantiaEvent("avantia_communication_sent", {
           channel: messageChannel,
@@ -863,7 +1012,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         summary: null,
         transcript: null,
         next_steps: [],
-        media: attachment ? [{ type: attachment.type }] : [],
+        media: sentAttachments.map((file) => ({
+          type: file.type,
+          name: file.name,
+        })),
         status: "queued",
         duration_seconds: null,
         occurred_at: result.occurredAt || new Date().toISOString(),
@@ -871,7 +1023,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         read_at: result.occurredAt || new Date().toISOString(),
       }
       setLiveCommunications((current) => [optimistic, ...current])
-      setAttachment(null)
+      setAttachments([])
       if (attachmentInputRef.current) attachmentInputRef.current.value = ""
       const sentIdentity = identityKey(optimistic.counterparty_phone, optimistic.counterparty_email)
       setActiveKey(directory.alias.get(sentIdentity)?.key || sentIdentity || `unknown:${optimistic.id}`)
@@ -881,9 +1033,14 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         duration_ms: Math.round(performance.now() - startedAt),
         success: true,
       })
-      if (messageChannel === "sms") setSmsAiMode("off")
+      if (messageChannel === "sms" || messageChannel === "whatsapp") setSmsAiMode("off")
       if (sentDraftId) {
-        const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply, correctionReasons })
+        const completed = await completeSmsReplyDraftAction({
+          draftId: sentDraftId,
+          reply: message,
+          teachAi: teachSentReply,
+          correctionReasons,
+        })
         setActiveDraftId(null)
         setTeachAi(false)
         setCorrectionReasons([])
@@ -895,7 +1052,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         }
       }
       setMessage("")
-      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text sent and saved. AI replies are paused for this conversation until you turn them on again." : messageChannel === "whatsapp" ? "WhatsApp sent and saved." : "Email sent and saved."}${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}` })
+      setFeedback({
+        tone: "success",
+        text: `${messageChannel === "sms" ? "Text sent and saved. AI replies are paused for this conversation until you turn them on again." : messageChannel === "whatsapp" ? "WhatsApp sent and saved." : "Email sent and saved."}${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}`,
+      })
     })
   }
 
@@ -914,9 +1074,41 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         conversationPhone: activeConversation.phone,
         conversationEmail: activeConversation.email,
       })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
       setLinkTarget("")
-      setFeedback({ tone: "success", text: `Conversation assigned to ${entry.name}.` })
+      setFeedback({
+        tone: "success",
+        text: `Conversation assigned to ${entry.name}.`,
+      })
+      router.refresh()
+    })
+  }
+
+  function resolveDuplicateCandidate(candidate: CallerIdentityCandidate) {
+    if (!activeConversation || candidate.kind === "contact") return
+    const linkedKind: Exclude<ContactKind, "contact"> = candidate.kind
+    startTransition(async () => {
+      const result = await linkCommunicationContactAction({
+        kind: linkedKind,
+        sourceId: candidate.id,
+        name: candidate.name,
+        company: candidate.company || "",
+        phone: candidate.phone || activeConversation.phone,
+        email: "",
+        conversationPhone: activeConversation.phone,
+        conversationEmail: activeConversation.email,
+      })
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      setFeedback({
+        tone: "success",
+        text: `Conversation linked to ${candidate.name}. No history was deleted.`,
+      })
       router.refresh()
     })
   }
@@ -930,7 +1122,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         entityType: entityType as "client" | "lead" | "supplier" | "material_request",
         entityId: idParts.join(":"),
       })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      if (!result.ok) {
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
       setEmailLinkTarget("")
       setFeedback({ tone: "success", text: "Email conversation linked." })
       router.refresh()
@@ -939,77 +1134,815 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const activeEmailLinks = activeConversation ? [...new Map(activeConversation.messages.flatMap((item) => item.links ?? []).map((link) => [`${link.entity_type}:${link.entity_id}`, link])).values()] : []
   const activeHasEmail = activeConversation?.messages.some((item) => item.channel === "email") ?? false
-  const requestCandidateId = activeConversation ? [...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null : null
+  const requestCandidateId = activeConversation ? ([...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null) : null
   const activeSmsDraft = activeDraftId ? smsReplyDrafts.find((draft) => draft.id === activeDraftId) || null : null
   const activeDraftEdited = Boolean(activeSmsDraft && message.trim() !== activeSmsDraft.reply_text.trim())
   const activeRequestLink = activeConversation?.messages.flatMap((item) => item.links ?? []).find((link) => link.entity_type === "material_request")
   const activeRequest = activeRequestLink ? materialRequests.find((request) => request.id === activeRequestLink.entity_id) : undefined
-  const nextAction = activeConversation ? recommendCommunicationAction({
-    name: activeConversation.name,
-    kind: activeConversation.kind,
-    hasMaterialRequest: Boolean(activeRequestLink),
-    materialRequestStatus: activeRequest?.status,
-    messages: activeConversation.messages.map((item) => ({
-      direction: item.direction,
-      body: item.body,
-      summary: item.summary,
-      transcript: item.transcript,
-      status: item.status,
-      occurredAt: item.occurred_at,
-    })),
-  }) : null
+  const nextAction = activeConversation
+    ? recommendCommunicationAction({
+        name: activeConversation.name,
+        kind: activeConversation.kind,
+        hasMaterialRequest: Boolean(activeRequestLink),
+        materialRequestStatus: activeRequest?.status,
+        messages: activeConversation.messages.map((item) => ({
+          direction: item.direction,
+          body: item.body,
+          summary: item.summary,
+          transcript: item.transcript,
+          status: item.status,
+          occurredAt: item.occurred_at,
+        })),
+      })
+    : null
   const quickReplies = activeConversation ? communicationTemplates(activeConversation.name, activeConversation.kind) : []
+  const activeResponseMetric = activeConversation ? responseMetric(activeConversation.messages) : null
 
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
-  return <section className="h-full min-h-0 w-full max-w-full touch-pan-y overscroll-none overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="Unified communications inbox">
-    <div className="grid h-full min-h-0 min-w-0 md:grid-cols-[20rem_minmax(0,1fr)]">
-      <aside className={`${threadVisible ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-slate-200 bg-white`}>
-        <header className="shrink-0 border-b border-slate-200 p-3">
-          <div className="flex items-center justify-between gap-3"><div><h1 className="text-lg font-bold">Inbox</h1><p className="text-[11px] text-slate-500">All calls and messages</p></div><div className="flex items-center gap-1"><Link href="/admin/ai-tools/sms-replies" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sky-700" aria-label="AI reply settings" title="AI reply settings"><Bot className="h-4 w-4" /></Link><button type="button" onClick={newConversation} className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0071e3] text-white md:h-9 md:w-9" aria-label="New conversation"><Plus className="h-4 w-4" /></button></div></div>
-          <label className="relative mt-3 block"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><span className="sr-only">Search conversations</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0071e3]" /></label>
-          <div className="mt-2 flex gap-1 overflow-x-auto pb-1">{([['all', 'All'], ['customer', 'Customers'], ['lead', 'Leads'], ['supplier', 'Suppliers / Vendors']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setContactFilter(value)} className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${contactFilter === value ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"}`}>{label}</button>)}</div>
-          <label className="mt-2 block"><span className="sr-only">Filter channel</span><select value={channelFilter} onChange={(event) => changeChannelFilter(event.target.value)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold"><option value="all">All channels</option><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option><option value="call">Calls</option></select></label>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong><span className="flex shrink-0 items-center gap-1.5">{conversation.unread ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>{conversation.unread}</span> : null}<time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span></span>{conversation.company ? <span className={`mt-0.5 block truncate text-[10px] font-semibold ${conversation.identityStatus === "ambiguous" ? "text-amber-700" : "text-slate-500"}`}>{conversation.company}</span> : null}<span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${conversation.identityStatus === "ambiguous" ? "bg-amber-100 text-amber-800" : contactKindTone(conversation.kind)}`}>{conversation.identityStatus === "ambiguous" ? "Duplicate phone" : contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}{conversation.identityStatus !== "verified" && conversation.phone ? <span className="truncate text-[9px] font-semibold text-slate-500">{conversation.phone}</span> : null}</span><span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span></span></button>)}
-          {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
-          {historyHasMore ? <div className="border-t border-slate-100 p-3"><button type="button" onClick={() => void loadOlderHistory("all")} disabled={historyLoading} className="h-9 w-full rounded-md border border-slate-300 bg-white text-[11px] font-bold text-slate-700 disabled:opacity-50">{historyLoading ? "Loading…" : "Load older conversations"}</button></div> : null}
-          {historyError ? <p className="px-3 pb-3 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
-        </div>
-      </aside>
-
-      <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-[#f5f5f7]`}>
-        {activeKey !== "__new__" && activeConversation?.phone && activeConversation.identityStatus === "unknown" ? <section className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-2" aria-label="Add contact"><div className="flex min-w-0 items-center gap-2"><UserRound className="h-4 w-4 shrink-0 text-sky-700" /><span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{activeConversation.latest.channel === "call" ? "Unknown caller" : "Unknown sender"} · save this number</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending} className="h-7 shrink-0 rounded-full border border-sky-200 bg-white px-2 text-[10px] font-bold text-sky-900 disabled:opacity-50">{label}</button>)}</div></section> : null}
-        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center gap-3"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={connections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}><Phone className="h-4 w-4" /></button> : null}</div>{activeConversation.phone ? <details className="mt-2 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700"><UserRound className="h-3.5 w-3.5 text-sky-700" /><span className="flex-1">{activeConversation.kind === "contact" ? "Save this number" : `${contactKindLabel(activeConversation.kind)} contact`}</span><span className="text-sky-700">{activeConversation.kind === "contact" ? "Add" : "Change"}</span></summary><div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-2"><span className="mr-1 text-[10px] font-bold text-slate-600">Save as</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending || activeConversation.kind === kind} className={`h-7 rounded-full border px-2.5 text-[10px] font-bold disabled:opacity-60 ${activeConversation.kind === kind ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-white"}`}>{label}{activeConversation.kind === kind ? " ✓" : ""}</button>)}<details className="w-full border-t border-slate-100 pt-1"><summary className="cursor-pointer text-[10px] font-semibold text-sky-700">Link to an existing person instead</summary><div className="mt-2 flex gap-2"><select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs"><option value="">Choose existing contact</option>{directory.entries.filter((entry) => entry.kind !== "contact").map((entry) => <option key={entry.key} value={entry.key}>{contactKindLabel(entry.kind)} · {entry.name}</option>)}</select><button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Link</button></div></details></div></details> : null}{activeConversation.phone ? <details className="mt-2 rounded-md bg-slate-50 p-1.5"><summary className="flex h-7 cursor-pointer list-none items-center gap-1.5 px-1 text-[10px] font-bold text-slate-700"><Bot className="h-3.5 w-3.5 text-sky-700" />AI replies · {smsAiMode === "off" ? "Off" : smsAiMode === "draft" ? "Drafts" : "Auto when safe"}<span className="ml-auto text-sky-700">Settings</span></summary><div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-1.5"><select aria-label="AI reply mode" value={smsAiMode} onChange={(event) => setSmsAiMode(event.target.value as typeof smsAiMode)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold"><option value="off">AI off</option><option value="draft">AI drafts</option><option value="auto_safe">Auto when safe</option></select><select aria-label="AI reply style" value={smsAiStyle} onChange={(event) => setSmsAiStyle(event.target.value as typeof smsAiStyle)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="brief">Very brief</option></select><button type="button" onClick={saveSmsAiSettings} disabled={pending} className="h-8 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white disabled:opacity-40">Save AI</button></div></details> : null}</header> : null}
-        {activeConversation?.identityStatus === "ambiguous" ? <section className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2" role="alert"><p className="text-[11px] font-bold text-amber-950">Duplicate phone number · no caller was selected automatically</p><p className="mt-0.5 text-[10px] leading-4 text-amber-800">{activeConversation.identityCandidates.map(callerIdentityCandidateLabel).join(" · ")} · {activeConversation.phone}</p></section> : activeConversation?.identityStatus === "verified" && activeConversation.company ? <section className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5"><p className="truncate text-[10px] font-semibold text-slate-600">Verified exact phone match · {activeConversation.company}</p></section> : null}
-        {activeHasEmail && activeConversation ? <section className="shrink-0 border-b border-slate-200 bg-sky-50/70 px-3 py-2" aria-label="Email links"><div className="flex flex-wrap items-center gap-1.5">{activeEmailLinks.map((link) => <Link key={`${link.entity_type}:${link.entity_id}`} href={link.entity_type === "material_request" ? `/owner/materials/requests/${link.entity_id}` : link.entity_type === "supplier" ? `/admin/vendors?q=${encodeURIComponent(link.entity_label)}` : "/admin/users"} className="rounded-full border border-sky-200 bg-white px-2 py-1 text-[10px] font-bold text-sky-800">{link.entity_type === "material_request" ? "Request" : link.entity_type === "supplier" ? "Supplier" : link.entity_type === "client" ? "Client" : "Lead"} · {link.entity_label}</Link>)}{!activeEmailLinks.length ? <span className="text-[10px] font-semibold text-slate-500">Not linked yet</span> : null}</div><div className="mt-2 flex gap-2"><select value={emailLinkTarget} onChange={(event) => setEmailLinkTarget(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold"><option value="">Link email to…</option><optgroup label="Material requests">{materialRequests.map((request) => <option key={request.id} value={`material_request:${request.id}`}>{request.title} · {request.status}</option>)}</optgroup><optgroup label="Clients">{customers.map((client) => <option key={client.id} value={`client:${client.id}`}>{client.full_name || client.company_name || client.email}</option>)}</optgroup><optgroup label="Leads">{leads.map((lead) => <option key={lead.id} value={`lead:${lead.id}`}>{lead.full_name || lead.company_name || lead.email || lead.phone}</option>)}</optgroup><optgroup label="Suppliers">{suppliers.map((supplier) => <option key={supplier.id} value={`supplier:${supplier.id}`}>{supplier.name}</option>)}</optgroup></select><button type="button" onClick={linkEmailConversation} disabled={!emailLinkTarget || pending} className="h-8 rounded-md bg-slate-950 px-3 text-[11px] font-bold text-white disabled:opacity-40">Link</button></div></section> : null}
-
-        {activeConversation?.phone ? <span className="sr-only">Add or change contact type</span> : null}
-        <div className="min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5">
-          {activeConversation ? <div className="mx-auto grid min-w-0 max-w-3xl gap-2">{historyError ? <p className="mb-1 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}{activeThreadHasMore ? <div className="mb-2 flex justify-center"><button type="button" onClick={() => void loadOlderHistory("thread")} disabled={historyLoading} className="h-8 rounded-full border border-slate-300 bg-white px-4 text-[10px] font-bold text-slate-600 shadow-sm disabled:opacity-50">{historyLoading ? "Loading…" : "Load earlier messages"}</button></div> : <p className="mb-2 text-center text-[10px] font-semibold text-slate-400">Beginning of conversation</p>}{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const exact = item.id === initialCommunicationId; const text = messageText(item); const media = Array.isArray(item.media) ? item.media : []; return <article key={item.id} ref={exact ? exactCommunicationRef : undefined} className={`flex min-w-0 scroll-m-6 ${outgoing ? "justify-end" : "justify-start"}`}><div className={`min-w-0 max-w-[88%] overflow-hidden rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${exact ? "ring-2 ring-[#0071e3] ring-offset-2" : ""} ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{item.channel === "call" && item.summary && item.summary !== text ? <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600"><strong>Summary:</strong> {item.summary}</p> : null}{item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? attachment.type?.startsWith("audio/") ? <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} /> : <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3 shrink-0" /><span className="truncate">{attachmentLabel(attachment, index)}</span></a> : <span key={`${attachment.providerAttachmentId || "attachment"}-${index}`} className={`inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border px-2 text-[10px] font-bold ${attachment.processingStatus === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}><Paperclip className="h-3 w-3 shrink-0" /><span>{pendingAttachmentLabel(attachment)}</span></span>)}</div> : null}{item.id === requestCandidateId ? <button type="button" onClick={() => reviewMessageForRequest(item.id)} disabled={pending} className="mt-2 inline-flex h-7 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-bold text-sky-800 disabled:opacity-40"><ClipboardList className="h-3 w-3" />Review material request</button> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{item.duration_seconds ? <span>{Math.floor(item.duration_seconds / 60)}:{String(item.duration_seconds % 60).padStart(2, "0")}</span> : null}{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
-        </div>
-
-        <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
-          <div className="mx-auto max-w-3xl">
-            {activeSmsDraft ? <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft"><div className="flex items-start gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.safety_level === "green" ? "bg-emerald-100 text-emerald-800" : activeSmsDraft.safety_level === "red" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{activeSmsDraft.safety_level || "yellow"} safety</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>{activeDraftEdited ? <div className="mt-2"><p className="text-[9px] font-bold uppercase tracking-wide text-sky-900">Why did you edit it?</p><div className="mt-1 flex flex-wrap gap-1">{SMS_CORRECTION_REASONS.map((reason) => <button key={reason} type="button" onClick={() => setCorrectionReasons((current) => current.includes(reason) ? current.filter((item) => item !== reason) : [...current, reason])} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${correctionReasons.includes(reason) ? "border-sky-700 bg-sky-700 text-white" : "border-sky-200 bg-white text-sky-800"}`}>{CORRECTION_REASON_LABELS[reason]}</button>)}</div></div> : null}<label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950"><input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />Teach AI from my approved reply</label><p className="mt-0.5 text-[9px] text-sky-700">Nothing is learned unless you check this box and send. Customer details are redacted before reuse. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}{activeSmsDraft.latency_ms ? ` · ${activeSmsDraft.latency_ms} ms` : ""}.</p></div></div></section> : null}
-            {nextAction ? <section className="mb-2 rounded-lg border border-slate-200 bg-slate-950 px-3 py-2 text-white" aria-label="Recommended next action"><div className="flex min-w-0 items-start gap-2"><span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-300 text-slate-950"><Sparkles className="h-3.5 w-3.5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5"><strong className="text-[11px]">{nextAction.action}</strong><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${nextAction.health === "Do Not Contact" ? "bg-rose-400/20 text-rose-200" : nextAction.health === "Needs Carlos" || nextAction.health === "At Risk" ? "bg-amber-300/20 text-amber-200" : "bg-white/10 text-slate-200"}`}>{nextAction.health}</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-300">{nextAction.reason}</p></div>{nextAction.action === "Call customer" && activeConversation?.phone ? <button type="button" onClick={() => setCallLauncher({ phone: activeConversation.phone, name: activeConversation.name })} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950"><Phone className="h-3 w-3" />Call</button> : nextAction.suggestedMessage ? <button type="button" onClick={() => setMessage(nextAction.suggestedMessage)} className="h-7 shrink-0 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950">Draft</button> : null}</div></section> : null}
-            <div className="flex gap-1.5 overflow-x-auto pb-2">{activeConversation?.phone ? <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40"><Sparkles className="h-3 w-3" />AI answer</button> : null}{quickReplies.map((reply) => <button key={reply.id} type="button" onClick={() => setMessage(reply.message)} title={`${reply.purpose} message`} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply.label}</button>)}</div>
-            <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
-              <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>
-              <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
-              {channel !== "call" ? <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment"><Paperclip className="h-4 w-4" /><input ref={attachmentInputRef} type="file" accept={channel === "sms" ? ".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" : ".pdf,.jpg,.jpeg,.png,.webp"} className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
-              <button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white disabled:bg-slate-300" aria-label="Send message"><Send className="h-4 w-4" /></button>
+  return (
+    <section className="h-full min-h-0 w-full max-w-full touch-pan-y overscroll-none overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="Unified communications inbox">
+      <div className="grid h-full min-h-0 min-w-0 md:grid-cols-[20rem_minmax(0,1fr)]">
+        <aside className={`${threadVisible ? "hidden md:flex" : "flex"} min-h-0 min-w-0 w-full flex-col border-r border-slate-200 bg-white`}>
+          <header className="shrink-0 border-b border-slate-200 p-3">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-lg font-bold">Inbox</h1>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[8px] font-black uppercase ${liveSyncState === "live" ? "bg-emerald-100 text-emerald-800" : liveSyncState === "fallback" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}>{liveSyncState === "live" ? "Live" : liveSyncState === "fallback" ? "3s backup" : "Connecting"}</span>
+                </div>
+                <p className="truncate text-[11px] text-slate-500">All calls and messages</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Link href="/admin/ai-tools/sms-replies" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sky-700" aria-label="AI reply settings" title="AI reply settings">
+                  <Bot className="h-4 w-4" />
+                </Link>
+                <button type="button" onClick={newConversation} className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0071e3] text-white md:h-9 md:w-9" aria-label="New conversation">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            {channel === "email" ? <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-2 h-9 w-full rounded-md border border-slate-300 px-3 text-xs" /> : null}
-            {attachment ? <div className="mt-2 flex items-center justify-between rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold"><span className="truncate">{attachment.name} · {channel === "sms" ? "opens securely in Q U O" : "delivers with the message"}</span><button type="button" onClick={() => { setAttachment(null); if (attachmentInputRef.current) attachmentInputRef.current.value = "" }} aria-label="Remove attachment"><X className="h-3.5 w-3.5" /></button></div> : null}
-            {!selectedChannelReady ? <p className="mt-2 text-xs font-semibold text-amber-700">This channel still needs a connection.</p> : null}
-            {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
+            <label className="relative mt-3 block">
+              <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <span className="sr-only">Search conversations</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0071e3]" />
+            </label>
+            <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
+              {(
+                [
+                  ["all", "All"],
+                  ["customer", "Customers"],
+                  ["lead", "Leads"],
+                  ["supplier", "Suppliers / Vendors"],
+                ] as const
+              ).map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setContactFilter(value)} className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${contactFilter === value ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <label>
+                <span className="sr-only">Filter channel</span>
+                <select value={channelFilter} onChange={(event) => changeChannelFilter(event.target.value)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold">
+                  <option value="all">All channels</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="sms">Text</option>
+                  <option value="email">Email</option>
+                  <option value="call">Calls</option>
+                </select>
+              </label>
+              <label>
+                <span className="sr-only">Filter work</span>
+                <select value={workFilter} onChange={(event) => setWorkFilter(event.target.value as WorkFilter)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold">
+                  <option value="all">All work</option>
+                  <option value="needs_reply">Needs reply</option>
+                  <option value="unread">Unread</option>
+                  <option value="ai_review">AI review</option>
+                  <option value="failed">Failed</option>
+                  <option value="duplicate">Duplicates</option>
+                </select>
+              </label>
+            </div>
+            <details className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+              <summary className="cursor-pointer list-none text-[10px] font-bold text-slate-700">Connections</summary>
+              <div className="mt-1.5 grid grid-cols-2 gap-1 text-[9px] font-semibold">
+                {(
+                  [
+                    { label: "WhatsApp", state: connections.whatsapp },
+                    { label: "Text", state: connections.quo },
+                    { label: "Email", state: connections.email },
+                    {
+                      label: "Calls",
+                      state: connections.voice || {
+                        receive: false,
+                        send: false,
+                      },
+                    },
+                  ] as const
+                ).map(({ label, state }) => (
+                  <span key={label} className="inline-flex min-w-0 items-center gap-1 rounded bg-white px-1.5 py-1">
+                    <i className={`h-1.5 w-1.5 shrink-0 rounded-full ${state.receive && state.send ? "bg-emerald-500" : state.receive || state.send ? "bg-amber-500" : "bg-rose-500"}`} />
+                    <span className="truncate">
+                      {label}: {state.receive && state.send ? "Ready" : state.receive ? "Receive only" : state.send ? "Send only" : "Setup"}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </details>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {filteredConversations.map((conversation) => (
+              <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}>
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {conversation.unread ? (
+                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>
+                          {conversation.unread}
+                        </span>
+                      ) : null}
+                      <time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time>
+                    </span>
+                  </span>
+                  {conversation.company ? <span className={`mt-0.5 block truncate text-[10px] font-semibold ${conversation.identityStatus === "ambiguous" ? "text-amber-700" : "text-slate-500"}`}>{conversation.company}</span> : null}
+                  <span className="mt-0.5 flex items-center gap-1.5">
+                    <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${conversation.identityStatus === "ambiguous" ? "bg-amber-100 text-amber-800" : contactKindTone(conversation.kind)}`}>{conversation.identityStatus === "ambiguous" ? "Duplicate phone" : contactKindLabel(conversation.kind)}</span>
+                    {conversation.channels.slice(0, 3).map((item) => (
+                      <span key={item}>{channelIcon(item, "h-3 w-3")}</span>
+                    ))}
+                    {conversation.identityStatus !== "verified" && conversation.phone ? <span className="truncate text-[9px] font-semibold text-slate-500">{conversation.phone}</span> : null}
+                  </span>
+                  <span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span>
+                </span>
+              </button>
+            ))}
+            {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
+            {historyHasMore ? (
+              <div className="border-t border-slate-100 p-3">
+                <button type="button" onClick={() => void loadOlderHistory("all")} disabled={historyLoading} className="h-9 w-full rounded-md border border-slate-300 bg-white text-[11px] font-bold text-slate-700 disabled:opacity-50">
+                  {historyLoading ? "Loading…" : "Load older conversations"}
+                </button>
+              </div>
+            ) : null}
+            {historyError ? <p className="px-3 pb-3 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
           </div>
-        </footer>
+        </aside>
+
+        <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-[#f5f5f7]`}>
+          {activeKey !== "__new__" && activeConversation?.phone && activeConversation.identityStatus === "unknown" ? (
+            <section className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-2" aria-label="Add contact">
+              <div className="flex min-w-0 items-center gap-2">
+                <UserRound className="h-4 w-4 shrink-0 text-sky-700" />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{activeConversation.latest.channel === "call" ? "Unknown caller" : "Unknown sender"} · save this number</span>
+                {(
+                  [
+                    ["customer", "Customer"],
+                    ["lead", "Lead"],
+                    ["supplier", "Supplier"],
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending} className="h-7 shrink-0 rounded-full border border-sky-200 bg-white px-2 text-[10px] font-bold text-sky-900 disabled:opacity-50">
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {activeKey === "__new__" ? (
+            <header className="shrink-0 border-b border-slate-200 bg-white p-3">
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations">
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div>
+                  <h2 className="font-bold">New conversation</h2>
+                  <p className="text-xs text-slate-500">Choose a person and channel</p>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
+                <select
+                  value={recipientType}
+                  onChange={(event) => {
+                    setRecipientType(event.target.value as Exclude<ContactKind, "contact">)
+                    setSelectedRecipientId("")
+                    setRecipient("")
+                  }}
+                  className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                >
+                  <option value="customer">Customers</option>
+                  <option value="lead">Leads</option>
+                  <option value="supplier">Suppliers / Vendors</option>
+                </select>
+                <select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm">
+                  <option value="">Choose a contact</option>
+                  {recipientOptions.map((item) => (
+                    <option key={item.key} value={item.id}>
+                      {item.name}
+                      {item.company && item.company !== item.name ? ` · ${item.company}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </header>
+          ) : activeConversation ? (
+            <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations">
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-sm font-bold">{activeConversation.name}</h2>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span>
+                    <span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span>
+                  </div>
+                  {activeResponseMetric ? <p className="mt-0.5 truncate text-[9px] font-semibold text-sky-700">{activeResponseMetric}</p> : null}
+                </div>
+                {activeConversation.phone ? (
+                  <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={connections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}>
+                    <Phone className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+              {activeConversation.phone ? (
+                <details className="mt-2 rounded-md border border-slate-200 bg-white">
+                  <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700">
+                    <UserRound className="h-3.5 w-3.5 text-sky-700" />
+                    <span className="flex-1">{activeConversation.kind === "contact" ? "Save this number" : `${contactKindLabel(activeConversation.kind)} contact`}</span>
+                    <span className="text-sky-700">{activeConversation.kind === "contact" ? "Add" : "Change"}</span>
+                  </summary>
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-2">
+                    <span className="mr-1 text-[10px] font-bold text-slate-600">Save as</span>
+                    {(
+                      [
+                        ["customer", "Customer"],
+                        ["lead", "Lead"],
+                        ["supplier", "Supplier"],
+                      ] as const
+                    ).map(([kind, label]) => (
+                      <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending || activeConversation.kind === kind} className={`h-7 rounded-full border px-2.5 text-[10px] font-bold disabled:opacity-60 ${activeConversation.kind === kind ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-white"}`}>
+                        {label}
+                        {activeConversation.kind === kind ? " ✓" : ""}
+                      </button>
+                    ))}
+                    <details className="w-full border-t border-slate-100 pt-1">
+                      <summary className="cursor-pointer text-[10px] font-semibold text-sky-700">Link to an existing person instead</summary>
+                      <div className="mt-2 flex gap-2">
+                        <select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs">
+                          <option value="">Choose existing contact</option>
+                          {directory.entries
+                            .filter((entry) => entry.kind !== "contact")
+                            .map((entry) => (
+                              <option key={entry.key} value={entry.key}>
+                                {contactKindLabel(entry.kind)} · {entry.name}
+                              </option>
+                            ))}
+                        </select>
+                        <button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">
+                          Link
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+                </details>
+              ) : null}
+              {activeConversation.phone ? (
+                <details className="mt-2 rounded-md bg-slate-50 p-1.5">
+                  <summary className="flex h-7 cursor-pointer list-none items-center gap-1.5 px-1 text-[10px] font-bold text-slate-700">
+                    <Bot className="h-3.5 w-3.5 text-sky-700" />
+                    AI replies · {smsAiMode === "off" ? "Off" : smsAiMode === "draft" ? "Drafts" : "Auto when safe"}
+                    <span className="ml-auto text-sky-700">Settings</span>
+                  </summary>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-1.5">
+                    <select aria-label="AI reply mode" value={smsAiMode} onChange={(event) => setSmsAiMode(event.target.value as typeof smsAiMode)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold">
+                      <option value="off">AI off</option>
+                      <option value="draft">AI drafts</option>
+                      <option value="auto_safe">Auto when safe</option>
+                    </select>
+                    <select aria-label="AI reply style" value={smsAiStyle} onChange={(event) => setSmsAiStyle(event.target.value as typeof smsAiStyle)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold">
+                      <option value="professional">Professional</option>
+                      <option value="friendly">Friendly</option>
+                      <option value="brief">Very brief</option>
+                    </select>
+                    <button type="button" onClick={saveSmsAiSettings} disabled={pending} className="h-8 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white disabled:opacity-40">
+                      Save AI
+                    </button>
+                  </div>
+                </details>
+              ) : null}
+            </header>
+          ) : null}
+          {activeConversation?.identityStatus === "ambiguous" ? (
+            <section className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2" role="alert">
+              <p className="text-[11px] font-bold text-amber-950">Duplicate phone number · no caller was selected automatically</p>
+              <p className="mt-0.5 text-[10px] leading-4 text-amber-800">
+                {activeConversation.identityCandidates.map(callerIdentityCandidateLabel).join(" · ")} · {activeConversation.phone}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {activeConversation.identityCandidates.map((candidate) => (
+                  <button key={candidate.canonicalKey} type="button" onClick={() => resolveDuplicateCandidate(candidate)} disabled={pending || candidate.kind === "contact"} className="h-7 rounded-full border border-amber-300 bg-white px-2.5 text-[10px] font-bold text-amber-950 disabled:opacity-50">
+                    Use {candidate.name}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : activeConversation?.identityStatus === "verified" && activeConversation.company ? (
+            <section className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5">
+              <p className="truncate text-[10px] font-semibold text-slate-600">Verified exact phone match · {activeConversation.company}</p>
+            </section>
+          ) : null}
+          {activeHasEmail && activeConversation ? (
+            <section className="shrink-0 border-b border-slate-200 bg-sky-50/70 px-3 py-2" aria-label="Email links">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {activeEmailLinks.map((link) => (
+                  <Link key={`${link.entity_type}:${link.entity_id}`} href={link.entity_type === "material_request" ? `/owner/materials/requests/${link.entity_id}` : link.entity_type === "supplier" ? `/admin/vendors?q=${encodeURIComponent(link.entity_label)}` : "/admin/users"} className="rounded-full border border-sky-200 bg-white px-2 py-1 text-[10px] font-bold text-sky-800">
+                    {link.entity_type === "material_request" ? "Request" : link.entity_type === "supplier" ? "Supplier" : link.entity_type === "client" ? "Client" : "Lead"} · {link.entity_label}
+                  </Link>
+                ))}
+                {!activeEmailLinks.length ? <span className="text-[10px] font-semibold text-slate-500">Not linked yet</span> : null}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <select value={emailLinkTarget} onChange={(event) => setEmailLinkTarget(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold">
+                  <option value="">Link email to…</option>
+                  <optgroup label="Material requests">
+                    {materialRequests.map((request) => (
+                      <option key={request.id} value={`material_request:${request.id}`}>
+                        {request.title} · {request.status}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Clients">
+                    {customers.map((client) => (
+                      <option key={client.id} value={`client:${client.id}`}>
+                        {client.full_name || client.company_name || client.email}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Leads">
+                    {leads.map((lead) => (
+                      <option key={lead.id} value={`lead:${lead.id}`}>
+                        {lead.full_name || lead.company_name || lead.email || lead.phone}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Suppliers">
+                    {suppliers.map((supplier) => (
+                      <option key={supplier.id} value={`supplier:${supplier.id}`}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button type="button" onClick={linkEmailConversation} disabled={!emailLinkTarget || pending} className="h-8 rounded-md bg-slate-950 px-3 text-[11px] font-bold text-white disabled:opacity-40">
+                  Link
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {activeConversation?.phone ? <span className="sr-only">Add or change contact type</span> : null}
+          <div className="min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5">
+            {activeConversation ? (
+              <div className="mx-auto grid min-w-0 max-w-3xl gap-2">
+                {historyError ? <p className="mb-1 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
+                {activeThreadHasMore ? (
+                  <div className="mb-2 flex justify-center">
+                    <button type="button" onClick={() => void loadOlderHistory("thread")} disabled={historyLoading} className="h-8 rounded-full border border-slate-300 bg-white px-4 text-[10px] font-bold text-slate-600 shadow-sm disabled:opacity-50">
+                      {historyLoading ? "Loading…" : "Load earlier messages"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mb-2 text-center text-[10px] font-semibold text-slate-400">Beginning of conversation</p>
+                )}
+                {activeConversation.messages.map((item) => {
+                  const outgoing = item.direction === "outgoing"
+                  const exact = item.id === initialCommunicationId
+                  const text = messageText(item)
+                  const media = Array.isArray(item.media) ? item.media : []
+                  return (
+                    <article key={item.id} ref={exact ? exactCommunicationRef : undefined} className={`flex min-w-0 scroll-m-6 ${outgoing ? "justify-end" : "justify-start"}`}>
+                      <div className={`min-w-0 max-w-[88%] overflow-hidden rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${exact ? "ring-2 ring-[#0071e3] ring-offset-2" : ""} ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+                        <ExpandableMessage text={text} />
+                        {item.channel === "call" && item.summary && item.summary !== text ? (
+                          <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600">
+                            <strong>Summary:</strong> {item.summary}
+                          </p>
+                        ) : null}
+                        {item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}
+                        {media.length ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {media.map((attachment, index) =>
+                              attachment.url ? (
+                                attachment.type?.startsWith("audio/") ? (
+                                  <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} />
+                                ) : (
+                                  <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold">
+                                    <Paperclip className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{attachmentLabel(attachment, index)}</span>
+                                  </a>
+                                )
+                              ) : (
+                                <span key={`${attachment.providerAttachmentId || "attachment"}-${index}`} className={`inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border px-2 text-[10px] font-bold ${attachment.processingStatus === "failed" ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+                                  <Paperclip className="h-3 w-3 shrink-0" />
+                                  <span>{pendingAttachmentLabel(attachment)}</span>
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        ) : null}
+                        {item.id === requestCandidateId ? (
+                          <button type="button" onClick={() => reviewMessageForRequest(item.id)} disabled={pending} className="mt-2 inline-flex h-7 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-bold text-sky-800 disabled:opacity-40">
+                            <ClipboardList className="h-3 w-3" />
+                            Review material request
+                          </button>
+                        ) : null}
+                        <div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400">
+                          <span>{channelIcon(item.channel, "h-3 w-3")}</span>
+                          <time>{formatMessageTime(item.occurred_at)}</time>
+                          {item.duration_seconds ? (
+                            <span>
+                              {Math.floor(item.duration_seconds / 60)}:{String(item.duration_seconds % 60).padStart(2, "0")}
+                            </span>
+                          ) : null}
+                          {outgoing ? (
+                            <span className="inline-flex items-center gap-0.5" title={statusLabel(item.status)}>
+                              {statusIcon(item.status)}
+                              <span>{statusLabel(item.status)}</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex h-full min-h-48 items-center justify-center text-center">
+                <div>
+                  <MessageCircle className="mx-auto h-10 w-10 text-slate-300" />
+                  <p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
+            <div className="mx-auto max-w-3xl">
+              {activeSmsDraft ? (
+                <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.safety_level === "green" ? "bg-emerald-100 text-emerald-800" : activeSmsDraft.safety_level === "red" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{activeSmsDraft.safety_level || "yellow"} safety</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>
+                      {activeDraftEdited ? (
+                        <div className="mt-2">
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-sky-900">Why did you edit it?</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {SMS_CORRECTION_REASONS.map((reason) => (
+                              <button key={reason} type="button" onClick={() => setCorrectionReasons((current) => (current.includes(reason) ? current.filter((item) => item !== reason) : [...current, reason]))} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${correctionReasons.includes(reason) ? "border-sky-700 bg-sky-700 text-white" : "border-sky-200 bg-white text-sky-800"}`}>
+                                {CORRECTION_REASON_LABELS[reason]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950">
+                        <input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />
+                        Teach AI from my approved reply
+                      </label>
+                      <p className="mt-0.5 text-[9px] text-sky-700">
+                        Nothing is learned unless you check this box and send. Customer details are redacted before reuse. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}
+                        {activeSmsDraft.latency_ms ? ` · ${activeSmsDraft.latency_ms} ms` : ""}.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+              {nextAction ? (
+                <section className="mb-2 rounded-lg border border-slate-200 bg-slate-950 px-3 py-2 text-white" aria-label="Recommended next action">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-300 text-slate-950">
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <strong className="text-[11px]">{nextAction.action}</strong>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${nextAction.health === "Do Not Contact" ? "bg-rose-400/20 text-rose-200" : nextAction.health === "Needs Carlos" || nextAction.health === "At Risk" ? "bg-amber-300/20 text-amber-200" : "bg-white/10 text-slate-200"}`}>{nextAction.health}</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-300">{nextAction.reason}</p>
+                    </div>
+                    {nextAction.action === "Call customer" && activeConversation?.phone ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCallLauncher({
+                            phone: activeConversation.phone,
+                            name: activeConversation.name,
+                          })
+                        }
+                        className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950"
+                      >
+                        <Phone className="h-3 w-3" />
+                        Call
+                      </button>
+                    ) : nextAction.suggestedMessage ? (
+                      <button type="button" onClick={() => setMessage(nextAction.suggestedMessage)} className="h-7 shrink-0 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950">
+                        Draft
+                      </button>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+              <div className="flex gap-1.5 overflow-x-auto pb-2">
+                {activeConversation?.phone ? (
+                  <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40">
+                    <Sparkles className="h-3 w-3" />
+                    AI answer
+                  </button>
+                ) : null}
+                {quickReplies.map((reply) => (
+                  <button key={reply.id} type="button" onClick={() => setMessage(reply.message)} title={`${reply.purpose} message`} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">
+                    {reply.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
+                <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2">
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="sms">Text</option>
+                  <option value="email">Email</option>
+                </select>
+                <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
+                {channel !== "call" ? (
+                  <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment">
+                    <Paperclip className="h-4 w-4" />
+                    <input
+                      ref={attachmentInputRef}
+                      type="file"
+                      multiple={channel !== "sms"}
+                      accept={channel === "sms" ? ".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" : ".pdf,.jpg,.jpeg,.png,.webp"}
+                      className="sr-only"
+                      onChange={(event) => {
+                        const selected = Array.from(event.target.files || [])
+                        const next = channel === "sms" ? selected.slice(0, 1) : selected
+                        if (next.length > 10) {
+                          setFeedback({
+                            tone: "error",
+                            text: "Choose up to 10 files.",
+                          })
+                          return
+                        }
+                        setAttachments(next)
+                        setFeedback(null)
+                      }}
+                    />
+                  </label>
+                ) : null}
+                <button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim() || hasUnresolvedTemplatePlaceholder(message)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white disabled:bg-slate-300" aria-label="Send message">
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+              {channel === "email" ? <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-2 h-9 w-full rounded-md border border-slate-300 px-3 text-xs" /> : null}
+              {attachments.length ? (
+                <div className="mt-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      {attachments.length} {attachments.length === 1 ? "file" : "files"} · {channel === "sms" ? "opens securely in Q U O" : "delivers with the message"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachments([])
+                        if (attachmentInputRef.current) attachmentInputRef.current.value = ""
+                      }}
+                      className="font-bold text-slate-600"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {attachments.map((file, index) => (
+                      <span key={`${file.name}-${file.size}-${index}`} className="inline-flex max-w-full items-center gap-1 rounded bg-white px-1.5 py-1">
+                        <span className="max-w-48 truncate">{file.name}</span>
+                        <button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {hasUnresolvedTemplatePlaceholder(message) ? <p className="mt-2 text-xs font-semibold text-amber-700">Replace the bracketed placeholder before sending.</p> : null}
+              {!selectedChannelReady ? <p className="mt-2 text-xs font-semibold text-amber-700">This channel still needs a connection.</p> : null}
+              {feedback ? (
+                <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">
+                  {feedback.text}
+                </p>
+              ) : null}
+            </div>
+          </footer>
+        </div>
       </div>
-    </div>
-    {requestReview ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="sms-request-review-title"><button type="button" className="absolute inset-0 cursor-default" onClick={() => !pending && setRequestReview(null)} aria-label="Close request review" /><aside className="relative flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-[#f7f7f8] shadow-2xl sm:rounded-2xl"><header className="flex items-start gap-3 border-b border-slate-200 bg-white px-4 py-4"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white"><ClipboardList className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">SMS → Carlos</p><h2 id="sms-request-review-title" className="mt-0.5 text-lg font-bold text-slate-950">Review new request</h2><p className="mt-1 text-xs leading-5 text-slate-500">AI prepared the details from this conversation. The customer must explicitly confirm the exact list before one request is created.</p></div><button type="button" onClick={() => setRequestReview(null)} disabled={pending} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label="Close"><X className="h-4 w-4" /></button></header><div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">{requestReview.existingRequestId ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Open request found:</strong> {requestReview.existingRequestTitle}. Confirming below creates a separate new request.</div> : null}<section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><div className="flex items-center gap-2 text-xs font-bold text-slate-900"><UserRound className="h-4 w-4 text-sky-700" />Customer</div><label className="mt-3 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Name</label><input value={requestReview.customerName} onChange={(event) => setRequestReview({ ...requestReview, customerName: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /><p className="mt-1.5 text-[11px] text-slate-500">Phone stays attached: {requestReview.phone}</p><label className="mt-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500"><MapPin className="h-3 w-3" />Job address</label><input value={requestReview.customerAddress} onChange={(event) => setRequestReview({ ...requestReview, customerAddress: event.target.value })} placeholder="Add if the customer provided one" className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></section><section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Request title</label><input value={requestReview.title} onChange={(event) => setRequestReview({ ...requestReview, title: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-semibold" /><label className="mt-3 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Department</label><input value={requestReview.department} onChange={(event) => setRequestReview({ ...requestReview, department: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></section><section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><div className="flex items-center justify-between gap-2"><h3 className="text-xs font-bold text-slate-900">Materials</h3><button type="button" onClick={() => setRequestReview({ ...requestReview, items: [...requestReview.items, { name: "", quantity: 1, unit: "each" }] })} className="h-7 rounded-full border border-slate-300 px-2.5 text-[10px] font-bold">Add item</button></div><div className="mt-2 space-y-2">{requestReview.items.map((item, index) => <div key={`${index}-${item.name}`} className="grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_1.75rem] gap-1.5"><input aria-label={`Item ${index + 1}`} value={item.name} onChange={(event) => setRequestReview({ ...requestReview, items: requestReview.items.map((current, itemIndex) => itemIndex === index ? { ...current, name: event.target.value } : current) })} placeholder="Material" className="h-9 min-w-0 rounded-md border border-slate-300 px-2 text-xs" /><input aria-label={`Quantity ${index + 1}`} type="number" min="0.01" step="any" value={item.quantity} onChange={(event) => setRequestReview({ ...requestReview, items: requestReview.items.map((current, itemIndex) => itemIndex === index ? { ...current, quantity: Number(event.target.value) } : current) })} className="h-9 rounded-md border border-slate-300 px-2 text-xs" /><input aria-label={`Unit ${index + 1}`} value={item.unit} onChange={(event) => setRequestReview({ ...requestReview, items: requestReview.items.map((current, itemIndex) => itemIndex === index ? { ...current, unit: event.target.value } : current) })} className="h-9 rounded-md border border-slate-300 px-2 text-xs" /><button type="button" onClick={() => setRequestReview({ ...requestReview, items: requestReview.items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex h-9 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100" aria-label={`Remove item ${index + 1}`}><X className="h-3.5 w-3.5" /></button></div>)}{!requestReview.items.length ? <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">No clear material lines were found. Add at least one item.</p> : null}</div></section><details className="rounded-xl border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-bold text-slate-700">Messages AI reviewed ({requestReview.sourceMessages.length})</summary><div className="mt-2 space-y-2">{requestReview.sourceMessages.map((source, index) => <p key={`${source}-${index}`} className="whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-600">{source}</p>)}</div></details></div><footer className="border-t border-slate-200 bg-white p-3"><p className="mb-2 text-[11px] text-slate-500">Assigned to <strong className="text-slate-800">Carlos</strong>. You can change the assignee later from Material Requests.</p><div className="flex gap-2"><button type="button" onClick={() => setRequestReview(null)} disabled={pending} className="h-10 flex-1 rounded-lg border border-slate-300 bg-white text-xs font-bold">Cancel</button><button type="button" onClick={createRequestFromReview} disabled={pending || !requestReview.title.trim() || !requestReview.items.some((item) => item.name.trim())} className="h-10 flex-[1.5] rounded-lg bg-slate-950 text-xs font-bold text-white disabled:bg-slate-300">{pending ? "Creating…" : "Create one request"}</button></div></footer></aside></div> : null}
-    <CommunicationCallLauncher open={Boolean(callLauncher)} phone={callLauncher?.phone || ""} name={callLauncher?.name || "Contact"} onClose={() => setCallLauncher(null)} />
-  </section>
+      {requestReview ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="sms-request-review-title">
+          <button type="button" className="absolute inset-0 cursor-default" onClick={() => !pending && setRequestReview(null)} aria-label="Close request review" />
+          <aside className="relative flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-[#f7f7f8] shadow-2xl sm:rounded-2xl">
+            <header className="flex items-start gap-3 border-b border-slate-200 bg-white px-4 py-4">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white">
+                <ClipboardList className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-700">SMS → Carlos</p>
+                <h2 id="sms-request-review-title" className="mt-0.5 text-lg font-bold text-slate-950">
+                  Review new request
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">AI prepared the details from this conversation. The customer must explicitly confirm the exact list before one request is created.</p>
+              </div>
+              <button type="button" onClick={() => setRequestReview(null)} disabled={pending} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+              {requestReview.existingRequestId ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                  <strong>Open request found:</strong> {requestReview.existingRequestTitle}. Confirming below creates a separate new request.
+                </div>
+              ) : null}
+              <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                  <UserRound className="h-4 w-4 text-sky-700" />
+                  Customer
+                </div>
+                <label className="mt-3 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Name</label>
+                <input
+                  value={requestReview.customerName}
+                  onChange={(event) =>
+                    setRequestReview({
+                      ...requestReview,
+                      customerName: event.target.value,
+                    })
+                  }
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                />
+                <p className="mt-1.5 text-[11px] text-slate-500">Phone stays attached: {requestReview.phone}</p>
+                <label className="mt-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  <MapPin className="h-3 w-3" />
+                  Job address
+                </label>
+                <input
+                  value={requestReview.customerAddress}
+                  onChange={(event) =>
+                    setRequestReview({
+                      ...requestReview,
+                      customerAddress: event.target.value,
+                    })
+                  }
+                  placeholder="Add if the customer provided one"
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                />
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Request title</label>
+                <input
+                  value={requestReview.title}
+                  onChange={(event) =>
+                    setRequestReview({
+                      ...requestReview,
+                      title: event.target.value,
+                    })
+                  }
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-semibold"
+                />
+                <label className="mt-3 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Department</label>
+                <input
+                  value={requestReview.department}
+                  onChange={(event) =>
+                    setRequestReview({
+                      ...requestReview,
+                      department: event.target.value,
+                    })
+                  }
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                />
+              </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold text-slate-900">Materials</h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRequestReview({
+                        ...requestReview,
+                        items: [...requestReview.items, { name: "", quantity: 1, unit: "each" }],
+                      })
+                    }
+                    className="h-7 rounded-full border border-slate-300 px-2.5 text-[10px] font-bold"
+                  >
+                    Add item
+                  </button>
+                </div>
+                <div className="mt-2 space-y-2">
+                  {requestReview.items.map((item, index) => (
+                    <div key={`${index}-${item.name}`} className="grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_1.75rem] gap-1.5">
+                      <input
+                        aria-label={`Item ${index + 1}`}
+                        value={item.name}
+                        onChange={(event) =>
+                          setRequestReview({
+                            ...requestReview,
+                            items: requestReview.items.map((current, itemIndex) => (itemIndex === index ? { ...current, name: event.target.value } : current)),
+                          })
+                        }
+                        placeholder="Material"
+                        className="h-9 min-w-0 rounded-md border border-slate-300 px-2 text-xs"
+                      />
+                      <input
+                        aria-label={`Quantity ${index + 1}`}
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        value={item.quantity}
+                        onChange={(event) =>
+                          setRequestReview({
+                            ...requestReview,
+                            items: requestReview.items.map((current, itemIndex) =>
+                              itemIndex === index
+                                ? {
+                                    ...current,
+                                    quantity: Number(event.target.value),
+                                  }
+                                : current,
+                            ),
+                          })
+                        }
+                        className="h-9 rounded-md border border-slate-300 px-2 text-xs"
+                      />
+                      <input
+                        aria-label={`Unit ${index + 1}`}
+                        value={item.unit}
+                        onChange={(event) =>
+                          setRequestReview({
+                            ...requestReview,
+                            items: requestReview.items.map((current, itemIndex) => (itemIndex === index ? { ...current, unit: event.target.value } : current)),
+                          })
+                        }
+                        className="h-9 rounded-md border border-slate-300 px-2 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRequestReview({
+                            ...requestReview,
+                            items: requestReview.items.filter((_, itemIndex) => itemIndex !== index),
+                          })
+                        }
+                        className="inline-flex h-9 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
+                        aria-label={`Remove item ${index + 1}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {!requestReview.items.length ? <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">No clear material lines were found. Add at least one item.</p> : null}
+                </div>
+              </section>
+              <details className="rounded-xl border border-slate-200 bg-white p-3">
+                <summary className="cursor-pointer text-xs font-bold text-slate-700">Messages AI reviewed ({requestReview.sourceMessages.length})</summary>
+                <div className="mt-2 space-y-2">
+                  {requestReview.sourceMessages.map((source, index) => (
+                    <p key={`${source}-${index}`} className="whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-600">
+                      {source}
+                    </p>
+                  ))}
+                </div>
+              </details>
+            </div>
+            <footer className="border-t border-slate-200 bg-white p-3">
+              <p className="mb-2 text-[11px] text-slate-500">
+                Assigned to <strong className="text-slate-800">Carlos</strong>. You can change the assignee later from Material Requests.
+              </p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setRequestReview(null)} disabled={pending} className="h-10 flex-1 rounded-lg border border-slate-300 bg-white text-xs font-bold">
+                  Cancel
+                </button>
+                <button type="button" onClick={createRequestFromReview} disabled={pending || !requestReview.title.trim() || !requestReview.items.some((item) => item.name.trim())} className="h-10 flex-[1.5] rounded-lg bg-slate-950 text-xs font-bold text-white disabled:bg-slate-300">
+                  {pending ? "Creating…" : "Create one request"}
+                </button>
+              </div>
+            </footer>
+          </aside>
+        </div>
+      ) : null}
+      <CommunicationCallLauncher open={Boolean(callLauncher)} phone={callLauncher?.phone || ""} name={callLauncher?.name || "Contact"} onClose={() => setCallLauncher(null)} />
+    </section>
+  )
 }

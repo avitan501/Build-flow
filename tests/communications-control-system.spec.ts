@@ -5,8 +5,14 @@ import path from "node:path";
 const root = process.cwd();
 
 test("communications use delta updates instead of full-page polling", () => {
-  const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
-  const updates = readFileSync(path.join(root, "app/api/admin/communications/updates/route.ts"), "utf8");
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  const updates = readFileSync(
+    path.join(root, "app/api/admin/communications/updates/route.ts"),
+    "utf8",
+  );
   expect(inbox).toContain("/api/admin/communications/updates?after=");
   expect(inbox).not.toContain("window.setInterval(refresh, 10_000)");
   expect(inbox).toContain('table: "aura_communications"');
@@ -26,13 +32,22 @@ test("provider webhooks rely on one deduplicated push source", () => {
     const source = readFileSync(path.join(root, file), "utf8");
     expect(source).not.toContain("notifyManagersSafely");
   }
-  const notifications = readFileSync(path.join(root, "lib/manager-push-notifications.ts"), "utf8");
+  const notifications = readFileSync(
+    path.join(root, "lib/manager-push-notifications.ts"),
+    "utf8",
+  );
   expect(notifications).toContain('.rpc("queue_manager_push_event"');
 });
 
 test("ambiguous provider failures do not fall back to a second send", () => {
-  const actions = readFileSync(path.join(root, "app/owner/aura/actions.ts"), "utf8");
-  const sendSection = actions.slice(actions.indexOf("export async function sendAuraMessageAction"), actions.indexOf("export async function getTwoChatVoiceTokenAction"));
+  const actions = readFileSync(
+    path.join(root, "app/owner/aura/actions.ts"),
+    "utf8",
+  );
+  const sendSection = actions.slice(
+    actions.indexOf("export async function sendAuraMessageAction"),
+    actions.indexOf("export async function getTwoChatVoiceTokenAction"),
+  );
   expect(sendSection).toContain("invokeMessagingBroker");
   expect(sendSection).not.toContain("sendAuraQuoText");
   expect(sendSection).not.toContain("sendAuraWhatsAppText");
@@ -40,9 +55,21 @@ test("ambiguous provider failures do not fall back to a second send", () => {
 });
 
 test("Carlos activity timeline records page changes and communications", () => {
-  const reporter = readFileSync(path.join(root, "app/admin/activity-actions.ts"), "utf8");
-  const timeline = readFileSync(path.join(root, "app/admin/carlos-activity/page.tsx"), "utf8");
-  const migration = readFileSync(path.join(root, "supabase/migrations/20260902174500_add_manager_staff_activity_timeline.sql"), "utf8");
+  const reporter = readFileSync(
+    path.join(root, "app/admin/activity-actions.ts"),
+    "utf8",
+  );
+  const timeline = readFileSync(
+    path.join(root, "app/admin/carlos-activity/page.tsx"),
+    "utf8",
+  );
+  const migration = readFileSync(
+    path.join(
+      root,
+      "supabase/migrations/20260902174500_add_manager_staff_activity_timeline.sql",
+    ),
+    "utf8",
+  );
   expect(reporter).toContain('event_type: "page_view"');
   expect(reporter).toContain('event_type: "communication_sent"');
   expect(timeline).toContain("Carlos activity");
@@ -52,13 +79,37 @@ test("Carlos activity timeline records page changes and communications", () => {
 });
 
 test("conversation assignment keeps contact notes and uses structured links", () => {
-  const actions = readFileSync(path.join(root, "app/admin/communications/actions.ts"), "utf8");
-  const broker = readFileSync(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
-  const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
-  const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
-  const history = readFileSync(path.join(root, "lib/aura/communication-history.ts"), "utf8");
-  const historyMigration = readFileSync(path.join(root, "supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql"), "utf8");
-  const emailLinks = readFileSync(path.join(root, "lib/aura/email-links.ts"), "utf8");
+  const actions = readFileSync(
+    path.join(root, "app/admin/communications/actions.ts"),
+    "utf8",
+  );
+  const broker = readFileSync(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  const page = readFileSync(
+    path.join(root, "app/admin/communications/page.tsx"),
+    "utf8",
+  );
+  const history = readFileSync(
+    path.join(root, "lib/aura/communication-history.ts"),
+    "utf8",
+  );
+  const historyMigration = readFileSync(
+    path.join(
+      root,
+      "supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql",
+    ),
+    "utf8",
+  );
+  const emailLinks = readFileSync(
+    path.join(root, "lib/aura/email-links.ts"),
+    "utf8",
+  );
 
   const action = actions.slice(
     actions.indexOf("export async function linkCommunicationContactAction"),
@@ -75,33 +126,78 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   expect(brokerAction).not.toContain("notes =");
   expect(page).toContain("loadCommunicationHistoryPage");
   expect(page).not.toContain("createAdminClient");
-  expect(history).toContain('reader.rpc("staff_load_aura_communication_history_page"');
+  expect(history).toContain(
+    'reader.rpc("staff_load_aura_communication_history_page"',
+  );
   expect(historyMigration).toContain("aura_communication_links as link");
   expect(emailLinks).toContain("reader ?? createAdminClient()");
   expect(inbox).toContain("communication.links?.find");
 });
 
 test("communications page does not load the hidden legacy log", () => {
-  const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
+  const page = readFileSync(
+    path.join(root, "app/admin/communications/page.tsx"),
+    "utf8",
+  );
   expect(page).not.toContain("CommunicationCenter");
   expect(page).not.toContain("COMMUNICATION_LOG_PREFIX");
   expect(page).not.toContain("listInboxThreads");
 });
 
 test("a failed mark-read action never crashes an opened conversation", () => {
-  const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
-  const actions = readFileSync(path.join(root, "app/admin/communications/actions.ts"), "utf8");
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  const actions = readFileSync(
+    path.join(root, "app/admin/communications/actions.ts"),
+    "utf8",
+  );
 
   expect(inbox).toContain("try {");
   expect(inbox).toContain("await markCommunicationConversationReadAction");
   expect(actions).toContain('supabase.rpc("mark_aura_conversation_read"');
-  expect(actions).not.toContain('.update({ read_at: readAt, last_event_at: readAt })');
-  expect(inbox).toContain("The conversation opened, but its unread status could not be updated.");
+  expect(actions).not.toContain(
+    ".update({ read_at: readAt, last_event_at: readAt })",
+  );
+  expect(inbox).toContain(
+    "The conversation opened, but its unread status could not be updated.",
+  );
 });
 
 test("the owner communication timeline uses New York time and shows media-only messages", () => {
-  const workspace = readFileSync(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8");
+  const workspace = readFileSync(
+    path.join(root, "components/buildflow/aura-communication-workspace.tsx"),
+    "utf8",
+  );
   expect(workspace).toContain("formatSiteDateTime");
   expect(workspace).toContain("Open attachment");
   expect(workspace).toContain("communication.media");
+});
+
+test("WhatsApp AI drafts use the same reviewed completion path as SMS", () => {
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  const actions = readFileSync(
+    path.join(root, "app/admin/communications/actions.ts"),
+    "utf8",
+  );
+  expect(inbox).toContain('["sms", "whatsapp"].includes(messageChannel)');
+  expect(inbox).toContain(
+    'incoming.channel === "whatsapp" ? "whatsapp" : "sms"',
+  );
+  expect(actions).toContain('.in("channel", ["sms", "whatsapp"])');
+});
+
+test("mobile inbox controls stay bounded and expose actionable work filters", () => {
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  expect(inbox).toContain("min-h-0 min-w-0 w-full flex-col");
+  expect(inbox).toContain('<option value="needs_reply">Needs reply</option>');
+  expect(inbox).toContain('<option value="duplicate">Duplicates</option>');
+  expect(inbox).toContain('liveSyncState === "live"');
 });
