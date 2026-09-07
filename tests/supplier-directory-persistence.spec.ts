@@ -87,6 +87,20 @@ test("the supplier directory exposes the new network workspace on desktop and mo
   expect(source).toContain(">New</span>")
 })
 
+test("the supplier network is compact on phones and can share a supplier", async () => {
+  const source = await readFile(
+    path.join(root, "components/buildflow/supplier-network-workspace.tsx"),
+    "utf8",
+  )
+
+  expect(source).toContain("sm:min-w-[720px]")
+  expect(source).toContain("sm:table-header-group")
+  expect(source).toContain("grid-cols-[minmax(0,1fr)_6rem_3rem]")
+  expect(source).toContain("navigator.share")
+  expect(source).toContain("navigator.clipboard.writeText")
+  expect(source).toContain("Paste it into WhatsApp, SMS, or email")
+})
+
 test("the upsert migration verifies the final locked row and keeps access controls", async () => {
   const migration = await readFile(
     path.join(root, "supabase/migrations/20260903031011_verify_supplier_directory_persistence.sql"),
