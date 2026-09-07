@@ -75,7 +75,7 @@ const maxInlineFileSize = 4 * 1024 * 1024
 const maxStoredFileSize = 25 * 1024 * 1024
 const maxAttachmentCount = 10
 const temporaryUploadPrefix = "public-intake/"
-const siteUrl = "https://build.avantiap.com"
+const siteUrl = "https://avantiabuild.com"
 const companyEmail = "office@build.avantiap.com"
 const companyPhone = "(516) 908-8319"
 const companyPhoneLink = "tel:+15169088319"
@@ -156,7 +156,7 @@ function requestedItemsHtml(items: CustomerEmailItem[], emptyLabel = "See the re
 }
 
 function customerEmailShell(content: string) {
-  return `<div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:14px;background:#ffffff"><div style="padding:18px 22px;border-bottom:1px solid #e5eaf1;background:#ffffff"><a href="${siteUrl}" style="display:inline-block;text-decoration:none"><img src="${customerEmailLogoUrl}" width="280" alt="Avantia Build" style="display:block;width:100%;max-width:280px;height:auto;border:0"></a></div><div style="padding:24px 22px">${content}</div><div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65"><strong style="color:#071126;font-size:15px">Avantia Build</strong><br><span>Everything it takes to build</span><br><a href="${siteUrl}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br><a href="mailto:${companyEmail}" style="color:#0066cc;text-decoration:none">${companyEmail}</a><br><a href="${companyPhoneLink}" style="color:#0066cc;text-decoration:none">${companyPhone}</a><span style="color:#94a3b8"> &middot; </span><a href="${companyWhatsAppUrl}" style="color:#0066cc;text-decoration:none">WhatsApp us</a></div></div></div>`
+  return `<div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:14px;background:#ffffff"><div style="padding:18px 22px;border-bottom:1px solid #e5eaf1;background:#ffffff"><a href="${siteUrl}" style="display:inline-block;text-decoration:none"><img src="${customerEmailLogoUrl}" width="280" alt="Avantia Build" style="display:block;width:100%;max-width:280px;height:auto;border:0"></a></div><div style="padding:24px 22px">${content}</div><div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65"><strong style="color:#071126;font-size:15px">Avantia Build</strong><br><span>Everything it takes to build</span><br><a href="${siteUrl}" style="color:#0066cc;text-decoration:none">avantiabuild.com</a><br><a href="mailto:${companyEmail}" style="color:#0066cc;text-decoration:none">${companyEmail}</a><br><a href="${companyPhoneLink}" style="color:#0066cc;text-decoration:none">${companyPhone}</a><span style="color:#94a3b8"> &middot; </span><a href="${companyWhatsAppUrl}" style="color:#0066cc;text-decoration:none">WhatsApp us</a></div></div></div>`
 }
 
 async function sendEmail(input: { to: string; subject: string; html: string; text: string; replyTo?: string; attachment?: QuotePayload["attachment"] }) {

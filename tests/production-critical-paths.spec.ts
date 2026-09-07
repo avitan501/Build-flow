@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 const liveGuard = process.env.PLAYWRIGHT_LIVE_GUARD === "1";
 const allowProductionWrites =
   process.env.PLAYWRIGHT_ALLOW_PRODUCTION_WRITES === "1";
-const expectedProductionHost = "build.avantiap.com";
+const expectedProductionHost = "avantiabuild.com";
 
 type PageHealth = {
   assertHealthy: () => Promise<void>;

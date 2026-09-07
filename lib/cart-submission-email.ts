@@ -126,7 +126,7 @@ type ProjectRequestNotificationFallback = (payload: Record<string, unknown>) => 
   result?: EmailDeliveryResult
 }>
 
-const SITE_URL = "https://build.avantiap.com"
+const SITE_URL = "https://avantiabuild.com"
 const COMPANY_EMAIL = "office@build.avantiap.com"
 const COMPANY_PHONE = "(516) 908-8319"
 const COMPANY_PHONE_LINK = "tel:+15169088319"
@@ -176,7 +176,7 @@ function customerEmailFooter() {
     <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">
       <strong style="color:#071126;font-size:15px">Avantia Build</strong><br />
       <span>Everything it takes to build</span><br />
-      <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br />
+      <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">avantiabuild.com</a><br />
       <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc;text-decoration:none">${COMPANY_EMAIL}</a><br />
       <a href="${COMPANY_PHONE_LINK}" style="color:#0066cc;text-decoration:none">${COMPANY_PHONE}</a>
       <span style="color:#94a3b8"> &middot; </span>
@@ -486,7 +486,7 @@ export async function sendSupplierQuoteRequestEmail(input: SupplierQuoteRequestE
           <p style="margin:10px 0 0">Reply to this email with your quote or any questions.</p>
           <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e5eaf1;color:#64748b;font-size:13px">
             <strong style="color:#071126">Avantia Build</strong><br />
-            <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc">${COMPANY_EMAIL}</a> · <a href="${SITE_URL}" style="color:#0066cc">build.avantiap.com</a>
+            <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc">${COMPANY_EMAIL}</a> · <a href="${SITE_URL}" style="color:#0066cc">avantiabuild.com</a>
           </div>
         </div>
       </div>
@@ -561,7 +561,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
         </div>
         <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">
           <strong style="color:#071126">Avantia Build</strong><br />
-          <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br />
+          <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">avantiabuild.com</a><br />
           <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc;text-decoration:none">${COMPANY_EMAIL}</a><br />
           <a href="${COMPANY_PHONE_LINK}" style="color:#0066cc;text-decoration:none">${COMPANY_PHONE}</a>
           <span style="color:#94a3b8"> &middot; </span><a href="${COMPANY_WHATSAPP_URL}" style="color:#0066cc;text-decoration:none">WhatsApp us</a>

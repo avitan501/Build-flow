@@ -16,6 +16,7 @@ import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settin
 import { getSessionWithProfile } from "@/lib/auth";
 import { managerCapabilities, STAFF_EMAILS } from "@/lib/owner-identity";
 import { parseShopLanguage, SHOP_LANGUAGE_COOKIE } from "@/lib/shop-i18n";
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
@@ -41,10 +42,10 @@ const searchEngineIdentity = JSON.stringify({
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://build.avantiap.com/#organization",
+      "@id": `${PRODUCTION_SITE_ORIGIN}/#organization`,
       name: "Avantia Build",
-      url: "https://build.avantiap.com",
-      logo: "https://build.avantiap.com/images/avantia/avantia-app-icon-512.png",
+      url: PRODUCTION_SITE_ORIGIN,
+      logo: `${PRODUCTION_SITE_ORIGIN}/images/avantia/avantia-app-icon-512.png`,
       contactPoint: {
         "@type": "ContactPoint",
         telephone: "+1-516-908-8319",
@@ -58,16 +59,16 @@ const searchEngineIdentity = JSON.stringify({
     },
     {
       "@type": "WebSite",
-      "@id": "https://build.avantiap.com/#website",
+      "@id": `${PRODUCTION_SITE_ORIGIN}/#website`,
       name: "Avantia Build",
-      url: "https://build.avantiap.com",
-      publisher: { "@id": "https://build.avantiap.com/#organization" },
+      url: PRODUCTION_SITE_ORIGIN,
+      publisher: { "@id": `${PRODUCTION_SITE_ORIGIN}/#organization` },
     },
   ],
 }).replace(/</g, "\\u003c");
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://build.avantiap.com"),
+  metadataBase: new URL(PRODUCTION_SITE_ORIGIN),
   applicationName: "Avantia Build",
   title: "Avantia Build | You Build. We Handle the Materials.",
   description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",

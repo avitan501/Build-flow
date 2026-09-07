@@ -9,6 +9,7 @@ import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideo
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 
 type Channel = "sms" | "whatsapp" | "email"
 type TemplateKey = "welcome" | "friendly_follow_up" | "request_material_list" | "quote_follow_up" | "order_follow_up" | "custom"
@@ -28,7 +29,7 @@ function firstName(name: string) {
 
 function welcomePackageMessages(name: string) {
   return [
-    `Hi ${firstName(name)}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery. See how it works: https://build.avantiap.com`,
+    `Hi ${firstName(name)}, Carlos from Avantia Build. We compare construction material quotes, negotiate supplier pricing, and coordinate delivery. See how it works: ${PRODUCTION_SITE_ORIGIN}`,
     "Send me whatever you have—a material list, photo, plan, or another supplier’s quote. We’ll work from there.",
   ] as const
 }
@@ -37,7 +38,7 @@ function templateMessage(template: TemplateKey, name: string, senderName: string
   const greeting = `Hi ${firstName(name)}`
   if (template === "welcome") return welcomePackageMessages(name)[0]
   if (template === "friendly_follow_up") return `${greeting}, this is ${senderName} from Avantia Build.\n\nI am checking in to see whether you need pricing or materials for a current or upcoming project. You can send us a material list, plan, photo, or supplier quote.\n\nIs there anything you need help sourcing this week?\n\nReply STOP if you no longer want to receive messages.`
-  if (template === "request_material_list") return `${greeting}, please send us the material list, plans, photos, quantities, and delivery address for your project.\n\nWe will organize the request and check available pricing. You can reply directly or upload it here:\nhttps://build.avantiap.com/request-quote`
+  if (template === "request_material_list") return `${greeting}, please send us the material list, plans, photos, quantities, and delivery address for your project.\n\nWe will organize the request and check available pricing. You can reply directly or upload it here:\n${PRODUCTION_SITE_ORIGIN}/request-quote`
   if (template === "quote_follow_up") return `${greeting}, I am following up regarding your Avantia Build estimate.\n\nPlease let us know if you approve it, have questions, or want us to review any changes before proceeding.`
   if (template === "order_follow_up") return `${greeting}, I am following up on your Avantia Build order. Please let us know if anything changed or if you need an update on pricing, availability, or delivery.`
   return ""

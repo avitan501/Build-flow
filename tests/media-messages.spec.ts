@@ -54,7 +54,7 @@ test("marketing pages preserve exact campaign copy and do not invent missing mes
   ]))
   const messages = marketingPageInventory.filter((item) => item.message)
   expect(messages).toHaveLength(2)
-  expect(new Set(messages.map((item) => item.message))).toEqual(new Set(["Already have a construction material quote? Send it to Avantia Build and we'll try to beat it. https://build.avantiap.com/beat-a-quote"]))
+  expect(new Set(messages.map((item) => item.message))).toEqual(new Set(["Already have a construction material quote? Send it to Avantia Build and we'll try to beat it. https://avantiabuild.com/beat-a-quote"]))
 })
 
 test("manager links and communication handoff are review-only", async () => {

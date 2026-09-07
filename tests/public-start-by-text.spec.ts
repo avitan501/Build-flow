@@ -71,7 +71,7 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(broker).toContain('const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v8"');
   const opening = publicStartTextOpeningMessage();
   expect(opening).toBe(
-    "Before you buy building materials, send us whatever you have—a list, photo, plan, or current quote. We’ll compare supplier prices for free and see if we can lower your cost. No obligation. See how it works: https://build.avantiap.com/videos/avantia-request-material-whatsapp-en-clear-20s.mp4",
+    "Before you buy building materials, send us whatever you have—a list, photo, plan, or current quote. We’ll compare supplier prices for free and see if we can lower your cost. No obligation. See how it works: https://avantiabuild.com/videos/avantia-request-material-whatsapp-en-clear-20s.mp4",
   );
   expect(broker).toContain("async function ensurePublicStartLead");
   expect(broker).toContain("public.manager_outreach_leads");

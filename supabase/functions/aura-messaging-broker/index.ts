@@ -5432,7 +5432,7 @@ async function customerPortalMagicUrl(
   if (generated.error || !tokenHash)
     throw new Error("customer_portal_magic_link_failed");
   const next = `/requests?request=${publicNumber}`;
-  const url = new URL("https://build.avantiap.com/auth/confirm");
+  const url = new URL("https://avantiabuild.com/auth/confirm");
   url.searchParams.set("token_hash", tokenHash);
   url.searchParams.set("type", "magiclink");
   url.searchParams.set("next", next);
@@ -5709,7 +5709,7 @@ async function confirmPendingSmsRequest(
       await transaction`insert into public.aura_communication_links (communication_id, entity_type, entity_id, entity_label, link_source, confidence) values (${sourceId}::uuid, 'material_request', ${requests[0].id}, ${pending.title}, 'automatic', 1) on conflict (communication_id, entity_type, entity_id) do nothing`;
     }
     const invitation =
-      "Your Avantia Build material request was submitted for review. Open its secure status page: https://build.avantiap.com/requests";
+      "Your Avantia Build material request was submitted for review. Open its secure status page: https://avantiabuild.com/requests";
     await transaction`insert into public.customer_request_portal_invite_outbox (request_id, normalized_phone, message) values (${requests[0].id}::uuid, ${phone}, ${invitation}) on conflict (request_id) do nothing`;
     await transaction`update public.aura_sms_request_pending_confirmations set status = 'confirmed', confirmation_communication_id = ${communicationId}::uuid, request_id = ${requests[0].id}::uuid, updated_at = now() where id = ${pending.id}::uuid`;
     await transaction`
@@ -11230,6 +11230,8 @@ async function handlePublicStartByText(req: Request) {
   const forwardedOrigin =
     req.headers.get("x-avantia-site-origin") || req.headers.get("origin") || "";
   const allowedOrigin =
+    forwardedOrigin === "https://avantiabuild.com" ||
+    forwardedOrigin === "https://www.avantiabuild.com" ||
     forwardedOrigin === "https://build.avantiap.com" ||
     forwardedOrigin === "http://localhost:3000" ||
     /^https:\/\/build-flow-[a-z0-9-]+\.vercel\.app$/i.test(forwardedOrigin);
@@ -12657,6 +12659,7 @@ Deno.serve(async (req: Request) => {
         };
         const expectedCallbacks = new Set([
           META_WHATSAPP_DIRECT_CALLBACK,
+          "https://avantiabuild.com/api/aura/whatsapp",
           "https://build.avantiap.com/api/aura/whatsapp",
         ]);
         const hasActiveMessagesWebhook = appPayload.data?.some((subscription) =>

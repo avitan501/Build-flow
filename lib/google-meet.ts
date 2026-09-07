@@ -3,7 +3,7 @@ const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
 export const GOOGLE_MEET_ORGANIZER = "avitanneto@gmail.com";
 export const GOOGLE_MEET_ATTENDEE = "buildavantiap@gmail.com";
-export const GOOGLE_MEET_SOURCE_URL = "https://build.avantiap.com/";
+export const GOOGLE_MEET_SOURCE_URL = "https://avantiabuild.com/";
 
 export type GoogleCalendarCredentials = {
   clientId: string;

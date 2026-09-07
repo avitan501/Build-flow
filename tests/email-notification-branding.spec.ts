@@ -39,7 +39,7 @@ test("customer email chrome includes the animated logo and every company contact
   const html = renderCustomerEmailShell("<p>Request received</p>")
 
   expect(html).toContain("avantia-build-rain-painter-animation.gif")
-  expect(html).toContain("https://build.avantiap.com")
+  expect(html).toContain("https://avantiabuild.com")
   expect(html).toContain("mailto:office@build.avantiap.com")
   expect(html).toContain("tel:+15169088319")
   expect(html).toContain("https://wa.me/15169088319")

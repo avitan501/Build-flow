@@ -92,7 +92,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
     rightText(page, bold, documentLabel, 572, 752, 18)
     rightText(page, regular, `Code: ${clean(input.quoteNumber)}`, 572, 730, 9, slate)
     page.drawLine({ start: { x: 40, y: 700 }, end: { x: 572, y: 700 }, thickness: 1, color: border })
-    page.drawText("Avantia Build  |  build.avantiap.com  |  office@build.avantiap.com  |  Call or text (516) 908-8319", { x: 40, y: 24, size: 7.2, font: regular, color: slate })
+    page.drawText("Avantia Build  |  avantiabuild.com  |  office@build.avantiap.com  |  Call or text (516) 908-8319", { x: 40, y: 24, size: 7.2, font: regular, color: slate })
     return page
   }
 

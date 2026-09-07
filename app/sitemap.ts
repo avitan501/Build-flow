@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const SITE_URL = "https://build.avantiap.com"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 
 type SitemapPage = {
   path: string
@@ -44,7 +44,7 @@ const pages: SitemapPage[] = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return pages.map(({ path, changeFrequency, priority }) => ({
-    url: `${SITE_URL}${path === "/" ? "" : path}`,
+    url: `${PRODUCTION_SITE_ORIGIN}${path === "/" ? "" : path}`,
     changeFrequency,
     priority,
   }))

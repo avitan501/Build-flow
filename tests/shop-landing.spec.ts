@@ -35,7 +35,7 @@ test("public routes declare their own canonical URL", async ({ page }) => {
   for (const pathName of ["/", "/shop", "/shop/framing", "/shop/concrete-masonry", "/privacy"]) {
     await page.goto(pathName)
     const canonical = new URL(await page.locator('link[rel="canonical"]').getAttribute("href") || "")
-    expect(canonical.origin).toBe("https://build.avantiap.com")
+    expect(canonical.origin).toBe("https://avantiabuild.com")
     expect(canonical.pathname).toBe(pathName)
   }
 })

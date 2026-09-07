@@ -105,7 +105,7 @@ function emailCopy(row: SupplierPartnerSourceRow) {
 
   return {
     subject: `AvantiaBuild partnership inquiry — ${row.Company}`,
-    body: `Hello ${row.Company} team,\n\nMy name is Carlos and I’m reaching out for AvantiaBuild, a New York construction-material sourcing website. We would like to discuss a ${relationship} that lets us introduce qualified customers and projects while your company keeps control of approved pricing, product terms, and fulfillment.\n\nWe are specifically interested in: ${row["Best ask for AvantiaBuild"]}.\n\nCould you connect me with the right person in ${row["Right department"]}? We will not advertise a partnership or use private pricing until we have written approval.\n\nThank you,\nCarlos\nAvantiaBuild\nhttps://build.avantiap.com`,
+    body: `Hello ${row.Company} team,\n\nMy name is Carlos and I’m reaching out for AvantiaBuild, a New York construction-material sourcing website. We would like to discuss a ${relationship} that lets us introduce qualified customers and projects while your company keeps control of approved pricing, product terms, and fulfillment.\n\nWe are specifically interested in: ${row["Best ask for AvantiaBuild"]}.\n\nCould you connect me with the right person in ${row["Right department"]}? We will not advertise a partnership or use private pricing until we have written approval.\n\nThank you,\nCarlos\nAvantiaBuild\nhttps://avantiabuild.com`,
   };
 }
 

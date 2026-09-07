@@ -30,7 +30,7 @@ export default async function BeatYourQuoteFlyerPage() {
             </div>
             <aside className="rounded-lg bg-[#071126] p-6 text-white">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-300">Start here</p>
-              <p className="mt-3 break-words text-xl font-semibold">build.avantiap.com/beat-a-quote</p>
+              <p className="mt-3 break-words text-xl font-semibold">avantiabuild.com/beat-a-quote</p>
               <div className="my-5 h-px bg-white/20" />
               <a href="tel:+15169088319" className="flex items-center gap-2 text-lg font-semibold"><Phone className="h-5 w-5" />(516) 908-8319</a>
               <p className="mt-2 text-sm text-slate-300">Call or text for help.</p>

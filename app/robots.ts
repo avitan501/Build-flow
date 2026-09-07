@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const SITE_URL = "https://build.avantiap.com"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -28,7 +28,7 @@ export default function robots(): MetadataRoute.Robots {
         "/upload",
       ],
     },
-    sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
+    sitemap: `${PRODUCTION_SITE_ORIGIN}/sitemap.xml`,
+    host: PRODUCTION_SITE_ORIGIN,
   }
 }

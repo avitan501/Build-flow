@@ -7,11 +7,11 @@ import { pathToFileURL } from "node:url";
 export const RELEASE_TARGET = Object.freeze({
   repository: "AV-Design-and-Build-Org/avantia-build",
   branch: "main",
-  domain: "https://build.avantiap.com",
+  domain: "https://avantiabuild.com",
   supabaseRef: "nprfhspwdflpqlopydmp",
   staleSupabaseRef: "adrhuwzipjvwiywjmfaa",
-  vercelTeam: "av-design-and-builds-projects",
-  vercelProject: "avantia-build",
+  vercelTeam: "avitanneto-1804s-projects",
+  vercelProject: "build-flow-wfl3",
   approvedAuthorEmails: ["sales@avdesignandbuilds.com"],
 });
 

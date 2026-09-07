@@ -1,4 +1,5 @@
-export const PRODUCTION_SITE_ORIGIN = "https://build.avantiap.com"
+export const PRODUCTION_SITE_ORIGIN = "https://avantiabuild.com"
+export const LEGACY_PRODUCTION_SITE_ORIGIN = "https://build.avantiap.com"
 
 export function authRedirectOrigin() {
   if (typeof window === "undefined") return PRODUCTION_SITE_ORIGIN

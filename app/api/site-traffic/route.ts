@@ -4,7 +4,12 @@ import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { hasSupabasePublicEnv } from "@/lib/supabase/env"
 
-const PRODUCTION_HOSTS = new Set(["build.avantiap.com", "www.build.avantiap.com"])
+const PRODUCTION_HOSTS = new Set([
+  "avantiabuild.com",
+  "www.avantiabuild.com",
+  "build.avantiap.com",
+  "www.build.avantiap.com",
+])
 
 function safeReferrerHost(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null

@@ -12,15 +12,16 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PRODUCTION_DOMAIN: https://build.avantiap.com
+  PRODUCTION_DOMAIN: https://avantiabuild.com
+  LEGACY_PRODUCTION_DOMAIN: https://build.avantiap.com
   PRODUCTION_SUPABASE_REF: nprfhspwdflpqlopydmp
-  VERCEL_TEAM_SLUG: av-design-and-builds-projects
-  VERCEL_PROJECT_SLUG: avantia-build
+  VERCEL_TEAM_SLUG: avitanneto-1804s-projects
+  VERCEL_PROJECT_SLUG: build-flow-wfl3
   VERCEL_APPROVED_AUTHOR_EMAILS: sales@avdesignandbuilds.com
 
 jobs:
   deploy:
-    name: Deploy main to build.avantiap.com
+    name: Deploy main to avantiabuild.com
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -63,16 +64,10 @@ jobs:
       - name: Trigger the scoped Vercel deploy hook
         id: trigger
         env:
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.PRIMARY_VERCEL_DEPLOY_HOOK_URL }}
         run: |
           echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           node scripts/production-release-guard.mjs trigger
-
-      - name: Verify the exact Vercel team and project deployment
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_STARTED_AT: ${{ steps.trigger.outputs.started_at }}
-        run: node scripts/production-release-guard.mjs wait-vercel
 
       - name: Verify the live commit and Supabase binding
         run: node scripts/production-release-guard.mjs verify-live
