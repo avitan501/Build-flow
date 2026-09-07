@@ -49,7 +49,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, provider: "Curri", quote }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     await captureOperationalError(error, { feature: "delivery", operation: "request-quote", provider: "curri", safeCode: error instanceof CurriError ? error.code : "curri-quote-failed" });
-    if (error instanceof CurriError) return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status: error.code === "structured_address_required" ? 400 : 502 });
+    if (error instanceof CurriError) {
+      const status = error.code === "structured_address_required" ? 400 : error.code === "credentials_unavailable" ? 503 : 502;
+      return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status });
+    }
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Curri could not return a live quote right now." }, { status: 502 });
   }
 }

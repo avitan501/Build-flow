@@ -1,16 +1,34 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 import { updateProviderDeliveryStatus } from "@/lib/delivery-status-update";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyUberWebhookSignature } from "@/lib/uber-webhook-signature";
 
 export const runtime = "nodejs";
 
+async function loadSigningKey() {
+  const fromEnvironment = process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY?.trim() || "";
+  if (fromEnvironment) return fromEnvironment;
+
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("get_uber_direct_webhook_signing_key");
+    if (error) return "";
+    return typeof data === "string" ? data.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function POST(request: Request) {
-  const signingKey = process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY?.trim() || "";
-  const signature = request.headers.get("x-uber-signature")?.trim().toLowerCase() || request.headers.get("x-postmates-signature")?.trim().toLowerCase() || "";
+  const signingKey = await loadSigningKey();
+  const signatures = [
+    request.headers.get("x-uber-signature"),
+    request.headers.get("x-uber-signature-new"),
+    request.headers.get("x-postmates-signature"),
+  ];
   const rawBody = await request.text();
-  const expected = signingKey ? createHmac("sha256", signingKey).update(rawBody).digest("hex") : "";
-  if (!signature || signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return new Response(null, { status: 401 });
-  const payload = JSON.parse(rawBody) as Record<string, unknown>;
+  if (!verifyUberWebhookSignature(rawBody, signingKey, signatures)) return new Response(null, { status: 401 });
+  const payload = await Promise.resolve().then(() => JSON.parse(rawBody) as Record<string, unknown>).catch(() => null);
+  if (!payload) return new Response(null, { status: 400 });
   const data = (payload.data || payload) as Record<string, unknown>;
   const meta = (payload.meta || data.meta || {}) as Record<string, unknown>;
   const deliveryId = [data.id, meta.order_id, meta.delivery_id].find((value): value is string => typeof value === "string");

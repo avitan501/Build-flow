@@ -2,9 +2,11 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { expect, test } from "@playwright/test"
+import { createHmac } from "node:crypto"
 
 import { calculateDeliveryEstimate, parseCoordinatePair } from "../lib/delivery-pricing"
 import { structuredLocation, uberAddress } from "../lib/delivery-address"
+import { verifyUberWebhookSignature } from "../lib/uber-webhook-signature"
 
 const root = process.cwd()
 
@@ -25,8 +27,19 @@ test("provider addresses stay structured and consistent between quote and bookin
   expect(JSON.parse(uberAddress(location, location.label))).toEqual({ street_address: ["20 W 34th St"], city: "New York", state: "NY", zip_code: "10001", country: "US" })
 })
 
+test("Uber webhooks accept only a valid HMAC of the untouched request body", () => {
+  const signingKey = "test-only-signing-key"
+  const rawBody = '{"kind":"event.delivery_status","value":"\\u0026"}'
+  const signature = createHmac("sha256", signingKey).update(rawBody).digest("hex")
+
+  expect(verifyUberWebhookSignature(rawBody, signingKey, [signature])).toBe(true)
+  expect(verifyUberWebhookSignature(rawBody.replace("\\u0026", "&"), signingKey, [signature])).toBe(false)
+  expect(verifyUberWebhookSignature(rawBody, signingKey, ["not-a-valid-signature"])).toBe(false)
+  expect(verifyUberWebhookSignature(rawBody, "", [signature])).toBe(false)
+})
+
 test("jobsite delivery remains a protected Manager-only internal route", async () => {
-  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, curriQuoteApi, curriScheduleApi, curri, curriMigration, goShareQuoteApi, goShareScheduleApi, goShareWebhookApi, goShare, goShareMigration] = await Promise.all([
+  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, uberWebhookApi, uberWebhookMigration, curriQuoteApi, curriScheduleApi, curri, curriMigration, goShareQuoteApi, goShareScheduleApi, goShareWebhookApi, goShare, goShareMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -39,6 +52,8 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
     readFile(path.join(root, "app/api/delivery/uber/quote/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/delivery/uber/schedule/route.ts"), "utf8"),
     readFile(path.join(root, "lib/uber-direct.ts"), "utf8"),
+    readFile(path.join(root, "app/api/delivery/uber/webhook/route.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260907032021_add_uber_webhook_vault_reader.sql"), "utf8"),
     readFile(path.join(root, "app/api/delivery/curri/quote/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/delivery/curri/schedule/route.ts"), "utf8"),
     readFile(path.join(root, "lib/curri.ts"), "utf8"),
@@ -94,6 +109,14 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(uberDirect).toContain("quantity: input.packageQuantity")
   expect(uberDirect).toContain("weight: Math.round(input.weightPerPackage * 453.592)")
   expect(uberDirect).toContain("address_undeliverable")
+  expect(uberDirect).toContain("account_disabled")
+  expect(uberDirect).toContain("metadata?.param_details")
+  expect(uberDirect).toContain("provider_unreachable")
+  expect(quoteApi).toContain('["account_disabled", "credentials_unavailable"].includes(error.code) ? 503')
+  expect(uberWebhookApi).toContain("get_uber_direct_webhook_signing_key")
+  expect(uberWebhookApi).toContain("verifyUberWebhookSignature")
+  expect(uberWebhookMigration).toContain("uber_direct_webhook_signing_key")
+  expect(uberWebhookMigration).toContain("grant execute on function public.get_uber_direct_webhook_signing_key() to service_role")
   expect(curriQuoteApi).toContain("managerCapabilities")
   expect(curriQuoteApi).toContain("quoteCurri")
   expect(curriScheduleApi).toContain('confirmed: z.literal(true)')
@@ -101,6 +124,8 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(curri).toContain("https://api.curri.com/graphql")
   expect(curri).toContain("accessorialFees")
   expect(curri).toContain("tollFees")
+  expect(curri).toContain("provider_unreachable")
+  expect(curriQuoteApi).toContain('error.code === "credentials_unavailable" ? 503')
   expect(curriMigration).toContain("get_curri_credentials")
   expect(curriMigration).toContain("enable row level security")
   expect(goShareQuoteApi).toContain("quoteGoShare")

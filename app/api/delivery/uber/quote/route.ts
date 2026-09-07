@@ -71,7 +71,10 @@ export async function POST(request: Request) {
       safeCode: "uber-quote-failed",
     });
     if (error instanceof UberDirectError) {
-      return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status: error.code === "address_undeliverable" ? 422 : 502, headers: { "Cache-Control": "no-store, max-age=0" } });
+      const status = error.code === "address_undeliverable"
+        ? 422
+        : ["account_disabled", "credentials_unavailable"].includes(error.code) ? 503 : 502;
+      return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status, headers: { "Cache-Control": "no-store, max-age=0" } });
     }
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }

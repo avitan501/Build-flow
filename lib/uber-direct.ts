@@ -34,24 +34,34 @@ export class UberDirectError extends Error {
 let tokenCache: { value: string; expiresAt: number } | null = null;
 
 async function credentials() {
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("get_uber_direct_credentials").single();
-  const value = data as Credentials | null;
-  if (error || !value?.customer_id || !value.client_id || !value.client_secret) {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("get_uber_direct_credentials").single();
+    const value = data as Credentials | null;
+    if (error || !value?.customer_id || !value.client_id || !value.client_secret) {
+      throw new UberDirectError("credentials_unavailable", "Uber Direct is not configured right now.");
+    }
+    return { customerId: value.customer_id, clientId: value.client_id, clientSecret: value.client_secret };
+  } catch (error) {
+    if (error instanceof UberDirectError) throw error;
     throw new UberDirectError("credentials_unavailable", "Uber Direct is not configured right now.");
   }
-  return { customerId: value.customer_id, clientId: value.client_id, clientSecret: value.client_secret };
 }
 
 async function accessToken(clientId: string, clientSecret: string) {
   const now = Date.now();
   if (tokenCache && tokenCache.expiresAt > now + 5 * 60 * 1000) return tokenCache.value;
-  const response = await fetch("https://auth.uber.com/oauth/v2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "client_credentials", scope: "eats.deliveries" }),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://auth.uber.com/oauth/v2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: "client_credentials", scope: "eats.deliveries" }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new UberDirectError("provider_unreachable", "Uber Direct could not be reached right now.");
+  }
   const payload = await response.json().catch(() => null) as { access_token?: string; expires_in?: number } | null;
   if (!response.ok || !payload?.access_token) throw new UberDirectError("authentication_failed", "Uber Direct authentication failed.");
   const expiresIn = Number.isFinite(payload.expires_in) ? Number(payload.expires_in) : 3600;
@@ -73,25 +83,37 @@ export async function quoteUberDirect(input: {
 }) {
   const account = await context();
   const readyAt = input.scheduledPickupAt ? new Date(input.scheduledPickupAt) : null;
-  const response = await fetch(`https://api.uber.com/v1/customers/${encodeURIComponent(account.customerId)}/delivery_quotes`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${account.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      pickup_address: uberAddress(input.pickupLocation || null, input.pickupAddress),
-      dropoff_address: uberAddress(input.dropoffLocation || null, input.dropoffAddress),
-      ...(input.pickupLocation ? { pickup_latitude: input.pickupLocation.latitude, pickup_longitude: input.pickupLocation.longitude } : {}),
-      ...(input.dropoffLocation ? { dropoff_latitude: input.dropoffLocation.latitude, dropoff_longitude: input.dropoffLocation.longitude } : {}),
-      ...(readyAt ? {
-        pickup_ready_dt: readyAt.toISOString(),
-        pickup_deadline_dt: new Date(readyAt.getTime() + 60 * 60 * 1000).toISOString(),
-      } : {}),
-    }),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`https://api.uber.com/v1/customers/${encodeURIComponent(account.customerId)}/delivery_quotes`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${account.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pickup_address: uberAddress(input.pickupLocation || null, input.pickupAddress),
+        dropoff_address: uberAddress(input.dropoffLocation || null, input.dropoffAddress),
+        ...(input.pickupLocation ? { pickup_latitude: input.pickupLocation.latitude, pickup_longitude: input.pickupLocation.longitude } : {}),
+        ...(input.dropoffLocation ? { dropoff_latitude: input.dropoffLocation.latitude, dropoff_longitude: input.dropoffLocation.longitude } : {}),
+        ...(readyAt ? {
+          pickup_ready_dt: readyAt.toISOString(),
+          pickup_deadline_dt: new Date(readyAt.getTime() + 60 * 60 * 1000).toISOString(),
+        } : {}),
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new UberDirectError("provider_unreachable", "Uber Direct could not be reached right now.");
+  }
   const quote = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok) {
     const providerCode = [quote?.code, quote?.error].find((value): value is string => typeof value === "string")?.toLowerCase() || "";
-    const detail = [providerCode, quote?.message].filter((value): value is string => typeof value === "string").join(" ").toLowerCase();
+    const metadata = quote?.metadata && typeof quote.metadata === "object" ? quote.metadata as Record<string, unknown> : null;
+    const detail = [providerCode, quote?.message, metadata?.param_details]
+      .filter((value): value is string => typeof value === "string")
+      .join(" ")
+      .toLowerCase();
+    if (detail.includes("account has been disabled")) {
+      throw new UberDirectError("account_disabled", "Uber Direct disabled this account. Avantia must ask Uber Direct billing to reactivate it before live prices can work.");
+    }
     if (detail.includes("tax_form_required")) throw new UberDirectError("tax_form_required", "Uber requires the business tax form before live quotes.");
     if (detail.includes("address_undeliverable")) throw new UberDirectError("address_undeliverable", "Uber Direct answered, but does not serve this exact route. Choose an autocomplete suggestion or add coordinates for a planning estimate, or try another courier.");
     throw new UberDirectError("provider_error", "Uber could not quote this route right now.");

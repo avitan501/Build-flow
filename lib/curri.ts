@@ -120,29 +120,39 @@ async function credentials() {
   };
   if (fromEnvironment.userId && fromEnvironment.apiKey) return fromEnvironment;
 
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc("get_curri_credentials").single();
-  const value = data as Credentials | null;
-  if (error || !value?.user_id || !value.api_key) {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("get_curri_credentials").single();
+    const value = data as Credentials | null;
+    if (error || !value?.user_id || !value.api_key) {
+      throw new CurriError("credentials_unavailable", "Curri needs an active Business Team API User ID and API key before live prices can be requested.");
+    }
+    return {
+      userId: value.user_id,
+      apiKey: value.api_key,
+      accountId: value.account_id || null,
+      accountLocation: value.account_location || null,
+    };
+  } catch (error) {
+    if (error instanceof CurriError) throw error;
     throw new CurriError("credentials_unavailable", "Curri needs an active Business Team API User ID and API key before live prices can be requested.");
   }
-  return {
-    userId: value.user_id,
-    apiKey: value.api_key,
-    accountId: value.account_id || null,
-    accountLocation: value.account_location || null,
-  };
 }
 
 async function graphQL<T>(query: string) {
   const account = await credentials();
   const token = Buffer.from(`${account.userId}:${account.apiKey}`, "utf8").toString("base64");
-  const response = await fetch("https://api.curri.com/graphql", {
-    method: "POST",
-    headers: { Accept: "application/json", Authorization: `Basic ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.curri.com/graphql", {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Basic ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new CurriError("provider_unreachable", "Curri could not be reached right now.");
+  }
   const payload = await response.json().catch(() => null) as { data?: T; errors?: Array<{ message?: string }> } | null;
   if (!response.ok || payload?.errors?.length || !payload?.data) {
     const detail = payload?.errors?.map((error) => error.message || "").join(" ").toLowerCase() || "";
