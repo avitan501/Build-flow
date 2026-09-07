@@ -964,6 +964,55 @@ async function repairResendEmailAttachments(communicationId: string) {
   }
 }
 
+async function createAuraAttachmentDownload(
+  communicationId: string,
+  attachmentId: string,
+) {
+  const rows = await sql<Array<{ media: unknown }>>`
+    select media
+    from public.aura_communications
+    where id = ${communicationId}::uuid
+    limit 1
+  `;
+  const rawMedia = rows[0]?.media;
+  const media = Array.isArray(rawMedia)
+    ? rawMedia
+    : typeof rawMedia === "string"
+    ? (() => {
+      try {
+        const parsed = JSON.parse(rawMedia);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })()
+    : [];
+  const attachment = media.find((value) => {
+    const item = value && typeof value === "object"
+      ? value as Record<string, unknown>
+      : {};
+    return item.providerAttachmentId === attachmentId;
+  }) as Record<string, unknown> | undefined;
+  const storagePath = typeof attachment?.storagePath === "string"
+    ? attachment.storagePath
+    : "";
+  const expectedPrefixes = [
+    `inbound-email/${communicationId}/${attachmentId}-`,
+    `inbound-whatsapp/${communicationId}/${attachmentId}-`,
+  ];
+  if (
+    !expectedPrefixes.some((prefix) => storagePath.startsWith(prefix)) ||
+    storagePath.includes("..")
+  ) throw new Error("Attachment not found.");
+  const name = safeResendAttachmentName(attachment?.name);
+  const { data, error } = await admin.storage
+    .from(RESEND_ATTACHMENT_BUCKET)
+    .createSignedUrl(storagePath, 60, { download: name });
+  if (error || !data?.signedUrl)
+    throw new Error("Attachment is temporarily unavailable.");
+  return { url: data.signedUrl };
+}
+
 async function validQuoSignature(
   rawBody: string,
   supplied: string | null,
@@ -11815,6 +11864,22 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         ...(await repairResendEmailAttachments(communicationId)),
+      });
+    }
+    if (input.action === "create_aura_attachment_download") {
+      const communicationId = typeof input.communicationId === "string" &&
+          /^[0-9a-f-]{36}$/i.test(input.communicationId)
+        ? input.communicationId
+        : "";
+      const attachmentId = typeof input.attachmentId === "string" &&
+          /^[a-zA-Z0-9_-]{1,160}$/.test(input.attachmentId)
+        ? input.attachmentId
+        : "";
+      if (!communicationId || !attachmentId)
+        return json({ error: "Attachment not found." }, 404);
+      return json({
+        ok: true,
+        ...(await createAuraAttachmentDownload(communicationId, attachmentId)),
       });
     }
     if (input.action === "activate_meta_whatsapp") {

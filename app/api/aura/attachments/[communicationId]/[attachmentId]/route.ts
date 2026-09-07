@@ -59,21 +59,35 @@ export async function GET(
     `inbound-email/${communicationId}/${attachmentId}-`,
     `inbound-whatsapp/${communicationId}/${attachmentId}-`,
   ];
-  if (!expectedPrefixes.some((prefix) => storagePath.startsWith(prefix)) || storagePath.includes(".."))
-    return errorResponse("Attachment not found.", 404);
+  if (expectedPrefixes.some((prefix) => storagePath.startsWith(prefix)) && !storagePath.includes("..")) {
+    const { data: file, error } = await session.supabase.storage.from(AURA_EMAIL_ATTACHMENT_BUCKET).download(storagePath);
+    if (!error && file) {
+      const name = safeAuraEmailAttachmentName(attachment?.name);
+      const asciiName = name.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+      const type = typeof attachment?.type === "string" ? attachment.type : "application/octet-stream";
+      return new Response(file, {
+        headers: {
+          "Cache-Control": "private, no-store",
+          "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+          "Content-Length": String(file.size),
+          "Content-Type": type,
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+  }
 
-  const { data: file, error } = await session.supabase.storage.from(AURA_EMAIL_ATTACHMENT_BUCKET).download(storagePath);
-  if (error || !file) return errorResponse("Attachment is temporarily unavailable.", 503);
-  const name = safeAuraEmailAttachmentName(attachment?.name);
-  const asciiName = name.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
-  const type = typeof attachment?.type === "string" ? attachment.type : "application/octet-stream";
-  return new Response(file, {
-    headers: {
-      "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-      "Content-Length": String(file.size),
-      "Content-Type": type,
-      "X-Content-Type-Options": "nosniff",
+  const { data: fallback, error: fallbackError } = await session.supabase.functions.invoke<{
+    ok?: boolean;
+    url?: string;
+  }>("aura-messaging-broker", {
+    body: {
+      action: "create_aura_attachment_download",
+      communicationId,
+      attachmentId,
     },
   });
+  if (fallbackError || !fallback?.url)
+    return errorResponse("Attachment is temporarily unavailable.", 503);
+  return NextResponse.redirect(fallback.url, 307);
 }

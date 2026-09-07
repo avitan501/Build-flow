@@ -70,11 +70,15 @@ test("verified inbound email attachments are durable, private, and review-only",
   expect(downloadRoute).toContain("access.suppliers");
   expect(downloadRoute).toContain('Cache-Control": "private, no-store"');
   expect(downloadRoute).toContain("session.supabase.storage.from(AURA_EMAIL_ATTACHMENT_BUCKET).download(storagePath)");
+  expect(downloadRoute).toContain('action: "create_aura_attachment_download"');
+  expect(downloadRoute).toContain("NextResponse.redirect(fallback.url, 307)");
   expect(broker).toContain("persistResendAttachments");
   expect(broker).toContain("email.attachments?.length");
   expect(broker).toContain("attachmentIds: attachments.flatMap");
   expect(broker).toContain("/attachments/${encodeURIComponent(attachmentId)}");
   expect(broker).toContain("inbound-email/${params.communicationId}");
+  expect(broker).toContain("createAuraAttachmentDownload");
+  expect(broker).toContain(".createSignedUrl(storagePath, 60");
 
   for (const source of [resend, attachmentStore, downloadRoute, broker]) {
     expect(source).not.toContain("createComparisonFromQuote");
