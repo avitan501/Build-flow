@@ -33,14 +33,25 @@ function identityRecordCandidate(record: IdentityRecord, source: CallerIdentityC
 async function queueOverdueSupplierFollowUps() {
   const admin = createAdminClient();
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: overdue } = await admin
-    .from("quote_request_supplier_recommendations")
-    .select("request_id,supplier_id,supplier_name_snapshot,contact_status,notes,updated_at")
-    .in("contact_status", ["request_sent", "awaiting_supplier_reply"])
-    .lt("updated_at", cutoff)
-    .order("updated_at", { ascending: true })
-    .limit(50)
-    .returns<Array<{ request_id: string; supplier_id: string; supplier_name_snapshot: string; contact_status: string; notes: string; updated_at: string }>>();
+  type OverdueSupplierRow = { request_id: string; supplier_id: string; supplier_name_snapshot: string; contact_status: string; notes: string; updated_at: string };
+  const overdue: OverdueSupplierRow[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const page = await admin
+      .from("quote_request_supplier_recommendations")
+      .select("request_id,supplier_id,supplier_name_snapshot,contact_status,notes,updated_at")
+      .in("contact_status", ["request_sent", "awaiting_supplier_reply"])
+      .eq("should_contact", true)
+      .lt("updated_at", cutoff)
+      .order("updated_at", { ascending: true })
+      .order("request_id", { ascending: true })
+      .order("supplier_id", { ascending: true })
+      .range(from, from + pageSize - 1)
+      .returns<OverdueSupplierRow[]>();
+    if (page.error) return;
+    overdue.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < pageSize) break;
+  }
   if (!overdue?.length) return;
   const requestIds = [...new Set(overdue.map((row) => row.request_id))];
   const supplierIds = [...new Set(overdue.map((row) => row.supplier_id))];
@@ -61,32 +72,32 @@ async function queueOverdueSupplierFollowUps() {
       admin.from("aura_communication_links").select("communication_id,entity_id")
         .eq("entity_type", "material_request").in("entity_id", requestIds).in("communication_id", linkedCommunicationIds)
         .returns<Array<{ communication_id: string; entity_id: string }>>(),
-      admin.from("aura_communications").select("id,occurred_at").eq("direction", "outgoing").in("id", linkedCommunicationIds)
-        .returns<Array<{ id: string; occurred_at: string }>>(),
+      admin.from("aura_communications").select("id,channel,occurred_at").eq("direction", "outgoing").in("id", linkedCommunicationIds)
+        .in("channel", ["email", "sms", "whatsapp"])
+        .returns<Array<{ id: string; channel: string; occurred_at: string }>>(),
     ])
     : [{ data: [] }, { data: [] }];
   const requestByCommunication = new Map((requestLinks ?? []).map((link) => [link.communication_id, link.entity_id]));
   const outgoingAtByCommunication = new Map((outgoing ?? []).map((communication) => [communication.id, communication.occurred_at]));
-  const outboundByPair = new Map<string, { count: number; latestAt: string }>();
+  const outboundByPair = new Map<string, string[]>();
   for (const link of supplierLinks ?? []) {
     const requestId = requestByCommunication.get(link.communication_id);
     const occurredAt = outgoingAtByCommunication.get(link.communication_id);
     if (!requestId || !occurredAt) continue;
     const key = `${requestId}:${link.entity_id}`;
-    const current = outboundByPair.get(key);
-    outboundByPair.set(key, {
-      count: (current?.count ?? 0) + 1,
-      latestAt: !current || occurredAt > current.latestAt ? occurredAt : current.latestAt,
-    });
+    outboundByPair.set(key, [...(outboundByPair.get(key) ?? []), occurredAt]);
   }
 
   const notificationRows: Array<Record<string, string>> = [];
   const noResponseMarker = "No response after two follow-ups. Try an alternative supplier.";
   for (const row of overdue) {
-    const activity = outboundByPair.get(`${row.request_id}:${row.supplier_id}`);
-    if (activity?.latestAt && activity.latestAt >= cutoff) continue;
+    const followUpActivity = (outboundByPair.get(`${row.request_id}:${row.supplier_id}`) ?? [])
+      .filter((occurredAt) => occurredAt > row.updated_at)
+      .sort();
+    const latestFollowUpAt = followUpActivity.at(-1);
+    if (latestFollowUpAt && latestFollowUpAt >= cutoff) continue;
     const title = requestTitleById.get(row.request_id) || "Material request";
-    if ((activity?.count ?? 0) >= 3) {
+    if (followUpActivity.length >= 2) {
       const notes = row.notes.includes(noResponseMarker) ? row.notes : [row.notes.trim(), noResponseMarker].filter(Boolean).join("\n");
       await admin.from("quote_request_supplier_recommendations").update({
         should_contact: false,
@@ -96,7 +107,7 @@ async function queueOverdueSupplierFollowUps() {
       notificationRows.push({
         event_type: "supplier_update",
         title: `Supplier no response · ${row.supplier_name_snapshot}`.slice(0, 160),
-        body: `${title} · Carlos: try an alternative supplier. David can see this update.`.slice(0, 500),
+        body: `${title} · Try an alternative supplier.`.slice(0, 500),
         href: `/owner/materials/requests/${row.request_id}`,
         tag: "supplier-no-response",
         dedupe_key: `supplier-no-response:${row.request_id}:${row.supplier_id}`.slice(0, 240),
@@ -104,11 +115,11 @@ async function queueOverdueSupplierFollowUps() {
       });
       continue;
     }
-    const followUpNumber = Math.max(1, activity?.count ?? 1);
+    const followUpNumber = followUpActivity.length + 1;
     notificationRows.push({
       event_type: "supplier_update",
-      title: `Carlos follow-up ${followUpNumber}/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
-      body: `${title} · Supplier has not replied in 24 hours. David can see this reminder.`.slice(0, 500),
+      title: `Supplier follow-up ${followUpNumber}/2 · ${row.supplier_name_snapshot}`.slice(0, 160),
+      body: `${title} · Supplier has not replied in 24 hours.`.slice(0, 500),
       href: `/owner/materials/requests/${row.request_id}`,
       tag: "supplier-follow-up",
       dedupe_key: `supplier-follow-up:${row.request_id}:${row.supplier_id}:${followUpNumber}`.slice(0, 240),

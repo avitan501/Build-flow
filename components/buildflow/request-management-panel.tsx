@@ -930,7 +930,7 @@ export function RequestManagementPanel({
 
           <details className="mb-3 rounded-lg border border-slate-200 bg-white">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-bold text-slate-800"><span>Supplier messages</span><span className="rounded-full bg-sky-50 px-2 py-1 text-[10px] text-sky-800">{supplierEmails.length}</span></summary>
-            <div className="border-t border-slate-200 px-2 pb-2"><RelatedEmailTimeline title="Supplier replies" emails={supplierEmails} /></div>
+            <div className="border-t border-slate-200 px-2 pb-2"><RelatedEmailTimeline title="Supplier activity" emails={supplierEmails} party="supplier" /></div>
           </details>
 
           {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
@@ -1043,7 +1043,7 @@ export function RequestManagementPanel({
               <button type="button" onClick={closeContact} disabled={pending} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white disabled:opacity-40" aria-label="Close contact client"><X className="h-4 w-4" /></button>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-4">
-          <RelatedEmailTimeline title="Client email" emails={clientEmails} />
+          <RelatedEmailTimeline title="Client messages" emails={clientEmails} party="client" />
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 

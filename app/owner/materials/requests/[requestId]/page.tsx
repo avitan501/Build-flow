@@ -532,42 +532,66 @@ export default async function OwnerMaterialRequestPage({
   ) ?? supplierComparisonTables.find((comparison) => comparison.suppliers.length > 0)
     ?? supplierComparisonTables[0]
     ?? null;
-  const { data: requestEmailLinks } = await supabase
+  const { data: requestCommunicationLinks } = await supabase
     .from("aura_communication_links")
     .select("communication_id")
     .eq("entity_type", "material_request")
     .eq("entity_id", request.id);
-  const linkedEmailIds = (requestEmailLinks ?? []).map(
+  const linkedCommunicationIds = (requestCommunicationLinks ?? []).map(
     (link) => link.communication_id,
   );
-  const { data: linkedEmails } = linkedEmailIds.length
-    ? await supabase
+  const [{ data: linkedCommunications }, { data: relatedEntityLinks }] = linkedCommunicationIds.length
+    ? await Promise.all([
+      supabase
         .from("aura_communications")
         .select(
-          "id,direction,counterparty_email,subject,body,occurred_at,status,media",
+          "id,channel,direction,counterparty_email,counterparty_phone,subject,body,occurred_at,status,media",
         )
-        .in("id", linkedEmailIds)
-        .eq("channel", "email")
+        .in("id", linkedCommunicationIds)
         .order("occurred_at", { ascending: false })
-        .returns<RelatedEmailItem[]>()
-    : { data: [] as RelatedEmailItem[] };
+        .returns<RelatedEmailItem[]>(),
+      supabase
+        .from("aura_communication_links")
+        .select("communication_id,entity_type,entity_id")
+        .in("communication_id", linkedCommunicationIds)
+        .in("entity_type", ["client", "supplier"])
+        .returns<Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }>>(),
+    ])
+    : [{ data: [] as RelatedEmailItem[] }, { data: [] as Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }> }];
+  const structuredSupplierCommunicationIds = new Set(
+    (relatedEntityLinks ?? [])
+      .filter((link) => link.entity_type === "supplier")
+      .map((link) => link.communication_id),
+  );
+  const structuredClientCommunicationIds = new Set(
+    (relatedEntityLinks ?? [])
+      .filter((link) => link.entity_type === "client")
+      .map((link) => link.communication_id),
+  );
   const supplierEmailAddresses = new Set(
     suppliers
       .flatMap((supplier) => [supplier.email, ...(supplier.additionalContacts ?? []).map((contact) => contact.email)])
       .map((email) => email?.trim().toLowerCase())
       .filter((email): email is string => Boolean(email)),
   );
-  const normalizedClientEmail = clientEmail.trim().toLowerCase();
-  const clientEmails = (linkedEmails ?? []).filter((email) => {
-    const counterpart = email.counterparty_email?.trim().toLowerCase() || "";
-    return (
-      counterpart === normalizedClientEmail ||
-      (!supplierEmailAddresses.has(counterpart) && email.direction !== "incoming")
-    );
-  });
-  const supplierEmails = (linkedEmails ?? []).filter((email) =>
-    supplierEmailAddresses.has(email.counterparty_email?.trim().toLowerCase() || ""),
+  const legacySupplierCommunicationIds = new Set(
+    (linkedCommunications ?? [])
+      .filter((communication) => supplierEmailAddresses.has(communication.counterparty_email?.trim().toLowerCase() || ""))
+      .map((communication) => communication.id),
   );
+  const supplierCommunicationIds = new Set([
+    ...structuredSupplierCommunicationIds,
+    ...legacySupplierCommunicationIds,
+  ]);
+  const normalizedClientEmail = clientEmail.trim().toLowerCase();
+  const supplierEmails = (linkedCommunications ?? []).filter((communication) =>
+    supplierCommunicationIds.has(communication.id) && !structuredClientCommunicationIds.has(communication.id),
+  );
+  const clientEmails = (linkedCommunications ?? []).filter((communication) => {
+    if (supplierCommunicationIds.has(communication.id)) return false;
+    if (structuredClientCommunicationIds.has(communication.id)) return true;
+    return Boolean(normalizedClientEmail && communication.counterparty_email?.trim().toLowerCase() === normalizedClientEmail);
+  });
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">

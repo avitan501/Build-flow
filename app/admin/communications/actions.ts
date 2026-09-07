@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireManagerPortalProfile } from "@/lib/auth";
@@ -887,7 +888,8 @@ export async function quickTagEmailSupplierAction(input: {
   let supplier = matches[0] ?? null;
   if (!supplier) {
     const suggestedName = input.name?.trim().slice(0, 160) || email.split("@")[0].replace(/[._-]+/g, " ");
-    const sourceId = canonicalSupplierId(suggestedName || email);
+    const emailFingerprint = createHash("sha256").update(email).digest("hex").slice(0, 12);
+    const sourceId = canonicalSupplierId(`${suggestedName || "supplier"}-${email.split("@")[1] || "email"}-${emailFingerprint}`);
     const saved = await supabase.rpc("staff_upsert_supplier_directory_entry", {
       p_supplier: {
         id: sourceId,
@@ -910,7 +912,18 @@ export async function quickTagEmailSupplierAction(input: {
     });
     if (saved.error)
       return { ok: false as const, error: "The supplier could not be added." };
-    supplier = { id: sourceId, name: suggestedName || email, email };
+    const verifiedSnapshot = await supabase.rpc("staff_load_supplier_directory_snapshot");
+    const verifiedSupplier = ((verifiedSnapshot.data as {
+      settings?: { suppliers?: Array<{ id: string; name: string; email?: string }> };
+    } | null)?.settings?.suppliers ?? []).find((entry) => entry.id === sourceId);
+    if (
+      verifiedSnapshot.error ||
+      !verifiedSupplier ||
+      normalizeAuraEmail(verifiedSupplier.email || "") !== email
+    ) {
+      return { ok: false as const, error: "The supplier was not verified after saving, so the conversation was not linked." };
+    }
+    supplier = verifiedSupplier;
   }
 
   const linked = await linkCommunicationContactAction({
