@@ -100,6 +100,8 @@ test("the supplier network is compact on phones and can share a supplier", async
   expect(source).toContain("navigator.clipboard.writeText")
   expect(source).toContain('document.execCommand("copy")')
   expect(source).toContain("Paste it into WhatsApp, SMS, or email")
+  expect(source).toContain("https://wa.me/?text=")
+  expect(source).toContain("Supplier details to copy")
 })
 
 test("the upsert migration verifies the final locked row and keeps access controls", async () => {

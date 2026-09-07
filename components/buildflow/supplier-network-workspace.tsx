@@ -102,6 +102,7 @@ export function SupplierNetworkWorkspace({
   );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [shareFallback, setShareFallback] = useState<{ name: string; text: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
   const [discoveryDepartment, setDiscoveryDepartment] = useState("");
@@ -303,6 +304,7 @@ export function SupplierNetworkWorkspace({
     ].filter(Boolean);
     const text = details.join("\n");
     setShareNotice(null);
+    setShareFallback(null);
     if (navigator.share) {
       try {
         await navigator.share({ title: row.name, text });
@@ -325,7 +327,8 @@ export function SupplierNetworkWorkspace({
       const copied = document.execCommand("copy");
       copyField.remove();
       if (!copied) {
-        setShareNotice("This supplier could not be copied. Please try again.");
+        setShareNotice("Choose where to share this supplier.");
+        setShareFallback({ name: row.name, text });
         return;
       }
     }
@@ -976,6 +979,38 @@ export function SupplierNetworkWorkspace({
                           <p className="mt-1 text-[10px] font-semibold text-sky-800" role="status">
                             {shareNotice}
                           </p>
+                        ) : null}
+                        {shareFallback?.name === row.name ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5 rounded-md border border-sky-200 bg-white p-2">
+                            <a
+                              href={`https://wa.me/?text=${encodeURIComponent(shareFallback.text)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-8 items-center rounded-md bg-emerald-600 px-3 text-[10px] font-bold text-white"
+                            >
+                              WhatsApp
+                            </a>
+                            <a
+                              href={`sms:?&body=${encodeURIComponent(shareFallback.text)}`}
+                              className="inline-flex h-8 items-center rounded-md border border-slate-200 px-3 text-[10px] font-bold text-slate-700"
+                            >
+                              SMS
+                            </a>
+                            <a
+                              href={`mailto:?subject=${encodeURIComponent(shareFallback.name)}&body=${encodeURIComponent(shareFallback.text)}`}
+                              className="inline-flex h-8 items-center rounded-md border border-slate-200 px-3 text-[10px] font-bold text-slate-700"
+                            >
+                              Email
+                            </a>
+                            <textarea
+                              readOnly
+                              value={shareFallback.text}
+                              onFocus={(event) => event.currentTarget.select()}
+                              aria-label="Supplier details to copy"
+                              rows={2}
+                              className="min-h-12 w-full resize-none rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] text-slate-700"
+                            />
+                          </div>
                         ) : null}
                       </div>
                     ) : null}
