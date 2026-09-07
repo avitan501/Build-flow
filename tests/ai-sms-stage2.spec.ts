@@ -51,9 +51,14 @@ test("material request details do not require a Vercel service-role key to open"
     path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"),
     "utf8",
   );
+  const broker = readFileSync(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
 
   expect(page).not.toContain("createAdminClient");
-  expect(page).toContain('.from("aura_communication_links")');
+  expect(page).toContain('action: "load_request_communications"');
+  expect(broker).toContain("request_link.entity_type = 'material_request'");
 });
 
 test("phone AI stays concise and never fills optional details with guesses", () => {
