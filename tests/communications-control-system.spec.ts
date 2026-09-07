@@ -191,6 +191,41 @@ test("WhatsApp AI drafts use the same reviewed completion path as SMS", () => {
   expect(actions).toContain('.in("channel", ["sms", "whatsapp"])');
 });
 
+test("approved WhatsApp utility templates can safely start an operational conversation", () => {
+  const inbox = readFileSync(
+    path.join(root, "components/buildflow/unified-communication-inbox.tsx"),
+    "utf8",
+  );
+  const actions = readFileSync(
+    path.join(root, "app/owner/aura/actions.ts"),
+    "utf8",
+  );
+  const broker = readFileSync(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
+
+  for (const template of [
+    "quote_request_received",
+    "service_request_received",
+    "quote_ready",
+    "order_received",
+  ]) {
+    expect(inbox).toContain(template);
+    expect(actions).toContain(template);
+    expect(broker).toContain(template);
+  }
+  expect(inbox).toContain("Outside the 24-hour window?");
+  expect(inbox).toContain("sendAuraWhatsAppUtilityTemplateAction");
+  expect(actions).toContain('action: "send_whatsapp_utility_template"');
+  expect(broker).toContain('input.action === "send_whatsapp_utility_template"');
+  expect(broker).toContain('candidate.status === "APPROVED"');
+  expect(broker).toContain('candidate.category === "UTILITY"');
+  expect(broker).toContain('type: "template"');
+  expect(broker).toContain("whatsapp_template_not_approved");
+  expect(broker).toContain("client-document");
+});
+
 test("mobile inbox controls stay bounded and expose actionable work filters", () => {
   const inbox = readFileSync(
     path.join(root, "components/buildflow/unified-communication-inbox.tsx"),

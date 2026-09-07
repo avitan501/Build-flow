@@ -7540,6 +7540,125 @@ async function handleQuoWebhook(req: Request) {
   return json({ ok: true, duplicate: false, accepted: true }, 202);
 }
 
+const META_UTILITY_TEMPLATES = {
+  quote_request_received: {
+    parameterCount: 2,
+    render: ([name, request]: string[]) =>
+      `Hi ${name}, we received your material request ${request}. Our team is reviewing it and will send updates here.`,
+  },
+  service_request_received: {
+    parameterCount: 2,
+    render: ([name, service]: string[]) =>
+      `Hi ${name}, we received your request for ${service}. Our team will review it and contact you here with the next update.`,
+  },
+  quote_ready: {
+    parameterCount: 3,
+    render: ([name, quote, url]: string[]) =>
+      `Hi ${name}, your Avantia Build quote ${quote} is ready. Review the details here: ${url}. Reply here if you have any questions.`,
+  },
+  order_received: {
+    parameterCount: 2,
+    render: ([name, order]: string[]) =>
+      `Hi ${name}, we received order ${order}. We will send another message when it is ready for the next step. Reply here if you have a question about this order.`,
+  },
+} as const;
+
+type MetaUtilityTemplateName = keyof typeof META_UTILITY_TEMPLATES;
+
+async function sendWhatsAppUtilityTemplate(
+  toValue: unknown,
+  templateNameValue: unknown,
+  parametersValue: unknown,
+) {
+  const config = await metaWhatsAppConfig();
+  if (!config)
+    throw new Error("Direct Meta WhatsApp requires credential review.");
+  const to = normalizePhone(toValue);
+  const templateName = typeof templateNameValue === "string" &&
+      Object.prototype.hasOwnProperty.call(META_UTILITY_TEMPLATES, templateNameValue)
+    ? templateNameValue as MetaUtilityTemplateName
+    : null;
+  const parameters = Array.isArray(parametersValue)
+    ? parametersValue.map((value) => typeof value === "string" ? value.trim() : "")
+    : [];
+  const definition = templateName ? META_UTILITY_TEMPLATES[templateName] : null;
+  if (
+    !to || !templateName || !definition ||
+    parameters.length !== definition.parameterCount ||
+    parameters.some((value) => !value || value.length > 1024 || /[\n\r\t]/.test(value))
+  ) throw new Error("Complete every approved WhatsApp template field.");
+  if (
+    templateName === "quote_ready" &&
+    !/^https:\/\/build\.avantiap\.com\/client-document\/[a-z0-9-]+(?:\?verify=\d+)?$/i.test(parameters[2])
+  ) throw new Error("Use a valid Avantia client-document link for the quote.");
+
+  const templatesUrl = new URL(
+    `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/message_templates`,
+  );
+  templatesUrl.searchParams.set("name", templateName);
+  templatesUrl.searchParams.set("fields", "name,status,language,category");
+  templatesUrl.searchParams.set("limit", "20");
+  const templateResponse = await fetch(templatesUrl, {
+    headers: { Authorization: `Bearer ${config.accessToken}` },
+  });
+  const templateResult = await templateResponse.json() as {
+    data?: Array<{ name?: string; status?: string; language?: string; category?: string }>;
+    error?: { message?: string };
+  };
+  if (!templateResponse.ok)
+    throw new Error(templateResult.error?.message || "WhatsApp template review could not be checked.");
+  const approved = templateResult.data?.find((candidate) =>
+    candidate.name === templateName && candidate.status === "APPROVED" &&
+    candidate.category === "UTILITY" && typeof candidate.language === "string"
+  );
+  if (!approved?.language) throw new Error("whatsapp_template_not_approved");
+
+  const response = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to.replace(/[^0-9]/g, ""),
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: approved.language },
+          components: [{
+            type: "body",
+            parameters: parameters.map((text) => ({ type: "text", text })),
+          }],
+        },
+      }),
+    },
+  );
+  const result = await response.json() as {
+    messages?: Array<{ id?: string }>;
+    error?: { message?: string };
+  };
+  const externalId = result.messages?.[0]?.id;
+  if (!response.ok || !externalId)
+    throw new Error(result.error?.message || `WhatsApp returned HTTP ${response.status}.`);
+
+  await storeCommunication({
+    provider: "whatsapp",
+    channel: "whatsapp",
+    externalId,
+    direction: "outgoing",
+    counterpartyPhone: to,
+    businessPhone: config.from,
+    body: definition.render(parameters),
+    summary: `Approved utility template: ${templateName}`,
+    status: "accepted",
+  });
+  return externalId;
+}
+
 async function sendWhatsApp(
   toValue: unknown,
   bodyValue: unknown,
@@ -12825,6 +12944,14 @@ Deno.serve(async (req: Request) => {
         input.message,
         input.mediaUrl,
         input.sourceCommunicationId,
+      );
+      return json({ ok: true, id });
+    }
+    if (input.action === "send_whatsapp_utility_template") {
+      const id = await sendWhatsAppUtilityTemplate(
+        input.to,
+        input.templateName,
+        input.parameters,
       );
       return json({ ok: true, id });
     }

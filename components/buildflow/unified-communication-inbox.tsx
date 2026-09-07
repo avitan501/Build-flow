@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
-import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraMessageWithAttachmentAction } from "@/app/owner/aura/actions"
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraMessageWithAttachmentAction, sendAuraWhatsAppUtilityTemplateAction, type AuraWhatsAppUtilityTemplateName } from "@/app/owner/aura/actions"
 import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagEmailSupplierAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { CommunicationCallLauncher } from "@/components/buildflow/communication-call-launcher"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
@@ -48,6 +48,46 @@ type ContactKind = "customer" | "lead" | "supplier" | "contact"
 type ContactFilter = "all" | ContactKind
 type WorkFilter = "all" | "needs_reply" | "unread" | "ai_review" | "failed" | "duplicate"
 type LiveSyncState = "connecting" | "live" | "fallback"
+
+const WHATSAPP_UTILITY_TEMPLATES: Record<AuraWhatsAppUtilityTemplateName, {
+  label: string
+  fields: Array<{ label: string; placeholder: string }>
+  render: (values: string[]) => string
+}> = {
+  quote_request_received: {
+    label: "Material request received",
+    fields: [
+      { label: "Customer first name", placeholder: "John" },
+      { label: "Request reference", placeholder: "MR-1042" },
+    ],
+    render: ([name, request]) => `Hi ${name}, we received your material request ${request}. Our team is reviewing it and will send updates here.`,
+  },
+  service_request_received: {
+    label: "Service request received",
+    fields: [
+      { label: "Customer first name", placeholder: "John" },
+      { label: "Service requested", placeholder: "material pricing" },
+    ],
+    render: ([name, service]) => `Hi ${name}, we received your request for ${service}. Our team will review it and contact you here with the next update.`,
+  },
+  quote_ready: {
+    label: "Quote ready",
+    fields: [
+      { label: "Customer first name", placeholder: "John" },
+      { label: "Quote number", placeholder: "Q-1042" },
+      { label: "Secure quote URL", placeholder: "https://build.avantiap.com/client-document/..." },
+    ],
+    render: ([name, quote, url]) => `Hi ${name}, your Avantia Build quote ${quote} is ready. Review the details here: ${url}. Reply here if you have any questions.`,
+  },
+  order_received: {
+    label: "Order received",
+    fields: [
+      { label: "Customer first name", placeholder: "John" },
+      { label: "Order number", placeholder: "O-1042" },
+    ],
+    render: ([name, order]) => `Hi ${name}, we received order ${order}. We will send another message when it is ready for the next step. Reply here if you have a question about this order.`,
+  },
+}
 
 type DirectoryEntry = {
   key: string
@@ -324,6 +364,9 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [threadHistory, setThreadHistory] = useState<Record<string, { cursor: string | null; hasMore: boolean }>>({})
   const [workFilter, setWorkFilter] = useState<WorkFilter>("all")
   const [liveSyncState, setLiveSyncState] = useState<LiveSyncState>("connecting")
+  const [templateComposerOpen, setTemplateComposerOpen] = useState(false)
+  const [utilityTemplateName, setUtilityTemplateName] = useState<AuraWhatsAppUtilityTemplateName>("quote_request_received")
+  const [utilityTemplateValues, setUtilityTemplateValues] = useState<string[]>(["", ""])
 
   useEffect(() => {
     let stopped = false
@@ -937,6 +980,91 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       return
     }
     setCallLauncher({ phone, name: conversation.name })
+  }
+
+  function openUtilityTemplateComposer() {
+    const selectedEntry = recipientOptions.find((entry) => entry.id === selectedRecipientId)
+    const candidateName = (activeConversation?.name || selectedEntry?.name || "").trim()
+    const firstName = candidateName && !/^\+?[\d\s().-]+$/.test(candidateName) && !/unknown|ambiguous/i.test(candidateName)
+      ? candidateName.split(/\s+/)[0]
+      : ""
+    const fieldCount = WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].fields.length
+    setUtilityTemplateValues(Array.from({ length: fieldCount }, (_, index) => index === 0 ? firstName : ""))
+    setTemplateComposerOpen(true)
+    setFeedback(null)
+  }
+
+  function changeUtilityTemplate(nextTemplate: AuraWhatsAppUtilityTemplateName) {
+    const fieldCount = WHATSAPP_UTILITY_TEMPLATES[nextTemplate].fields.length
+    setUtilityTemplateName(nextTemplate)
+    setUtilityTemplateValues((current) => Array.from({ length: fieldCount }, (_, index) => index === 0 ? current[0] || "" : ""))
+    setFeedback(null)
+  }
+
+  function sendUtilityTemplate() {
+    const sentRecipient = recipient.trim()
+    const selectedEntry = recipientOptions.find((entry) => entry.id === selectedRecipientId)
+    const recipientLabel = activeConversation?.name || selectedEntry?.name || sentRecipient
+    const definition = WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName]
+    const values = utilityTemplateValues.slice(0, definition.fields.length).map((value) => value.trim())
+    if (!sentRecipient || values.length !== definition.fields.length || values.some((value) => !value)) {
+      setFeedback({ tone: "error", text: "Complete every template field." })
+      return
+    }
+    const renderedMessage = definition.render(values)
+    setFeedback(null)
+    startTransition(async () => {
+      const startedAt = performance.now()
+      const result = await sendAuraWhatsAppUtilityTemplateAction({
+        recipient: sentRecipient,
+        recipientLabel,
+        templateName: utilityTemplateName,
+        parameters: values,
+      })
+      if (!result.ok) {
+        captureAvantiaEvent("avantia_communication_sent", {
+          channel: "whatsapp",
+          template: utilityTemplateName,
+          duration_ms: Math.round(performance.now() - startedAt),
+          success: false,
+        })
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      const occurredAt = result.occurredAt || new Date().toISOString()
+      const optimistic: AuraCommunicationRow = {
+        id: `optimistic:${result.externalId || crypto.randomUUID()}`,
+        contact_id: null,
+        provider: "whatsapp",
+        channel: "whatsapp",
+        direction: "outgoing",
+        counterparty_phone: normalizeAuraPhone(sentRecipient),
+        counterparty_email: null,
+        subject: null,
+        body: renderedMessage,
+        summary: `Approved utility template: ${utilityTemplateName}`,
+        transcript: null,
+        next_steps: [],
+        media: [],
+        status: "accepted",
+        duration_seconds: null,
+        occurred_at: occurredAt,
+        last_event_at: occurredAt,
+        read_at: occurredAt,
+      }
+      setLiveCommunications((current) => [optimistic, ...current])
+      const sentIdentity = identityKey(optimistic.counterparty_phone, null)
+      setActiveKey(directory.alias.get(sentIdentity)?.key || sentIdentity || `unknown:${optimistic.id}`)
+      setMobileThreadOpen(true)
+      setTemplateComposerOpen(false)
+      captureAvantiaEvent("avantia_communication_sent", {
+        channel: "whatsapp",
+        template: utilityTemplateName,
+        duration_ms: Math.round(performance.now() - startedAt),
+        success: true,
+      })
+      setFeedback({ tone: "success", text: "Approved WhatsApp template sent and saved." })
+    })
   }
 
   function sendMessage() {
@@ -1694,6 +1822,53 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                       </button>
                     ) : null}
                   </div>
+                </section>
+              ) : null}
+              {channel === "whatsapp" ? (
+                <section className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black text-emerald-950">Outside the 24-hour window?</p>
+                      <p className="mt-0.5 text-[10px] leading-4 text-emerald-800">Start with an approved Meta service template. A normal reply window opens after the customer replies.</p>
+                    </div>
+                    <button type="button" onClick={() => templateComposerOpen ? setTemplateComposerOpen(false) : openUtilityTemplateComposer()} className="shrink-0 rounded-full bg-emerald-700 px-3 py-1.5 text-[10px] font-black text-white">
+                      {templateComposerOpen ? "Close" : "Use template"}
+                    </button>
+                  </div>
+                  {templateComposerOpen ? (
+                    <div className="mt-3 space-y-2 border-t border-emerald-200 pt-3">
+                      <label className="block text-[10px] font-bold text-emerald-950">
+                        Service message
+                        <select value={utilityTemplateName} onChange={(event) => changeUtilityTemplate(event.target.value as AuraWhatsAppUtilityTemplateName)} className="mt-1 h-9 w-full rounded-md border border-emerald-300 bg-white px-2 text-xs text-slate-900">
+                          {Object.entries(WHATSAPP_UTILITY_TEMPLATES).map(([name, template]) => (
+                            <option key={name} value={name}>{template.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].fields.map((field, index) => (
+                          <label key={`${utilityTemplateName}-${field.label}`} className={index === 2 ? "block text-[10px] font-bold text-emerald-950 sm:col-span-2" : "block text-[10px] font-bold text-emerald-950"}>
+                            {field.label}
+                            <input
+                              value={utilityTemplateValues[index] || ""}
+                              onChange={(event) => setUtilityTemplateValues((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))}
+                              placeholder={field.placeholder}
+                              maxLength={1024}
+                              className="mt-1 h-9 w-full rounded-md border border-emerald-300 bg-white px-2 text-xs font-normal text-slate-900"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <p className="rounded-md bg-white p-2 text-[10px] leading-4 text-slate-600">{WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].render(utilityTemplateValues)}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[9px] leading-4 text-emerald-800">Meta approval is checked immediately before sending.</p>
+                        <button type="button" onClick={sendUtilityTemplate} disabled={pending || !selectedChannelReady || !recipient.trim() || utilityTemplateValues.some((value) => !value.trim())} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-[10px] font-black text-white disabled:bg-slate-300">
+                          <Send className="h-3 w-3" />
+                          Send template
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
               <div className="flex gap-1.5 overflow-x-auto pb-2">

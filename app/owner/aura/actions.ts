@@ -34,6 +34,11 @@ function requireUuid(value: FormDataEntryValue | null) {
 export type SendAuraMessageResult =
   | { ok: true; externalId?: string; occurredAt?: string }
   | { ok: false; error: string };
+export type AuraWhatsAppUtilityTemplateName =
+  | "quote_request_received"
+  | "service_request_received"
+  | "quote_ready"
+  | "order_received";
 export type PrepareQuoAttachmentResult =
   | { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string }
   | { ok: false; error: string };
@@ -369,6 +374,91 @@ export async function sendAuraMessageAction(input: {
           ? whatsappSendError(error)
           : `${channelName} could not send this message.`,
     };
+  }
+}
+
+const WHATSAPP_UTILITY_TEMPLATE_PARAMETER_COUNTS: Record<
+  AuraWhatsAppUtilityTemplateName,
+  number
+> = {
+  quote_request_received: 2,
+  service_request_received: 2,
+  quote_ready: 3,
+  order_received: 2,
+};
+
+export async function sendAuraWhatsAppUtilityTemplateAction(input: {
+  recipient: string;
+  recipientLabel?: string;
+  templateName: AuraWhatsAppUtilityTemplateName;
+  parameters: string[];
+}): Promise<SendAuraMessageResult> {
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.customers)
+    return { ok: false, error: "Customer communication access is required." };
+
+  const phone = normalizeAuraPhone(input.recipient);
+  const expectedParameterCount =
+    WHATSAPP_UTILITY_TEMPLATE_PARAMETER_COUNTS[input.templateName];
+  const parameters = Array.isArray(input.parameters)
+    ? input.parameters.map((value) => String(value || "").trim())
+    : [];
+  if (!phone) return { ok: false, error: "Enter a valid customer phone number." };
+  if (
+    !expectedParameterCount ||
+    parameters.length !== expectedParameterCount ||
+    parameters.some((value) => !value || value.length > 1024 || /[\n\r\t]/.test(value))
+  ) {
+    return { ok: false, error: "Complete every approved template field." };
+  }
+
+  const startedAt = Date.now();
+  const label = input.recipientLabel || phone;
+  try {
+    const result = await invokeMessagingBroker(supabase, {
+      action: "send_whatsapp_utility_template",
+      to: phone,
+      templateName: input.templateName,
+      parameters,
+    });
+    if (!result.id)
+      return {
+        ok: false,
+        error: "Meta did not confirm this template message. Check the conversation before trying again.",
+      };
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: "whatsapp",
+      recipient: phone,
+      label,
+      outcome: "sent",
+      startedAt,
+      subject: `WhatsApp template: ${input.templateName}`,
+    });
+    revalidatePath("/owner/aura");
+    revalidatePath("/admin/communications");
+    revalidatePath("/admin/users");
+    return {
+      ok: true,
+      externalId: result.id,
+      occurredAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: "whatsapp",
+      recipient: phone,
+      label,
+      outcome: "failed",
+      startedAt,
+      subject: `WhatsApp template: ${input.templateName}`,
+    });
+    const detail = error instanceof Error ? error.message : "";
+    if (/template.*pending|not approved/i.test(detail)) {
+      return {
+        ok: false,
+        error: "This WhatsApp template is still waiting for Meta approval.",
+      };
+    }
+    return { ok: false, error: whatsappSendError(error) };
   }
 }
 
