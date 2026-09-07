@@ -895,9 +895,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function newConversation() {
     setActiveKey("__new__")
     setMobileThreadOpen(true)
+    setChannel("whatsapp")
     setSelectedRecipientId("")
     setRecipient("")
+    setSubject("")
     setMessage("")
+    setAttachments([])
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setActiveDraftId(null)
     setTeachAi(false)
     setCorrectionReasons([])
@@ -1319,7 +1323,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   <p className="text-xs text-slate-500">Choose a person and channel</p>
                 </div>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
+              <div className="mt-3 grid gap-2 sm:grid-cols-[8rem_9rem_minmax(0,1fr)]">
+                <label>
+                  <span className="sr-only">New conversation channel</span>
+                  <select
+                    value={channel}
+                    onChange={(event) => changeChannel(event.target.value as Channel)}
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold"
+                  >
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="sms">Text</option>
+                    <option value="email">Email</option>
+                  </select>
+                </label>
                 <select
                   value={recipientType}
                   onChange={(event) => {
@@ -1343,6 +1359,26 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   ))}
                 </select>
               </div>
+              <label className="mt-2 block">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  {selectedRecipientId ? "Selected recipient" : channel === "email" ? "Email address" : "Phone number"}
+                </span>
+                <input
+                  value={recipient}
+                  onChange={(event) => {
+                    setRecipient(event.target.value)
+                    setSelectedRecipientId("")
+                    setFeedback(null)
+                  }}
+                  inputMode={channel === "email" ? "email" : "tel"}
+                  autoComplete={channel === "email" ? "email" : "tel"}
+                  placeholder={channel === "email" ? "name@company.com" : "+1 516 555 0123"}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"
+                />
+              </label>
+              <p className="mt-1.5 text-[10px] text-slate-500">
+                Choose an existing contact or enter a new {channel === "email" ? "email address" : "phone number"}.
+              </p>
             </header>
           ) : activeConversation ? (
             <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5">
@@ -1674,11 +1710,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                 ))}
               </div>
               <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
-                <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2">
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="sms">Text</option>
-                  <option value="email">Email</option>
-                </select>
+                {activeKey !== "__new__" ? (
+                  <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2">
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="sms">Text</option>
+                    <option value="email">Email</option>
+                  </select>
+                ) : null}
                 <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
                 {channel !== "call" ? (
                   <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment">

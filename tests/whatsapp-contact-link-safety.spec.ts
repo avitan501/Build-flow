@@ -64,3 +64,14 @@ test("unlinked communications remain visible to authorized staff", async () => {
   expect(broker).toContain('input.action === "load_communication_updates"')
   expect(broker).toContain("communication.last_event_at >")
 })
+
+test("the new conversation button supports every channel and a new recipient", async () => {
+  const inbox = await read("components/buildflow/unified-communication-inbox.tsx")
+
+  expect(inbox).toContain('aria-label="New conversation"')
+  expect(inbox).toContain("New conversation channel")
+  expect(inbox).toContain("Choose an existing contact or enter a new")
+  expect(inbox).toContain('inputMode={channel === "email" ? "email" : "tel"}')
+  expect(inbox).toContain('setChannel("whatsapp")')
+  expect(inbox).toContain('setAttachments([])')
+})
