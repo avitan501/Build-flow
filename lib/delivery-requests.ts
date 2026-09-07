@@ -42,7 +42,7 @@ export type SavedDeliveryRequest = {
     serviceFee: number;
   };
   providerQuote?: {
-    provider: "Uber Direct" | "Curri";
+    provider: "Uber Direct" | "Curri" | "GoShare";
     quoteId: string;
     total: number;
     currency: string;
@@ -57,7 +57,7 @@ export type SavedDeliveryRequest = {
     expiresAt: string;
   };
   providerDelivery?: {
-    provider: "Uber Direct" | "Curri";
+    provider: "Uber Direct" | "Curri" | "GoShare";
     deliveryId: string;
     trackingUrl: string | null;
     status: string;

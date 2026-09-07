@@ -4,7 +4,7 @@ import { DELIVERY_NOTES_PREFIX, parseDeliveryRequest } from "@/lib/delivery-requ
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function updateProviderDeliveryStatus(input: {
-  provider: "Uber Direct" | "Curri";
+  provider: "Uber Direct" | "Curri" | "GoShare";
   deliveryId: string;
   status?: string | null;
   trackingUrl?: string | null;
@@ -21,8 +21,8 @@ export async function updateProviderDeliveryStatus(input: {
   if (!task || !request?.providerDelivery || request.providerDelivery.deliveryId !== input.deliveryId) return false;
 
   const status = input.status?.toLowerCase() || request.providerDelivery.status;
-  const completed = ["delivered", "completed"].includes(status);
-  const cancelled = ["canceled", "cancelled", "failed", "returned"].includes(status);
+  const completed = ["delivered", "completed", "finished", "project_completed"].includes(status);
+  const cancelled = ["canceled", "cancelled", "failed", "returned", "project_canceled"].includes(status);
   const nextRequest = {
     ...request,
     status: completed ? "completed" as const : cancelled ? "cancelled" as const : "dispatched" as const,

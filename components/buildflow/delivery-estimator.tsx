@@ -22,7 +22,7 @@ const currency = new Intl.NumberFormat("en-US", {
 })
 
 type LiveProviderQuote = {
-  provider: "Uber Direct" | "Curri"
+  provider: "Uber Direct" | "Curri" | "GoShare"
   quoteId: string
   total: number
   baseFee?: number
@@ -182,8 +182,9 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         scheduledPickupAt: deliveryTiming === "later" ? scheduledPickupIso : null,
       }
       const providers = [
-        ...(parsedPackageQuantity <= 20 && parsedWeightPerPackage <= 50 ? [{ name: "Uber Direct", url: "/api/delivery/uber/quote" }] : []),
-        { name: "Curri", url: "/api/delivery/curri/quote" },
+        ...(vehicle !== "box-truck" && parsedPackageQuantity <= 20 && parsedWeightPerPackage <= 50 ? [{ name: "Uber Direct", url: "/api/delivery/uber/quote" }] : []),
+        ...(vehicle !== "box-truck" ? [{ name: "Curri", url: "/api/delivery/curri/quote" }] : []),
+        { name: "GoShare", url: "/api/delivery/goshare/quote" },
       ]
       const results = await Promise.all(providers.map(async (provider) => {
         const response = await fetch(provider.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -331,7 +332,8 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
     setScheduleState("loading")
     setScheduleMessage("")
     try {
-      const response = await fetch(liveQuote.provider === "Curri" ? "/api/delivery/curri/schedule" : "/api/delivery/uber/schedule", {
+      const scheduleUrl = liveQuote.provider === "Curri" ? "/api/delivery/curri/schedule" : liveQuote.provider === "GoShare" ? "/api/delivery/goshare/schedule" : "/api/delivery/uber/schedule"
+      const response = await fetch(scheduleUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskId: savedTaskId, confirmed: true }),
@@ -462,21 +464,21 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                 <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                   Number of items / packages
                   <input type="number" min="1" max="100" step="1" value={packageQuantity} onChange={(event) => { const value = event.target.value; setPackageQuantity(value); if (Number(value) > 1 && vehicle === "small") setVehicle("car"); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                  <span className={`text-xs font-normal ${packageQuantityValid ? "text-slate-500" : "text-rose-600"}`}>Curri supports larger loads; Uber is checked only for 20 packages or fewer.</span>
+                  <span className={`text-xs font-normal ${packageQuantityValid ? "text-slate-500" : "text-rose-600"}`}>Curri and GoShare support larger loads; Uber is checked only for 20 packages or fewer.</span>
                 </label>
                 <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                   Weight of each item (lb)
                   <input type="number" min="0.1" max="5000" step="0.1" value={weightPerPackage} onChange={(event) => { setWeightPerPackage(event.target.value); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                  <span className={`text-xs font-normal ${weightPerPackageValid ? "text-slate-500" : "text-rose-600"}`}>Uber is checked only when every package is 50 lb or less; Curri handles heavier loads.</span>
+                  <span className={`text-xs font-normal ${weightPerPackageValid ? "text-slate-500" : "text-rose-600"}`}>Uber is checked only when every package is 50 lb or less; Curri and GoShare handle heavier loads.</span>
                 </label>
               </div>
-              {packageQuantityValid && weightPerPackageValid ? <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><strong>{parsedPackageQuantity} × {parsedWeightPerPackage.toLocaleString()} lb</strong> = {totalWeightPounds.toLocaleString()} lb total load. {parsedWeightPerPackage <= 50 && parsedPackageQuantity <= 20 ? "Uber and Curri will both be checked." : "This load will be quoted by Curri."}</div> : null}
+              {packageQuantityValid && weightPerPackageValid ? <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><strong>{parsedPackageQuantity} × {parsedWeightPerPackage.toLocaleString()} lb</strong> = {totalWeightPounds.toLocaleString()} lb total load. {vehicle === "box-truck" ? "This load will be quoted by GoShare." : parsedWeightPerPackage <= 50 && parsedPackageQuantity <= 20 ? "Uber, Curri, and GoShare will be checked." : "Curri and GoShare will be checked."}</div> : null}
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <label className="grid gap-1 text-xs font-semibold text-slate-600">Length (in)<input type="number" min="0.1" max="600" value={lengthInches} onChange={(event) => { setLengthInches(event.target.value); resetLiveQuote() }} className="min-h-10 rounded-xl border border-slate-200 px-2 text-sm font-normal" /></label>
                 <label className="grid gap-1 text-xs font-semibold text-slate-600">Width (in)<input type="number" min="0.1" max="600" value={widthInches} onChange={(event) => { setWidthInches(event.target.value); resetLiveQuote() }} className="min-h-10 rounded-xl border border-slate-200 px-2 text-sm font-normal" /></label>
                 <label className="grid gap-1 text-xs font-semibold text-slate-600">Height (in)<input type="number" min="0.1" max="600" value={heightInches} onChange={(event) => { setHeightInches(event.target.value); resetLiveQuote() }} className="min-h-10 rounded-xl border border-slate-200 px-2 text-sm font-normal" /></label>
               </div>
-              <label className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"><input type="checkbox" checked={loadUnloadRequired} onChange={(event) => { setLoadUnloadRequired(event.target.checked); resetLiveQuote() }} className="mt-0.5 h-4 w-4" /><span><strong>Driver loading and unloading required</strong><br />Curri prices this separately and it is included in the displayed total.</span></label>
+              <label className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700"><input type="checkbox" checked={loadUnloadRequired} onChange={(event) => { setLoadUnloadRequired(event.target.checked); resetLiveQuote() }} className="mt-0.5 h-4 w-4" /><span><strong>Loading and unloading help required</strong><br />Curri prices loading separately; GoShare adds a second Delivery Pro helper.</span></label>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {(Object.entries(DELIVERY_VEHICLES) as [DeliveryVehicle, (typeof DELIVERY_VEHICLES)[DeliveryVehicle]][]).map(([key, option]) => (
                   <button key={key} type="button" onClick={() => { setVehicle(key); resetLiveQuote() }} aria-pressed={vehicle === key} className={`rounded-2xl border p-4 text-left transition active:scale-[0.99] ${vehicle === key ? "border-[#0e2341] bg-[#0e2341] text-white shadow-[0_12px_28px_rgba(14,35,65,0.18)]" : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-300 hover:bg-white"}`}>
@@ -488,10 +490,10 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-500">Curri quotes the selected vehicle. Uber assigns an available courier vehicle and does not guarantee a pickup truck or van.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">Curri and GoShare quote the selected vehicle. Uber assigns an available courier vehicle and does not guarantee a pickup truck or van.</p>
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-950">Courier contacts and schedule</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Both providers need a contact at pickup and drop-off. These details are saved with this Manager delivery request.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Every provider needs a contact at pickup and drop-off. These details are saved with this Manager delivery request.</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Pickup contact<input value={pickupContactName} onChange={(event) => setPickupContactName(event.target.value)} autoComplete="name" placeholder="Person at the store" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
                   <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Pickup phone<input value={pickupPhone} onChange={(event) => setPickupPhone(event.target.value)} type="tel" autoComplete="tel" placeholder="(516) 555-0123" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
@@ -507,11 +509,11 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
               </div>
               <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div><p className="text-sm font-semibold text-slate-950">Compare Uber Direct and Curri</p><p className="mt-1 text-xs text-slate-600">One tap requests live prices. Curri totals include tolls and selected loading fees.</p></div>
+                  <div><p className="text-sm font-semibold text-slate-950">Compare Uber Direct, Curri, and GoShare</p><p className="mt-1 text-xs text-slate-600">One tap requests live prices. GoShare matches the selected commercial vehicle and can add a helper.</p></div>
                   <button type="button" onClick={requestLiveQuote} disabled={liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70">{liveQuoteState === "loading" ? "Checking providers…" : "Compare live prices"}</button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">{quoteRequirements.map((item) => <span key={item.label} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{item.ready ? "✓" : "Needs"} {item.label}</span>)}</div>
-                {providerQuotes.length ? <div role="status" className="mt-3 grid gap-2 sm:grid-cols-2">{providerQuotes.map((quote) => <button key={`${quote.provider}-${quote.quoteId}`} type="button" onClick={() => { setLiveQuote(quote); setScheduleConfirmed(false); setScheduleState("idle") }} className={`rounded-xl border p-3 text-left ${liveQuote?.quoteId === quote.quoteId ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-800"}`}><span className="flex items-center justify-between gap-2"><strong>{quote.provider}</strong><strong>{currency.format(quote.total)}</strong></span><span className="mt-1 block text-xs">{quote.deliveryMethodLabel || "Courier"} · {quote.distanceMiles ? `${quote.distanceMiles} mi` : estimate ? `${estimate.estimatedRoadMiles} mi planned` : "Distance pending"} · {quote.durationMinutes ? `${quote.durationMinutes} min` : "ETA pending"}</span>{quote.provider === "Curri" ? <span className="mt-1 block text-[10px]">Base {currency.format(quote.baseFee || 0)} + tolls {currency.format(quote.tolls || 0)} + extras {currency.format(quote.accessorialFees || 0)}</span> : null}</button>)}</div> : null}
+                {providerQuotes.length ? <div role="status" className="mt-3 grid gap-2 sm:grid-cols-3">{providerQuotes.map((quote) => <button key={`${quote.provider}-${quote.quoteId}`} type="button" onClick={() => { setLiveQuote(quote); setScheduleConfirmed(false); setScheduleState("idle") }} className={`rounded-xl border p-3 text-left ${liveQuote?.quoteId === quote.quoteId ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-800"}`}><span className="flex items-center justify-between gap-2"><strong>{quote.provider}</strong><strong>{currency.format(quote.total)}</strong></span><span className="mt-1 block text-xs">{quote.deliveryMethodLabel || "Courier"} · {quote.distanceMiles ? `${quote.distanceMiles} mi` : estimate ? `${estimate.estimatedRoadMiles} mi planned` : "Distance pending"} · {quote.durationMinutes ? `${quote.durationMinutes} min` : "ETA pending"}</span>{quote.provider === "Curri" ? <span className="mt-1 block text-[10px]">Base {currency.format(quote.baseFee || 0)} + tolls {currency.format(quote.tolls || 0)} + extras {currency.format(quote.accessorialFees || 0)}</span> : null}</button>)}</div> : null}
                 {liveQuote ? <p className="mt-2 text-[10px] text-emerald-700">Selected: {liveQuote.provider} · quote {liveQuote.quoteId.slice(-10)} · received {liveQuoteReceivedAt ? formatSiteTime(liveQuoteReceivedAt, { hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }) : "now"} · expires {formatSiteTime(liveQuote.expiresAt)}</p> : null}
                 {liveQuoteMessage ? <div role="alert" className={`mt-3 rounded-xl border bg-white px-4 py-3 text-sm ${providerQuotes.length ? "border-amber-200 text-amber-800" : "border-rose-200 text-rose-700"}`}>{liveQuoteMessage}</div> : null}
               </div>
@@ -593,7 +595,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
               <div className="mt-5 rounded-[22px] border border-dashed border-white/16 bg-white/5 px-5 py-10 text-center">
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/8 text-amber-300"><PinIcon /></span>
                 <p className="mt-4 text-sm font-semibold">Add addresses for a live price</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">Choose both addresses from search for live Uber and Curri prices.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Choose both addresses from search for live Uber, Curri, and GoShare prices.</p>
               </div>
             )}
 
@@ -602,11 +604,11 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         </div>
 
         <section className="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Provider setup and dispatch options</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct handles urgent small packages. Curri is integrated for construction materials and selected cars, pickups, and cargo vans once its Business API credentials are active.</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Provider setup and dispatch options</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct handles urgent small packages. Curri and GoShare cover construction materials, commercial vehicles, and loading help once their production API credentials are active.</p></div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {DELIVERY_PARTNERS.map((partner) => (
               <article key={partner.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{partner.name}</h3><p className="mt-1 text-xs font-bold text-sky-700">{partner.recommendation}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${partner.name === "Uber Direct" || partner.name === "Curri" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-white text-slate-600 ring-slate-200"}`}>{partner.name === "Uber Direct" ? "Connected · live" : partner.name === "Curri" ? "API ready · credentials required" : "Future option"}</span></div>
+                <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{partner.name}</h3><p className="mt-1 text-xs font-bold text-sky-700">{partner.recommendation}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${partner.name === "Uber Direct" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : partner.name === "Curri" || partner.name === "GoShare" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-white text-slate-600 ring-slate-200"}`}>{partner.name === "Uber Direct" ? "Connected · live" : partner.name === "Curri" || partner.name === "GoShare" ? "Built · credentials required" : "Future option"}</span></div>
                 <p className="mt-3 text-sm font-medium text-slate-800">{partner.bestFor}</p><p className="mt-2 text-xs leading-5 text-slate-500">{partner.vehicles}</p><p className="mt-2 text-xs leading-5 text-slate-500">{partner.integration}</p>
                 <div className="mt-4 flex gap-2"><a href={partner.applyUrl} target="_blank" rel="noreferrer" className="rounded-xl bg-[#10233f] px-3 py-2 text-xs font-bold text-white">Apply / contact</a><a href={partner.docsUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">API details</a></div>
               </article>

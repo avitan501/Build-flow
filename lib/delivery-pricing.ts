@@ -1,4 +1,4 @@
-export type DeliveryVehicle = "small" | "car" | "pickup" | "van"
+export type DeliveryVehicle = "small" | "car" | "pickup" | "van" | "box-truck"
 export type DeliverySpeed = "flexible" | "same-day" | "rush"
 
 export type Coordinate = {
@@ -47,6 +47,13 @@ export const DELIVERY_VEHICLES: Record<
     baseCharge: 44,
     perMile: 2.85,
     minimum: 55,
+  },
+  "box-truck": {
+    label: "Box truck",
+    description: "Heavy, palletized, or high-volume construction material",
+    baseCharge: 85,
+    perMile: 4.25,
+    minimum: 110,
   },
 }
 

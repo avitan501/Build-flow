@@ -40,7 +40,7 @@ const requestSchema = z.object({
   heightInches: z.number().positive().max(600).nullable().optional(),
   loadUnloadRequired: z.boolean().optional(),
   scheduledPickupAt: z.iso.datetime().nullable(),
-  vehicle: z.enum(["small", "car", "pickup", "van"]),
+  vehicle: z.enum(["small", "car", "pickup", "van", "box-truck"]),
   speed: z.enum(["flexible", "same-day", "rush"]),
   estimate: z.object({
     estimatedRoadMiles: z.number().nonnegative().max(1000),
@@ -48,7 +48,7 @@ const requestSchema = z.object({
     serviceFee: z.number().nonnegative().max(10000),
   }),
   providerQuote: z.object({
-    provider: z.enum(["Uber Direct", "Curri"]),
+    provider: z.enum(["Uber Direct", "Curri", "GoShare"]),
     quoteId: z.string().trim().min(3).max(200),
     total: z.number().nonnegative().max(100000),
     currency: z.string().trim().length(3),

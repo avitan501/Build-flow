@@ -26,7 +26,7 @@ test("provider addresses stay structured and consistent between quote and bookin
 })
 
 test("jobsite delivery remains a protected Manager-only internal route", async () => {
-  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, curriQuoteApi, curriScheduleApi, curri, migration] = await Promise.all([
+  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, curriQuoteApi, curriScheduleApi, curri, curriMigration, goShareQuoteApi, goShareScheduleApi, goShareWebhookApi, goShare, goShareMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -43,6 +43,11 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
     readFile(path.join(root, "app/api/delivery/curri/schedule/route.ts"), "utf8"),
     readFile(path.join(root, "lib/curri.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260906125013_add_service_only_curri_credentials_reader.sql"), "utf8"),
+    readFile(path.join(root, "app/api/delivery/goshare/quote/route.ts"), "utf8"),
+    readFile(path.join(root, "app/api/delivery/goshare/schedule/route.ts"), "utf8"),
+    readFile(path.join(root, "app/api/delivery/goshare/webhook/route.ts"), "utf8"),
+    readFile(path.join(root, "lib/goshare.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260907024151_add_goshare_delivery_provider.sql"), "utf8"),
   ])
   expect(header).not.toContain('href: "/delivery"')
   expect(shopNavigation).not.toContain('label: "Jobsite Delivery"')
@@ -57,14 +62,15 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(actions).toContain('jobsiteCoordinates: z.string().trim().max(100)')
   expect(estimator).toContain('url: "/api/delivery/uber/quote"')
   expect(estimator).toContain('url: "/api/delivery/curri/quote"')
+  expect(estimator).toContain('url: "/api/delivery/goshare/quote"')
   expect(estimator).toContain("Saved to the Manager delivery queue.")
   expect(estimator).toContain("LocationAutocomplete")
   expect(estimator).toContain("Open store search in Maps")
   expect(estimator).toContain("Number of items / packages")
   expect(estimator).toContain("Weight of each item (lb)")
-  expect(estimator).toContain("Compare Uber Direct and Curri")
+  expect(estimator).toContain("Compare Uber Direct, Curri, and GoShare")
   expect(estimator).toContain("Compare live prices")
-  expect(estimator).toContain("Driver loading and unloading required")
+  expect(estimator).toContain("Loading and unloading help required")
   expect(estimator).toContain('disabled={liveQuoteState === "loading"}')
   expect(autocomplete).toContain('/api/location/search?q=')
   expect(autocomplete).toContain('aria-autocomplete="list"')
@@ -95,8 +101,21 @@ test("jobsite delivery remains a protected Manager-only internal route", async (
   expect(curri).toContain("https://api.curri.com/graphql")
   expect(curri).toContain("accessorialFees")
   expect(curri).toContain("tollFees")
-  expect(migration).toContain("get_curri_credentials")
-  expect(migration).toContain("enable row level security")
+  expect(curriMigration).toContain("get_curri_credentials")
+  expect(curriMigration).toContain("enable row level security")
+  expect(goShareQuoteApi).toContain("quoteGoShare")
+  expect(goShareQuoteApi).toContain("managerCapabilities")
+  expect(goShareScheduleApi).toContain('confirmed: z.literal(true)')
+  expect(goShareScheduleApi).toContain('provider: "GoShare"')
+  expect(goShareWebhookApi).toContain("get_goshare_webhook_token")
+  expect(goShareWebhookApi).toContain("timingSafeEqual")
+  expect(goShare).toContain('"/v1/projects/estimate"')
+  expect(goShare).toContain('"/v1/projects"')
+  expect(goShare).toContain('vehicle: "helper"')
+  expect(goShare).toContain("totalPrice")
+  expect(goShareMigration).toContain("get_goshare_credentials")
+  expect(goShareMigration).toContain("goshare_webhook_token")
+  expect(goShareMigration).toContain("'GoShare'")
 })
 
 test("legacy public delivery URL forwards into the protected Manager tool", async ({ page }) => {
