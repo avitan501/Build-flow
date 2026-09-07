@@ -32,7 +32,7 @@ test("identifies Avantia Build to search engines", async ({ page }) => {
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://avantiabuild.com")
   const schema = await page.locator('script[type="application/ld+json"]').textContent()
   expect(schema).toContain('"name":"Avantia Build"')
-  expect(schema).toContain('"telephone":"+1-516-908-8319"')
+  expect(schema).toContain('"telephone":"+1-516-990-1990"')
   expect(schema).toContain('"name":"New York"')
 })
 

@@ -33,6 +33,7 @@ import {
   normalizeAuraPhone,
   type AuraCustomerIdentity,
 } from "@/lib/aura/identity";
+import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
@@ -145,7 +146,7 @@ function quoCallHref(phone: string) {
     typeof navigator !== "undefined" &&
     /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
   ) {
-    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`;
+    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent(AVANTIA_QUO_CALLER_ID)}&action=call`;
   }
   return `tel:${phone}`;
 }

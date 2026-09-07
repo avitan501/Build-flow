@@ -169,7 +169,7 @@ export function AuraConnectionSetup({
             <input type="hidden" name="provider" value="quo" />
             <h3 className="font-semibold">Q U O text messages</h3>
             <label className="grid gap-1 text-xs font-semibold">API key<input required type="password" name="apiKey" autoComplete="new-password" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
-            <label className="grid gap-1 text-xs font-semibold">Business phone<input required name="from" inputMode="tel" placeholder="(516) 908-8319" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
+            <label className="grid gap-1 text-xs font-semibold">Business phone<input required name="from" inputMode="tel" placeholder="(516) 990-1990" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
             <button disabled={pending} className="min-h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50">Connect text messages</button>
           </form>
           <form action={submit} className="grid gap-3 rounded-md border border-slate-200 p-4">

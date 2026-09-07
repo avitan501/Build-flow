@@ -65,7 +65,7 @@ const SPANISH_TEXT: Record<string, string> = {
   "We contact you before substituting a product. You can approve the alternative, request another option, or remove the item.": "Nos comunicamos con usted antes de sustituir un producto. Puede aprobar la alternativa, solicitar otra opción o eliminar el artículo.",
   "What if materials arrive damaged?": "¿Qué hago si los materiales llegan dañados?",
   "Photograph the material and delivery ticket immediately, keep the packaging, and contact Avantia as soon as possible so we can review the supplier claim.": "Fotografíe inmediatamente el material y el recibo de entrega, conserve el empaque y contacte a Avantia cuanto antes para revisar el reclamo al proveedor.",
-  "Call (516) 908-8319": "Llame al (516) 908-8319",
+  "Call (516) 990-1990": "Llame al (516) 990-1990",
   "Everything it takes to build": "Todo lo necesario para construir",
   "You build. We handle the materials.": "Usted construye. Nosotros nos encargamos de los materiales.",
   "Plans, pricing, ordering, and jobsite delivery.": "Planos, precios, pedidos y entrega en la obra.",

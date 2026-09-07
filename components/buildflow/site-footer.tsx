@@ -33,8 +33,8 @@ export function SiteFooter() {
                 <a href="mailto:office@build.avantiap.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
                   <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">office@build.avantiap.com</span></span><span aria-hidden="true">↗</span>
                 </a>
-                  <a href="tel:+15169088319" aria-label="Call or text (516) 908-8319" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
-                    <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 908-8319</span>
+                  <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                    <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 990-1990</span>
                   </a>
                   <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-10 w-10 items-center justify-center border border-white/25 text-white transition-colors hover:border-white hover:bg-white hover:text-black">
                     <WhatsAppIcon className="h-5 w-5" />
@@ -77,8 +77,8 @@ export function SiteFooter() {
           <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
             <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@build.avantiap.com</span>
           </a>
-          <a href="tel:+15169088319" aria-label="Call or text (516) 908-8319" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
-            <Phone className="h-4 w-4" aria-hidden="true" /><span className="whitespace-nowrap text-[11px] font-semibold sm:text-sm">(516) 908-8319</span>
+          <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
+            <Phone className="h-4 w-4" aria-hidden="true" /><span className="whitespace-nowrap text-[11px] font-semibold sm:text-sm">(516) 990-1990</span>
           </a>
           <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="group relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#128c7e] text-white transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
             <WhatsAppIcon className="h-5 w-5" />

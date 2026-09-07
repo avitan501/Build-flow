@@ -48,7 +48,7 @@ const searchEngineIdentity = JSON.stringify({
       logo: `${PRODUCTION_SITE_ORIGIN}/images/avantia/avantia-app-icon-512.png`,
       contactPoint: {
         "@type": "ContactPoint",
-        telephone: "+1-516-908-8319",
+        telephone: "+1-516-990-1990",
         contactType: "sales",
         areaServed: {
           "@type": "State",
@@ -96,7 +96,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Avantia Build | Materials Priced & Delivered",
-    description: "Send plans or a material list. WhatsApp: (516) 908-8319.",
+    description: "Send plans or a material list. WhatsApp: (516) 990-1990.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
@@ -105,7 +105,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Avantia Build | Materials Priced & Delivered",
-    description: "Send plans or a material list. WhatsApp: (516) 908-8319.",
+    description: "Send plans or a material list. WhatsApp: (516) 990-1990.",
   },
   other: {
     "impact-site-verification": "08c0dd51-7fec-49c5-b32b-c32ee98fcbcc",

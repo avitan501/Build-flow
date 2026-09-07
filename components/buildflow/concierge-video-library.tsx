@@ -562,8 +562,8 @@ export function ConciergeVideoLibrary() {
             <Link href="/shop" className={styles.primary}>
               Request materials <ArrowRight aria-hidden="true" />
             </Link>
-            <a href="tel:+15169088319" className={styles.secondary}>
-              <Volume2 aria-hidden="true" /> Text (516) 908-8319
+            <a href="tel:+15169901990" className={styles.secondary}>
+              <Volume2 aria-hidden="true" /> Call (516) 990-1990
             </a>
           </div>
           <a href="mailto:office@build.avantiap.com" className={styles.email}>

@@ -6,6 +6,7 @@ import { ArrowUpRight, Check, ChevronDown, MapPin, MessageSquareText, Pause, Pla
 import { useEffect, useRef, useState } from "react"
 
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
+import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
@@ -54,7 +55,7 @@ const reviewReasons = [
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
   const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
   const secondaryHref = secondary.toLowerCase().includes("text")
-    ? "sms:+15169088319?body=Hi%20Avantia%20Build%2C%20I%20want%20to%20send%20a%20material%20list."
+    ? `sms:${AVANTIA_QUO_CALLER_ID}?body=Hi%20Avantia%20Build%2C%20I%20want%20to%20send%20a%20material%20list.`
     : "/request-quote"
 
   return <div className={`relative mt-7 flex flex-col gap-2.5 sm:ml-0 sm:flex-row ${compact ? "w-[60%] min-w-[12.5rem] max-w-[22rem]" : "-ml-2 w-[calc(100vw-1.5rem)] max-w-none sm:w-full sm:max-w-xl"}`}>

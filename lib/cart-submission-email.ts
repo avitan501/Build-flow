@@ -128,9 +128,9 @@ type ProjectRequestNotificationFallback = (payload: Record<string, unknown>) => 
 
 const SITE_URL = "https://avantiabuild.com"
 const COMPANY_EMAIL = "office@build.avantiap.com"
-const COMPANY_PHONE = "(516) 908-8319"
-const COMPANY_PHONE_LINK = "tel:+15169088319"
-const COMPANY_WHATSAPP_URL = "https://wa.me/15169088319"
+const COMPANY_PHONE = "(516) 990-1990"
+const COMPANY_PHONE_LINK = "tel:+15169901990"
+const COMPANY_WHATSAPP_URL = "https://wa.me/15169901990"
 const CUSTOMER_EMAIL_LOGO_URL = `${SITE_URL}/images/avantia/avantia-build-rain-painter-animation.gif`
 const EMAIL_LOGO_URL = `${SITE_URL}/images/avantia/avantia-build-lockup-share.png`
 const DEFAULT_TO = "avitanneto@gmail.com"

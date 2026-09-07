@@ -131,9 +131,9 @@ export function requestPaymentMethodsLabel(methods: RequestPaymentMethod[]) {
 
 export function requestPaymentGuidanceForMethod(method: RequestPaymentMethod, securePaymentUrl?: string) {
   if (method === "credit_card" && securePaymentUrl) return "Pay Avantia Build using the secure hosted payment page below. Do not send card details by email or text."
-  if (method === "ach") return "Pay Avantia Build by ACH. Call or text (516) 908-8319 to coordinate securely; never send routing or account details by email or text."
-  if (method === "check") return "Make the check payable to Avantia Build. Call or text (516) 908-8319 to coordinate delivery or mailing instructions."
-  return "Call or text Avantia Build at (516) 908-8319 to coordinate card payment. Never send a card number or security code by email or text."
+  if (method === "ach") return "Pay Avantia Build by ACH. Call (516) 990-1990 to coordinate securely; never send routing or account details by email or text."
+  if (method === "check") return "Make the check payable to Avantia Build. Call (516) 990-1990 to coordinate delivery or mailing instructions."
+  return "Call Avantia Build at (516) 990-1990 to coordinate card payment. Never send a card number or security code by email or text."
 }
 
 export function requestPaymentGuidance(payment: Pick<RequestClientPaymentRequest, "methods" | "securePaymentUrl">) {

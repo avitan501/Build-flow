@@ -67,7 +67,7 @@ test("acceptance errors explain whether to refresh, correct identity, or contact
   expect(action).toContain("client_document_email_mismatch")
   expect(action).toContain("client_document_terms_hash_mismatch")
   expect(action).toContain("No acceptance was recorded")
-  expect(action).toContain("(516) 908-8319")
+  expect(action).toContain("(516) 990-1990")
 })
 
 test("saved documents persist the same mandatory terms used by acceptance", async () => {

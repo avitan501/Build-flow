@@ -8,8 +8,8 @@ const root = process.cwd()
 
 test("normalizes equivalent email and US phone formats for duplicate detection", () => {
   expect(normalizeOutreachLeadEmail(" Lead@Example.COM ")).toBe("lead@example.com")
-  expect(normalizeOutreachLeadPhone("+1 (516) 908-8319")).toBe("5169088319")
-  expect(normalizeOutreachLeadPhone("516-908-8319")).toBe("5169088319")
+  expect(normalizeOutreachLeadPhone("+1 (516) 990-1990")).toBe("5169901990")
+  expect(normalizeOutreachLeadPhone("516-990-1990")).toBe("5169901990")
 })
 
 test("stores source, follow-up, note, and raw intake in the existing notes field", () => {

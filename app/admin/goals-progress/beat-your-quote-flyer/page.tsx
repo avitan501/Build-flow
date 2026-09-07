@@ -32,7 +32,7 @@ export default async function BeatYourQuoteFlyerPage() {
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-300">Start here</p>
               <p className="mt-3 break-words text-xl font-semibold">avantiabuild.com/beat-a-quote</p>
               <div className="my-5 h-px bg-white/20" />
-              <a href="tel:+15169088319" className="flex items-center gap-2 text-lg font-semibold"><Phone className="h-5 w-5" />(516) 908-8319</a>
+              <a href="tel:+15169901990" className="flex items-center gap-2 text-lg font-semibold"><Phone className="h-5 w-5" />(516) 990-1990</a>
               <p className="mt-2 text-sm text-slate-300">Call or text for help.</p>
             </aside>
           </div>

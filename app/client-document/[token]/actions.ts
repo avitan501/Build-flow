@@ -45,8 +45,8 @@ function acceptanceErrorMessage(error: { code?: string; message?: string } | nul
   if (message.includes("client_document_signer_invalid")) return { status: "error" as const, message: "Enter the signer’s full name and try again." }
   if (message.includes("client_document_not_found")) return { status: "error" as const, message: "This document link is no longer available. Ask Avantia Build for the newest link." }
   if (message.includes("client_document_terms_invalid") || message.includes("client_document_terms_hash_mismatch")) return { status: "error" as const, message: "This document needs to be refreshed by Avantia Build before it can be accepted." }
-  if (error?.code === "PGRST202" || message.includes("accept_request_client_document_public")) return { status: "error" as const, message: "Acceptance is temporarily unavailable. Please contact Avantia Build at (516) 908-8319." }
-  return { status: "error" as const, message: "We could not save your acknowledgement. No acceptance was recorded. Refresh and try again, or contact Avantia Build at (516) 908-8319." }
+  if (error?.code === "PGRST202" || message.includes("accept_request_client_document_public")) return { status: "error" as const, message: "Acceptance is temporarily unavailable. Please contact Avantia Build at (516) 990-1990." }
+  return { status: "error" as const, message: "We could not save your acknowledgement. No acceptance was recorded. Refresh and try again, or contact Avantia Build at (516) 990-1990." }
 }
 
 export async function acceptClientDocumentAction(
@@ -101,6 +101,6 @@ export async function acceptClientDocumentAction(
     }
   } catch (cause) {
     console.error(JSON.stringify({ level: "error", message: "Client document acknowledgement crashed", route: "/client-document/[token]", error: cause instanceof Error ? cause.message : "Unknown error" }))
-    return { status: "error", message: "We could not save your acknowledgement. No acceptance was recorded. Refresh and try again, or contact Avantia Build at (516) 908-8319." }
+    return { status: "error", message: "We could not save your acknowledgement. No acceptance was recorded. Refresh and try again, or contact Avantia Build at (516) 990-1990." }
   }
 }

@@ -15,6 +15,7 @@ import {
 
 import { CustomerRequestLiveRefresh } from "@/components/buildflow/customer-request-live-refresh";
 import { getCustomerPortalRequests } from "@/lib/customer-request-portal";
+import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links";
 
 export const metadata: Metadata = {
   title: "My Account | Avantia Build",
@@ -91,7 +92,7 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
 
         {!openedRequest ? <section className="relative -mt-3 mx-3 grid gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_14px_40px_rgba(15,23,42,0.10)] sm:mx-6 sm:grid-cols-3" aria-label="Account quick actions">
           <Link href="/shop" className="flex min-h-14 items-center gap-3 rounded-xl bg-[#1473e6] px-4 text-sm font-bold text-white transition hover:bg-[#0d65d1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-white/15"><Plus className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Start another request</span><ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-          <a href="sms:+15169088319" className="flex min-h-14 items-center gap-3 rounded-xl px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-teal-50 text-teal-700"><MessageCircle className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Text Avantia</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></a>
+          <a href={`sms:${AVANTIA_QUO_CALLER_ID}`} className="flex min-h-14 items-center gap-3 rounded-xl px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-teal-50 text-teal-700"><MessageCircle className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Text Avantia</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></a>
           <Link href="/account" className="flex min-h-14 items-center gap-3 rounded-xl px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-700"><ShieldCheck className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Manage account</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></Link>
         </section> : null}
 
@@ -137,7 +138,7 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Link href={`/requests/${request.publicNumber}/pdf`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2"><Download className="h-3.5 w-3.5" aria-hidden="true" />Download PDF</Link>
-                    <a href={`sms:+15169088319?body=${encodeURIComponent(`Request #${request.publicNumber}: I need to change `)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-xs font-bold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />Request a change</a>
+                    <a href={`sms:${AVANTIA_QUO_CALLER_ID}?body=${encodeURIComponent(`Request #${request.publicNumber}: I need to change `)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-xs font-bold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />Request a change</a>
                   </div>
                 </header>
                 <details open={expanded} className="group border-t border-slate-100">
@@ -198,7 +199,7 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
             <p className="mt-2 text-sm leading-6 text-slate-600">
               If you just received an invitation, confirm that you signed in
               with the same phone number. Otherwise, contact Avantia at (516)
-              908-8319.
+              990-1990.
             </p>
             <Link href="/shop" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#1473e6] px-5 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><Plus className="h-4 w-4" aria-hidden="true" />Start a material request</Link>
           </section>

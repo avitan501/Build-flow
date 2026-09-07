@@ -8,6 +8,7 @@ import { createPortal } from "react-dom"
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction, sendAuraWelcomePackageAction, sendAuraWhatsAppWelcomeTemplateAction } from "@/app/owner/aura/actions"
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
+import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 
@@ -54,7 +55,7 @@ function templateMessage(template: TemplateKey, name: string, senderName: string
 function callHref(phone: string) {
   if (!phone) return "#"
   if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`
+    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent(AVANTIA_QUO_CALLER_ID)}&action=call`
   }
   return `tel:${phone}`
 }

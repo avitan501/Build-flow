@@ -22,8 +22,8 @@ export function ShopFaq() {
             <h2 id="shop-faq-title" className="mt-1 text-2xl font-bold text-slate-950">Material ordering questions</h2>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">Get a clear answer before pricing, approval, or delivery.</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <a href="tel:+15169088319" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800"><Phone className="h-4 w-4" />Call (516) 908-8319</a>
-              <a href="https://wa.me/15169088319" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#128c7e] px-3 text-sm font-semibold text-white"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+              <a href="tel:+15169901990" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800"><Phone className="h-4 w-4" />Call (516) 990-1990</a>
+              <a href="https://wa.me/15169901990" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#128c7e] px-3 text-sm font-semibold text-white"><MessageCircle className="h-4 w-4" />WhatsApp</a>
               <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800"><Mail className="h-4 w-4" />Email</a>
             </div>
           </div>

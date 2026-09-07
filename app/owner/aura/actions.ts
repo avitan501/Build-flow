@@ -18,6 +18,7 @@ import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 import { addAuraCommunicationLinks } from "@/lib/aura/email-links";
 import { extractAuraProposal } from "@/lib/aura/intake";
 import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
+import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links";
 
 function requireUuid(value: FormDataEntryValue | null) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -926,7 +927,7 @@ export async function prepareQuoAttachmentMessageAction(
   }
   const params = new URLSearchParams({
     number: phone,
-    from: "+15169088319",
+    from: AVANTIA_QUO_CALLER_ID,
     text: message,
     attachments: signed.data.signedUrl,
   });

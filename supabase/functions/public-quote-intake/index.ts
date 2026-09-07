@@ -77,9 +77,9 @@ const maxAttachmentCount = 10
 const temporaryUploadPrefix = "public-intake/"
 const siteUrl = "https://avantiabuild.com"
 const companyEmail = "office@build.avantiap.com"
-const companyPhone = "(516) 908-8319"
-const companyPhoneLink = "tel:+15169088319"
-const companyWhatsAppUrl = "https://wa.me/15169088319"
+const companyPhone = "(516) 990-1990"
+const companyPhoneLink = "tel:+15169901990"
+const companyWhatsAppUrl = "https://wa.me/15169901990"
 const customerEmailLogoUrl = `${siteUrl}/images/avantia/avantia-build-rain-painter-animation.gif`
 const corsHeaders = {
   "access-control-allow-origin": "*",

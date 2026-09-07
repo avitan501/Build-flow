@@ -1,5 +1,6 @@
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity"
 
+// Keep this provider-specific sender separate from Avantia's public phone number.
 export const AVANTIA_QUO_CALLER_ID = "+15169088319"
 
 export type CommunicationThreadIdentity = {

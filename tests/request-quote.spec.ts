@@ -119,7 +119,7 @@ test("quote request is a compact contact and material workflow", async ({
     page.getByTestId("site-header").getByTestId("avantia-build-lockup"),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /Call \(516\) 908-8319/ }),
+    page.locator("main").getByRole("link", { name: /Call \(516\) 990-1990/ }),
   ).toHaveCount(0);
   await expect(page.getByRole("checkbox", { name: "WhatsApp" })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Text" })).not.toBeChecked();

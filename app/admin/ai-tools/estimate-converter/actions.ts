@@ -69,7 +69,7 @@ function convertEstimate(input: {
     details,
     "",
     "Please include lead times, delivery charges, taxes, substitutions, and exclusions in your proposal.",
-    "Avantia Build | (516) 908-8319",
+    "Avantia Build | (516) 990-1990",
   ].filter((line, index, lines) => line || lines[index - 1] !== "").join("\n")
 }
 
