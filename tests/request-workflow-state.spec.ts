@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 
 import { hasPersistedReceiptProof, requestWorkflowState, type RequestWorkflowStateInput } from "@/lib/request-workflow-state"
 
@@ -85,4 +87,14 @@ test("receipt completion requires a matching persisted document and sent event",
   expect(hasPersistedReceiptProof([{ ...currentEvent, document_public_token: "other-token" }], receipt)).toBe(false)
   expect(hasPersistedReceiptProof([{ ...currentEvent, document_version: 2 }], receipt)).toBe(false)
   expect(hasPersistedReceiptProof([{ client_action: "receipt_sent", document_number: "REC-104" }], receipt)).toBe(true)
+})
+
+test("the request page exposes a direct estimate without requiring supplier comparison", async () => {
+  const source = await readFile(
+    path.join(process.cwd(), "components/buildflow/request-management-panel.tsx"),
+    "utf8",
+  )
+
+  expect(source).toContain('onClick={() => openDocument("estimate")}')
+  expect(source).toContain("Direct estimate")
 })

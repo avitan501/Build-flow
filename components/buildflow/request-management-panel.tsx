@@ -958,6 +958,7 @@ export function RequestManagementPanel({
 
           <div className="flex flex-wrap justify-end gap-2">
             {renderStep2PrimaryAction()}
+            {!estimateSent && !workflow.step2Complete ? <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Direct estimate</button> : null}
             {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Plus className="h-4 w-4" />{supplierQuoteCount ? "Add another quote" : "Add supplier quote"}</button> : null}
             <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button>
           </div>
