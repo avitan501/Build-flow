@@ -32,6 +32,8 @@ test("customer directory connects customers, leads, requests, and Aura conversat
   expect(leads).toContain('overflow-x-auto')
   expect(leads).toContain('title="Edit lead"')
   expect(leads).toContain('aria-label={`Remove ${lead.full_name}`}')
+  expect(leads).toContain("grid min-w-0 gap-2 sm:flex")
+  expect(leads).toContain("sm:w-[7.75rem] sm:flex-none")
   expect(conversation).toContain("No calls or messages yet.")
   expect(conversation).toContain("View earlier messages")
   expect(createCustomer).toContain('approval_status: "pending"')

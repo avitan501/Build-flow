@@ -56,6 +56,10 @@ test("Lead review is exception-only while trusted clear screenshots use the auto
 })
 
 test("each lead exposes the explicit editable welcome package action", async () => {
-  const directory = await readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8")
+  const [directory, contactActions] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/contact-actions.tsx"), "utf8"),
+  ])
   expect(directory.match(/showWelcomePackageButton/g)).toHaveLength(2)
+  expect(contactActions).toContain("sr-only sm:not-sr-only")
 })

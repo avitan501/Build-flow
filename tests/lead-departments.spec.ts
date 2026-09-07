@@ -70,13 +70,22 @@ test("lead generation is staff-only, source-backed, and never sends messages", a
   const route = await readFile(path.join(process.cwd(), "app/api/admin/leads/generate/route.ts"), "utf8")
 
   expect(route).toContain('requireStaffProfile("customers")')
-  expect(route).toContain("EXA_API_KEY")
-  expect(route).toContain("api.zippopotam.us")
+  expect(route).toContain("nominatim.openstreetmap.org")
+  expect(route).toContain('placePayload[0]?.type !== "postcode"')
   expect(route).toContain("overpass.kumi.systems")
   expect(route).toContain("overpass-api.de")
   expect(route).toContain("Source: ${lead.sourceUrl}")
   expect(route).toContain('relationship_level: parsed.data.department')
+  expect(route).toContain('domain === "openstreetmap.org" ? `${domain}${url.pathname}` : domain')
   expect(route).not.toContain("send-message")
   expect(route).not.toContain("whatsapp")
   expect(route).not.toContain("sms")
+})
+
+test("manual lead entry defaults safely and rejects an existing email or phone", async () => {
+  const actions = await readFile(path.join(process.cwd(), "app/admin/goals-progress/lead-actions.ts"), "utf8")
+
+  expect(actions).toContain("input.relationshipLevel : 5")
+  expect(actions).toContain("already exists in the Lead Directory")
+  expect(actions).toContain('revalidatePath("/admin/users")')
 })

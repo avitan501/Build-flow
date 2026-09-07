@@ -21,43 +21,18 @@ type ExistingLead = {
   notes: string | null
 }
 
-function existingSourceDomains(leads: ExistingLead[]) {
+function existingSourceIdentities(leads: ExistingLead[]) {
   return leads.flatMap((lead) => {
     const match = lead.notes?.match(/Source:\s+(https:\/\/\S+)/i)
     if (!match) return []
     try {
-      return [new URL(match[1]).hostname.toLowerCase().replace(/^www\./, "")]
+      const url = new URL(match[1])
+      const domain = url.hostname.toLowerCase().replace(/^www\./, "")
+      return [domain === "openstreetmap.org" ? `${domain}${url.pathname}` : domain]
     } catch {
       return []
     }
   })
-}
-
-function discoveryQuery(department: LeadDepartment, zipCode: string) {
-  if (department === 1) return `General contractors, remodeling contractors, and construction companies serving ZIP code ${zipCode}`
-  if (department === 2) return `Commercial building owners, property management companies, and real estate development companies serving ZIP code ${zipCode}`
-  return `Architecture firms, interior designers, and construction design firms serving ZIP code ${zipCode}`
-}
-
-async function searchExa(apiKey: string, department: LeadDepartment, zipCode: string) {
-  const response = await fetch("https://api.exa.ai/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-    signal: AbortSignal.timeout(45_000),
-    body: JSON.stringify({
-      query: `${discoveryQuery(department, zipCode)}. Return official business contact or company pages with a public business phone number or email. Exclude directories, social networks, articles, and private individuals.`,
-      type: "deep-lite",
-      numResults: 100,
-      contents: {
-        text: { maxCharacters: 5000 },
-        highlights: { query: "company name business phone email contact services and service area", maxCharacters: 2400 },
-        maxAgeHours: 0,
-      },
-    }),
-  })
-  if (!response.ok) throw new Error(`exa_${response.status}`)
-  const payload = await response.json() as { results?: LeadDiscoverySource[] }
-  return payload.results ?? []
 }
 
 function overpassFilters(department: LeadDepartment) {
@@ -69,7 +44,7 @@ function overpassFilters(department: LeadDepartment) {
   }
   if (department === 2) {
     return [
-      '["office"~"property_management|estate_agent|real_estate|developer",i]',
+      '["office"~"property_management|developer",i]',
     ]
   }
   return [
@@ -79,23 +54,22 @@ function overpassFilters(department: LeadDepartment) {
 }
 
 async function searchOpenStreetMap(department: LeadDepartment, zipCode: string) {
-  const placeResponse = await fetch(`https://api.zippopotam.us/us/${zipCode}`, {
+  const placeResponse = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zipCode}&country=United%20States&format=jsonv2&limit=1`, {
     headers: { "User-Agent": "AvantiaBuildLeadDirectory/1.0 (https://avantiabuild.com)" },
     signal: AbortSignal.timeout(12_000),
   })
   if (!placeResponse.ok) throw new Error("zip_lookup_failed")
-  const placePayload = await placeResponse.json() as { places?: Array<{ latitude?: string; longitude?: string }> }
-  const latitude = Number(placePayload.places?.[0]?.latitude)
-  const longitude = Number(placePayload.places?.[0]?.longitude)
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) throw new Error("zip_coordinates_missing")
-
-  const bounds = [latitude - 0.145, longitude - 0.19, latitude + 0.145, longitude + 0.19]
-    .map((value) => value.toFixed(5))
-    .join(",")
+  const placePayload = await placeResponse.json() as Array<{ boundingbox?: string[]; type?: string }>
+  const bounds = placePayload[0]?.boundingbox?.map(Number)
+  if (placePayload[0]?.type !== "postcode" || bounds?.length !== 4 || bounds.some((value) => !Number.isFinite(value))) {
+    throw new Error("zip_bounds_missing")
+  }
+  const [south, north, west, east] = bounds
+  const overpassBounds = [south, west, north, east].map((value) => value.toFixed(6)).join(",")
   const clauses = overpassFilters(department)
-    .map((filter) => `nwr(${bounds})${filter};`)
+    .map((filter) => `nwr(${overpassBounds})${filter};`)
     .join("\n")
-  const query = `[out:json][timeout:25];(\n${clauses}\n);out tags 200;`
+  const query = `[out:json][timeout:20];(\n${clauses}\n);out tags center 200;`
   let response: Response | null = null
   for (const endpoint of ["https://overpass.kumi.systems/api/interpreter", "https://overpass-api.de/api/interpreter"]) {
     try {
@@ -106,7 +80,7 @@ async function searchOpenStreetMap(department: LeadDepartment, zipCode: string) 
           "User-Agent": "AvantiaBuildLeadDirectory/1.0 (https://avantiabuild.com)",
         },
         body: new URLSearchParams({ data: query }),
-        signal: AbortSignal.timeout(38_000),
+        signal: AbortSignal.timeout(28_000),
       })
       if (result.ok) {
         response = result
@@ -156,14 +130,12 @@ export async function POST(request: Request) {
       .returns<ExistingLead[]>()
     if (existingError) throw existingError
 
-    const sources = process.env.EXA_API_KEY
-      ? await searchExa(process.env.EXA_API_KEY, parsed.data.department, parsed.data.zipCode)
-      : await searchOpenStreetMap(parsed.data.department, parsed.data.zipCode)
+    const sources = await searchOpenStreetMap(parsed.data.department, parsed.data.zipCode)
     const candidates = selectLeadDiscoveryCandidates({
       sources,
       existingEmails: (existing ?? []).flatMap((lead) => lead.email ? [lead.email] : []),
       existingPhones: (existing ?? []).flatMap((lead) => lead.phone ? [lead.phone] : []),
-      existingDomains: existingSourceDomains(existing ?? []),
+      existingDomains: existingSourceIdentities(existing ?? []),
     })
     if (!candidates.length) {
       return NextResponse.json({ ok: true, added: 0, requested: LEAD_DISCOVERY_LIMIT, partial: true })

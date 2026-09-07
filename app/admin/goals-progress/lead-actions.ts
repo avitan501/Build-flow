@@ -11,6 +11,7 @@ const CLIENT_LANGUAGES = ["en", "es"] as const;
 
 function refreshOutreach() {
   revalidatePath("/admin/goals-progress");
+  revalidatePath("/admin/users");
 }
 
 export async function createOutreachLeadAction(input: {
@@ -28,7 +29,7 @@ export async function createOutreachLeadAction(input: {
   const email = input.email.trim().toLowerCase().slice(0, 320);
   const phone = input.phone.trim().slice(0, 40);
   const notes = input.notes.trim().slice(0, 1000);
-  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 1;
+  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 5;
   const preferredLanguage = CLIENT_LANGUAGES.find((language) => language === input.preferredLanguage) ?? "en";
 
   if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
@@ -37,6 +38,18 @@ export async function createOutreachLeadAction(input: {
   if (phone && (!/^[+()\d\s.-]+$/.test(phone) || phone.replace(/\D/g, "").length < 7)) {
     return { ok: false, error: "Enter a valid phone number." };
   }
+
+  const { data: existingLeads, error: existingError } = await supabase
+    .from("manager_outreach_leads")
+    .select("full_name,email,phone")
+    .limit(5000)
+    .returns<Array<{ full_name: string; email: string | null; phone: string | null }>>();
+  if (existingError) return { ok: false, error: "The lead could not be checked. Please try again." };
+  const phoneDigits = phone.replace(/\D/g, "");
+  const duplicate = (existingLeads ?? []).find((lead) =>
+    Boolean((email && lead.email?.trim().toLowerCase() === email) || (phoneDigits && lead.phone?.replace(/\D/g, "") === phoneDigits)),
+  );
+  if (duplicate) return { ok: false, error: `${duplicate.full_name} already exists in the Lead Directory.` };
 
   const { error } = await supabase.from("manager_outreach_leads").insert({
     full_name: fullName,
@@ -78,7 +91,7 @@ export async function updateOutreachLeadAction(input: {
   const email = input.email.trim().toLowerCase().slice(0, 320);
   const phone = input.phone.trim().slice(0, 40);
   const notes = input.notes.trim().slice(0, 1000);
-  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 1;
+  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 5;
   const preferredLanguage = CLIENT_LANGUAGES.find((language) => language === input.preferredLanguage) ?? "en";
 
   if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
@@ -131,13 +144,13 @@ export async function updateOutreachLeadRelationshipAction(input: { id: string; 
   const { supabase } = await requireStaffProfile("customers");
   const relationshipLevel = Number(input.relationshipLevel);
   if (!Number.isInteger(relationshipLevel) || relationshipLevel < 1 || relationshipLevel > 5) {
-    return { ok: false, error: "Choose a valid lead group." };
+    return { ok: false, error: "Choose a valid lead department." };
   }
   const { error } = await supabase
     .from("manager_outreach_leads")
     .update({ relationship_level: relationshipLevel })
     .eq("id", input.id);
-  if (error) return { ok: false, error: "The lead group could not be updated." };
+  if (error) return { ok: false, error: "The lead department could not be updated." };
 
   refreshOutreach();
   return { ok: true };
