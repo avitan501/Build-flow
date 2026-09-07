@@ -74,6 +74,19 @@ test("Supplier Network confirms the canonical directory before reporting success
   expect(update.indexOf("staff_upsert_supplier_directory_entry")).toBeLessThan(update.indexOf("saveSupplierNetworkOptions"))
 })
 
+test("the supplier directory exposes the new network workspace on desktop and mobile", async () => {
+  const source = await readFile(
+    path.join(root, "components/buildflow/supplier-routing-manager.tsx"),
+    "utf8",
+  )
+
+  expect(source).toContain('aria-label="Supplier workspace views"')
+  expect(source).toContain('href="/admin/supplier-network"')
+  expect(source).toContain("grid-cols-2")
+  expect(source).toContain("sm:grid-cols-4")
+  expect(source).toContain(">New</span>")
+})
+
 test("the upsert migration verifies the final locked row and keeps access controls", async () => {
   const migration = await readFile(
     path.join(root, "supabase/migrations/20260903031011_verify_supplier_directory_persistence.sql"),
