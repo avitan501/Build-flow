@@ -66,7 +66,7 @@ export type AuraCommunicationRow = {
   summary: string | null;
   transcript: string | null;
   next_steps: string[];
-  media: Array<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number }>;
+  media: Array<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number; processingStatus?: "processing" | "ready" | "failed" }>;
   status: string | null;
   duration_seconds: number | null;
   occurred_at: string;

@@ -1,5 +1,5 @@
 export function looksLikeMaterialRequestMessage(channel: string, direction: string | null, rawText: string) {
-  if (channel !== "sms" || direction !== "incoming") return false
+  if (!["sms", "whatsapp"].includes(channel) || direction !== "incoming") return false
   const text = rawText.trim()
   if (text.length < 8) return false
   const normalized = text.toLowerCase().replace(/[.!?]+$/g, "").trim()

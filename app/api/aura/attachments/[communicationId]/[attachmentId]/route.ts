@@ -12,6 +12,7 @@ type StoredAttachment = {
   name?: unknown;
   storagePath?: unknown;
   providerAttachmentId?: unknown;
+  processingStatus?: unknown;
 };
 
 function errorResponse(message: string, status: number) {
@@ -37,7 +38,8 @@ export async function GET(
     approvalStatus: session.profile?.approval_status,
     isActive: session.profile?.is_active,
   });
-  if (!access.suppliers) return errorResponse("Supplier access is required.", 403);
+  if (!access.communications || !access.suppliers)
+    return errorResponse("Communications access is required.", 403);
 
   const { data } = await session.supabase
     .from("aura_communications")
@@ -53,8 +55,12 @@ export async function GET(
   }
   const attachment = media.find((item) => item.providerAttachmentId === attachmentId);
   const storagePath = typeof attachment?.storagePath === "string" ? attachment.storagePath : "";
-  const expectedPrefix = `inbound-email/${communicationId}/${attachmentId}-`;
-  if (!storagePath.startsWith(expectedPrefix) || storagePath.includes("..")) return errorResponse("Attachment not found.", 404);
+  const expectedPrefixes = [
+    `inbound-email/${communicationId}/${attachmentId}-`,
+    `inbound-whatsapp/${communicationId}/${attachmentId}-`,
+  ];
+  if (!expectedPrefixes.some((prefix) => storagePath.startsWith(prefix)) || storagePath.includes(".."))
+    return errorResponse("Attachment not found.", 404);
 
   const { data: file, error } = await session.supabase.storage.from(AURA_EMAIL_ATTACHMENT_BUCKET).download(storagePath);
   if (error || !file) return errorResponse("Attachment is temporarily unavailable.", 503);
