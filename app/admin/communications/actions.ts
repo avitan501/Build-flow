@@ -702,6 +702,7 @@ export async function quickTagPhoneContactAction(input: {
           phone,
           status: "new",
           notes: "Added from Communications",
+          relationship_level: 4,
           created_by: user.id,
         })
         .select("id")

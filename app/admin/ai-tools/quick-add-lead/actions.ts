@@ -66,7 +66,7 @@ export async function quickAddOutreachLeadAction(input: QuickLeadInput): Promise
     email: email || null,
     notes: notes || null,
     status,
-    relationship_level: 1,
+    relationship_level: 5,
     preferred_language: "en",
     created_by: user.id,
   }).select("id").single<{ id: string }>()

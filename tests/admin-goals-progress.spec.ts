@@ -240,6 +240,7 @@ test("outreach leads remain separate from clients and store relationship level a
     languageMigration,
     indexMigration,
     ownerPolicyMigration,
+    leadDiscovery,
   ] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(
@@ -290,6 +291,7 @@ test("outreach leads remain separate from clients and store relationship level a
       ),
       "utf8",
     ),
+    readFile(path.join(root, "lib/lead-discovery.ts"), "utf8"),
   ]);
 
   expect(page).toContain('.from("manager_outreach_leads")');
@@ -297,9 +299,9 @@ test("outreach leads remain separate from clients and store relationship level a
   expect(component).toContain(
     "A lead stays separate from active clients and orders.",
   );
-  expect(component).toContain("Lead group");
-  expect(component).toContain('label: "Friend"');
-  expect(component).toContain('label: "Worked with"');
+  expect(component).toContain("Department");
+  expect(leadDiscovery).toContain('label: "Designers"');
+  expect(leadDiscovery).toContain('label: "Inbound"');
   expect(component).toContain("updateOutreachLeadRelationshipAction");
   expect(component).toContain("Preferred language");
   expect(component).toContain("updateClientLanguageAction");

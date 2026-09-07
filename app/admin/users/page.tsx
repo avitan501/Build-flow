@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import { approvePendingUser, changeUserRole, rejectUser, suspendUser } from "@/app/admin/users/actions"
 import { AddTargetClient } from "@/components/buildflow/add-target-client"
-import { AddOutreachLead, OutreachLeadDirectory, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach"
+import { AddOutreachLead, LeadDepartmentDirectory, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach"
 import { CustomerContactForm } from "@/components/buildflow/customer-contact-form"
 import { ContactActions } from "@/components/buildflow/contact-actions"
 import { ContactConversation, type DirectoryConversationEntry } from "@/components/buildflow/contact-conversation"
@@ -17,6 +17,7 @@ import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 import { formatSiteDate } from "@/lib/site-date-time"
+import type { LeadDepartment } from "@/lib/lead-discovery"
 
 const roleOptions = ["admin", "staff", "client"] as const
 const deletableRequestStatuses = new Set(["draft", "submitted", "in_review", "quoted"])
@@ -92,7 +93,7 @@ function directoryConversation(communications: AuraCommunicationRow[], phoneValu
     }))
 }
 
-export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; status?: string; customer?: string; sort?: string }> }) {
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; status?: string; customer?: string; sort?: string; department?: string }> }) {
   const { supabase, profile, user } = await requireStaffProfile("customers")
   const isOwner = isApprovedManagerIdentity({
     email: user.email || profile?.email,
@@ -105,6 +106,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const search = params.q?.trim().toLowerCase() || ""
   const status = params.status?.trim() || "all"
   const sort = ["newest", "oldest", "alphabetical"].includes(params.sort || "") ? params.sort! : "newest"
+  const activeLeadDepartment = ([1, 2, 3, 4, 5].includes(Number(params.department)) ? Number(params.department) : 1) as LeadDepartment
 
   const [customersResult, leadsResult, requestsResult, projectsResult, auditResult, categoriesResult, communicationResult, auraResult] = await Promise.all([
     supabase
@@ -198,7 +200,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const pageDescription = view === "customers"
     ? "Customers, contact details, requests, and conversations."
     : view === "leads"
-      ? "People to contact before they become active customers."
+      ? "Five focused lead departments in one compact workspace."
       : "Every material and service request submitted by your customers."
 
   return (
@@ -217,6 +219,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         <form className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]" action="/admin/users">
           <input type="hidden" name="view" value={view} />
           {params.customer ? <input type="hidden" name="customer" value={params.customer} /> : null}
+          {view === "leads" ? <input type="hidden" name="department" value={activeLeadDepartment} /> : null}
           <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search</span><input name="q" defaultValue={params.q || ""} placeholder={view === "customers" ? "Search name, email, company, or phone" : view === "leads" ? "Search lead, company, phone, email, or notes" : "Search request number, address, or customer"} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
           {view === "requests" ? <select name="status" defaultValue={status} aria-label="Request status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : view === "leads" ? <select name="status" defaultValue={status} aria-label="Lead status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{leadStatuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : <span />}
           <select name="sort" defaultValue={sort} aria-label="Directory order" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="alphabetical">A–Z</option></select>
@@ -253,7 +256,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             {filteredCustomers.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customers match this search.</p> : null}
           </section>
         ) : view === "leads" ? (
-          <div className="mt-3"><OutreachLeadDirectory leads={filteredLeads} conversations={leadConversations} senderName={senderName} /></div>
+          <div className="mt-3"><LeadDepartmentDirectory leads={filteredLeads} conversations={leadConversations} senderName={senderName} activeDepartment={activeLeadDepartment} /></div>
         ) : (
           <section className="mt-3 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
