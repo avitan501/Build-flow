@@ -39,10 +39,13 @@ export function managerPipelineStage(
 export function managerPipelineStageWithOverride(
   calculated: ManagerPipelineStage,
   override: unknown,
+  allowRegression = false,
 ): ManagerPipelineStage {
   if (!managerPipelineOrder.includes(override as ManagerPipelineStage)) {
     return calculated;
   }
+
+  if (allowRegression) return override as ManagerPipelineStage;
 
   const calculatedIndex = managerPipelineOrder.indexOf(calculated);
   const overrideIndex = managerPipelineOrder.indexOf(override as ManagerPipelineStage);

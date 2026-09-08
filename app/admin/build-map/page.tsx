@@ -220,6 +220,7 @@ export default async function AdminDashboardPage({
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const latestQueueState = new Map<string, ManagerRequestQueueState>();
   const latestStageOverride = new Map<string, ManagerPipelineStage>();
+  const latestStageAllowsRegression = new Map<string, boolean>();
   const latestSubstep = new Map<string, string>();
   for (const event of quickEventsResult.data ?? []) {
     const metadata = event.metadata ?? {};
@@ -245,6 +246,7 @@ export default async function AdminDashboardPage({
     const override = String(metadata.pipeline_stage || "");
     if (pipelineStages.some((item) => item.id === override)) {
       latestStageOverride.set(requestId, override as ManagerPipelineStage);
+      latestStageAllowsRegression.set(requestId, metadata.workflow_reopened === true);
     }
   }
   const queueRank: Record<ManagerRequestQueueState, number> = { rush: 0, queued: 1, normal: 2 };
@@ -252,7 +254,11 @@ export default async function AdminDashboardPage({
     const calculatedStage = managerPipelineStage(request, comparisons, packages);
     return {
       request,
-      stage: managerPipelineStageWithOverride(calculatedStage, latestStageOverride.get(request.id)),
+      stage: managerPipelineStageWithOverride(
+        calculatedStage,
+        latestStageOverride.get(request.id),
+        latestStageAllowsRegression.get(request.id) === true,
+      ),
       queueState: latestQueueState.get(request.id) ?? "normal" as ManagerRequestQueueState,
     };
   }).sort((left, right) => queueRank[left.queueState] - queueRank[right.queueState]);

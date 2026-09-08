@@ -918,20 +918,33 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
   return { ok: true as const }
 }
 
-export async function updateRequestSubstepAction(input: { requestId: string; substep: RequestWorkflowSubstepId }) {
+export async function updateRequestSubstepAction(input: { requestId: string; substep: RequestWorkflowSubstepId; reopen?: boolean }) {
   const requestId = String(input.requestId || "").trim()
   const substep = requestWorkflowSubstep(input.substep)
+  const reopeningNow = input.reopen === true
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !substep) {
     return { ok: false as const, error: "Choose a valid workflow status." }
   }
 
   const { supabase, user } = await requireStaffProfile("customers")
-  const { data: request, error: requestError } = await supabase
-    .from("quote_requests")
-    .select("id,owner_id,project_id,title,status,submitted_at")
-    .eq("id", requestId)
-    .maybeSingle<{ id: string; owner_id: string; project_id: string; title: string; status: (typeof REQUEST_STATUS_ORDER)[number]; submitted_at: string | null }>()
+  const [requestResult, previousWorkflowResult] = await Promise.all([
+    supabase
+      .from("quote_requests")
+      .select("id,owner_id,project_id,title,status,submitted_at")
+      .eq("id", requestId)
+      .maybeSingle<{ id: string; owner_id: string; project_id: string; title: string; status: (typeof REQUEST_STATUS_ORDER)[number]; submitted_at: string | null }>(),
+    supabase
+      .from("project_events")
+      .select("metadata")
+      .contains("metadata", { quote_request_id: requestId, manager_action: "request_substep_status" })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ metadata: Record<string, unknown> }>(),
+  ])
+  const { data: request, error: requestError } = requestResult
   if (requestError || !request) return { ok: false as const, error: "Request not found." }
+  if (previousWorkflowResult.error) return { ok: false as const, error: "The current workflow status could not be checked." }
+  const reopen = reopeningNow || previousWorkflowResult.data?.metadata?.workflow_reopened === true
 
   const currentIndex = REQUEST_STATUS_ORDER.indexOf(request.status)
   const minimumIndex = REQUEST_STATUS_ORDER.indexOf(substep.minimumRequestStatus)
@@ -950,14 +963,17 @@ export async function updateRequestSubstepAction(input: { requestId: string; sub
     owner_id: request.owner_id,
     event_type: "status_changed",
     source: "admin",
-    title: `${request.title}: ${substep.label}`,
-    description: `Step ${substep.step} moved to ${substep.label}. Internal workflow status only; no customer or supplier message was sent.`,
+    title: `${request.title}: ${substep.label}${reopeningNow ? " reopened" : ""}`,
+    description: reopeningNow
+      ? `Reopened at ${substep.label}. Existing quotes, documents, and history were kept; no customer or supplier message was sent.`
+      : `Step ${substep.step} moved to ${substep.label}. Internal workflow status only; no customer or supplier message was sent.`,
     metadata: {
       quote_request_id: request.id,
       manager_action: "request_substep_status",
       request_substep: substep.id,
       workflow_step: substep.step,
       pipeline_stage: substep.pipelineStage,
+      workflow_reopened: reopen,
       previous_status: request.status,
       request_status: nextStatus,
       actor_user_id: user.id,
@@ -977,7 +993,7 @@ export async function updateRequestSubstepAction(input: { requestId: string; sub
     entity_id: request.id,
     page_path: `/owner/materials/requests/${request.id}`,
     page_label: "Material request",
-    metadata: { request_id: request.id, outcome: "completed", label: `Workflow moved to ${substep.label}` },
+    metadata: { request_id: request.id, outcome: "completed", label: reopeningNow ? `Workflow reopened at ${substep.label}` : `Workflow moved to ${substep.label}` },
   })
 
   revalidatePath("/admin/build-map")

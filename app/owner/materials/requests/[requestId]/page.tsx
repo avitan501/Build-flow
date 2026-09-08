@@ -433,10 +433,15 @@ export default async function OwnerMaterialRequestPage({
     comparisons ?? [],
     (packages ?? []).map((pkg) => ({ request_id: request.id, ...pkg })),
   );
-  const pipelineOverride = (clientActionEvents ?? []).find(
+  const pipelineOverrideEvent = (clientActionEvents ?? []).find(
     (event) => ["request_pipeline_stage", "request_substep_status"].includes(String(event.metadata?.manager_action || "")),
-  )?.metadata?.pipeline_stage;
-  const currentStage = managerPipelineStageWithOverride(calculatedStage, pipelineOverride);
+  );
+  const pipelineOverride = pipelineOverrideEvent?.metadata?.pipeline_stage;
+  const currentStage = managerPipelineStageWithOverride(
+    calculatedStage,
+    pipelineOverride,
+    pipelineOverrideEvent?.metadata?.workflow_reopened === true,
+  );
   const comparisonSummaries: RequestComparisonSummary[] = (
     comparisons ?? []
   ).map((comparison) => {
@@ -475,9 +480,10 @@ export default async function OwnerMaterialRequestPage({
       })),
     };
   });
-  const savedSubstep = requestWorkflowSubstep((clientActionEvents ?? []).find(
+  const savedSubstepEvent = (clientActionEvents ?? []).find(
     (event) => event.metadata?.manager_action === "request_substep_status",
-  )?.metadata?.request_substep)?.id;
+  );
+  const savedSubstep = requestWorkflowSubstep(savedSubstepEvent?.metadata?.request_substep)?.id;
   const inferredSubstep: RequestWorkflowSubstepId = initialPaymentDelivery.deliveryScheduled
     ? "delivery"
     : initialPaymentDelivery.paymentReceived
@@ -501,7 +507,11 @@ export default async function OwnerMaterialRequestPage({
                       : "request-received";
   const savedSubstepIndex = REQUEST_WORKFLOW_SUBSTEPS.findIndex((substep) => substep.id === savedSubstep);
   const inferredSubstepIndex = REQUEST_WORKFLOW_SUBSTEPS.findIndex((substep) => substep.id === inferredSubstep);
-  const currentSubstep = REQUEST_WORKFLOW_SUBSTEPS[Math.max(savedSubstepIndex, inferredSubstepIndex)]?.id ?? inferredSubstep;
+  const reopenedSubstepIsCurrent = savedSubstepEvent?.metadata?.workflow_reopened === true
+    && savedSubstepEvent.id === pipelineOverrideEvent?.id;
+  const currentSubstep = reopenedSubstepIsCurrent && savedSubstep
+    ? savedSubstep
+    : REQUEST_WORKFLOW_SUBSTEPS[Math.max(savedSubstepIndex, inferredSubstepIndex)]?.id ?? inferredSubstep;
   const latestClientTargetComparison = (comparisons ?? []).find((comparison) =>
     (comparisonItemsResult.data ?? []).some(
       (item) =>
