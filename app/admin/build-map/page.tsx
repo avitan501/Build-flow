@@ -39,6 +39,10 @@ import {
   type ManagerPipelineStage,
   type ManagerRequestQueueState,
 } from "@/lib/manager-dashboard";
+import {
+  requestWorkflowSubstep,
+  requestWorkflowSubstepLabel,
+} from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time";
 
 const QUO_INBOX_URL =
@@ -50,6 +54,7 @@ type RequestRow = {
   title: string;
   status: string;
   updated_at: string;
+  manager_assignee: string;
 };
 
 type ComparisonRow = {
@@ -88,6 +93,13 @@ const pipelineTone: Record<ManagerPipelineStage, string> = {
   pricing: "border-sky-200 bg-sky-50 text-sky-700",
   approval: "border-violet-200 bg-violet-50 text-violet-700",
   delivery: "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
+
+const compactPipelineLabels: Record<ManagerPipelineStage, string> = {
+  received: "Received",
+  pricing: "Pricing",
+  approval: "Waiting for client",
+  delivery: "Payment / delivery",
 };
 
 const pipelineStages: Array<{
@@ -164,7 +176,7 @@ export default async function AdminDashboardPage({
   ] = await Promise.all([
     supabase
       .from("quote_requests")
-      .select("id,owner_id,title,status,updated_at")
+      .select("id,owner_id,title,status,updated_at,manager_assignee")
       .order("updated_at", { ascending: false })
       .limit(250)
       .returns<RequestRow[]>(),
@@ -183,7 +195,7 @@ export default async function AdminDashboardPage({
     supabase
       .from("project_events")
       .select("metadata,created_at")
-      .contains("metadata", { manager_feature: REQUEST_QUICK_ACTION_FEATURE })
+      .or(`metadata->>manager_feature.eq.${REQUEST_QUICK_ACTION_FEATURE},metadata->>manager_action.eq.request_substep_status`)
       .order("created_at", { ascending: false })
       .limit(1000)
       .returns<RequestQuickEventRow[]>(),
@@ -208,6 +220,7 @@ export default async function AdminDashboardPage({
   const clientMap = new Map(clients.map((client) => [client.id, client]));
   const latestQueueState = new Map<string, ManagerRequestQueueState>();
   const latestStageOverride = new Map<string, ManagerPipelineStage>();
+  const latestSubstep = new Map<string, string>();
   for (const event of quickEventsResult.data ?? []) {
     const metadata = event.metadata ?? {};
     const requestId = String(metadata.quote_request_id || "");
@@ -215,9 +228,23 @@ export default async function AdminDashboardPage({
     if (metadata.manager_action === "request_queue_state" && !latestQueueState.has(requestId)) {
       latestQueueState.set(requestId, normalizeManagerRequestQueueState(metadata.queue_state));
     }
-    if (["request_pipeline_stage", "request_substep_status"].includes(String(metadata.manager_action || "")) && !latestStageOverride.has(requestId)) {
-      const override = String(metadata.pipeline_stage || "");
-      if (pipelineStages.some((item) => item.id === override)) latestStageOverride.set(requestId, override as ManagerPipelineStage);
+  }
+  for (const event of quickEventsResult.data ?? []) {
+    const metadata = event.metadata ?? {};
+    const requestId = String(metadata.quote_request_id || "");
+    if (!requestId || latestSubstep.has(requestId)) continue;
+    const substep = requestWorkflowSubstep(metadata.request_substep);
+    if (!substep) continue;
+    latestSubstep.set(requestId, substep.id);
+  }
+  for (const event of quickEventsResult.data ?? []) {
+    const metadata = event.metadata ?? {};
+    const requestId = String(metadata.quote_request_id || "");
+    if (!requestId || latestStageOverride.has(requestId)) continue;
+    if (!["request_pipeline_stage", "request_substep_status"].includes(String(metadata.manager_action || ""))) continue;
+    const override = String(metadata.pipeline_stage || "");
+    if (pipelineStages.some((item) => item.id === override)) {
+      latestStageOverride.set(requestId, override as ManagerPipelineStage);
     }
   }
   const queueRank: Record<ManagerRequestQueueState, number> = { rush: 0, queued: 1, normal: 2 };
@@ -245,15 +272,19 @@ export default async function AdminDashboardPage({
 
   const quickRows: ManagerRequestQuickRow[] = visibleRequests.map(({ request, stage: requestStage, queueState }) => {
     const client = clientMap.get(request.owner_id);
-    const stageInfo = pipelineStages.find((item) => item.id === requestStage)!;
+    const savedSubstep = requestWorkflowSubstep(latestSubstep.get(request.id));
+    const statusLabel = savedSubstep?.pipelineStage === requestStage
+      ? requestWorkflowSubstepLabel(savedSubstep.id)
+      : compactPipelineLabels[requestStage];
     return {
       id: request.id,
       title: request.title,
       clientLabel: client?.full_name || client?.email || "Client",
       stage: requestStage,
-      stageLabel: stageInfo.label,
+      stageLabel: statusLabel || compactPipelineLabels[requestStage],
       updatedLabel: formatUpdated(request.updated_at),
       queueState,
+      assignee: request.manager_assignee === "david" ? "david" : "carlos",
     };
   });
 

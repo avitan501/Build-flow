@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   RotateCcw,
   Truck,
+  UserRoundCheck,
   X,
 } from "lucide-react"
 import Link from "next/link"
@@ -24,6 +25,10 @@ import {
   applyManagerRequestQuickAction,
   type ManagerRequestQuickAction,
 } from "@/app/admin/build-map/actions"
+import {
+  updateMaterialRequestAssigneeAction,
+  type MaterialRequestAssignee,
+} from "@/app/owner/materials/requests/actions"
 import type {
   ManagerPipelineStage,
   ManagerRequestQueueState,
@@ -37,6 +42,7 @@ export type ManagerRequestQuickRow = {
   stageLabel: string
   updatedLabel: string
   queueState: ManagerRequestQueueState
+  assignee: MaterialRequestAssignee
 }
 
 const stagePresentation = {
@@ -126,6 +132,31 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
     })
   }
 
+  function assign(row: ManagerRequestQuickRow, assignee: MaterialRequestAssignee) {
+    if (pending) return
+    if (row.assignee === assignee) {
+      setOpenMenuId(null)
+      return
+    }
+
+    setFeedback("")
+    setIsError(false)
+    setOpenMenuId(null)
+    startTransition(async () => {
+      const result = await updateMaterialRequestAssigneeAction({
+        requestId: row.id,
+        assignee,
+      })
+      if (!result.ok) {
+        setIsError(true)
+        setFeedback(result.error)
+        return
+      }
+      setFeedback(`Assigned to ${assignee === "david" ? "David" : "Carlos"}`)
+      router.refresh()
+    })
+  }
+
   return (
     <div className="relative">
       <div className="flex min-h-9 items-center justify-between border-b border-slate-100 px-3 py-1.5">
@@ -191,8 +222,15 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
                 ) : row.queueState === "queued" ? (
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-600">Queue</span>
                 ) : null}
+                <span
+                  aria-label={`Status: ${row.stageLabel}`}
+                  title={`Request status: ${row.stageLabel}`}
+                  className={`max-w-32 shrink-0 truncate rounded border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${presentation.tone}`}
+                >
+                  {row.stageLabel}
+                </span>
               </span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">{row.clientLabel} · {row.stageLabel}</span>
+              <span className="mt-0.5 block truncate text-xs text-slate-500">{row.clientLabel}</span>
             </Link>
 
             <span className="ml-2 hidden shrink-0 text-xs text-slate-400 sm:block">{row.updatedLabel}</span>
@@ -210,7 +248,7 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
                 {openMenuId === row.id ? (
-                  <div role="menu" className="absolute bottom-10 right-0 z-30 w-36 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                  <div role="menu" className="absolute bottom-10 right-0 z-30 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
                     {quickActions.map((action) => {
                       const ActionIcon = action.icon
                       return (
@@ -223,6 +261,26 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
                           className={`flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-xs font-semibold hover:bg-slate-100 disabled:opacity-50 ${action.tone || "text-slate-700"}`}
                         >
                           <ActionIcon className="h-3.5 w-3.5" />{action.label}
+                        </button>
+                      )
+                    })}
+                    <div className="my-1 border-t border-slate-100" />
+                    {(["david", "carlos"] as const).map((assignee) => {
+                      const name = assignee === "david" ? "David" : "Carlos"
+                      const selectedAssignee = row.assignee === assignee
+                      return (
+                        <button
+                          key={assignee}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={selectedAssignee}
+                          disabled={pending}
+                          onClick={() => assign(row, assignee)}
+                          className={`flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-xs font-semibold hover:bg-slate-100 disabled:opacity-50 ${selectedAssignee ? "bg-sky-50 text-[#0066cc]" : "text-slate-700"}`}
+                        >
+                          <UserRoundCheck className="h-3.5 w-3.5" />
+                          <span className="min-w-0 flex-1">Assign to {name}</span>
+                          {selectedAssignee ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                         </button>
                       )
                     })}

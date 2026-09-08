@@ -32,6 +32,35 @@ test("request rows use one compact accessible quick-action square on phone and d
   expect(list).not.toContain("Rush Queue Next Archive")
 })
 
+test("each request menu assigns David or Carlos and keeps the workflow status read-only", async () => {
+  const [page, list, requestActions] = await Promise.all([
+    readFile(pagePath, "utf8"),
+    readFile(listPath, "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
+  ])
+
+  expect(page).toContain("manager_assignee")
+  expect(page).toContain("metadata->>manager_action.eq.request_substep_status")
+  expect(page).toContain("requestWorkflowSubstepLabel")
+  expect(list).toContain("Assign to {name}")
+  expect(list).toContain('(["david", "carlos"] as const)')
+  expect(list).toContain("updateMaterialRequestAssigneeAction")
+  expect(list).toContain('role="menuitemradio"')
+  expect(list).toContain("aria-checked={selectedAssignee}")
+  expect(list).toContain('aria-label={`Status: ${row.stageLabel}`}')
+  expect(list).toContain("Request status: ${row.stageLabel}")
+  expect(list).toContain("{row.clientLabel}</span>")
+  expect(list).not.toContain("{row.clientLabel} · {row.stageLabel}")
+
+  const assignmentStart = requestActions.indexOf("export async function updateMaterialRequestAssigneeAction")
+  const assignmentEnd = requestActions.indexOf("export async function updateMaterialRequestTitleAction", assignmentStart)
+  const assignmentAction = requestActions.slice(assignmentStart, assignmentEnd)
+  expect(assignmentAction).toContain('manager_action: "request_assignee"')
+  expect(assignmentAction).toContain("previous_assignee")
+  expect(assignmentAction).toContain("request_assignee: assignee")
+  expect(assignmentAction).not.toMatch(/send(?:Sms|SMS|WhatsApp|Email|Message)\s*\(/)
+})
+
 test("phone swipe reveals the same menu without making request rows taller", async () => {
   const list = await readFile(listPath, "utf8")
 
