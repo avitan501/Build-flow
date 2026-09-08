@@ -11884,11 +11884,35 @@ Deno.serve(async (req: Request) => {
           ? input.requestId
           : "";
       if (!requestId) return json({ error: "Choose a valid material request." }, 400);
-      const requestRows = await sql<{ id: string }[]>`
-        select id from public.quote_requests where id = ${requestId}::uuid limit 1
-      `;
-      if (!requestRows[0]) return json({ error: "Material request not found." }, 404);
-      const communications = await sql<Array<{
+      // Keep manager page reads independent from the broker's single long-lived
+      // SQL connection. Polling and automation work can occupy that connection;
+      // using the service-role Data API here prevents a read-only timeline from
+      // timing out and taking the entire material-request page down with it.
+      const { data: requestRow, error: requestLookupError } = await admin
+        .from("quote_requests")
+        .select("id")
+        .eq("id", requestId)
+        .maybeSingle<{ id: string }>();
+      if (requestLookupError) throw new Error(`request_communication_lookup_failed:${requestLookupError.message}`);
+      if (!requestRow) return json({ error: "Material request not found." }, 404);
+      const { data: requestLinks, error: requestLinksError } = await admin
+        .from("aura_communication_links")
+        .select("communication_id")
+        .eq("entity_type", "material_request")
+        .eq("entity_id", requestId)
+        .limit(500);
+      if (requestLinksError) throw new Error(`request_communication_links_failed:${requestLinksError.message}`);
+      const communicationIds = [...new Set((requestLinks || []).map((link) => link.communication_id))];
+      if (!communicationIds.length) return json({ ok: true, communications: [], links: [] });
+      const [{ data: communications, error: communicationsError }, { data: links, error: linksError }] = await Promise.all([
+        admin
+          .from("aura_communications")
+          .select("id,channel,direction,counterparty_email,counterparty_phone,subject,body,occurred_at,status,media")
+          .in("id", communicationIds)
+          .order("occurred_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(500)
+          .returns<Array<{
         id: string;
         channel: string;
         direction: string;
@@ -11899,35 +11923,21 @@ Deno.serve(async (req: Request) => {
         occurred_at: string;
         status: string | null;
         media: unknown;
-      }>>`
-        select communication.id, communication.channel, communication.direction,
-          communication.counterparty_email, communication.counterparty_phone,
-          communication.subject, communication.body, communication.occurred_at,
-          communication.status, communication.media
-        from public.aura_communications as communication
-        join public.aura_communication_links as request_link
-          on request_link.communication_id = communication.id
-         and request_link.entity_type = 'material_request'
-         and request_link.entity_id = ${requestId}
-        order by communication.occurred_at desc, communication.id desc
-        limit 500
-      `;
-      const links = await sql<Array<{
-        communication_id: string;
-        entity_type: string;
-        entity_id: string;
-      }>>`
-        select link.communication_id, link.entity_type, link.entity_id
-        from public.aura_communication_links as link
-        where link.communication_id in (
-          select request_link.communication_id
-          from public.aura_communication_links as request_link
-          where request_link.entity_type = 'material_request'
-            and request_link.entity_id = ${requestId}
-        )
-          and link.entity_type in ('client', 'supplier')
-      `;
-      return json({ ok: true, communications, links });
+          }>>(),
+        admin
+          .from("aura_communication_links")
+          .select("communication_id,entity_type,entity_id")
+          .in("communication_id", communicationIds)
+          .in("entity_type", ["client", "supplier"])
+          .returns<Array<{
+            communication_id: string;
+            entity_type: string;
+            entity_id: string;
+          }>>(),
+      ]);
+      if (communicationsError) throw new Error(`request_communications_failed:${communicationsError.message}`);
+      if (linksError) throw new Error(`request_communication_entities_failed:${linksError.message}`);
+      return json({ ok: true, communications: communications || [], links: links || [] });
     }
     if (input.action === "load_supplier_communications") {
       const communications = await sql<Array<{

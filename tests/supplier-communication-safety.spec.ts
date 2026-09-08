@@ -33,8 +33,10 @@ test("request supplier activity uses structured links across all communication c
   expect(page).not.toContain('.eq("channel", "email")')
   expect(page).not.toContain("createAdminClient")
   expect(broker).toContain('input.action === "load_request_communications"')
-  expect(broker).toContain("request_link.entity_type = 'material_request'")
-  expect(broker).toContain("link.entity_type in ('client', 'supplier')")
+  expect(broker).toContain('.from("aura_communication_links")')
+  expect(broker).toContain('.eq("entity_type", "material_request")')
+  expect(broker).toContain('.in("entity_type", ["client", "supplier"])')
+  expect(broker).toContain('if (!communicationIds.length) return json({ ok: true, communications: [], links: [] })')
 })
 
 test("supplier updates suppress generic phone pushes and use the website workflow", async () => {
