@@ -7,9 +7,10 @@ type AvantiaBuildLockupProps = {
   showSlogan?: boolean;
   className?: string;
   tone?: "navy" | "light";
+  loading?: "eager" | "lazy";
 };
 
-export function AvantiaBuildLockup({ compact = false, header = false, homepageHeader = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
+export function AvantiaBuildLockup({ compact = false, header = false, homepageHeader = false, showSlogan = false, className = "", loading = "eager" }: AvantiaBuildLockupProps) {
   const widthClass = homepageHeader
     ? "w-[12.5rem] min-[390px]:w-[14rem] sm:w-[15rem] md:w-[10.5rem] lg:w-[12.5rem]"
     : header
@@ -25,7 +26,7 @@ export function AvantiaBuildLockup({ compact = false, header = false, homepageHe
         alt="Avantia Build"
         width={1400}
         height={450}
-        loading="eager"
+        loading={loading}
         unoptimized
         className={`${widthClass} h-auto select-none object-contain [image-rendering:auto]`}
       />

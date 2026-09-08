@@ -24,7 +24,7 @@ export function SiteFooter() {
             <div className="flex flex-col justify-between gap-5 border-b border-white/15 pb-6 sm:flex-row sm:items-end">
               <div>
                 <Link href="/" aria-label="Avantia home" className="inline-flex [&_img]:brightness-0 [&_img]:invert">
-                  <AvantiaBuildLockup header />
+                  <AvantiaBuildLockup header loading="lazy" />
                 </Link>
                 <p className="mt-3 max-w-md text-xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-3xl">You build. We handle the materials.</p>
                 <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Plans · Pricing · Ordering · Delivery</p>
@@ -66,7 +66,7 @@ export function SiteFooter() {
         <div className="grid items-center gap-4 sm:grid-cols-[minmax(15rem,1fr)_auto]">
         <div className="flex min-w-0 items-center gap-4">
           <Link href="/" aria-label="Avantia home" className="inline-flex shrink-0">
-            <AvantiaBuildLockup header />
+            <AvantiaBuildLockup header loading="lazy" />
           </Link>
           <div className="min-w-0 border-l border-slate-200 pl-3 sm:pl-4">
             <p className="text-[11px] font-bold leading-4 text-[#071126] sm:text-sm">You build. We handle the materials.</p>

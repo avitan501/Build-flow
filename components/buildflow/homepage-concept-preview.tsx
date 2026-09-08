@@ -169,17 +169,27 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
 
   useEffect(() => {
     if (!reviewOnly) return
-    const timer = window.setTimeout(() => setHeroDeckReady(true), 700)
-    return () => window.clearTimeout(timer)
+    let timer: number | undefined
+    const loadRemainingHeroPhotos = () => {
+      timer = window.setTimeout(() => setHeroDeckReady(true), 4000)
+    }
+
+    if (document.readyState === "complete") loadRemainingHeroPhotos()
+    else window.addEventListener("load", loadRemainingHeroPhotos, { once: true })
+
+    return () => {
+      window.removeEventListener("load", loadRemainingHeroPhotos)
+      if (timer) window.clearTimeout(timer)
+    }
   }, [reviewOnly])
 
   useEffect(() => {
-    if (!reviewOnly || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    if (!reviewOnly || !heroDeckReady || paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
     const interval = window.setInterval(() => {
       setHeroPhotoIndex((current) => (current + 1) % reviewHeroPhotos.length)
     }, 3600)
     return () => window.clearInterval(interval)
-  }, [paused, reviewOnly])
+  }, [heroDeckReady, paused, reviewOnly])
 
   const togglePlayback = () => {
     if (reviewOnly) {
