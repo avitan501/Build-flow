@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Files,
   LayoutDashboard,
+  Megaphone,
   Menu,
   MessagesSquare,
   PackageOpen,
@@ -86,6 +87,7 @@ function navigationLinks(access: ManagerAccess): ManagerNavigationLink[] {
       { href: "/admin/documents", label: "Documents", shortLabel: "Documents", icon: Files },
     ] : []),
     ...(access.aiTools ? [{ href: "/admin/build-map?section=manager-tools#manager-tools", label: "Manager Tools", shortLabel: "Tools", icon: Wrench, prefetch: true }] : []),
+    ...(access.owner ? [{ href: "/admin/share-ads", label: "Share Ads", shortLabel: "Share Ads", icon: Megaphone, prefetch: true }] : []),
   ];
 }
 
