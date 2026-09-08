@@ -61,7 +61,7 @@ export async function requestOpenClawJob(input: {
     },
     body,
     cache: "no-store",
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(115_000),
   });
   const payload = await response.json().catch(() => null) as OpenClawJobResponse | null;
   if (!payload || payload.provider !== "codex_openclaw") {

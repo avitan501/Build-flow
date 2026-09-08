@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 const port = 29000 + Math.floor(Math.random() * 1000);
@@ -34,6 +35,14 @@ async function waitForHealth() {
   }
   throw new Error("test service did not start");
 }
+
+test("primary route uses native Codex search and only verifies contacts with keyless search", async () => {
+  const source = await readFile("infra/openclaw-lead-jobs/server.mjs", "utf8");
+  assert.match(source, /Use the native Codex web_search tool/);
+  assert.match(source, /searchProvider: "openai_codex_native"/);
+  assert.match(source, /contactVerificationProvider: "duckduckgo"/);
+  assert.doesNotMatch(source, /--deliver/);
+});
 
 test("Hetzner job service enforces signature, replay, allowlist, and OAuth readiness", async (context) => {
   const child = spawn(process.execPath, ["infra/openclaw-lead-jobs/server.mjs"], {
