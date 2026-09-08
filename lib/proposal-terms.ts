@@ -11,6 +11,16 @@ export const REQUIRED_PROPOSAL_TERMS = [
 ]
 
 export const DEFAULT_PROPOSAL_TERMS = [
+  "Confirm items, quantities, and delivery details.",
+  "Prices may change until processed; quotes expire after 30 days.",
+  "All sales are final unless stated otherwise.",
+  "Tax and freight apply only when shown; delivery is curbside unless stated otherwise.",
+  CREDIT_CARD_PROCESSING_TERM,
+  "Approved returns require prior written authorization and may include a restocking fee of up to 25% plus disclosed return costs.",
+  "Before requesting a stop-payment, reversal, or chargeback, contact Avantia. Your legal rights remain unchanged.",
+].join("\n")
+
+const PREVIOUS_COMPACT_DEFAULT_PROPOSAL_TERMS = [
   "Please confirm the items, quantities, and delivery details above are correct.",
   "Prices and availability may change until processed.",
   "All sales are final unless stated otherwise.",
@@ -45,7 +55,7 @@ export function proposalTermsForEditor(terms?: string | null) {
   const savedTerms = String(terms || "").trim()
   if (!savedTerms) return DEFAULT_PROPOSAL_TERMS
   const normalizedSavedTerms = savedTerms.replace(/\s+/g, " ")
-  if (normalizedSavedTerms === LEGACY_DEFAULT_PROPOSAL_TERMS) return DEFAULT_PROPOSAL_TERMS
+  if ([LEGACY_DEFAULT_PROPOSAL_TERMS, PREVIOUS_COMPACT_DEFAULT_PROPOSAL_TERMS].includes(normalizedSavedTerms)) return DEFAULT_PROPOSAL_TERMS
   return includeRequiredProposalTerms(savedTerms)
 }
 

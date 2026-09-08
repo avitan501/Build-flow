@@ -139,7 +139,9 @@ test("shared proposal terms disclose the 25% return fee and preserve statutory d
 })
 
 test("new estimates use one compact client-friendly terms block without appended duplicates", () => {
-  expect(DEFAULT_PROPOSAL_TERMS).toContain("Please confirm the items, quantities, and delivery details above are correct.")
+  expect(DEFAULT_PROPOSAL_TERMS).toContain("Confirm items, quantities, and delivery details.")
+  expect(DEFAULT_PROPOSAL_TERMS).toContain("quotes expire after 30 days")
+  expect(DEFAULT_PROPOSAL_TERMS).toContain("delivery is curbside")
   expect(DEFAULT_PROPOSAL_TERMS).toContain("All sales are final unless stated otherwise.")
   expect(DEFAULT_PROPOSAL_TERMS.length).toBeLessThan(600)
   expect(DEFAULT_PROPOSAL_TERMS.trim().split(/\s+/).length).toBeLessThanOrEqual(80)

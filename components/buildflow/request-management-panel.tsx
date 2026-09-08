@@ -14,6 +14,7 @@ import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildf
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
+import { buildClientLinkMessage, splitClientLinkMessage } from "@/lib/client-link-message"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms, proposalTermsForEditor } from "@/lib/proposal-terms"
@@ -25,6 +26,7 @@ import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { createClient } from "@/lib/supabase/client"
 
@@ -123,7 +125,7 @@ const REPLY_BLOCKS = [
   { id: "question", label: "I have a question", text: "I have a question about your request before we continue." },
   { id: "pricing", label: "Pricing is ready", text: "Your pricing is ready. Please review the attached quote." },
   { id: "missing", label: "Ask for missing details", text: "Please reply with the missing information so we can complete your request." },
-  { id: "payment", label: "Secure payment link", text: `You can pay securely here: ${AVANTIA_PAYMENT_LINK}` },
+  { id: "payment", label: "Secure payment link", text: "Use Avantia Build's secure payment link below." },
   { id: "delivery", label: "Delivery scheduled", text: "Your material delivery is scheduled." },
 ] as const
 
@@ -258,11 +260,12 @@ export function RequestManagementPanel({
   const [paymentInstructions, setPaymentInstructions] = useState<Partial<Record<RequestPaymentMethod, string>>>({})
   const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
+  const [preparedDocumentText, setPreparedDocumentText] = useState<{ message: string; url: string; inputSignature: string; documentType: RequestClientDocumentType; documentNumber: string } | null>(null)
   const [documentAttachments, setDocumentAttachments] = useState<RequestClientDocumentAttachment[]>([])
   const [attachmentUploadPending, setAttachmentUploadPending] = useState(false)
   const [deletedDocumentTokens, setDeletedDocumentTokens] = useState<string[]>([])
   const [deletingDocument, setDeletingDocument] = useState("")
-  const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
+  const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `${PRODUCTION_SITE_ORIGIN}/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
   const [pending, startTransition] = useTransition()
   const pendingRef = useRef(pending)
   const contactDialogRef = useRef<HTMLElement | null>(null)
@@ -298,8 +301,13 @@ export function RequestManagementPanel({
       ]
       return [block.text]
     })
-    return [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
+    const messageText = [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
+    return replyBlock === "payment"
+      ? buildClientLinkMessage({ messageText, url: AVANTIA_PAYMENT_LINK, fallbackMessage: "Use Avantia Build's secure payment link below." })
+      : messageText
   }, [client.name, deliveryAddress, deliveryDate, deliveryWindowEnd, deliveryWindowHoursNumber, deliveryWindowStart, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
+
+  const clientPaymentPreview = useMemo(() => replyBlock === "payment" ? splitClientLinkMessage(clientMessage) : null, [clientMessage, replyBlock])
 
   useEffect(() => {
     function openContact() {
@@ -416,6 +424,7 @@ export function RequestManagementPanel({
     setHostedPaymentUrl(savedPayment?.securePaymentUrl || legacyPaymentLink || AVANTIA_PAYMENT_LINK)
     setDocumentAttachments(saved?.documentData.attachments || [])
     setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice. Reply with any questions." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
+    setPreparedDocumentText(null)
     setContactOpen(false)
     setQuoteOpen(true)
   }
@@ -734,20 +743,39 @@ export function RequestManagementPanel({
     })
   }
 
-  function textQuote() {
+  function prepareDocumentText() {
     setQuoteFeedback("")
     startTransition(async () => {
       const saved = await runDocumentActionWithApprovalWarning(saveRequestClientDocumentAction)
       if (!saved) return
       if (!saved.ok || !saved.shareUrl) return setQuoteFeedback(saved.ok ? "The live link could not be prepared." : saved.error)
-      const message = `${quoteMessage.trim() || `Hello ${firstName}, your Avantia Build ${documentLabel.toLowerCase()} is ready.`}\n\nOpen or download the latest version: ${saved.shareUrl}`
-      const sent = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message, materialRequestId: requestId, materialRequestTitle: requestTitle })
-      if (!sent.ok) return setQuoteFeedback(sent.error)
-      const recorded = await recordRequestClientDocumentSentAction({ requestId, documentType, documentNumber: quoteNumber, channel: "sms" })
-      if (!recorded.ok) return setQuoteFeedback(recorded.error)
+      const message = buildClientLinkMessage({
+        messageText: quoteMessage,
+        url: saved.shareUrl,
+        fallbackMessage: `Hello ${firstName}, your Avantia Build ${documentLabel.toLowerCase()} is ready.`,
+      })
       setDocumentLinks((current) => ({ ...current, [documentType]: saved.shareUrl }))
-      markDocumentSent(documentType)
+      setPreparedDocumentText({ message, url: saved.shareUrl, inputSignature: JSON.stringify(quoteInput()), documentType, documentNumber: quoteNumber })
+      setQuoteFeedback("Review the exact text below. Nothing has been sent yet.")
+    })
+  }
+
+  function sendPreparedDocumentText() {
+    if (!preparedDocumentText) return
+    if (preparedDocumentText.inputSignature !== JSON.stringify(quoteInput())) {
+      setPreparedDocumentText(null)
+      setQuoteFeedback("The document changed after the preview. Prepare a new text preview before sending.")
+      return
+    }
+    setQuoteFeedback("")
+    startTransition(async () => {
+      const sent = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message: preparedDocumentText.message, materialRequestId: requestId, materialRequestTitle: requestTitle })
+      if (!sent.ok) return setQuoteFeedback(sent.error)
+      const recorded = await recordRequestClientDocumentSentAction({ requestId, documentType: preparedDocumentText.documentType, documentNumber: preparedDocumentText.documentNumber, channel: "sms" })
+      if (!recorded.ok) return setQuoteFeedback(recorded.error)
+      markDocumentSent(preparedDocumentText.documentType)
       setQuoteFeedback(`${documentLabel} link sent by text. Future edits will update the same link.`)
+      setPreparedDocumentText(null)
     })
   }
 
@@ -1014,7 +1042,7 @@ export function RequestManagementPanel({
                 <details className="group/document-actions relative">
                   <summary className="inline-flex min-h-10 cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc] hover:border-sky-300 [&::-webkit-details-marker]:hidden">Actions<ChevronDown className="h-3.5 w-3.5 transition group-open/document-actions:rotate-180" /></summary>
                   <div className="absolute right-0 top-[calc(100%+.35rem)] z-30 grid w-44 gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
-                    <a href={`/client-document/${saved.publicToken}?preview=${saved.managerPreviewToken}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-xs font-bold text-[#0066cc] hover:bg-sky-50"><FileText className="h-3.5 w-3.5" />Open</a>
+                    <a href={`${PRODUCTION_SITE_ORIGIN}/client-document/${saved.publicToken}?preview=${saved.managerPreviewToken}`} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-xs font-bold text-[#0066cc] hover:bg-sky-50"><FileText className="h-3.5 w-3.5" />Open</a>
                     <button type="button" onClick={() => openDocument(saved.documentType, saved)} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-left text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" />Edit</button>
                     <button type="button" onClick={() => deleteClientDocument(saved)} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" />{deletingDocument === deletionKey ? "Deleting…" : "Delete"}</button>
                   </div>
@@ -1080,7 +1108,7 @@ export function RequestManagementPanel({
             </div>
 
             <label className="mt-3 grid gap-1 text-xs font-bold text-slate-600">Add a note <span className="font-normal text-slate-400">(optional)</span><textarea value={replyNote} onChange={(event) => setReplyNote(event.target.value)} rows={2} placeholder="Write a short note" className="resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
-            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[#0066cc]">Preview message</summary><div className="whitespace-pre-wrap border-t border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700" aria-label="Reply preview">{clientMessage}</div></details>
+            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[#0066cc]">Preview message — full text</summary><div className="border-t border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700" aria-label="Reply preview">{clientPaymentPreview ? <><p className="whitespace-pre-wrap break-words">{clientPaymentPreview.text}</p><a href={clientPaymentPreview.url} target="_blank" rel="noreferrer" className="mt-3 block break-all font-bold text-[#0066cc] underline underline-offset-4">{clientPaymentPreview.url}</a></> : <p className="whitespace-pre-wrap break-words">{clientMessage}</p>}</div></details>
 
             <div className="mt-5 border-t border-slate-200 pt-4">
               <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#8b6a27]">Contact client</p>
@@ -1152,7 +1180,7 @@ export function RequestManagementPanel({
               {[...new Map([...requestAttachments, ...documentAttachments].map((entry) => [entry.id, entry])).values()].length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {[...new Map([...requestAttachments, ...documentAttachments].map((entry) => [entry.id, entry])).values()].map((entry) => {
                   const selected = documentAttachments.some((candidate) => candidate.id === entry.id)
-                  return <label key={entry.id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${selected ? "border-sky-300 bg-white text-slate-950" : "border-slate-200 bg-slate-100 text-slate-700"}`}><input type="checkbox" checked={selected} onChange={(event) => setDocumentAttachments((current) => event.target.checked ? [...current.filter((candidate) => candidate.id !== entry.id), entry] : current.filter((candidate) => candidate.id !== entry.id))} className="h-4 w-4 accent-[#0071e3]" /><FileText className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{entry.fileName}</span><span className="shrink-0 text-[10px] text-slate-500">{Math.max(1, Math.round(entry.fileSize / 1024))} KB</span></label>
+                  return <label key={entry.id} className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${selected ? "border-sky-300 bg-white text-slate-950" : "border-slate-200 bg-slate-100 text-slate-700"}`}><input type="checkbox" checked={selected} onChange={(event) => setDocumentAttachments((current) => event.target.checked ? [...current.filter((candidate) => candidate.id !== entry.id), entry] : current.filter((candidate) => candidate.id !== entry.id))} className="mt-0.5 h-4 w-4 shrink-0 accent-[#0071e3]" /><FileText className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 break-all leading-5">{entry.fileName}</span><span className="shrink-0 text-[10px] leading-5 text-slate-500">{Math.max(1, Math.round(entry.fileSize / 1024))} KB</span></label>
                 })}
               </div> : <p className="mt-3 text-xs text-slate-500">No request files yet. Add several photos or documents at once.</p>}
               <p className="mt-2 text-[11px] font-medium text-slate-500">PDF, JPG, PNG, WebP, DOCX, or XLSX · up to 10 files · 25 MB total</p>
@@ -1160,8 +1188,8 @@ export function RequestManagementPanel({
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
               <div className="grid gap-3">
-                <label className="grid gap-1 text-xs font-bold">Terms &amp; conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={2} className="min-h-16 resize-y rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal leading-4" /></label>
-                <label className="grid gap-1 text-xs font-bold">Email message<textarea value={quoteMessage} onChange={(event) => setQuoteMessage(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+                <label className="grid gap-1 text-xs font-bold">Terms &amp; conditions <span className="font-normal text-slate-500">Short, complete, and shown in full to the client.</span><textarea value={quoteTerms} onChange={(event) => { setQuoteTerms(event.target.value); setPreparedDocumentText(null) }} rows={7} className="min-h-40 resize-y rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal leading-5" /></label>
+                <label className="grid gap-1 text-xs font-bold">Message sent with the live link <span className="font-normal text-slate-500">The secure URL will appear by itself on the last line.</span><textarea value={quoteMessage} onChange={(event) => { setQuoteMessage(event.target.value); setPreparedDocumentText(null) }} rows={4} className="min-h-28 resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal leading-6" /></label>
                 <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold"><input type="checkbox" checked={requestPayment} onChange={(event) => { setRequestPayment(event.target.checked); if (event.target.checked && !paymentAmountDue) setPaymentAmountDue(quoteTotal.toFixed(2)) }} className="h-4 w-4 accent-[#0071e3]" />{documentType === "receipt" ? "Include payment details" : "Request payment from client"}</label>
                 {requestPayment ? <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 sm:p-4">
                   <p className="text-xs font-bold leading-5 text-slate-700">These options tell the client how to pay Avantia Build. Never enter a full card number, CVV/security code, routing number, or bank account number here.</p>
@@ -1197,9 +1225,10 @@ export function RequestManagementPanel({
                 <div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div>
               </aside>
             </div>
-            {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
+            {preparedDocumentText ? <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4" aria-label="Exact text message preview"><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#0066cc]">Exact SMS preview · nothing sent yet</p><p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{splitClientLinkMessage(preparedDocumentText.message).text}</p><a href={splitClientLinkMessage(preparedDocumentText.message).url} target="_blank" rel="noreferrer" className="mt-3 block break-all text-sm font-bold text-[#0066cc] underline underline-offset-4">{splitClientLinkMessage(preparedDocumentText.message).url}</a><button type="button" onClick={sendPreparedDocumentText} disabled={pending || !client.phone} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-45"><MessageSquareText className="h-4 w-4" />{pending ? "Sending…" : "Send this exact text"}</button></section> : null}
+            {quoteFeedback ? <p className="mt-3 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold leading-6" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto break-all text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={prepareDocumentText} disabled={pending || !client.phone || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><MessageSquareText className="h-4 w-4" />Text live link preview</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>

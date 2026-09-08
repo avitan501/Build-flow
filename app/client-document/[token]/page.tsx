@@ -1,5 +1,6 @@
 import Image from "next/image"
-import { notFound } from "next/navigation"
+import { headers } from "next/headers"
+import { notFound, permanentRedirect } from "next/navigation"
 import { connection } from "next/server"
 
 import {
@@ -10,6 +11,7 @@ import {
 import { parseRequestClientDocument, type StoredRequestClientDocumentWithAcceptance } from "@/lib/request-client-document-data"
 import { requestClientPaymentDocumentCopy } from "@/lib/request-client-payment"
 import { formatSiteDateTime } from "@/lib/site-date-time"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import { createClient } from "@/lib/supabase/server"
 
 import { ClientDocumentAcceptance, type ClientDocumentAcceptanceReceipt } from "./client-document-acceptance"
@@ -25,6 +27,11 @@ export default async function ClientDocumentPage({ params, searchParams }: { par
   const query = await searchParams
   const managerPreviewToken = typeof query.preview === "string" ? query.preview.trim().slice(0, 36) : null
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound()
+  const requestHeaders = await headers()
+  const requestHost = (requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "").split(",")[0].trim().toLowerCase().split(":")[0]
+  if (requestHost === "build.avantiap.com" || requestHost === "www.build.avantiap.com") {
+    permanentRedirect(`${PRODUCTION_SITE_ORIGIN}/client-document/${token}${managerPreviewToken ? `?preview=${encodeURIComponent(managerPreviewToken)}` : ""}`)
+  }
   const supabase = await createClient()
   const { data: row } = await supabase.rpc("get_request_client_document", { p_public_token: token }).maybeSingle<StoredRequestClientDocumentWithAcceptance>()
   if (!row) notFound()
@@ -83,9 +90,9 @@ export default async function ClientDocumentPage({ params, searchParams }: { par
       </section>
       {document.attachments?.length ? <section className="border-t border-slate-200 px-5 py-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Attached photos &amp; documents</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">{document.attachments.map((attachment) => <a key={attachment.id} href={`/client-document/${token}/attachments/${attachment.id}?v=${row.version}`} className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-[#0066cc]"><span aria-hidden="true">↧</span><span className="min-w-0 flex-1 truncate">{attachment.fileName}</span><span className="shrink-0 text-xs font-medium text-slate-500">{Math.max(1, Math.round(attachment.fileSize / 1024))} KB</span></a>)}</div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">{document.attachments.map((attachment) => <a key={attachment.id} href={`${PRODUCTION_SITE_ORIGIN}/client-document/${token}/attachments/${attachment.id}?v=${row.version}`} className="flex min-h-12 items-start gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-[#0066cc]"><span aria-hidden="true">↧</span><span className="min-w-0 flex-1 break-all leading-5">{attachment.fileName}</span><span className="shrink-0 text-xs font-medium leading-5 text-slate-500">{Math.max(1, Math.round(attachment.fileSize / 1024))} KB</span></a>)}</div>
       </section> : null}
-      <section className="border-t border-slate-200 px-5 py-3 sm:px-8"><p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-500">Terms &amp; conditions</p><p className="mt-1 whitespace-pre-wrap text-[11px] leading-4 text-slate-600">{termsText}</p></section>
+      <section className="border-t border-slate-200 px-5 py-3 sm:px-8"><p className="text-[9px] font-black uppercase tracking-[.12em] text-slate-500">Terms &amp; conditions</p><p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-5 text-slate-600">{termsText}</p></section>
       {document.paymentRequest && paymentCopy ? <section className="border-t border-sky-200 bg-sky-50/70 px-5 py-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">{paymentCopy.heading}</p>
         <p className="mt-3 text-sm"><span className="text-slate-500">{paymentCopy.amountLabel}</span><strong className="mt-0.5 block text-lg tabular-nums">{money.format(document.paymentRequest.amountDue)}</strong></p>
@@ -102,7 +109,7 @@ export default async function ClientDocumentPage({ params, searchParams }: { par
       </section> : null}
       {row.document_type !== "receipt" ? <ClientDocumentAcceptance token={token} documentVersion={row.version} documentLabel={label} initialReceipt={receipt} /> : null}
       <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-8">
-        <a href={`/client-document/${token}/download`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-bold">Download PDF</a>
+        <a href={`${PRODUCTION_SITE_ORIGIN}/client-document/${token}/download`} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 text-sm font-bold">Download PDF</a>
       </footer>
     </article>
   </main>

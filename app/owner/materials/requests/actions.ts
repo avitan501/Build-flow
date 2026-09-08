@@ -17,6 +17,7 @@ import { requestWorkflowSubstep, type RequestWorkflowSubstepId } from "@/lib/req
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
+import { buildClientLinkMessage } from "@/lib/client-link-message"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
@@ -1089,7 +1090,11 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
   const saved = await savePreparedRequestClientDocument(prepared, input.confirmAcceptedChange === true)
   if (!saved.ok) return saved
   const baseMessage = String(input.message || `Please review the Avantia Build ${label.toLowerCase()}.`).trim().slice(0, 4600)
-  const message = `${baseMessage}\n\nOpen or download the latest version: ${saved.shareUrl}`
+  const message = buildClientLinkMessage({
+    messageText: baseMessage,
+    url: saved.shareUrl,
+    fallbackMessage: `Please review the Avantia Build ${label.toLowerCase()}.`,
+  })
   const emailInput = {
     requestId: prepared.request.id,
     requestTitle: `${label} ${prepared.quoteNumber}: ${prepared.request.title}`,

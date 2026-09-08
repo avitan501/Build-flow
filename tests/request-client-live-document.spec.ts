@@ -23,7 +23,7 @@ test("Step 3 keeps estimate, invoice, receipt, payment, and delivery together", 
 test("workflow CTAs stay singular and mobile sheets clear the safe area", async () => {
   const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
   expect(panel).toContain("if (workflow.step2Complete)")
-  expect(panel).toContain('!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote"')
+  expect(panel.match(/\{renderStep2PrimaryAction\(\)\}/g)).toHaveLength(1)
   expect(panel).toContain('!workflow.step2Complete && quoteEntryOpen')
   expect(panel).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]")
   expect(panel).toContain("pb-[max(0.75rem,env(safe-area-inset-bottom))]")

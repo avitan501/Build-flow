@@ -17,6 +17,7 @@ import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identi
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
 import { normalizeCommunicationCallPhone, normalizeCommunicationThread } from "@/lib/aura/phone-links"
 import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
+import { buildClientLinkMessage } from "@/lib/client-link-message"
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { formatSiteDate, formatSiteDateTime, formatSiteTime, siteBusinessDateKey } from "@/lib/site-date-time"
@@ -77,7 +78,11 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<AuraWhatsAppUtilityTemplateName, {
       { label: "Quote number", placeholder: "Q-1042" },
       { label: "Secure quote URL", placeholder: "https://avantiabuild.com/client-document/..." },
     ],
-    render: ([name, quote, url]) => `Hi ${name}, your Avantia Build quote ${quote} is ready. Review the details here: ${url}. Reply here if you have any questions.`,
+    render: ([name, quote, url]) => url?.trim() ? buildClientLinkMessage({
+      messageText: `Hi ${name}, your Avantia Build quote ${quote} is ready. Reply here if you have any questions.`,
+      url,
+      fallbackMessage: "Your Avantia Build quote is ready.",
+    }) : `Hi ${name || "there"}, your Avantia Build quote ${quote || ""} is ready.\n\nAdd the secure quote link.`,
   },
   order_received: {
     label: "Order received",
