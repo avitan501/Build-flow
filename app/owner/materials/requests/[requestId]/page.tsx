@@ -51,6 +51,7 @@ type RequestDetails = {
 };
 type Attachment = {
   id: string;
+  item_id: string | null;
   material_response_id: string | null;
   file_name: string;
   file_path: string;
@@ -163,7 +164,7 @@ export default async function OwnerMaterialRequestPage({
       .returns<MaterialQuestionnaireResponse[]>(),
     supabase
       .from("quote_request_attachments")
-      .select("id,material_response_id,file_name,file_path,file_type,file_size,source_party")
+      .select("id,item_id,material_response_id,file_name,file_path,file_type,file_size,source_party")
       .eq("request_id", requestId)
       .returns<Attachment[]>(),
     supabase
@@ -680,7 +681,7 @@ export default async function OwnerMaterialRequestPage({
           currentSubstep={currentSubstep}
           supplierComparisons={primarySupplierComparison ? [primarySupplierComparison] : []}
           suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-          attachments={clientRequestFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
+          attachments={clientRequestFiles.map((file) => ({ id: file.id, item_id: file.item_id, file_name: file.file_name, file_type: file.file_type, url: file.url }))}
         />
         {(responses ?? []).length ? (
           <details

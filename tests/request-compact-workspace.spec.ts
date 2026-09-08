@@ -61,21 +61,21 @@ test("step one keeps add, documents, and AI organization in one small tools menu
   expect(worktable).toContain("h-9 cursor-pointer")
   expect(toolsMenu).toContain("OriginalRequestItemEditor")
   expect(toolsMenu).toContain('mode="add"')
-  expect(toolsMenu).toContain("Documents")
+  expect(toolsMenu).toContain("Client request files")
   expect(toolsMenu).toContain("RequestAttachmentUploader")
   expect(toolsMenu).toContain("OrganizeMaterialListButton")
   expect(worktable).not.toContain("Quantity, item details, and only the information still missing.")
 })
 
-test("material details are available as compact hover/focus information instead of permanent text", async () => {
+test("material details stay compact and expand only for the selected item", async () => {
   const worktable = await readFile(worktablePath, "utf8")
 
-  expect(worktable).toContain("Info")
-  expect(worktable).toContain("title={itemDetails(item)}")
-  expect(worktable).toContain("Item details: ${itemDetails(item)}")
-  expect(worktable).toContain("h-7 w-7")
-  expect(worktable).toContain("cursor-help")
-  expect(worktable).not.toMatch(/itemDetails\(item\)\s*\?\s*<p[^>]*className="[^"]*line-clamp-2/)
+  expect(worktable).toContain("expandedItemIds")
+  expect(worktable).toContain("toggleExpandedItem")
+  expect(worktable).toContain('aria-label={`${expanded ? "Collapse" : "Open"} ${item.name}`}')
+  expect(worktable).toContain("requestItemFieldSummary(item.metadata).slice(0, 4)")
+  expect(worktable).toContain("Add size, brand, color, shipping, or another field.")
+  expect(worktable).toContain("OriginalRequestItemEditor")
 })
 
 test("activity history is one collapsed line and opens the complete accessible log dialog", async () => {
