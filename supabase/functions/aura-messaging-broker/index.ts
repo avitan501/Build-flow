@@ -12615,6 +12615,7 @@ Deno.serve(async (req: Request) => {
         voice: voice.ready,
         voiceRecording: voice.recording,
         voicePhone: voice.ready ? TWO_CHAT_BUSINESS_PHONE : null,
+        emailReceive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET")),
         email: Boolean(Deno.env.get("RESEND_API_KEY")),
       });
     }

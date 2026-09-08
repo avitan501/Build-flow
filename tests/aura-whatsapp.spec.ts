@@ -50,12 +50,17 @@ test("Aura normalizes legacy JSON strings before rendering communications", asyn
 });
 
 test("Aura reads nested broker connection readiness returned by the edge function", async () => {
-  const dashboard = await readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8");
+  const [dashboard, broker] = await Promise.all([
+    readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ]);
 
   expect(dashboard).toContain("status?.connections");
   expect(dashboard).toContain("connections?.email?.receive");
   expect(dashboard).toContain("connections?.email?.send");
+  expect(dashboard).toContain("connections?.email?.receive ?? status?.emailReceive");
   expect(dashboard).toContain("brokerConnections.email.receive");
+  expect(broker).toContain('emailReceive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
 });
 
 test("Aura webhook rejects unverified requests", async ({ request }) => {

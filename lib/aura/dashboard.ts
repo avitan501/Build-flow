@@ -126,6 +126,7 @@ type AuraBrokerStatus = {
   voiceRecording?: boolean;
   voicePhone?: string | null;
   email?: boolean;
+  emailReceive?: boolean;
 };
 
 function normalizeBrokerConnections(status: AuraBrokerStatus | null) {
@@ -147,7 +148,7 @@ function normalizeBrokerConnections(status: AuraBrokerStatus | null) {
       provider: connections?.whatsapp?.provider ?? status?.whatsappProvider ?? null,
     },
     email: {
-      receive: Boolean(connections?.email?.receive),
+      receive: Boolean(connections?.email?.receive ?? status?.emailReceive),
       send: Boolean(connections?.email?.send ?? status?.email),
     },
   };
