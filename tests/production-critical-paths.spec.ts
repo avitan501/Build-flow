@@ -95,6 +95,7 @@ test.describe("production critical paths", () => {
     ).toBeVisible();
 
     const attachments = page.getByLabel("Attach plans or material lists");
+    await page.waitForLoadState("networkidle");
     await attachments.setInputFiles([
       {
         name: "avantia-e2e-photo.jpg",

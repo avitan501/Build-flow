@@ -18,6 +18,15 @@ const maxAttachmentCount = 10;
 const inputClass =
   "h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#0071e3] focus:ring-2 focus:ring-sky-100";
 
+function attachmentValidationError(files: File[]) {
+  if (files.length > maxAttachmentCount)
+    return `Choose up to ${maxAttachmentCount} files at a time.`;
+  const oversized = files.find((file) => file.size > maxAttachmentSize);
+  return oversized
+    ? `${oversized.name} is too large. Each file must be 25 MB or smaller.`
+    : "";
+}
+
 function SubmitButton({
   pending,
   beatQuote,
@@ -72,20 +81,19 @@ export function QuoteRequestForm({
     });
   }, [beatQuote, selectedFiles.length, state.status]);
 
+  useEffect(() => {
+    // A slow mobile device can expose the server-rendered file picker before
+    // React hydrates. Preserve files chosen during that short window.
+    const files = Array.from(attachmentRef.current?.files ?? []);
+    if (!files.length) return;
+    setSelectedFiles(files);
+    setFileError(attachmentValidationError(files));
+  }, []);
+
   function validateAttachments(files: File[]) {
-    if (files.length > maxAttachmentCount) {
-      setFileError(`Choose up to ${maxAttachmentCount} files at a time.`);
-      return false;
-    }
-    const oversized = files.find((file) => file.size > maxAttachmentSize);
-    if (oversized) {
-      setFileError(
-        `${oversized.name} is too large. Each file must be 25 MB or smaller.`,
-      );
-      return false;
-    }
-    setFileError("");
-    return true;
+    const error = attachmentValidationError(files);
+    setFileError(error);
+    return !error;
   }
 
   async function uploadLargeAttachment(file: File) {
