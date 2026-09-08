@@ -579,11 +579,24 @@ export default async function OwnerMaterialRequestPage({
     communications?: RelatedEmailItem[];
     links?: Array<{ communication_id: string; entity_type: "client" | "supplier"; entity_id: string }>;
   }>("aura-messaging-broker", { body: { action: "load_request_communications", requestId: request.id } });
-  if (requestCommunicationError || !requestCommunicationData?.ok) {
-    throw new Error(`Could not load request communications: ${requestCommunicationData?.error || requestCommunicationError?.message || "service unavailable"}`);
+  const requestCommunicationsAvailable = !requestCommunicationError && requestCommunicationData?.ok === true;
+  if (!requestCommunicationsAvailable) {
+    console.error(JSON.stringify({
+      level: "error",
+      message: "Could not load request communications",
+      requestId,
+      reason: requestCommunicationData?.error || requestCommunicationError?.message || "service unavailable",
+    }));
   }
-  const linkedCommunications = requestCommunicationData.communications ?? [];
-  const relatedEntityLinks = requestCommunicationData.links ?? [];
+  // Communication history is useful context, but it is not required to work on
+  // the material request. Keep the request, items, files, pricing, and activity
+  // available when Aura is temporarily unavailable or rejects the invocation.
+  const linkedCommunications = requestCommunicationsAvailable
+    ? requestCommunicationData.communications ?? []
+    : [];
+  const relatedEntityLinks = requestCommunicationsAvailable
+    ? requestCommunicationData.links ?? []
+    : [];
   const structuredSupplierCommunicationIds = new Set(
     (relatedEntityLinks ?? [])
       .filter((link) => link.entity_type === "supplier")
