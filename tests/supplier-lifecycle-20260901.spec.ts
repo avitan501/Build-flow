@@ -22,8 +22,10 @@ test("supplier relationship workflow keeps only current focus in the middle stag
   expect(workspace).toContain('label: "Building Relationship"')
   expect(workspace).toContain("Approved suppliers · ready when needed")
   expect(workspace).toContain("Generate 10")
-  expect(discovery).toContain('action: "price_research"')
-  expect(discovery).toContain('requireStaffProfile("suppliers")')
+  expect(discovery).toContain('job: "find_suppliers"')
+  expect(discovery).toContain("requestOpenClawJob")
+  expect(discovery).toContain("if (!auth.isOwner)")
+  expect(discovery).toContain('provider: "codex_openclaw"')
 })
 
 test("supplier profile exposes compact relationship controls", async () => {
