@@ -298,6 +298,12 @@ function pendingAttachmentLabel(attachment: { processingStatus?: "processing" | 
   return attachment.processingStatus === "failed" ? "Attachment unavailable — ask the customer to resend" : "Attachment processing…"
 }
 
+function isImageAttachment(attachment: { url?: string | null; type?: string | null; name?: string | null }) {
+  if (attachment.type?.toLowerCase().startsWith("image/")) return true
+  const candidate = `${attachment.name || ""} ${attachment.url || ""}`.toLowerCase()
+  return /\.(?:avif|gif|jpe?g|png|webp)(?:[?#]|\s|$)/.test(candidate)
+}
+
 function initialConversationKey(communication: AuraCommunicationRow | undefined, contacts: AuraContactRow[]) {
   if (!communication) return "__new__"
   const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email)
@@ -321,6 +327,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const updatesCursorRef = useRef(initialCursor)
   const syncCountRef = useRef(0)
   const [liveCommunications, setLiveCommunications] = useState(communications)
+  const [imagePreview, setImagePreview] = useState<{ url: string; label: string } | null>(null)
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
@@ -1308,6 +1315,15 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
+  useEffect(() => {
+    if (!imagePreview) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImagePreview(null)
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => window.removeEventListener("keydown", closeOnEscape)
+  }, [imagePreview])
+
   return (
     <section className="h-full min-h-0 w-full max-w-full touch-pan-y overscroll-none overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="Unified communications inbox">
       <div className="grid h-full min-h-0 min-w-0 md:grid-cols-[20rem_minmax(0,1fr)]">
@@ -1701,6 +1717,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                               attachment.url ? (
                                 attachment.type?.startsWith("audio/") ? (
                                   <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} />
+                                ) : isImageAttachment(attachment) ? (
+                                  <button
+                                    key={`${attachment.url}-${index}`}
+                                    type="button"
+                                    onClick={() => setImagePreview({ url: attachment.url!, label: attachmentLabel(attachment, index) })}
+                                    className="group relative h-24 w-24 overflow-hidden rounded-lg border border-slate-300 bg-slate-100 text-left shadow-sm sm:h-28 sm:w-28"
+                                    aria-label={`Open image ${attachmentLabel(attachment, index)}`}
+                                  >
+                                    {/* Provider media uses short-lived signed URLs, so it must bypass the Next image proxy. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={attachment.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition group-hover:scale-[1.02]" />
+                                    <span className="absolute inset-x-0 bottom-0 truncate bg-slate-950/75 px-2 py-1 text-[9px] font-bold text-white">{attachmentLabel(attachment, index)}</span>
+                                  </button>
                                 ) : (
                                   <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold">
                                     <Paperclip className="h-3 w-3 shrink-0" />
@@ -1963,6 +1992,24 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
           </footer>
         </div>
       </div>
+      {imagePreview ? (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/90 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="communication-image-preview-title" onMouseDown={(event) => { if (event.currentTarget === event.target) setImagePreview(null) }}>
+          <section className="flex max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-slate-950 shadow-2xl">
+            <header className="flex min-h-12 items-center gap-3 border-b border-white/15 px-3 text-white sm:px-4">
+              <h2 id="communication-image-preview-title" className="min-w-0 flex-1 truncate text-sm font-bold">{imagePreview.label}</h2>
+              <a href={imagePreview.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-md border border-white/25 px-3 text-xs font-bold">Open original</a>
+              <button type="button" onClick={() => setImagePreview(null)} className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-950" aria-label="Close image preview">
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-2 sm:p-4">
+              {/* Provider media uses short-lived signed URLs, so it must bypass the Next image proxy. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePreview.url} alt={imagePreview.label} className="max-h-[calc(94dvh-4.5rem)] max-w-full object-contain" />
+            </div>
+          </section>
+        </div>
+      ) : null}
       {requestReview ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="sms-request-review-title">
           <button type="button" className="absolute inset-0 cursor-default" onClick={() => !pending && setRequestReview(null)} aria-label="Close request review" />
