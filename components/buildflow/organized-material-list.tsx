@@ -6,6 +6,7 @@ import { useState } from "react"
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { requestItemFieldSummary } from "@/lib/request-item-fields"
 
 const STATUS_STYLE = {
   ready: { label: "Ready", badge: "bg-emerald-100 text-emerald-800" },
@@ -14,12 +15,8 @@ const STATUS_STYLE = {
 } as const
 
 function details(item: ReviewableMaterialItem) {
-  const dimensions = typeof item.metadata?.dimensions === "string" ? item.metadata.dimensions : ""
-  const thickness = typeof item.metadata?.thickness === "string" ? item.metadata.thickness : ""
-  const productType = typeof item.metadata?.product_type === "string" ? item.metadata.product_type : ""
-  const screwLength = typeof item.metadata?.screw_length === "string" ? item.metadata.screw_length : ""
   const requestDetails = cleanMaterialRequestDetails(item.metadata?.request_details)
-  return [productType, dimensions, thickness, screwLength && `Length: ${screwLength}`, requestDetails].filter(Boolean).join(" · ") || "Details not specified"
+  return [...new Set([...requestItemFieldSummary(item.metadata), requestDetails].filter(Boolean))].join(" · ") || "Details not specified"
 }
 
 function copyText(items: ReviewableMaterialItem[]) {

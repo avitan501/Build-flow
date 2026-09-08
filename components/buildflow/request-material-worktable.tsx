@@ -16,6 +16,7 @@ import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-fun
 import { RequestSupplierRouteEditor, type RequestRouteSupplier } from "@/components/buildflow/request-supplier-route-editor"
 import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { requestItemFieldSummary } from "@/lib/request-item-fields"
 import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 
 export type RequestWorktableComparison = {
@@ -28,12 +29,8 @@ export type RequestWorktableComparison = {
 
 function itemDetails(item: ReviewableMaterialItem) {
   const metadata = item.metadata ?? {}
-  const productType = typeof metadata.product_type === "string" ? metadata.product_type : ""
-  const dimensions = typeof metadata.dimensions === "string" ? metadata.dimensions : ""
-  const thickness = typeof metadata.thickness === "string" ? metadata.thickness : ""
-  const screwLength = typeof metadata.screw_length === "string" ? metadata.screw_length : ""
   const requestDetails = cleanMaterialRequestDetails(metadata.request_details)
-  return [productType, dimensions, thickness, screwLength && `Length: ${screwLength}`, requestDetails].filter(Boolean).join(" · ")
+  return [...new Set([...requestItemFieldSummary(metadata), requestDetails].filter(Boolean))].join(" · ")
 }
 
 function supplierRouteVersion(metadata: Record<string, unknown> | null | undefined) {

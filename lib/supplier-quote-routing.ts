@@ -1,3 +1,5 @@
+import { requestItemFieldSummary } from "@/lib/request-item-fields"
+
 type DirectorySupplier = { id: string; name: string }
 
 type QuoteMatchItem = {
@@ -56,10 +58,7 @@ export function requestItemSpecification(
   fallbackDepartment: string,
 ) {
   const values = [
-    clean(metadata?.product_type, 160),
-    clean(metadata?.dimensions, 300),
-    clean(metadata?.thickness, 160),
-    clean(metadata?.screw_length, 80),
+    ...requestItemFieldSummary(metadata),
     clean(metadata?.request_details, 1000),
   ].filter(Boolean)
   return [...new Set(values)].join(" · ") || clean(fallbackDepartment, 1000)

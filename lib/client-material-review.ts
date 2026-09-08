@@ -1,3 +1,5 @@
+import { requestItemFieldSummary } from "@/lib/request-item-fields"
+
 export type MaterialReviewStatus = "ready" | "check" | "missing"
 
 export type ReviewableMaterialItem = {
@@ -94,10 +96,7 @@ export function cleanMaterialRequestDetails(value: unknown) {
 export function materialSearchQuery(item: ReviewableMaterialItem) {
   return [
     item.name,
-    text(item.metadata?.dimensions),
-    text(item.metadata?.thickness),
-    text(item.metadata?.product_type),
-    text(item.metadata?.screw_length),
+    ...requestItemFieldSummary(item.metadata),
     cleanMaterialRequestDetails(item.metadata?.request_details),
   ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 240)
 }

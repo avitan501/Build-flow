@@ -4,6 +4,7 @@ import { SupplierRequestDraft } from "@/components/buildflow/supplier-request-dr
 import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import { preferredRequestMaterialSources, type RequestMaterialChartSource } from "@/lib/request-material-chart"
+import { requestItemFieldSummary } from "@/lib/request-item-fields"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type RequestRow = { id: string; title: string; projects: { address: string | null } | null }
@@ -20,12 +21,7 @@ function itemDetails(item: RequestItem) {
       })
     : []
   const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details.trim() : ""
-  const specifications = [
-    typeof item.metadata?.product_type === "string" && item.metadata.product_type ? `Type: ${item.metadata.product_type}` : "",
-    typeof item.metadata?.dimensions === "string" && item.metadata.dimensions ? `Size: ${item.metadata.dimensions}` : "",
-    typeof item.metadata?.thickness === "string" && item.metadata.thickness ? `Thickness: ${item.metadata.thickness}` : "",
-    typeof item.metadata?.screw_length === "string" && item.metadata.screw_length ? `Length: ${item.metadata.screw_length}` : "",
-  ].filter(Boolean).map((detail) => `  ${detail}`)
+  const specifications = requestItemFieldSummary(item.metadata).map((detail) => `  ${detail}`)
   return [`${item.quantity} ${item.unit || "each"} - ${item.name}`, ...specifications, ...answers, ...(requestDetails ? requestDetails.split(/\r?\n/).map((line) => `  ${line}`) : [])]
 }
 

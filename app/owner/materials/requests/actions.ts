@@ -14,6 +14,7 @@ import { generateRequestClientQuotePdf, type RequestClientDocumentType, type Req
 import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
 import { requestClientDocumentContentMatches } from "@/lib/request-client-document-version"
 import { requestWorkflowSubstep, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
+import { requestItemFieldsMetadata, type RequestItemField } from "@/lib/request-item-fields"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
@@ -446,6 +447,7 @@ export async function updateOrganizedMaterialItemAction(formData: FormData) {
   const screwLength = String(formData.get("screwLength") || "").trim().replace(/\s+/g, " ").slice(0, 80)
   const details = String(formData.get("details") || "").trim().replace(/\s+/g, " ").slice(0, 1200)
   const markReady = formData.get("markReady") === "true"
+  const rawRequestItemFields = formData.get("requestItemFields")
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(itemId)) return { ok: false as const, error: "This item could not be identified." }
   if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit." }
 
@@ -465,6 +467,7 @@ export async function updateOrganizedMaterialItemAction(formData: FormData) {
     product_type: productType,
     screw_length: screwLength,
     request_details: details,
+    ...(typeof rawRequestItemFields === "string" ? requestItemFieldsMetadata(rawRequestItemFields) : {}),
     manually_reviewed_at: new Date().toISOString(),
     manually_reviewed_by: user.id,
     ...(markReady ? { review_status: "ready", review_reasons: [], needs_review: false } : {}),
@@ -486,6 +489,7 @@ export async function saveOriginalMaterialItemAction(input: {
   quantity: number
   unit: string
   details?: string
+  fields?: RequestItemField[]
   version?: number
 }) {
   const requestId = String(input.requestId || "").trim()
@@ -495,6 +499,7 @@ export async function saveOriginalMaterialItemAction(input: {
   const unit = String(input.unit || "").trim().replace(/\s+/g, " ").slice(0, 60)
   const details = String(input.details || "").trim().replace(/\s+/g, " ").slice(0, 1200)
   const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
+  const fieldMetadata = requestItemFieldsMetadata(input.fields ?? [])
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || (itemId && !/^[0-9a-f-]{36}$/i.test(itemId))) return { ok: false as const, error: "This request item could not be identified.", version }
   if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit.", version }
 
@@ -505,7 +510,7 @@ export async function saveOriginalMaterialItemAction(input: {
   if (itemId) {
     const { data: current } = await supabase.from("quote_request_items").select("id,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; metadata: Record<string, unknown> | null }>()
     if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here.", version }
-    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
+    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
     if (error) return { ok: false as const, error: "The original item could not be saved.", version }
     const { data: organizedRows } = await supabase
       .from("quote_request_items")
@@ -551,7 +556,7 @@ export async function saveOriginalMaterialItemAction(input: {
       quantity,
       unit,
       qualification_status: "not_required",
-      metadata: { request_details: details, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
+      metadata: { ...fieldMetadata, request_details: details, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
     })
     if (error) return { ok: false as const, error: "The new item could not be added.", version }
   }
