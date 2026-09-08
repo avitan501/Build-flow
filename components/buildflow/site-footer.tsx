@@ -14,7 +14,7 @@ const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password", "/homepage
 export function SiteFooter() {
   const pathname = usePathname()
 
-  if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin"))) return null
+  if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin") || pathname.startsWith("/requests"))) return null
 
   if (pathname === "/" || pathname === "/homepage-review") {
     return (

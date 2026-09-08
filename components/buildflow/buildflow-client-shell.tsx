@@ -14,6 +14,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isHomepagePreview = pathname === "/homepage-preview";
   const isCinematicStory = pathname === "/how-it-works";
   const isAccount = pathname === "/account";
+  const isCustomerPortal = pathname === "/requests";
   const isShopLanding = pathname === "/shop";
   const isShopFlow = Boolean(pathname?.startsWith("/shop/"));
   const isProjectFlow = Boolean(pathname?.startsWith("/projects"));
@@ -30,6 +31,10 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
 
   if (isAuthFlow) {
     return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
+  if (isCustomerPortal) {
+    return <div className="min-h-screen bg-[#f5f5f7]">{children}</div>;
   }
 
   return (

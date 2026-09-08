@@ -38,8 +38,8 @@ test("opening a request link never starts a PDF download automatically", async (
 
 test("secure text entry prioritizes the opened request instead of account dashboard chrome", async () => {
   const source = await readFile(path.join(root, "app/requests/page.tsx"), "utf8");
-  expect(source).toContain("Opened securely from your text");
+  expect(source).toContain("Opened from your secure text");
   expect(source).toContain("The request from your text is open below.");
   expect(source).toContain("!openedRequest ? <section");
-  expect(source).toContain("Request <span className=\"font-mono text-cyan-200\"");
+  expect(source).toContain("Request #{openedRequest.publicNumber}");
 });

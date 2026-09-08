@@ -18,10 +18,24 @@ test("customer portal keeps a semantic, mobile-first information hierarchy", asy
   expect(pageSource).toContain("<summary");
   expect(pageSource).toContain('aria-label="Account quick actions"');
   expect(pageSource).toContain("aria-current={openedFromText");
-  expect(pageSource).toContain("sm:grid-cols-3");
+  expect(pageSource).toContain("max-w-6xl");
+  expect(pageSource).not.toContain("radial-gradient");
   expect(pageSource).not.toMatch(/<(?:div|span)[^>]+onClick=/);
   expect(pageSource).not.toContain("user-scalable=no");
   expect(pageSource).not.toContain("maximum-scale=1");
+});
+
+test("customer portal removes the public header and narrow phone-width desktop shell", async () => {
+  const [header, shell, footer] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/buildflow-client-shell.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/site-footer.tsx"), "utf8"),
+  ]);
+
+  expect(header).toContain('"/requests"');
+  expect(shell).toContain('const isCustomerPortal = pathname === "/requests"');
+  expect(shell).toContain('if (isCustomerPortal)');
+  expect(footer).toContain('pathname.startsWith("/requests")');
 });
 
 test("signed-out customer access stays one-tap, zoomable, and usable on a narrow phone", async ({
