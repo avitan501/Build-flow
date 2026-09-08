@@ -43,10 +43,41 @@ test("editor is a mobile portal with explicit save, common dropdown values, and 
   expect(editor).toContain('aria-label="Add item detail"')
   expect(editor).toContain("New custom field")
   expect(editor).toContain("Save changes")
+  expect(editor).toContain("Edit original request")
+  expect(editor).toContain("Save draft")
+  expect(editor).toContain("Save & organize")
+  expect(editor).toContain("maxLength={20_000}")
+  expect(editor).toContain("organizeClientMaterialRequestAction")
   expect(editor).toContain("requestItemFields")
   expect(editor).not.toContain("useSequencedAutosave")
   expect(actions).toContain("requestItemFieldsMetadata")
   expect(actions).toContain("fields?: RequestItemField[]")
+  expect(actions).toContain('ai_organization_status: "draft_changed"')
+  expect(actions).toContain("slice(0, 20_000)")
+})
+
+test("request draft offers the construction fields needed before AI organization", async () => {
+  const root = process.cwd()
+  const fields = await readFile(path.join(root, "lib/request-item-fields.ts"), "utf8")
+  for (const label of ["Color", "Brand", "Packaging", "Shipping / delivery", "Delivery address", "Price requirements"]) {
+    expect(fields).toContain(`label: "${label}"`)
+  }
+})
+
+test("AI reads manager fields, grounds photo details, and stores structured attributes", async () => {
+  const root = process.cwd()
+  const organizer = await readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8")
+
+  expect(organizer).toContain("User-confirmed fields")
+  expect(organizer).toContain('Use key custom and preserve the manager\'s label')
+  expect(organizer).toContain("visibly legible in an attached photo or document")
+  expect(organizer).toContain("never guess a brand or color from appearance alone")
+  expect(organizer).toContain("Common sense is allowed only")
+  expect(organizer).toContain('Never create an attribute whose value is the word "Missing"')
+  expect(organizer).toContain("2 pallets, 72 boxes in each pallet, 23.21 square feet per box")
+  expect(organizer).toContain("quantity 144 boxes")
+  expect(organizer).toContain("request_item_fields: requestItemFields")
+  expect(organizer).toContain("request_item_field_evidence: requestItemFieldEvidence")
 })
 
 test("saved item details reach supplier requests, search, charts, and workspace summaries", async () => {

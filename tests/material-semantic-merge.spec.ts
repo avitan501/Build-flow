@@ -60,3 +60,24 @@ test("deduplicates repeated attachment evidence without doubling and never inven
   expect(merged).toHaveLength(1)
   expect(merged[0]).toMatchObject({ quantity: 6, dimensions: "", thickness: "", reviewStatus: "missing" })
 })
+
+test("preserves structured attributes while merging repeated evidence", () => {
+  const first = row({
+    name: "Luxury vinyl plank flooring",
+    quantity: 72,
+    sourceText: "Waterproof vinyl plank, Charleston Oak",
+    attributes: [{ key: "color", label: "Color", value: "Charleston Oak", sourceText: "Charleston Oak" }],
+  })
+  const second = row({
+    name: "Luxury vinyl plank flooring",
+    quantity: 72,
+    sourceText: "12-mil waterproof vinyl plank",
+    attributes: [{ key: "product_type", label: "Type / material", value: "Waterproof click lock", sourceText: "waterproof" }],
+  })
+
+  const [merged] = mergeSemanticallyEquivalentMaterialItems([first, second])
+  expect(merged.attributes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ key: "color", value: "Charleston Oak" }),
+    expect.objectContaining({ key: "product_type", value: "Waterproof click lock" }),
+  ]))
+})

@@ -466,7 +466,7 @@ test("client material lists are organized securely in the background", async () 
   expect(ownerActions).toContain("item.metadata?.ai_organized !== true");
   expect(ownerActions).toContain("manually_reviewed_by: user.id");
   expect(organizerButton).toContain("Organizing...");
-  expect(organizerButton).toContain("Reorganize request");
+  expect(organizerButton).toContain("Reorganize with AI");
   expect(organizerButton).toContain('formData.set("force", "true")');
   expect(organizerButton).toContain('role="status"');
   expect(organizerButton).toContain("still need details");

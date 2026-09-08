@@ -21,8 +21,11 @@ export const COMMON_REQUEST_ITEM_FIELDS: CommonRequestItemField[] = [
   { id: "finish", label: "Finish", metadataKey: "finish", suggestions: ["Matte", "Satin", "Semi-gloss", "Gloss", "Match existing"] },
   { id: "model", label: "Model / SKU", metadataKey: "model", suggestions: ["Exact match required", "Equivalent accepted"] },
   { id: "coverage", label: "Coverage / pack", metadataKey: "coverage", suggestions: ["Per box", "Per bundle", "Per roll", "Per pallet"] },
+  { id: "packaging", label: "Packaging", metadataKey: "packaging", suggestions: ["Box", "Bundle", "Pallet", "Roll", "Loose pieces"] },
   { id: "grade", label: "Grade", metadataKey: "grade", suggestions: ["Standard", "Premium", "Contractor grade", "Match existing"] },
   { id: "shipping", label: "Shipping / delivery", metadataKey: "shipping", suggestions: ["Pickup", "Curbside delivery", "Jobsite delivery", "Delivery included", "Freight", "To be confirmed"] },
+  { id: "delivery-address", label: "Delivery address", metadataKey: "delivery_address", suggestions: ["Use customer address", "Use jobsite address", "To be confirmed"] },
+  { id: "price-requirements", label: "Price requirements", metadataKey: "price_requirements", suggestions: ["Tax included", "Shipping included", "Tax and shipping included", "Itemized tax and freight"] },
 ]
 
 const COMMON_BY_ID = new Map(COMMON_REQUEST_ITEM_FIELDS.map((field) => [field.id, field]))
@@ -61,7 +64,7 @@ export function normalizeRequestItemFields(value: unknown): RequestItemField[] {
     while (seen.has(id)) id = `${baseId}-${suffix++}`
     seen.add(id)
     return [{ id, label, value: fieldValue }]
-  }).slice(0, 12)
+  }).slice(0, 16)
 }
 
 export function requestItemFieldsFromMetadata(metadata: Record<string, unknown> | null | undefined) {
@@ -72,7 +75,7 @@ export function requestItemFieldsFromMetadata(metadata: Record<string, unknown> 
     const value = clean(metadata?.[field.metadataKey], 300)
     return value ? [{ id: field.id, label: field.label, value }] : []
   })
-  return [...saved, ...legacy].slice(0, 12)
+  return [...saved, ...legacy].slice(0, 16)
 }
 
 export function requestItemFieldsMetadata(value: unknown): Record<string, unknown> & { request_item_fields: RequestItemField[] } {

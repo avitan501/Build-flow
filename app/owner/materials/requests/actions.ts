@@ -497,7 +497,8 @@ export async function saveOriginalMaterialItemAction(input: {
   const name = String(input.name || "").trim().replace(/\s+/g, " ").slice(0, 300)
   const quantity = Number(input.quantity)
   const unit = String(input.unit || "").trim().replace(/\s+/g, " ").slice(0, 60)
-  const details = String(input.details || "").trim().replace(/\s+/g, " ").slice(0, 1200)
+  const multilineDetails = String(input.details || "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n").split("\n").map((line) => line.trim().replace(/[ \t]+/g, " ")).join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 20_000)
+  const compactDetails = multilineDetails.replace(/\s+/g, " ").slice(0, 1200)
   const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
   const fieldMetadata = requestItemFieldsMetadata(input.fields ?? [])
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || (itemId && !/^[0-9a-f-]{36}$/i.test(itemId))) return { ok: false as const, error: "This request item could not be identified.", version }
@@ -508,17 +509,19 @@ export async function saveOriginalMaterialItemAction(input: {
   if (!request) return { ok: false as const, error: "Request not found.", version }
 
   if (itemId) {
-    const { data: current } = await supabase.from("quote_request_items").select("id,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; metadata: Record<string, unknown> | null }>()
+    const { data: current } = await supabase.from("quote_request_items").select("id,name,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; name: string; metadata: Record<string, unknown> | null }>()
     if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here.", version }
-    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
-    if (error) return { ok: false as const, error: "The original item could not be saved.", version }
     const { data: organizedRows } = await supabase
       .from("quote_request_items")
       .select("id,metadata")
       .eq("request_id", requestId)
       .contains("metadata", { ai_organized: true, source_item_id: itemId })
       .returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
-    if (organizedRows?.length === 1) {
+    const isRawRequest = current.name.trim().toLowerCase() === "free-text material list"
+    const details = isRawRequest ? multilineDetails : compactDetails
+    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, ...(organizedRows?.length ? { ai_organization_status: "draft_changed", ai_organization_summary: "Original request changed. Reorganize to refresh the AI copy." } : {}), manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
+    if (error) return { ok: false as const, error: "The original item could not be saved.", version }
+    if (!isRawRequest && organizedRows?.length === 1) {
       const organized = organizedRows[0]
       const { error: syncError } = await supabase
         .from("quote_request_items")
@@ -556,7 +559,7 @@ export async function saveOriginalMaterialItemAction(input: {
       quantity,
       unit,
       qualification_status: "not_required",
-      metadata: { ...fieldMetadata, request_details: details, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
+      metadata: { ...fieldMetadata, request_details: compactDetails, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
     })
     if (error) return { ok: false as const, error: "The new item could not be added.", version }
   }

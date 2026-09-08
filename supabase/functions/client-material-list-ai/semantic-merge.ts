@@ -10,6 +10,7 @@ export type SemanticMaterialItem = {
   reviewStatus: "ready" | "check" | "missing"
   reviewReasons: string[]
   sourceText: string
+  attributes?: Array<{ key: string; label?: string; value: string; sourceText: string }>
 }
 
 const MATERIAL_ALIASES: Array<[RegExp, string]> = [
@@ -94,6 +95,20 @@ function joinUnique(left: string, right: string, separator = " · ") {
   return [...new Set(values)].join(separator)
 }
 
+function mergeAttributes(left: SemanticMaterialItem["attributes"], right: SemanticMaterialItem["attributes"]) {
+  const byKey = new Map<string, { key: string; label?: string; value: string; sourceText: string }>()
+  for (const attribute of [...(left ?? []), ...(right ?? [])]) {
+    const identity = attribute.key === "custom" ? `${attribute.key}:${attribute.label || ""}` : attribute.key
+    const current = byKey.get(identity)
+    byKey.set(identity, current ? {
+      ...current,
+      value: joinUnique(current.value, attribute.value),
+      sourceText: joinUnique(current.sourceText, attribute.sourceText, "\n"),
+    } : { ...attribute })
+  }
+  return [...byKey.values()]
+}
+
 function worstStatus(left: SemanticMaterialItem["reviewStatus"], right: SemanticMaterialItem["reviewStatus"]) {
   const rank = { ready: 0, check: 1, missing: 2 } as const
   return rank[left] >= rank[right] ? left : right
@@ -122,6 +137,7 @@ export function mergeSemanticallyEquivalentMaterialItems<T extends SemanticMater
       needsReview: current.needsReview || item.needsReview,
       reviewStatus: worstStatus(current.reviewStatus, item.reviewStatus),
       reviewReasons: [...new Set([...current.reviewReasons, ...item.reviewReasons])].slice(0, 5),
+      attributes: mergeAttributes(current.attributes, item.attributes),
     }
   }
   return merged

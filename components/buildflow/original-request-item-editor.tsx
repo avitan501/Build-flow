@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import { useState, useTransition, type ReactNode } from "react"
 
-import { saveOriginalMaterialItemAction, updateOrganizedMaterialItemAction } from "@/app/owner/materials/requests/actions"
+import { organizeClientMaterialRequestAction, saveOriginalMaterialItemAction, updateOrganizedMaterialItemAction } from "@/app/owner/materials/requests/actions"
 import { cleanMaterialRequestDetails, materialQuantity, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
 import { COMMON_REQUEST_ITEM_FIELDS, requestItemFieldDefinition, requestItemFieldsFromMetadata, type RequestItemField } from "@/lib/request-item-fields"
 
@@ -13,11 +13,14 @@ type ItemDraft = { name: string; quantity: string; unit: string; details: string
 const COMMON_UNITS = ["each", "box", "bundle", "sheet", "piece", "roll", "bag", "pallet", "linear ft.", "sq. ft.", "cu. yd."]
 
 function draftFromItem(item?: ReviewableMaterialItem): ItemDraft {
+  const rawRequest = item?.name.trim().toLowerCase() === "free-text material list"
   return {
     name: item?.name ?? "",
     quantity: String(item ? materialQuantity(item) : 1),
     unit: item ? materialSalesUnit(item) : "each",
-    details: item ? cleanMaterialRequestDetails(item.metadata?.request_details) : "",
+    details: item ? rawRequest
+      ? String(item.metadata?.request_details ?? "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n").trim()
+      : cleanMaterialRequestDetails(item.metadata?.request_details) : "",
     fields: requestItemFieldsFromMetadata(item?.metadata),
   }
 }
@@ -29,13 +32,15 @@ function nextCustomId(fields: RequestItemField[]) {
   return `custom-${number}`
 }
 
-export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", children }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; children?: ReactNode }) {
+export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ItemDraft>(() => draftFromItem(item))
   const [fieldToAdd, setFieldToAdd] = useState("")
   const [feedback, setFeedback] = useState("")
+  const [organizeAfterSave, setOrganizeAfterSave] = useState(false)
   const [pending, startTransition] = useTransition()
+  const rawRequest = item?.name.trim().toLowerCase() === "free-text material list"
 
   function openEditor() {
     setDraft(draftFromItem(item))
@@ -69,7 +74,7 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
   }
 
   function addField() {
-    if (!fieldToAdd || draft.fields.length >= 12) return
+    if (!fieldToAdd || draft.fields.length >= 16) return
     if (fieldToAdd === "custom") {
       setDraft((current) => ({ ...current, fields: [...current.fields, { id: nextCustomId(current.fields), label: "", value: "" }] }))
     } else {
@@ -87,18 +92,31 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
     setDraft((current) => ({ ...current, fields: current.fields.filter((field) => field.id !== id) }))
   }
 
-  function save() {
+  function save(shouldOrganize = false) {
     if (!valid(draft)) return
     setFeedback("")
+    setOrganizeAfterSave(shouldOrganize)
     startTransition(async () => {
       try {
         const result = await persist(draft)
         if (!result.ok) { setFeedback(result.error); return }
+        if (shouldOrganize) {
+          const formData = new FormData()
+          formData.set("requestId", requestId)
+          formData.set("force", "true")
+          const organization = await organizeClientMaterialRequestAction(formData)
+          if (!organization.ok) {
+            setFeedback(`The draft was saved, but AI could not start: ${organization.error}`)
+            return
+          }
+        }
         if (mode === "add") setDraft(draftFromItem())
         setOpen(false)
         router.refresh()
       } catch {
         setFeedback("The item was not saved. Check the connection and try again.")
+      } finally {
+        setOrganizeAfterSave(false)
       }
     })
   }
@@ -109,19 +127,19 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
     <div className="fixed inset-0 z-[180] flex items-end justify-center bg-slate-950/45 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={mode === "add" ? "Add request item" : "Edit request item"} onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor() }}>
       <section className="flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3">
-          <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#0066cc]">{itemKind === "organized" ? "AI organized" : "Original request"}</p><h3 className="text-base font-bold">{mode === "add" ? "Add item" : "Edit item"}</h3></div>
+          <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#0066cc]">{itemKind === "organized" ? "AI organized" : "Original request"}</p><h3 className="text-base font-bold">{mode === "add" ? "Add item" : rawRequest ? "Edit original request" : "Edit item"}</h3></div>
           <button type="button" onClick={closeEditor} aria-label="Close" className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 sm:h-9 sm:w-9"><X className="h-4 w-4" /></button>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid gap-3 sm:grid-cols-[6rem_8rem_minmax(0,1fr)]">
+          {rawRequest ? <label className="grid gap-1.5 text-xs font-bold">Request text<textarea autoFocus rows={9} maxLength={20_000} value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Type or paste the complete material request. Add quantities, sizes, colors, brands, delivery, or price requirements you already know." className="min-h-52 resize-y rounded-xl border border-slate-300 p-3 text-sm font-normal leading-6" /><span className="text-[10px] font-normal text-slate-500">The AI reads this saved version and the fields below. It does not overwrite your original.</span></label> : <div className="grid gap-3 sm:grid-cols-[6rem_8rem_minmax(0,1fr)]">
             <label className="grid gap-1 text-xs font-bold">Quantity<input type="number" inputMode="decimal" min="0.01" step="0.01" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold">Unit<input list="request-item-units" value={draft.unit} onChange={(event) => setDraft((current) => ({ ...current, unit: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /><datalist id="request-item-units">{COMMON_UNITS.map((unit) => <option key={unit} value={unit} />)}</datalist></label>
             <label className="grid gap-1 text-xs font-bold">Item<input autoFocus value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
-          </div>
+          </div>}
 
           <div className="mt-5 border-t border-slate-100 pt-4">
-            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold">Item details</p><p className="text-[10px] text-slate-500">Choose a common field or create your own.</p></div><span className="text-[10px] font-semibold text-slate-400">{draft.fields.length}/12</span></div>
+            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold">Item details</p><p className="text-[10px] text-slate-500">Choose a common field or create your own.</p></div><span className="text-[10px] font-semibold text-slate-400">{draft.fields.length}/16</span></div>
             {draft.fields.length ? <div className="grid gap-2">{draft.fields.map((field) => {
               const definition = requestItemFieldDefinition(field.id)
               const listId = definition ? `request-item-options-${definition.id}` : undefined
@@ -132,22 +150,22 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
                 <button type="button" onClick={() => removeField(field.id)} aria-label={`Remove ${field.label || "custom field"}`} className="col-start-2 row-start-1 inline-flex h-11 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-700 sm:col-start-3"><Trash2 className="h-4 w-4" /></button>
               </div>
             })}</div> : <p className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-500">No extra details yet.</p>}
-            {draft.fields.length < 12 ? <div className="mt-3 flex gap-2"><select aria-label="Add item detail" value={fieldToAdd} onChange={(event) => setFieldToAdd(event.target.value)} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold"><option value="">Add detail…</option>{availableFields.map((field) => <option key={field.id} value={field.id}>{field.label}</option>)}<option value="custom">New custom field</option></select><button type="button" onClick={addField} disabled={!fieldToAdd} className="inline-flex h-11 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-[#0066cc] disabled:opacity-40"><Plus className="h-4 w-4" />Add</button></div> : null}
+            {draft.fields.length < 16 ? <div className="mt-3 flex gap-2"><select aria-label="Add item detail" value={fieldToAdd} onChange={(event) => setFieldToAdd(event.target.value)} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold"><option value="">Add detail…</option>{availableFields.map((field) => <option key={field.id} value={field.id}>{field.label}</option>)}<option value="custom">New custom field</option></select><button type="button" onClick={addField} disabled={!fieldToAdd} className="inline-flex h-11 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-[#0066cc] disabled:opacity-40"><Plus className="h-4 w-4" />Add</button></div> : null}
           </div>
 
-          <label className="mt-5 grid gap-1 border-t border-slate-100 pt-4 text-xs font-bold">General notes<textarea rows={3} value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Anything else the supplier should know" className="resize-y rounded-lg border border-slate-300 p-3 font-normal" /></label>
+          {!rawRequest ? <label className="mt-5 grid gap-1 border-t border-slate-100 pt-4 text-xs font-bold">General notes<textarea rows={3} value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Anything else the supplier should know" className="resize-y rounded-lg border border-slate-300 p-3 font-normal" /></label> : null}
           {feedback ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{feedback}</p> : null}
         </div>
 
         <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
           <button type="button" onClick={closeEditor} disabled={pending} className="h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Cancel</button>
-          <button type="button" onClick={save} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />{pending ? "Saving…" : mode === "add" ? "Add item" : "Save changes"}</button>
+          {rawRequest ? <><button type="button" onClick={() => save(false)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 disabled:opacity-40"><Check className="h-4 w-4" />{pending && !organizeAfterSave ? "Saving…" : "Save draft"}</button><button type="button" onClick={() => save(true)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">{pending && organizeAfterSave ? "Starting AI…" : "Save & organize"}</button></> : <button type="button" onClick={() => save(false)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />{pending ? "Saving…" : mode === "add" ? "Add item" : "Save changes"}</button>}
         </footer>
       </section>
     </div>, document.body) : null
 
   return <div className={trigger === "content" ? "block w-full" : "inline-flex"}>
-    <button type="button" onClick={openEditor} aria-expanded={open} title={trigger === "content" ? "Click to edit item, quantity, and details" : undefined} className={trigger === "content" ? "group relative block min-h-11 w-full rounded-md text-left outline-none transition hover:bg-sky-50/70 focus-visible:ring-2 focus-visible:ring-[#0071e3] sm:min-h-0" : `inline-flex min-h-11 items-center gap-1 rounded-md border px-2 text-[10px] font-bold normal-case tracking-normal sm:min-h-9 ${mode === "add" ? "border-sky-200 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}>{trigger === "content" ? <>{children}<span className="pointer-events-none absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[#0066cc] opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100"><Pencil className="h-3 w-3" /></span></> : <>{mode === "add" ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}{mode === "add" ? "Add item" : "Edit"}</>}</button>
+    <button type="button" onClick={openEditor} aria-expanded={open} title={trigger === "content" ? rawRequest ? "Edit the original request before AI organization" : "Click to edit item, quantity, and details" : undefined} className={trigger === "content" ? "group relative block min-h-11 w-full rounded-md text-left outline-none transition hover:bg-sky-50/70 focus-visible:ring-2 focus-visible:ring-[#0071e3] sm:min-h-0" : `inline-flex min-h-11 items-center gap-1 rounded-md border px-2 text-[10px] font-bold normal-case tracking-normal sm:min-h-9 ${mode === "add" ? "border-sky-200 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}>{trigger === "content" ? <>{children}<span className="pointer-events-none absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-[#0066cc] opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100"><Pencil className="h-3 w-3" /></span></> : <>{mode === "add" ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}{buttonLabel || (mode === "add" ? "Add item" : rawRequest ? "Edit draft" : "Edit")}</>}</button>
     {dialog}
   </div>
 }
