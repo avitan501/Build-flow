@@ -13,6 +13,7 @@ import { LocationAutocomplete } from "@/components/buildflow/location-autocomple
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
+import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import { buildClientLinkMessage, splitClientLinkMessage } from "@/lib/client-link-message"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -185,6 +186,7 @@ export function RequestManagementPanel({
   clientEmails,
   supplierEmails,
   requestAttachments,
+  supplierRequestFiles,
 }: {
   requestId: string
   requestTitle: string
@@ -209,6 +211,7 @@ export function RequestManagementPanel({
   clientEmails: RelatedEmailItem[]
   supplierEmails: RelatedEmailItem[]
   requestAttachments: RequestClientDocumentAttachment[]
+  supplierRequestFiles: Array<{ id: string; fileName: string; url: string | null }>
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
@@ -962,6 +965,19 @@ export function RequestManagementPanel({
         </>} />
         <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
+          {supplierRequestFiles.length ? <details className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-black text-[#12263f] [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5 text-amber-700" />Supplier files <span className="rounded-full bg-white px-1.5 py-0.5 text-[9px]">{supplierRequestFiles.length}</span></span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+            </summary>
+            <div className="grid gap-1.5 border-t border-amber-200 p-2">
+              {supplierRequestFiles.map((file) => <div key={file.id} className="flex min-w-0 items-center justify-between gap-1.5 rounded-md border border-amber-200 bg-white p-1">
+                {file.url ? <a href={file.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate px-1 text-[10px] font-bold text-[#0066cc]">{file.fileName}</a> : <span className="min-w-0 flex-1 truncate px-1 text-[10px] font-bold text-slate-500">{file.fileName}</span>}
+                <RequestAttachmentSourceControl requestId={requestId} attachmentId={file.id} currentSource="supplier" />
+              </div>)}
+              <p className="px-1 text-[9px] text-slate-500">Received from a supplier. Link it to the correct supplier when adding the quote.</p>
+            </div>
+          </details> : null}
           <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-bold">
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{pricingSummaryItems.length} item{pricingSummaryItems.length === 1 ? "" : "s"}</span>
             <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-800">{selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</span>

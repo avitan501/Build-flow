@@ -210,6 +210,7 @@ export async function saveQuoteAttachmentRecordAction(input: {
     file_path: input.filePath,
     file_type: input.fileType || null,
     file_size: input.fileSize,
+    source_party: "client",
   }).select("id").single<{ id: string }>()
   if (error || !data) return { ok: false, error: "The file uploaded, but its project record could not be saved." }
   revalidatePath(`/projects/${input.projectId}`)

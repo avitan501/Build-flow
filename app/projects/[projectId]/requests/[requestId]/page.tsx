@@ -16,7 +16,7 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
   const [{ data: request }, { data: items }, { data: attachments }, { data: materialResponses }] = await Promise.all([
     supabase.from("quote_requests").select("id, project_id, owner_id, title, status, submitted_at, created_at, updated_at").eq("id", requestId).eq("project_id", projectId).eq("owner_id", user.id).maybeSingle<QuoteRequestRecord>(),
     supabase.from("quote_request_items").select("id, request_id, project_id, owner_id, catalog_item_id, name, department, item_type, quantity, unit, unit_price, qualification_status, answers, metadata, created_at, updated_at").eq("request_id", requestId).eq("owner_id", user.id).order("created_at").returns<QuoteRequestItemRecord[]>(),
-    supabase.from("quote_request_attachments").select("id, item_id, file_name, file_path, file_type, file_size").eq("request_id", requestId).eq("owner_id", user.id).returns<AttachmentRecord[]>(),
+    supabase.from("quote_request_attachments").select("id, item_id, file_name, file_path, file_type, file_size").eq("request_id", requestId).eq("owner_id", user.id).neq("source_party", "supplier").returns<AttachmentRecord[]>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).eq("owner_id", user.id).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
   ])
   if (!request) notFound()

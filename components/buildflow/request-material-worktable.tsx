@@ -12,6 +12,7 @@ import { MaterialReviewEditor } from "@/components/buildflow/material-review-edi
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
+import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
 import { RequestSupplierRouteEditor, type RequestRouteSupplier } from "@/components/buildflow/request-supplier-route-editor"
 import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
@@ -168,7 +169,17 @@ export function RequestMaterialWorktable({
             <p className="text-[10px] font-bold uppercase tracking-[.1em] text-slate-400">Request tools</p>
             <div className="flex flex-wrap gap-2"><OriginalRequestItemEditor requestId={requestId} mode="add" />{organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : <>{organizationStatus === "failed" ? <MaterialOrganizationStatus status="failed" /> : null}<OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} compact /></>}</div>
             {items.length ? <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => copyList("original")} disabled={!sourceItems.length} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 disabled:opacity-40"><Copy className="h-3.5 w-3.5" />{copied === "original" ? "Copied" : "Copy original"}</button><button type="button" onClick={() => copyList("ai")} disabled={!organizedItems.length || !aiCoversEverySource} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 text-[10px] font-bold text-[#0066cc] disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"><Copy className="h-3.5 w-3.5" />{copied === "ai" ? "Copied" : "Copy AI"}</button></div> : null}
-            <div className="border-t border-slate-100 pt-2"><div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold text-slate-600"><FileText className="h-3.5 w-3.5" />Documents <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px]">{attachments.length}</span></div><RequestAttachmentUploader requestId={requestId} compact />{attachments.length ? <div className="mt-2 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">{attachments.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="max-w-full truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="max-w-full truncate rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{file.file_name}</span>)}</div> : <p className="mt-2 text-[10px] text-slate-500">No documents attached.</p>}</div>
+            <div className="border-t border-slate-100 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600"><FileText className="h-3.5 w-3.5" />Client request files <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px]">{attachments.length}</span></div>
+                <RequestAttachmentUploader requestId={requestId} compact />
+              </div>
+              {attachments.length ? <div className="mt-2 grid max-h-36 gap-1.5 overflow-y-auto">{attachments.map((file) => <div key={file.id} className="flex min-w-0 items-center justify-between gap-1.5 rounded-md border border-slate-200 bg-slate-50 p-1">
+                {file.url ? <a href={file.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate px-1 text-[10px] font-bold text-[#0066cc]">{file.file_name}</a> : <span className="min-w-0 flex-1 truncate px-1 text-[10px] font-bold text-slate-500">{file.file_name}</span>}
+                <RequestAttachmentSourceControl requestId={requestId} attachmentId={file.id} currentSource="client" />
+              </div>)}</div> : <p className="mt-2 text-[10px] text-slate-500">No files received from the client.</p>}
+              <p className="mt-1 text-[9px] text-slate-400">Supplier quotes and supplier photos belong in Step 2.</p>
+            </div>
           </div>
         </details>
       </div>

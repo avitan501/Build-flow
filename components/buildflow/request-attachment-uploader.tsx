@@ -65,9 +65,9 @@ export function RequestAttachmentUploader({ requestId, compact = false }: { requ
     })
   }
 
-  return <section className={compact ? "p-3" : "mt-2 rounded-lg border border-sky-200 bg-sky-50/60 p-3"} aria-label="Add files to request">
+  return <section className={compact ? "" : "mt-2 rounded-lg border border-sky-200 bg-sky-50/60 p-3"} aria-label="Add client files to request">
     <div className="flex flex-wrap items-center gap-2">
-      <label className={`inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-300 bg-white px-4 text-sm font-bold text-[#0066cc] ${pending ? "cursor-wait opacity-60" : "cursor-pointer"}`}>{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}{pending ? "Uploading and attaching…" : "Add documents or photos"}<input type="file" accept="image/jpeg,image/png,image/webp,.pdf" multiple disabled={pending} className="sr-only" onChange={(event) => { const selected = Array.from(event.target.files ?? []); event.currentTarget.value = ""; attachFiles(selected) }} /></label>
+      <label className={`inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-white font-bold text-[#0066cc] ${compact ? "min-h-8 px-2 text-[10px]" : "min-h-11 px-4 text-sm"} ${pending ? "cursor-wait opacity-60" : "cursor-pointer"}`}>{pending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}{pending ? "Uploading…" : compact ? "Add client file" : "Add documents or photos"}<input type="file" accept="image/jpeg,image/png,image/webp,.pdf" multiple disabled={pending} className="sr-only" onChange={(event) => { const selected = Array.from(event.target.files ?? []); event.currentTarget.value = ""; attachFiles(selected) }} /></label>
     </div>
     {message ? <p role="status" className={`mt-2 text-xs font-bold ${isError ? "text-rose-700" : "text-emerald-700"}`}>{message}</p> : null}
   </section>

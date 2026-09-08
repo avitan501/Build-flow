@@ -16,7 +16,7 @@ test("estimate composer supports direct multi-file upload and edit preload", asy
 
 test("server resolves selected attachment ids under the exact request and builds the snapshot", async () => {
   const actions = await readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8")
-  expect(actions).toContain('.from("quote_request_attachments").select("id,file_name,file_type,file_size").eq("request_id", request.id).in("id", attachmentIds)')
+  expect(actions).toContain('.from("quote_request_attachments").select("id,file_name,file_type,file_size").eq("request_id", request.id).eq("source_party", "client").in("id", attachmentIds)')
   expect(actions).toContain("data.length !== attachmentIds.length")
   expect(actions).toContain("documentAttachments.reduce((sum, attachment) => sum + attachment.fileSize, 0) > 25 * 1024 * 1024")
   expect(actions).toContain("attachments: documentAttachments")

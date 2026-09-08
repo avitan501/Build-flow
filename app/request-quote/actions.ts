@@ -511,6 +511,7 @@ export async function submitQuoteRequestFormAction(
             file_path: storedFilePath,
             file_type: attachment.type,
             file_size: attachment.size,
+            source_party: "client",
           });
         if (attachmentError) throw new Error("attachment_record_failed");
       } else if (attachment.bytes) {
@@ -533,6 +534,7 @@ export async function submitQuoteRequestFormAction(
             file_path: storedFilePath,
             file_type: attachment.type,
             file_size: attachment.bytes.byteLength,
+            source_party: "client",
           });
         if (attachmentError) throw new Error("attachment_record_failed");
       }

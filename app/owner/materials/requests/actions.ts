@@ -32,6 +32,7 @@ type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
 export type ExistingRequestUploadInput = { storagePath: string; filename: string; type: string; size: number }
+export type RequestAttachmentSourceParty = "client" | "supplier"
 export type PrepareRequestAttachmentUploadResult =
   | { ok: true; data: { storagePath: string; token: string } }
   | { ok: false; code: "invalid_origin" | "invalid_file" | "request_not_found" | "prepare_failed"; error: string }
@@ -137,7 +138,7 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
       )
       if (!verified.ok) throw new Error("attachment_verification_failed")
       storedPaths.push(attachment.storagePath)
-      const { data: record, error: recordError } = await supabase.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: attachment.storagePath, file_type: attachment.type, file_size: attachment.size }).select("id,file_name,file_type,file_size").single<{ id: string; file_name: string; file_type: string; file_size: number }>()
+      const { data: record, error: recordError } = await supabase.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: attachment.storagePath, file_type: attachment.type, file_size: attachment.size, source_party: "client" }).select("id,file_name,file_type,file_size").single<{ id: string; file_name: string; file_type: string; file_size: number }>()
       if (recordError || !record) throw new Error("attachment_record_failed")
       storedAttachments.push({ id: record.id, fileName: record.file_name, fileType: record.file_type, fileSize: record.file_size })
     }
@@ -168,6 +169,69 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
     console.error("Existing request attachment revalidation failed", cause)
   }
   return { ok: true, organizationStatus, attachments: storedAttachments }
+}
+
+export async function classifyRequestAttachmentSourceAction(input: {
+  requestId: string
+  attachmentId: string
+  sourceParty: RequestAttachmentSourceParty
+}) {
+  const requestId = String(input?.requestId || "").trim()
+  const attachmentId = String(input?.attachmentId || "").trim()
+  const sourceParty = String(input?.sourceParty || "") as RequestAttachmentSourceParty
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(attachmentId) || !["client", "supplier"].includes(sourceParty)) {
+    return { ok: false as const, error: "The file source could not be changed." }
+  }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: attachment } = await supabase
+    .from("quote_request_attachments")
+    .select("id,request_id,project_id,owner_id,file_name,source_party")
+    .eq("id", attachmentId)
+    .eq("request_id", requestId)
+    .maybeSingle<{ id: string; request_id: string; project_id: string; owner_id: string; file_name: string; source_party: string }>()
+  if (!attachment) return { ok: false as const, error: "The file was not found on this request." }
+  if (attachment.source_party === sourceParty) return { ok: true as const }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("quote_request_attachments")
+    .update({ source_party: sourceParty })
+    .eq("id", attachment.id)
+    .eq("request_id", attachment.request_id)
+    .select("id")
+    .maybeSingle<{ id: string }>()
+  if (updateError || !updated) return { ok: false as const, error: "The file source could not be changed." }
+
+  const { error: historyError } = await supabase.from("project_events").insert({
+    project_id: attachment.project_id,
+    owner_id: attachment.owner_id,
+    event_type: "note_added",
+    source: "admin",
+    title: `File moved to ${sourceParty === "supplier" ? "supplier pricing" : "client request"}`,
+    description: attachment.file_name,
+    metadata: {
+      quote_request_id: attachment.request_id,
+      manager_action: "request_attachment_source",
+      attachment_id: attachment.id,
+      previous_source_party: attachment.source_party,
+      source_party: sourceParty,
+    },
+  })
+  if (historyError) {
+    await supabase.from("quote_request_attachments").update({ source_party: attachment.source_party }).eq("id", attachment.id).eq("request_id", attachment.request_id)
+    return { ok: false as const, error: "The file was not moved because its history could not be saved." }
+  }
+
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "record_updated",
+    entity_type: "quote_request_attachments",
+    entity_id: attachment.id,
+    page_path: `/owner/materials/requests/${attachment.request_id}`,
+    page_label: "Material request file source",
+  })
+  revalidatePath(`/owner/materials/requests/${attachment.request_id}`)
+  return { ok: true as const }
 }
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
@@ -949,7 +1013,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   if (attachmentIds.length > 10 || attachmentIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose up to 10 valid attachments." }
   let documentAttachments: RequestClientDocumentAttachment[] = []
   if (attachmentIds.length) {
-    const { data, error } = await supabase.from("quote_request_attachments").select("id,file_name,file_type,file_size").eq("request_id", request.id).in("id", attachmentIds).returns<Array<{ id: string; file_name: string; file_type: string | null; file_size: number | null }>>()
+    const { data, error } = await supabase.from("quote_request_attachments").select("id,file_name,file_type,file_size").eq("request_id", request.id).eq("source_party", "client").in("id", attachmentIds).returns<Array<{ id: string; file_name: string; file_type: string | null; file_size: number | null }>>()
     if (error || !data || data.length !== attachmentIds.length) return { ok: false as const, error: "One or more attachments do not belong to this request. Refresh and try again." }
     const byId = new Map(data.map((row) => [row.id, row]))
     documentAttachments = attachmentIds.map((id) => byId.get(id)!).map((row) => ({ id: row.id, fileName: String(row.file_name || "").trim().slice(0, 180), fileType: String(row.file_type || "").toLowerCase(), fileSize: Number(row.file_size) }))

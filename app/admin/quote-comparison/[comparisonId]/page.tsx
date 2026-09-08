@@ -61,6 +61,7 @@ export default async function QuoteComparisonDetailPage({
         .from("quote_request_attachments")
         .select("id,request_id,file_name,file_path,file_type,file_size,created_at")
         .eq("request_id", comparisonResult.data.request_id)
+        .eq("source_party", "client")
         .order("created_at", { ascending: false })
         .returns<RequestClientQuoteSource[]>()
     : { data: [] as RequestClientQuoteSource[], error: null };

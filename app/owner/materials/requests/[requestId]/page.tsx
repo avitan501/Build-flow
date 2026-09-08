@@ -56,6 +56,7 @@ type Attachment = {
   file_path: string;
   file_type: string | null;
   file_size: number | null;
+  source_party: "client" | "supplier" | "internal";
 };
 type RequestItem = {
   id: string;
@@ -162,7 +163,7 @@ export default async function OwnerMaterialRequestPage({
       .returns<MaterialQuestionnaireResponse[]>(),
     supabase
       .from("quote_request_attachments")
-      .select("id,material_response_id,file_name,file_path,file_type,file_size")
+      .select("id,material_response_id,file_name,file_path,file_type,file_size,source_party")
       .eq("request_id", requestId)
       .returns<Attachment[]>(),
     supabase
@@ -382,6 +383,8 @@ export default async function OwnerMaterialRequestPage({
       }
     }),
   );
+  const clientRequestFiles = signedFiles.filter((file) => file.source_party !== "supplier");
+  const supplierRequestFiles = signedFiles.filter((file) => file.source_party === "supplier");
   const suppliers = canonicalSupplierDirectory(
     managerSettings?.state?.qualificationSettings?.suppliers ?? [],
   );
@@ -654,7 +657,7 @@ export default async function OwnerMaterialRequestPage({
           currentSubstep={currentSubstep}
           supplierComparisons={primarySupplierComparison ? [primarySupplierComparison] : []}
           suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-          attachments={signedFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
+          attachments={clientRequestFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
         />
         {(responses ?? []).length ? (
           <details
@@ -770,7 +773,8 @@ export default async function OwnerMaterialRequestPage({
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, managerPreviewToken: entry.manager_preview_token, version: entry.version, updatedAt: entry.updated_at, lastOpenedAt: currentClientDocumentViewByVersion.get(`${entry.id}:${entry.version}`)?.last_opened_at ?? null }))}
-            requestAttachments={(attachments ?? []).flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
+            requestAttachments={clientRequestFiles.flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
+            supplierRequestFiles={supplierRequestFiles.map((entry) => ({ id: entry.id, fileName: entry.file_name, url: entry.url }))}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
             supplierEmails={supplierEmails}

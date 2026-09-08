@@ -49,7 +49,7 @@ export default async function SupplierApprovalDetailPage({ params }: { params: P
     supabase.from("profiles").select("full_name,email,phone,company_name").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null; phone: string | null; company_name: string | null }>(),
     supabase.from("quote_request_items").select("id,name,department,item_type,quantity,unit,qualification_status,answers,metadata").eq("request_id", request.id).order("created_at").returns<ItemRecord[]>(),
     supabase.from("material_questionnaire_responses").select("id,request_id,project_id,owner_id,category_id,category_name_snapshot,category_slug_snapshot,definition_version,definition_snapshot,status,completed_at,created_at,updated_at").eq("request_id", request.id).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
-    supabase.from("quote_request_attachments").select("id,item_id,material_response_id,file_name,file_path,file_type,file_size").eq("request_id", request.id).order("created_at").returns<AttachmentRecord[]>(),
+    supabase.from("quote_request_attachments").select("id,item_id,material_response_id,file_name,file_path,file_type,file_size").eq("request_id", request.id).neq("source_party", "supplier").order("created_at").returns<AttachmentRecord[]>(),
     supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: ManagerState }>(),
     supabase.from("project_question_answers").select("question_id,value").eq("project_id", request.project_id).returns<Array<{ question_id: string; value: string }>>(),
   ])

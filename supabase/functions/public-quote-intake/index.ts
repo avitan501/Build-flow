@@ -392,6 +392,7 @@ Deno.serve(async (request) => {
         .from("quote_request_attachments")
         .select("file_name,file_path,file_type,file_size")
         .eq("request_id", rawPayload.requestId)
+        .eq("source_party", "client")
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle<{ file_name: string; file_path: string; file_type: string; file_size: number }>()
@@ -605,6 +606,7 @@ Deno.serve(async (request) => {
       file_path: string
       file_type: string
       file_size: number
+      source_party: "client"
     }> = []
     for (const attachment of preparedAttachments) {
       const storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${attachment.filename}`
@@ -626,6 +628,7 @@ Deno.serve(async (request) => {
         file_path: storedFilePath,
         file_type: attachment.type,
         file_size: attachment.size,
+        source_party: "client",
       })
     }
     if (attachmentRows.length) {

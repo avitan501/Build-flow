@@ -31,6 +31,7 @@ type Attachment = {
   file_path: string
   file_type: string | null
   file_size: number | null
+  source_party: "client" | "supplier" | "internal"
 }
 
 type AiItem = {
@@ -279,7 +280,7 @@ Deno.serve(async (request: Request) => {
   const [{ data: requestRecord }, { data: sourceItems }, { data: attachments }] = await Promise.all([
     admin.from("quote_requests").select("id").eq("id", requestId).maybeSingle(),
     admin.from("quote_request_items").select("id,request_id,project_id,owner_id,name,department,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<SourceItem[]>(),
-    admin.from("quote_request_attachments").select("file_name,file_path,file_type,file_size").eq("request_id", requestId).order("created_at").returns<Attachment[]>(),
+    admin.from("quote_request_attachments").select("file_name,file_path,file_type,file_size,source_party").eq("request_id", requestId).neq("source_party", "supplier").order("created_at").returns<Attachment[]>(),
   ])
   if (!requestRecord || !sourceItems?.length) return json({ error: "Request not found" }, 404)
 
