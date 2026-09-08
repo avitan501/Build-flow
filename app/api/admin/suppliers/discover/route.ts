@@ -18,6 +18,7 @@ const inputSchema = z.object({
   excludeIdentities: z.array(z.string().trim().min(1).max(240)).max(500).default([]),
   provider: z.enum(["primary", "exa"]).default("primary"),
   exaApprovalToken: z.string().max(2_000).optional(),
+  limit: z.number().int().min(1).max(SUPPLIER_DISCOVERY_RESULT_LIMIT).default(SUPPLIER_DISCOVERY_RESULT_LIMIT),
 });
 
 type DirectorySupplier = { name?: string | null; portalUrl?: string | null };
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, error: "Enter a department and a valid ZIP code." }, { status: 400 });
   const zipCode = parsed.data.zipCode.slice(0, 5);
+  const requestedLimit = parsed.data.limit;
   const fallbackIdentity = { userId: auth.user.id, job: "find_suppliers" as const, department: parsed.data.department, zipCode };
 
   try {
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
       sources = await searchWithExa({ apiKey, department: parsed.data.department, zipCode, excludeDomains });
       provider = "exa_fallback";
     } else {
-      const primary = await requestOpenClawJob({ job: "find_suppliers", department: parsed.data.department, zipCode, limit: SUPPLIER_DISCOVERY_RESULT_LIMIT });
+      const primary = await requestOpenClawJob({ job: "find_suppliers", department: parsed.data.department, zipCode, limit: requestedLimit });
       if (!primary.ok) {
         return NextResponse.json({ ok: false, error: primary.error || "OpenClaw search is unavailable.", code: primary.code, provider: "codex_openclaw", fallbackAvailable: primary.fallbackAvailable, exaApprovalToken: primary.fallbackAvailable ? createDiscoveryFallbackToken(fallbackIdentity) : undefined, exaMayIncurCharge: primary.fallbackAvailable }, { status: 503 });
       }
@@ -78,15 +80,15 @@ export async function POST(request: Request) {
       fallbackAvailable = primary.fallbackAvailable;
     }
 
-    const suppliers = selectSafeSupplierCandidates({ sources, excludedIdentities: parsed.data.excludeIdentities, existingSuppliers });
-    fallbackAvailable ||= provider === "codex_openclaw" && suppliers.length < SUPPLIER_DISCOVERY_RESULT_LIMIT;
+    const suppliers = selectSafeSupplierCandidates({ sources, excludedIdentities: parsed.data.excludeIdentities, existingSuppliers, limit: requestedLimit });
+    fallbackAvailable ||= provider === "codex_openclaw" && suppliers.length < requestedLimit;
     console.info("[supplier-discovery] completed", { provider, count: suppliers.length });
     return NextResponse.json({
       ok: true,
       suppliers,
       count: suppliers.length,
-      requestedCount: SUPPLIER_DISCOVERY_RESULT_LIMIT,
-      partial: suppliers.length < SUPPLIER_DISCOVERY_RESULT_LIMIT,
+      requestedCount: requestedLimit,
+      partial: suppliers.length < requestedLimit,
       provider,
       fallbackAvailable,
       exaApprovalToken: fallbackAvailable ? createDiscoveryFallbackToken(fallbackIdentity) : undefined,

@@ -12075,7 +12075,7 @@ Deno.serve(async (req: Request) => {
       const requestId = typeof input.requestId === "string" ? input.requestId : "";
       const supplierId = typeof input.supplierId === "string" ? input.supplierId.trim().slice(0, 180) : "";
       const status = typeof input.status === "string" ? input.status : "";
-      const allowedStatuses = new Set(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"]);
+      const allowedStatuses = new Set(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received", "unavailable"]);
       if (!/^[0-9a-f-]{36}$/i.test(requestId) || !supplierId || !allowedStatuses.has(status)) {
         return json({ error: "Choose a valid supplier status." }, 400);
       }
@@ -12112,7 +12112,7 @@ Deno.serve(async (req: Request) => {
       const labels: Record<string, string> = {
         not_contacted: "Not contacted", request_sent: "Request sent",
         supplier_replied: "Supplier replied", awaiting_supplier_reply: "Replied · waiting for supplier",
-        quote_received: "Quote received",
+        quote_received: "Quote received", unavailable: "They don't have it",
       };
       await sql`
         insert into public.project_events

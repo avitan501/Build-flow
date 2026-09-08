@@ -143,6 +143,7 @@ export async function sendAuraMessageAction(input: {
   supplierName?: string;
   materialRequestId?: string;
   materialRequestTitle?: string;
+  materialRequestItemIds?: string[];
   sourceCommunicationId?: string;
   idempotencyKey?: string;
 }): Promise<SendAuraMessageResult> {
@@ -284,6 +285,30 @@ export async function sendAuraMessageAction(input: {
       outcome: "sent",
       startedAt,
     });
+    try {
+      if (input.supplierId && input.materialRequestId && /^[0-9a-f-]{36}$/i.test(input.materialRequestId)) {
+        const requestedItemIds = [...new Set((Array.isArray(input.materialRequestItemIds) ? input.materialRequestItemIds : []).map((id) => String(id || "").trim()).filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 250);
+        if (requestedItemIds.length) {
+          const [{ data: request }, { data: linkedItems }] = await Promise.all([
+            supabase.from("quote_requests").select("project_id,owner_id").eq("id", input.materialRequestId).maybeSingle<{ project_id: string; owner_id: string }>(),
+            supabase.from("quote_request_items").select("id,name").eq("request_id", input.materialRequestId).in("id", requestedItemIds).returns<Array<{ id: string; name: string }>>(),
+          ]);
+          if (request && linkedItems?.length === requestedItemIds.length) {
+            await supabase.from("project_events").insert({
+              project_id: request.project_id,
+              owner_id: request.owner_id,
+              event_type: "status_changed",
+              source: "admin",
+              title: `Supplier request sent to ${String(input.supplierName || "supplier").slice(0, 160)}`,
+              description: linkedItems.map((item) => item.name).join("; ").slice(0, 2000),
+              metadata: { quote_request_id: input.materialRequestId, supplier_id: input.supplierId, supplier_name: input.supplierName || null, supplier_request_item_ids: requestedItemIds, supplier_request_channel: channel, provider_message_id: externalId },
+            });
+          }
+        }
+      }
+    } catch {
+      // A provider-confirmed send must not be reported as failed if optional item-link bookkeeping fails.
+    }
     revalidatePath("/owner/aura");
     revalidatePath("/admin/communications");
     revalidatePath("/admin/users");

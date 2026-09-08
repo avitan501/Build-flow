@@ -45,11 +45,11 @@ export type RequestSupplierPlanInput = {
   suppliers: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
 }
 
-export type RequestSupplierContactStatus = "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received"
+export type RequestSupplierContactStatus = "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received" | "unavailable"
 
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
-const REQUEST_SUPPLIER_CONTACT_STATUSES = new Set<RequestSupplierContactStatus>(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"])
+const REQUEST_SUPPLIER_CONTACT_STATUSES = new Set<RequestSupplierContactStatus>(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received", "unavailable"])
 const REQUEST_STATUS_ORDER = ["draft", "submitted", "in_review", "quoted", "closed"] as const
 
 export async function prepareRequestAttachmentUploadAction(input: {
@@ -820,12 +820,13 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
   return { ok: false, error: delivery.status === "failed" ? delivery.error : "Email delivery is not configured." }
 }
 
-export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; startTime: string; durationHours: number; address: string }): Promise<DeliveryScheduleResult> {
+export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; startTime: string; durationHours: number; address: string; itemIds: string[] }): Promise<DeliveryScheduleResult> {
   const requestId = String(input.requestId || "").trim()
   const date = String(input.date || "").trim()
   const startTime = String(input.startTime || "").trim()
   const durationHours = Number(input.durationHours)
   const address = String(input.address || "").trim().slice(0, 500)
+  const itemIds = [...new Set((Array.isArray(input.itemIds) ? input.itemIds : []).map((id) => String(id || "").trim()).filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 250)
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, error: "This request could not be identified." }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) return { ok: false, error: "Choose a delivery date." }
   const [deliveryHour, deliveryMinute] = startTime.split(":").map(Number)
@@ -835,6 +836,7 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
   if (windowEndMinutes >= 24 * 60) return { ok: false, error: "Choose a delivery window that ends before midnight." }
   const endTime = `${String(Math.floor(windowEndMinutes / 60)).padStart(2, "0")}:${String(windowEndMinutes % 60).padStart(2, "0")}`
   if (!address) return { ok: false, error: "Enter the delivery address." }
+  if (!itemIds.length) return { ok: false, error: "Choose at least one material for this delivery." }
 
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase
@@ -843,6 +845,12 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
     .eq("id", requestId)
     .maybeSingle<{ id: string; title: string; owner_id: string; project_id: string }>()
   if (!request) return { ok: false, error: "Request not found." }
+  const [{ data: deliveryItems, error: deliveryItemsError }, { count: requestItemCount, error: requestItemCountError }] = await Promise.all([
+    supabase.from("quote_request_items").select("id,name,quantity,unit").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; name: string; quantity: number; unit: string | null }>>(),
+    supabase.from("quote_request_items").select("id", { count: "exact", head: true }).eq("request_id", requestId),
+  ])
+  if (deliveryItemsError || requestItemCountError || deliveryItems?.length !== itemIds.length) return { ok: false, error: "One or more selected materials no longer belong to this request." }
+  const deliveryItemSummary = (deliveryItems ?? []).map((item) => `${item.quantity} ${item.unit || "each"} ${item.name}`)
 
   const { error } = await supabase.from("project_events").insert({
     project_id: request.project_id,
@@ -850,7 +858,7 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
     event_type: "status_changed",
     source: "admin",
     title: "Delivery scheduled",
-    description: `${date} between ${startTime} and ${endTime} (${durationHours} hour${durationHours === 1 ? "" : "s"}) · ${address}`,
+    description: `${date} between ${startTime} and ${endTime} (${durationHours} hour${durationHours === 1 ? "" : "s"}) · ${address} · ${deliveryItemSummary.join("; ").slice(0, 1200)}`,
     metadata: {
       quote_request_id: request.id,
       client_action: "delivery_scheduled",
@@ -860,6 +868,9 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
       delivery_window_end: endTime,
       delivery_window_hours: durationHours,
       delivery_address: address,
+      delivery_item_ids: itemIds,
+      delivery_items: deliveryItemSummary,
+      delivery_scope: itemIds.length === requestItemCount ? "all" : "partial",
     },
   })
   if (error) return { ok: false, error: "The delivery schedule could not be saved. Please try again." }

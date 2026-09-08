@@ -412,8 +412,8 @@ test("client material lists are organized securely in the background", async () 
   expect(ownerPage).not.toContain("RequestWorkflowStepHeader");
   expect(worktable).toContain("refresh={organizedItems.length > 0}");
   expect(worktable).toContain("Last AI review:");
-  expect(worktable).toContain("<table");
-  expect(worktable).toContain("Missing info / AI notes");
+  expect(worktable).toContain('aria-label="AI organized request items"');
+  expect(worktable).toContain("AI review");
   expect(worktable).toContain("supplierComparisons.map");
   expect(organizedList).toContain("divide-y divide-slate-200");
   expect(organizedList).not.toContain("md:grid-cols-2");

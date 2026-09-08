@@ -43,7 +43,12 @@ test("review and organization use one compact grouped item workspace", async () 
   expect(worktable).toContain("Group similar")
   expect(worktable).toContain("similarItemGroupLabel")
   expect(worktable).toContain("Select group")
-  expect(worktable).toContain("Send group to supplier")
+  expect(worktable).toContain("Apply supplier route")
+  expect(worktable).toContain("Choose one or more suppliers")
+  expect(worktable).toContain("Generate 5 suppliers")
+  expect(worktable).toContain("addDiscoveredSupplierNetworkAction")
+  expect(worktable).toContain("previously requested suppliers are removed")
+  expect(worktable).toContain('limit: 5')
   expect(worktable).toContain("Reference only")
   expect(worktable).toContain('label: "VERIFIED"')
   expect(worktable).toContain('label: "CLIENT"')
@@ -60,7 +65,17 @@ test("review and organization use one compact grouped item workspace", async () 
   expect(worktable).toContain("AI review")
   expect(worktable).toContain("Supplier route")
   expect(worktable).toContain("Review missing")
-  expect(worktable).toContain("Edit item")
+  expect(worktable).toContain("Original list")
+  expect(worktable).toContain("Edit details")
+  expect(worktable).toContain("General notes")
+  await Promise.all([
+    "rpz-assembly.webp",
+    "capped-test-tee.webp",
+    "outlet-control-valve.webp",
+    "inlet-control-valve.webp",
+    "water-meter.webp",
+    "y-strainer.webp",
+  ].map((fileName) => access(path.join(root, "public/images/materials/request-reference", fileName))))
 
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Review client list"')
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Organize request"')
@@ -481,4 +496,24 @@ test("step three starts from the latest client-ready-to-pay values", async () =>
   expect(management).toContain("clientReadyToPayDefaults.itemUnitPrices[item.id]")
   expect(management).toContain("clientReadyToPayDefaults.deliveryCharge")
   expect(management).toContain("clientReadyToPayDefaults.salesTaxRate")
+})
+
+test("supplier results and partial fulfillment stay linked to exact request items", async () => {
+  const [page, management, actions, aura, migration] = await Promise.all([
+    source(pagePath),
+    source(managementPath),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+    source(path.join(root, "app/owner/aura/actions.ts")),
+    source(path.join(root, "supabase/migrations/20260908225638_add_supplier_unavailable_status.sql")),
+  ])
+
+  expect(page).toContain("sourceRequestItemId")
+  expect(page).toContain('status: price?.is_available')
+  expect(management).toContain("They don’t have it")
+  expect(management).toContain("supplierRequestItemLinks")
+  expect(management).toContain("includedQuoteLines")
+  expect(management).toContain("Materials in this delivery")
+  expect(actions).toContain("delivery_item_ids: itemIds")
+  expect(aura).toContain("supplier_request_item_ids: requestedItemIds")
+  expect(migration).toContain("'unavailable'")
 })

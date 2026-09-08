@@ -6,11 +6,12 @@ import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import { preferredRequestMaterialSources, type RequestMaterialChartSource } from "@/lib/request-material-chart"
 import { requestItemFieldSummary } from "@/lib/request-item-fields"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import { supplierIdentityKeys } from "@/lib/supplier-identity"
 
 type RequestRow = { id: string; title: string; projects: { address: string | null } | null }
-type RequestItem = RequestMaterialChartSource
+type RequestItem = RequestMaterialChartSource & { id: string }
 
-function itemDetails(item: RequestItem) {
+function itemDetails(item: RequestMaterialChartSource) {
   const answers = Array.isArray(item.answers)
     ? item.answers.flatMap((answer) => {
         if (!answer || typeof answer !== "object") return []
@@ -39,12 +40,12 @@ export default async function SupplierRequestDraftPage({
   const { supabase } = await requireStaffProfile("suppliers")
   const [{ data: request }, { data: items }, { data: managerSettings }] = await Promise.all([
     supabase.from("quote_requests").select("id,title,projects(address)").eq("id", requestId).maybeSingle<RequestRow>(),
-    supabase.from("quote_request_items").select("request_id,name,department,item_type,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
+    supabase.from("quote_request_items").select("id,request_id,name,department,item_type,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
     supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>(),
   ])
   if (!request) notFound()
 
-  const preferredItems = preferredRequestMaterialSources(items ?? [])
+  const preferredItems = preferredRequestMaterialSources(items ?? []) as RequestItem[]
   const departmentValue = Array.isArray(query.department) ? query.department[0] : query.department
   const itemDepartments = [...new Set(preferredItems.map((item) => normalizeMaterialCatalogDepartment(item.department)))]
   const department = departmentValue?.trim() || (itemDepartments.length === 1 ? itemDepartments[0] : itemDepartments.length > 1 ? "Multiple departments" : "Others")
@@ -58,9 +59,14 @@ export default async function SupplierRequestDraftPage({
       phone: supplier.phone?.trim() || "",
       whatsapp: supplier.whatsapp?.trim() || "",
       preferredDeliveryMethod: supplier.preferredDeliveryMethod || "manual",
+      items: preferredItems.filter((item) => {
+        const routeNames = Array.isArray(item.metadata?.supplier_route_names) ? item.metadata.supplier_route_names.filter((name): name is string => typeof name === "string") : []
+        const supplierKeys = new Set(supplierIdentityKeys({ name: supplier.name }))
+        return routeNames.some((name) => supplierIdentityKeys({ name }).some((key) => supplierKeys.has(key)))
+      }).map((item) => ({ id: item.id, label: itemDetails(item).join("\n") })),
     }))
   if (!selectedSuppliers.length) redirect(`/owner/materials/requests/${requestId}`)
 
   const materialList = matchingItems.flatMap(itemDetails).join("\n") || `Request: ${request.title}`
-  return <SupplierRequestDraft requestId={request.id} requestTitle={request.title} department={department} suppliers={selectedSuppliers} initialAddress={request.projects?.address || "280 Lawrence Ave, Lawrence, NY 11559"} initialMaterialList={materialList} />
+  return <SupplierRequestDraft requestId={request.id} requestTitle={request.title} department={department} suppliers={selectedSuppliers.map((supplier) => ({ ...supplier, items: supplier.items.length ? supplier.items : preferredItems.map((item) => ({ id: item.id, label: itemDetails(item).join("\n") })) }))} initialAddress={request.projects?.address || "280 Lawrence Ave, Lawrence, NY 11559"} initialMaterialList={materialList} />
 }

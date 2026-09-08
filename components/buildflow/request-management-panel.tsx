@@ -32,7 +32,7 @@ import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { createClient } from "@/lib/supabase/client"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
-type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
+type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number; included: boolean }
 export type RequestComparisonSummary = {
   id: string
   title: string
@@ -41,7 +41,7 @@ export type RequestComparisonSummary = {
   clientQuoteStatus: string
   quoteNumber: string
   updatedAt: string
-  bids: Array<{ id: string; supplierId: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }>
+  bids: Array<{ id: string; supplierId: string; supplierName: string; landedTotal: number; pricedItemCount: number; unavailableItemCount: number; itemCount: number; recommended: boolean; items: Array<{ id: string; sourceRequestItemId: string | null; name: string; status: "quoted" | "unavailable" | "waiting" }> }>
   documents: Array<{ id: string; supplierId: string | null; fileName: string; sourceUrl: string | null }>
 }
 export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
@@ -83,6 +83,7 @@ const SUPPLIER_CONTACT_STATUS_OPTIONS: Array<{ value: RequestSupplierContactStat
   { value: "supplier_replied", label: "They replied" },
   { value: "awaiting_supplier_reply", label: "We replied · waiting" },
   { value: "quote_received", label: "Quote received" },
+  { value: "unavailable", label: "They don’t have it" },
 ]
 
 const TAX_LOCATION_PRESETS = [
@@ -100,6 +101,7 @@ function taxPresetForRate(rate: number) {
 function supplierContactStatusClass(status: RequestSupplierContactStatus | "no_response") {
   if (status === "no_response") return "border-rose-200 bg-rose-50 text-rose-800"
   if (status === "quote_received") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (status === "unavailable") return "border-rose-200 bg-rose-50 text-rose-800"
   if (status === "awaiting_supplier_reply") return "border-amber-200 bg-amber-50 text-amber-900"
   if (status === "supplier_replied") return "border-violet-200 bg-violet-50 text-violet-800"
   if (status === "request_sent") return "border-sky-200 bg-sky-50 text-sky-800"
@@ -187,6 +189,7 @@ export function RequestManagementPanel({
   supplierEmails,
   requestAttachments,
   supplierRequestFiles,
+  supplierRequestItemLinks,
 }: {
   requestId: string
   requestTitle: string
@@ -212,6 +215,7 @@ export function RequestManagementPanel({
   supplierEmails: RelatedEmailItem[]
   requestAttachments: RequestClientDocumentAttachment[]
   supplierRequestFiles: Array<{ id: string; fileName: string; url: string | null }>
+  supplierRequestItemLinks: Array<{ supplierId: string; itemIds: string[]; channel: string }>
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
@@ -249,7 +253,8 @@ export function RequestManagementPanel({
   const [issueDate, setIssueDate] = useState(() => formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
   const [clientAddress, setClientAddress] = useState("")
   const [shipTo, setShipTo] = useState(projectAddress)
-  const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+  const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0, included: true })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0, included: true }])
+  const [deliveryItemIds, setDeliveryItemIds] = useState<string[]>(() => requestItems.map((item) => item.id))
   const [deliveryCharge, setDeliveryCharge] = useState(clientReadyToPayDefaults.deliveryCharge)
   const [salesTaxRate, setSalesTaxRate] = useState(clientReadyToPayDefaults.salesTaxRate)
   const [taxLocationPreset, setTaxLocationPreset] = useState(() => taxPresetForRate(clientReadyToPayDefaults.salesTaxRate))
@@ -286,7 +291,8 @@ export function RequestManagementPanel({
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
   const deliveryWindowHoursNumber = Number(deliveryWindowHours)
   const deliveryWindowEnd = useMemo(() => deliveryWindowEndTime(deliveryWindowStart, deliveryWindowHoursNumber), [deliveryWindowHoursNumber, deliveryWindowStart])
-  const deliveryWindowReady = Boolean(deliveryDate && deliveryWindowStart && deliveryWindowEnd && deliveryAddress.trim() && deliveryWindowHoursNumber >= 0.5 && deliveryWindowHoursNumber <= 12)
+  const deliveryWindowReady = Boolean(deliveryDate && deliveryWindowStart && deliveryWindowEnd && deliveryAddress.trim() && deliveryWindowHoursNumber >= 0.5 && deliveryWindowHoursNumber <= 12 && deliveryItemIds.length)
+  const deliveryItemLabels = useMemo(() => requestItems.filter((item) => deliveryItemIds.includes(item.id)).map((item) => `${item.quantity} ${item.unit || "each"} ${item.name}`), [deliveryItemIds, requestItems])
 
   useEffect(() => {
     pendingRef.current = pending
@@ -301,6 +307,7 @@ export function RequestManagementPanel({
         ...(deliveryDate ? [`Date: ${deliveryDateLabel(deliveryDate)}`] : []),
         ...(deliveryWindowStart && deliveryWindowEnd ? [`Delivery window: Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)} Eastern (${deliveryWindowHoursNumber.toLocaleString()} hour${deliveryWindowHoursNumber === 1 ? "" : "s"})`] : []),
         ...(deliveryAddress.trim() ? [`Address: ${deliveryAddress.trim()}`] : []),
+        ...(deliveryItemLabels.length ? ["Materials:", ...deliveryItemLabels.map((item) => `- ${item}`)] : []),
       ]
       return [block.text]
     })
@@ -308,7 +315,7 @@ export function RequestManagementPanel({
     return replyBlock === "payment"
       ? buildClientLinkMessage({ messageText, url: AVANTIA_PAYMENT_LINK, fallbackMessage: "Use Avantia Build's secure payment link below." })
       : messageText
-  }, [client.name, deliveryAddress, deliveryDate, deliveryWindowEnd, deliveryWindowHoursNumber, deliveryWindowStart, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
+  }, [client.name, deliveryAddress, deliveryDate, deliveryItemLabels, deliveryWindowEnd, deliveryWindowHoursNumber, deliveryWindowStart, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
 
   const clientPaymentPreview = useMemo(() => replyBlock === "payment" ? splitClientLinkMessage(clientMessage) : null, [clientMessage, replyBlock])
 
@@ -414,7 +421,7 @@ export function RequestManagementPanel({
     setIssueDate(saved?.documentData.issueDate || formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
     setClientAddress(saved?.documentData.clientAddress || "")
     setShipTo(saved?.documentData.shipTo || projectAddress)
-    setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+    setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID(), included: true })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0, included: true })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0, included: true }])
     setDeliveryCharge(saved?.documentData.deliveryCharge === undefined ? clientReadyToPayDefaults.deliveryCharge : Number(saved.documentData.deliveryCharge) || 0)
     setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate)
     setTaxLocationPreset(taxPresetForRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate))
@@ -544,7 +551,7 @@ export function RequestManagementPanel({
   function saveDeliverySchedule() {
     startTransition(async () => {
       setFeedback("")
-      const result = await scheduleRequestDeliveryAction({ requestId, date: deliveryDate, startTime: deliveryWindowStart, durationHours: deliveryWindowHoursNumber, address: deliveryAddress })
+      const result = await scheduleRequestDeliveryAction({ requestId, date: deliveryDate, startTime: deliveryWindowStart, durationHours: deliveryWindowHoursNumber, address: deliveryAddress, itemIds: deliveryItemIds })
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? "Delivery schedule saved. The client message is ready to send." : result.error)
       if (result.ok) {
@@ -628,7 +635,8 @@ export function RequestManagementPanel({
     })
   }
 
-  const quoteSubtotal = quoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
+  const includedQuoteLines = quoteLines.filter((line) => line.included)
+  const quoteSubtotal = includedQuoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
   const quoteTax = (quoteSubtotal + (taxableDelivery ? deliveryCharge : 0)) * salesTaxRate / 100
   const quoteTotal = quoteSubtotal + deliveryCharge + quoteTax
   const documentLabel = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
@@ -651,7 +659,7 @@ export function RequestManagementPanel({
       clientAddress,
       shipTo,
       message: quoteMessage,
-      lines: quoteLines.map(({ description, quantity, unit, unitPrice }) => ({ description, quantity, unit, unitPrice })),
+      lines: includedQuoteLines.map(({ description, quantity, unit, unitPrice }) => ({ description, quantity, unit, unitPrice })),
       deliveryCharge,
       salesTaxRate,
       taxableDelivery,
@@ -904,7 +912,9 @@ export function RequestManagementPanel({
     const supplierPackage = supplier ? packages.find((entry) => entry.supplier_id === supplier.id) ?? null : null
     const note = routeSelections.find((selection) => supplierNameCollator.compare(selection.name, name) === 0)?.note || ""
     const comparisonCount = supplier ? requestSupplierFolderContents(comparisons, supplier.id).length : 0
-    return { name, supplier, bid, supplierPackage, note, comparisonCount }
+    const routedItems = pricingSummaryItems.filter((item) => item.route.split(",").some((routeName) => supplierNameCollator.compare(routeName.trim(), name) === 0))
+    const sentItemIds = supplier ? [...new Set(supplierRequestItemLinks.filter((entry) => entry.supplierId === supplier.id).flatMap((entry) => entry.itemIds))] : []
+    return { name, supplier, bid, supplierPackage, note, comparisonCount, routedItems, sentItemIds }
   })
   const comparisonFolder = comparisonFolderSupplier ? requestSupplierFolderContents(comparisons, comparisonFolderSupplier.supplierId) : []
 
@@ -1004,7 +1014,7 @@ export function RequestManagementPanel({
               : contactStatus
             return <article role="row" key={row.name} className="grid min-h-16 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem] sm:items-center">
               <div role="cell" className="flex min-w-0 items-start justify-between gap-2">
-                <div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
+                <div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p><p className="mt-0.5 text-[10px] font-bold text-slate-500">{row.routedItems.length} routed{row.sentItemIds.length ? ` · ${row.sentItemIds.length} sent` : ""}{row.bid ? ` · ${row.bid.pricedItemCount} quoted${row.bid.unavailableItemCount ? ` · ${row.bid.unavailableItemCount} unavailable` : ""}` : ""}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}<details className="mt-1"><summary className="cursor-pointer text-[10px] font-bold text-[#0066cc]">View item status</summary><div className="mt-1 grid gap-1">{(row.bid?.items.length ? row.bid.items : row.routedItems.map((item) => ({ id: item.id, sourceRequestItemId: item.id, name: item.organized || item.original, status: "waiting" as const }))).map((item) => <div key={item.id} className="flex items-center justify-between gap-2 rounded bg-slate-50 px-2 py-1 text-[10px]"><span className="min-w-0 truncate font-semibold">{item.name}</span><span className={`shrink-0 font-bold ${item.status === "quoted" ? "text-emerald-700" : item.status === "unavailable" ? "text-rose-700" : "text-amber-700"}`}>{item.status === "quoted" ? "Price received" : item.status === "unavailable" ? "They don’t have it" : row.sentItemIds.includes(item.sourceRequestItemId || item.id) || row.supplierPackage ? "Sent · waiting" : "Routed"}</span></div>)}</div></details></div>
                 <div className="flex shrink-0 justify-end gap-1.5 sm:hidden">{renderSupplierRouteActions(row)}</div>
               </div>
               <div role="cell" className="grid gap-1.5"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={displayContactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(displayContactStatus)}`}>{displayContactStatus === "no_response" ? <option value="no_response" disabled>No response</option> : null}{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
@@ -1113,6 +1123,11 @@ export function RequestManagementPanel({
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Window starts (Eastern)<input type="time" value={deliveryWindowStart} onChange={(event) => setDeliveryWindowStart(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Window length (hours)<input type="number" min="0.5" max="12" step="0.5" value={deliveryWindowHours} onChange={(event) => setDeliveryWindowHours(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2 lg:col-span-3">Delivery address<input value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Jobsite delivery address" className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950" /></label>
+                <fieldset className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:col-span-2 lg:col-span-3">
+                  <div className="flex items-center justify-between gap-2"><legend className="text-xs font-black text-slate-800">Materials in this delivery</legend><button type="button" onClick={() => setDeliveryItemIds(deliveryItemIds.length === requestItems.length ? [] : requestItems.map((item) => item.id))} className="text-[11px] font-bold text-[#0066cc]">{deliveryItemIds.length === requestItems.length ? "Clear" : "Select all"}</button></div>
+                  <div className="grid gap-1 sm:grid-cols-2">{requestItems.map((item) => <label key={item.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-2 text-xs font-semibold"><input type="checkbox" checked={deliveryItemIds.includes(item.id)} onChange={(event) => setDeliveryItemIds((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} className="h-4 w-4 accent-[#0071e3]" /><span className="min-w-0 flex-1 truncate">{item.quantity} {item.unit || "each"} · {item.name}</span></label>)}</div>
+                  <p className="text-[10px] font-semibold text-slate-500">{deliveryItemIds.length} of {requestItems.length} material lines selected. You can schedule the remaining lines separately.</p>
+                </fieldset>
                 {deliveryWindowStart && !deliveryWindowEnd ? <p className="text-xs font-bold text-rose-700 sm:col-span-2 lg:col-span-3">Choose a shorter window that ends before midnight.</p> : null}
                 <button type="button" onClick={saveDeliverySchedule} disabled={pending || !deliveryWindowReady} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2 lg:col-span-3"><CalendarClock className="h-4 w-4" />{pending ? "Saving..." : "Save window and prepare client message"}</button>
               </div>
@@ -1184,9 +1199,9 @@ export function RequestManagementPanel({
             </div>
 
             <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[48rem] text-left text-xs"><thead className="bg-slate-950 text-white"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Quantity</th><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Unit price</th><th className="px-3 py-2 text-right">Total</th><th className="w-10" /></tr></thead><tbody>{quoteLines.map((line, index) => <tr key={line.key} className="border-b border-slate-200 last:border-b-0"><td className="px-3 py-2 font-bold">{index + 1}</td><td className="p-1.5"><input value={line.description} onChange={(event) => updateQuoteLine(line.key, { description: event.target.value })} className="h-9 w-full min-w-56 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(event) => updateQuoteLine(line.key, { quantity: Number(event.target.value) })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input value={line.unit} onChange={(event) => updateQuoteLine(line.key, { unit: event.target.value })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(event) => updateQuoteLine(line.key, { unitPrice: Number(event.target.value) })} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="px-3 py-2 text-right font-bold tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</td><td><button type="button" onClick={() => setQuoteLines((current) => current.filter((item) => item.key !== line.key))} className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:text-rose-700" aria-label={`Remove item ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table>
+              <table className="w-full min-w-[48rem] text-left text-xs"><thead className="bg-slate-950 text-white"><tr><th className="px-3 py-2">Use</th><th className="px-3 py-2">Item</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Quantity</th><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Unit price</th><th className="px-3 py-2 text-right">Total</th><th className="w-10" /></tr></thead><tbody>{quoteLines.map((line, index) => <tr key={line.key} className={`border-b border-slate-200 last:border-b-0 ${line.included ? "bg-white" : "bg-slate-100 opacity-60"}`}><td className="px-3 py-2"><input type="checkbox" checked={line.included} onChange={(event) => updateQuoteLine(line.key, { included: event.target.checked })} aria-label={`Include item ${index + 1} in ${documentLabel.toLowerCase()}`} className="h-4 w-4 accent-[#0071e3]" /></td><td className="px-3 py-2 font-bold">{index + 1}</td><td className="p-1.5"><input value={line.description} onChange={(event) => updateQuoteLine(line.key, { description: event.target.value })} className="h-9 w-full min-w-56 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(event) => updateQuoteLine(line.key, { quantity: Number(event.target.value) })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input value={line.unit} onChange={(event) => updateQuoteLine(line.key, { unit: event.target.value })} className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="p-1.5"><input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(event) => updateQuoteLine(line.key, { unitPrice: Number(event.target.value) })} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-slate-950" /></td><td className="px-3 py-2 text-right font-bold tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</td><td><button type="button" onClick={() => setQuoteLines((current) => current.filter((item) => item.key !== line.key))} className="inline-flex h-8 w-8 items-center justify-center text-slate-600 hover:text-rose-700" aria-label={`Remove item ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table>
             </div>
-            <button type="button" onClick={() => setQuoteLines((current) => [...current, { key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])} className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold"><Plus className="h-3.5 w-3.5" />Add item</button>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-slate-600">{includedQuoteLines.length} of {quoteLines.length} lines included in this {documentLabel.toLowerCase()}</p><div className="flex gap-2"><button type="button" onClick={() => setQuoteLines((current) => current.map((line) => ({ ...line, included: true })))} className="inline-flex min-h-9 items-center rounded-md border border-slate-300 px-3 text-xs font-bold">Select all</button><button type="button" onClick={() => setQuoteLines((current) => [...current, { key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0, included: true }])} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold"><Plus className="h-3.5 w-3.5" />Add item</button></div></div>
 
             {documentType === "estimate" ? <section className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" aria-label="Estimate attachments">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1244,7 +1259,7 @@ export function RequestManagementPanel({
             {preparedDocumentText ? <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4" aria-label="Exact text message preview"><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#0066cc]">Exact SMS preview · nothing sent yet</p><p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{splitClientLinkMessage(preparedDocumentText.message).text}</p><a href={splitClientLinkMessage(preparedDocumentText.message).url} target="_blank" rel="noreferrer" className="mt-3 block break-all text-sm font-bold text-[#0066cc] underline underline-offset-4">{splitClientLinkMessage(preparedDocumentText.message).url}</a><button type="button" onClick={sendPreparedDocumentText} disabled={pending || !client.phone} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-45"><MessageSquareText className="h-4 w-4" />{pending ? "Sending…" : "Send this exact text"}</button></section> : null}
             {quoteFeedback ? <p className="mt-3 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold leading-6" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto break-all text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={prepareDocumentText} disabled={pending || !client.phone || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><MessageSquareText className="h-4 w-4" />Text live link preview</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto break-all text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !includedQuoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={prepareDocumentText} disabled={pending || !client.phone || !includedQuoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-600 disabled:opacity-100"><MessageSquareText className="h-4 w-4" />Text live link preview</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !includedQuoteLines.length || paymentOptionsInvalid} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-700 disabled:opacity-100"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>

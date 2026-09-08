@@ -214,7 +214,7 @@ export default async function OwnerMaterialRequestPage({
       .from("quote_request_supplier_recommendations")
       .select("supplier_id,is_recommended,should_contact,contact_status,notes")
       .eq("request_id", requestId)
-      .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean; contact_status: "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received"; notes: string }>>(),
+      .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean; contact_status: "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received" | "unavailable"; notes: string }>>(),
     supabase
       .from("request_client_documents")
       .select("id,document_type,document_number,document_data,public_token,manager_preview_token,version,updated_at")
@@ -464,15 +464,30 @@ export default async function OwnerMaterialRequestPage({
       clientQuoteStatus: comparison.client_quote_status,
       quoteNumber: comparison.quote_number,
       updatedAt: comparison.updated_at,
-      bids: analyses.map((analysis) => ({
-        id: analysis.bidId,
-        supplierId: comparisonBids.find((bid) => bid.id === analysis.bidId)?.supplier_id || "",
-        supplierName: analysis.supplierName,
-        landedTotal: analysis.landedTotal,
-        pricedItemCount: analysis.pricedItemCount,
-        itemCount: analysis.itemCount,
-        recommended: analysis.isRecommended,
-      })),
+      bids: analyses.map((analysis) => {
+        const bid = comparisonBids.find((candidate) => candidate.id === analysis.bidId)
+        const prices = new Map((bid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]))
+        const bidItems = comparisonItems.map((item) => {
+          const price = prices.get(item.id)
+          return {
+            id: item.id,
+            sourceRequestItemId: item.source_request_item_id ?? null,
+            name: item.description,
+            status: price?.is_available && price.unit_price !== null ? "quoted" as const : price && !price.is_available ? "unavailable" as const : "waiting" as const,
+          }
+        })
+        return {
+          id: analysis.bidId,
+          supplierId: bid?.supplier_id || "",
+          supplierName: analysis.supplierName,
+          landedTotal: analysis.landedTotal,
+          pricedItemCount: analysis.pricedItemCount,
+          unavailableItemCount: bidItems.filter((item) => item.status === "unavailable").length,
+          itemCount: analysis.itemCount,
+          recommended: analysis.isRecommended,
+          items: bidItems,
+        }
+      }),
       documents: comparisonDocuments.map((document) => ({
         id: document.id,
         supplierId: document.supplier_id,
@@ -799,6 +814,11 @@ export default async function OwnerMaterialRequestPage({
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, managerPreviewToken: entry.manager_preview_token, version: entry.version, updatedAt: entry.updated_at, lastOpenedAt: currentClientDocumentViewByVersion.get(`${entry.id}:${entry.version}`)?.last_opened_at ?? null }))}
             requestAttachments={clientRequestFiles.flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
             supplierRequestFiles={supplierRequestFiles.map((entry) => ({ id: entry.id, fileName: entry.file_name, url: entry.url }))}
+            supplierRequestItemLinks={(clientActionEvents ?? []).flatMap((event) => {
+              const supplierId = typeof event.metadata?.supplier_id === "string" ? event.metadata.supplier_id : ""
+              const itemIds = Array.isArray(event.metadata?.supplier_request_item_ids) ? event.metadata.supplier_request_item_ids.filter((id): id is string => typeof id === "string") : []
+              return supplierId && itemIds.length ? [{ supplierId, itemIds, channel: String(event.metadata?.supplier_request_channel || "") }] : []
+            })}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
             supplierEmails={supplierEmails}
