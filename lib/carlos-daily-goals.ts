@@ -30,10 +30,18 @@ type CommunicationReceipt = {
   metadata: { outcome?: string; external_id?: string; channel?: string; recipient?: string; subject?: string } | null
 }
 
+type RecordActivityReceipt = {
+  event_type: string
+  entity_type: string | null
+  entity_id: string | null
+}
+
 export function countUniqueSuccessfulCommunications(receipts: CommunicationReceipt[]) {
   const keys = new Set<string>()
   for (const receipt of receipts) {
-    if (!["sent", "completed"].includes(receipt.metadata?.outcome || "")) continue
+    const outcome = receipt.metadata?.outcome || ""
+    const callOpened = receipt.metadata?.channel === "call" && outcome === "opened_on_device"
+    if (!["sent", "completed"].includes(outcome) && !callOpened) continue
     const externalId = receipt.metadata?.external_id?.trim()
     if (externalId) {
       keys.add(`provider:${externalId}`)
@@ -44,4 +52,20 @@ export function countUniqueSuccessfulCommunications(receipts: CommunicationRecei
     keys.add([receipt.metadata?.channel || "message", receipt.metadata?.recipient || "unknown", receipt.metadata?.subject || "", minute].join("|"))
   }
   return keys.size
+}
+
+export function countUniqueRecordActivity(
+  receipts: RecordActivityReceipt[],
+  entityType: string,
+  eligibleEntityIds?: ReadonlySet<string>,
+) {
+  const entityIds = new Set<string>()
+  for (const receipt of receipts) {
+    if (!["record_created", "record_updated"].includes(receipt.event_type)) continue
+    if (receipt.entity_type !== entityType) continue
+    const entityId = receipt.entity_id?.trim()
+    if (!entityId || (eligibleEntityIds && !eligibleEntityIds.has(entityId))) continue
+    entityIds.add(entityId)
+  }
+  return entityIds.size
 }

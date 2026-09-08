@@ -12,6 +12,7 @@ import { saveRequestSupplierProgressNoteAction } from "@/app/owner/materials/req
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
+import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
@@ -20,6 +21,7 @@ import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
 import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
 import { requestPaymentGuidanceForMethod, type RequestPaymentMethod } from "@/lib/request-client-payment"
+import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
@@ -170,6 +172,7 @@ export function RequestManagementPanel({
   pricingSummaryItems,
   routeSelections,
   projectAddress,
+  currentSubstep,
   comparisons,
   clientReplyCompleted,
   step2CompletedOverride,
@@ -193,6 +196,7 @@ export function RequestManagementPanel({
   routeSelections: RequestSupplierRouteSelection[]
   projectAddress: string
   currentStage: ManagerPipelineStage
+  currentSubstep: RequestWorkflowSubstepId
   comparisons: RequestComparisonSummary[]
   clientReplyCompleted: boolean
   step2CompletedOverride: boolean | null
@@ -876,6 +880,7 @@ export function RequestManagementPanel({
   const primaryWorkflowClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
   const secondaryWorkflowClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
   const compactWorkflowClass = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-[#0066cc] transition hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] disabled:opacity-45 sm:min-h-9"
+  const stepToolClass = "inline-flex min-h-10 w-full items-center gap-2 rounded-md px-3 text-left text-xs font-bold text-slate-700 hover:bg-sky-50 hover:text-[#0066cc] disabled:opacity-40"
 
   function renderStep2PrimaryAction() {
     if (workflow.step2Complete) {
@@ -920,7 +925,14 @@ export function RequestManagementPanel({
   return (
     <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0">
       <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" />
+        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" tools={<>
+          <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={stepToolClass}><Route className="h-4 w-4" />Choose supplier route</button>
+          <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={stepToolClass}><Paperclip className="h-4 w-4" />Upload supplier quote</a>
+          <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Plus className="h-4 w-4" />Enter pricing manually</button>
+          <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Compare supplier route</button>
+          {!estimateSent ? <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Create direct estimate</button> : null}
+        </>} />
+        <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
           <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-bold">
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{pricingSummaryItems.length} item{pricingSummaryItems.length === 1 ? "" : "s"}</span>
@@ -956,12 +968,7 @@ export function RequestManagementPanel({
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
 
-          <div className="flex flex-wrap justify-end gap-2">
-            {renderStep2PrimaryAction()}
-            {!estimateSent && !workflow.step2Complete ? <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Direct estimate</button> : null}
-            {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Plus className="h-4 w-4" />{supplierQuoteCount ? "Add another quote" : "Add supplier quote"}</button> : null}
-            <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button>
-          </div>
+          <div className="flex flex-wrap justify-end gap-2">{renderStep2PrimaryAction()}</div>
 
           {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
             <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={secondaryWorkflowClass}><Paperclip className="h-4 w-4" />Upload File or Photo</a>
@@ -971,7 +978,15 @@ export function RequestManagementPanel({
       </details>
 
       <details open={paymentDeliveryStatus === "active"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} />
+        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} tools={<>
+          <button type="button" onClick={() => setContactOpen(true)} className={stepToolClass}><MessageSquareText className="h-4 w-4" />Contact client</button>
+          <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Estimate</button>
+          <button type="button" onClick={() => openDocument("invoice")} className={stepToolClass}><FileText className="h-4 w-4" />Invoice</button>
+          <button type="button" onClick={() => openDocument("receipt")} className={stepToolClass}><ReceiptText className="h-4 w-4" />Receipt</button>
+          <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className={stepToolClass}><Send className="h-4 w-4" />Payment link</button>
+          <button type="button" onClick={openDeliverySchedule} className={stepToolClass}><CalendarClock className="h-4 w-4" />Delivery schedule</button>
+        </>} />
+        <RequestSubstepFunnel requestId={requestId} step={3} currentSubstep={currentSubstep} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
           <ol className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {[
@@ -1010,7 +1025,6 @@ export function RequestManagementPanel({
 
           <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mt-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep3PrimaryAction()}</div>
 
-          <details className="group/docs mt-2 rounded-lg border border-slate-200 bg-slate-50"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>All Documents</span><span className="inline-flex items-center gap-1 text-[10px] font-normal text-slate-500">Edit, send, or download<ChevronDown className="h-4 w-4 transition group-open/docs:rotate-180" /></span></summary><div className="grid grid-cols-3 gap-1.5 border-t border-slate-200 p-2"><button type="button" onClick={() => openDocument("estimate")} className={secondaryWorkflowClass}><FileCheck2 className="h-3.5 w-3.5" />Estimate</button><button type="button" onClick={() => openDocument("invoice")} className={secondaryWorkflowClass}><FileText className="h-3.5 w-3.5" />Invoice</button><button type="button" onClick={() => openDocument("receipt")} className={secondaryWorkflowClass}><ReceiptText className="h-3.5 w-3.5" />Receipt</button></div></details>
           {feedback ? <p className={`mt-2 rounded-lg border px-3 py-2 text-xs font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status" aria-live="polite">{feedback}</p> : null}
         </div>
       </details>

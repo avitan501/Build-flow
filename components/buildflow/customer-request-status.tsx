@@ -26,11 +26,13 @@ export function CustomerRequestStatus({
   requestId,
   status,
   currentStage,
+  currentLabel,
   hideLabel = false,
 }: {
   requestId: string;
   status: QuoteRequestStatus;
   currentStage: ManagerPipelineStage;
+  currentLabel?: string;
   hideLabel?: boolean;
 }) {
   const router = useRouter();
@@ -63,7 +65,7 @@ export function CustomerRequestStatus({
   }
 
   return (
-    <div className="w-44 min-w-0">
+    <div className="w-full min-w-0">
         <label className="grid gap-1">
           <span
             id="request-status-heading"
@@ -83,7 +85,7 @@ export function CustomerRequestStatus({
           >
             {stages.map((stage) => (
               <option key={stage.status} value={stage.status}>
-                {stage.label}
+                {stage.status === selectedStatus && currentLabel ? currentLabel : stage.label}
               </option>
             ))}
           </select>

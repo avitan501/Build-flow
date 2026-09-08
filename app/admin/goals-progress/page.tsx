@@ -21,7 +21,7 @@ import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { ManagerGoalPrioritySelect } from "@/components/buildflow/manager-goal-priority-select";
 import { requireManagerPortalProfile } from "@/lib/auth";
-import { buildCarlosDailyGoals, countUniqueSuccessfulCommunications, newYorkBusinessDayRange } from "@/lib/carlos-daily-goals";
+import { buildCarlosDailyGoals, countUniqueRecordActivity, countUniqueSuccessfulCommunications, newYorkBusinessDayRange } from "@/lib/carlos-daily-goals";
 import {
   CARLOS_FIXED_GOALS,
   fixedGoalKey as parseFixedGoalKey,
@@ -323,7 +323,7 @@ export async function CarlosGoalsWorkspace({
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult, publishedResult, handledLeadResult, clientActivityResult, vendorContactResult, preparedQuoteResult, closedRequestResult] =
+  const [clientResult, goalResult, leadResult, publishedResult, recordActivityResult, clientActivityResult, vendorContactResult, preparedQuoteResult, closedRequestResult] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -361,21 +361,26 @@ export async function CarlosGoalsWorkspace({
             priority: number;
           }>
         >(),
-      day ? supabase.from("manager_outreach_leads").select("id", { count: "exact", head: true }).neq("status", "new").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
-      day ? supabase.from("manager_staff_activity_events").select("id,occurred_at,metadata").eq("user_id", carlosId).eq("event_type", "communication_sent").gte("occurred_at", day.start).lt("occurred_at", day.end).limit(500).returns<Array<{ id: string; occurred_at: string; metadata: { outcome?: string; external_id?: string; channel?: string; recipient?: string; subject?: string } | null }>>() : Promise.resolve({ data: [] }),
-      day ? supabase.from("quote_request_supplier_recommendations").select("supplier_id", { count: "exact", head: true }).eq("updated_by", carlosId).neq("contact_status", "not_contacted").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
-      day ? supabase.from("request_client_documents").select("id", { count: "exact", head: true }).eq("updated_by", carlosId).in("document_type", ["estimate", "invoice"]).gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
-      day ? supabase.from("quote_requests").select("id", { count: "exact", head: true }).eq("manager_assignee", "carlos").eq("status", "closed").gte("updated_at", day.start).lt("updated_at", day.end) : Promise.resolve({ count: 0 }),
+      day ? supabase.from("manager_staff_activity_events").select("id,event_type,entity_type,entity_id,occurred_at").eq("user_id", carlosId).in("event_type", ["record_created", "record_updated"]).gte("occurred_at", day.start).lt("occurred_at", day.end).limit(500).returns<Array<{ id: string; event_type: string; entity_type: string | null; entity_id: string | null; occurred_at: string }>>() : Promise.resolve({ data: [], error: null }),
+      day ? supabase.from("manager_staff_activity_events").select("id,occurred_at,metadata").eq("user_id", carlosId).eq("event_type", "communication_sent").gte("occurred_at", day.start).lt("occurred_at", day.end).limit(500).returns<Array<{ id: string; occurred_at: string; metadata: { outcome?: string; external_id?: string; channel?: string; recipient?: string; subject?: string } | null }>>() : Promise.resolve({ data: [], error: null }),
+      day ? supabase.from("quote_request_supplier_recommendations").select("request_id,supplier_id").eq("updated_by", carlosId).neq("contact_status", "not_contacted").gte("updated_at", day.start).lt("updated_at", day.end).limit(500).returns<Array<{ request_id: string; supplier_id: string }>>() : Promise.resolve({ data: [], error: null }),
+      day ? supabase.from("request_client_documents").select("request_id").eq("updated_by", carlosId).in("document_type", ["estimate", "invoice"]).gte("updated_at", day.start).lt("updated_at", day.end).limit(500).returns<Array<{ request_id: string }>>() : Promise.resolve({ data: [], error: null }),
+      supabase.from("quote_requests").select("id").eq("manager_assignee", "carlos").eq("status", "closed").limit(500).returns<Array<{ id: string }>>(),
     ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
+  const recordActivity = recordActivityResult.error ? [] : (recordActivityResult.data ?? []);
+  const handledLeadIds = new Set(leads.filter((lead) => lead.status !== "new").map((lead) => lead.id));
+  const closedRequestIds = new Set((closedRequestResult.error ? [] : closedRequestResult.data ?? []).map((request) => request.id));
+  const contactedSupplierIds = new Set((vendorContactResult.error ? [] : vendorContactResult.data ?? []).map((contact) => `${contact.request_id}:${contact.supplier_id}`));
+  const preparedQuoteRequestIds = new Set((preparedQuoteResult.error ? [] : preparedQuoteResult.data ?? []).map((quote) => quote.request_id));
   const dailyGoals = buildCarlosDailyGoals({
-    leads: handledLeadResult.count ?? 0,
+    leads: countUniqueRecordActivity(recordActivity, "manager_outreach_leads", handledLeadIds),
     clients: countUniqueSuccessfulCommunications(clientActivityResult.data ?? []),
-    vendors: vendorContactResult.count ?? 0,
-    quotes: preparedQuoteResult.count ?? 0,
-    closed: closedRequestResult.count ?? 0,
+    vendors: contactedSupplierIds.size,
+    quotes: preparedQuoteRequestIds.size,
+    closed: countUniqueRecordActivity(recordActivity, "quote_requests", closedRequestIds),
   });
   const carlosFixedTaskKeys = new Set(
     Object.keys(CARLOS_FIXED_GOALS).map((key) => `carlos-fixed-${key}`),

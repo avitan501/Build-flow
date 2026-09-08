@@ -29,6 +29,7 @@ import {
 import { managerPipelineStage, managerPipelineStageWithOverride, type ManagerPipelineStage } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
+import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubstepLabel, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing";
@@ -310,10 +311,11 @@ export default async function OwnerMaterialRequestPage({
   const [{ data: profile }, answersResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name,email,phone")
+      .select("full_name,company_name,email,phone")
       .eq("id", request.owner_id)
       .maybeSingle<{
         full_name: string | null;
+        company_name: string | null;
         email: string | null;
         phone: string | null;
       }>(),
@@ -429,7 +431,7 @@ export default async function OwnerMaterialRequestPage({
     (packages ?? []).map((pkg) => ({ request_id: request.id, ...pkg })),
   );
   const pipelineOverride = (clientActionEvents ?? []).find(
-    (event) => event.metadata?.manager_action === "request_pipeline_stage",
+    (event) => ["request_pipeline_stage", "request_substep_status"].includes(String(event.metadata?.manager_action || "")),
   )?.metadata?.pipeline_stage;
   const currentStage = managerPipelineStageWithOverride(calculatedStage, pipelineOverride);
   const comparisonSummaries: RequestComparisonSummary[] = (
@@ -470,6 +472,33 @@ export default async function OwnerMaterialRequestPage({
       })),
     };
   });
+  const savedSubstep = requestWorkflowSubstep((clientActionEvents ?? []).find(
+    (event) => event.metadata?.manager_action === "request_substep_status",
+  )?.metadata?.request_substep)?.id;
+  const inferredSubstep: RequestWorkflowSubstepId = initialPaymentDelivery.deliveryScheduled
+    ? "delivery"
+    : initialPaymentDelivery.paymentReceived
+      ? "payment"
+      : initialPaymentDelivery.invoiceSent
+        ? "invoice"
+        : initialPaymentDelivery.clientApproved
+          ? "client-approval"
+          : initialPaymentDelivery.estimateSent
+            ? "estimate"
+            : (comparisons ?? []).some((comparison) => comparison.status === "awarded")
+              ? "route-selected"
+              : (comparisonBidsResult.data ?? []).length
+                ? "quotes-received"
+                : (packages ?? []).length
+                  ? "requests-sent"
+                  : routeSelections.length
+                    ? "suppliers-chosen"
+                    : organizedItems.length
+                      ? "ai-organized"
+                      : "request-received";
+  const savedSubstepIndex = REQUEST_WORKFLOW_SUBSTEPS.findIndex((substep) => substep.id === savedSubstep);
+  const inferredSubstepIndex = REQUEST_WORKFLOW_SUBSTEPS.findIndex((substep) => substep.id === inferredSubstep);
+  const currentSubstep = REQUEST_WORKFLOW_SUBSTEPS[Math.max(savedSubstepIndex, inferredSubstepIndex)]?.id ?? inferredSubstep;
   const latestClientTargetComparison = (comparisons ?? []).find((comparison) =>
     (comparisonItemsResult.data ?? []).some(
       (item) =>
@@ -592,14 +621,17 @@ export default async function OwnerMaterialRequestPage({
       <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
         <header className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
-          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:gap-2">
-            <span className="shrink-0 text-[11px] font-semibold text-slate-400">#{request.public_number}</span>
-            <div className="min-w-0 max-w-40 flex-1 truncate text-xs font-semibold text-slate-700 sm:flex-none" title="Client"><RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" /></div>
-            <RequestClientContact />
-            <span className="hidden text-slate-300 sm:inline">·</span>
-            <div className="min-w-[8rem] flex-1 truncate text-sm font-bold" title={projectLabel || request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
+          <div className="flex min-w-0 items-center gap-1.5" data-testid="request-header-internal-row">
+            <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700" title={profile?.company_name || projectLabel || "Company not added"}>{profile?.company_name || projectLabel || "Company not added"}</span>
             <div className="w-28 shrink-0"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact hideLabel /></div>
-            <div className="w-36 shrink-0"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} hideLabel /></div>
+            <div className="w-36 shrink-0"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} currentLabel={request.status === "closed" ? "Completed" : requestWorkflowSubstepLabel(currentSubstep) || undefined} hideLabel /></div>
+          </div>
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 border-t border-slate-100 pt-1.5" data-testid="request-header-owner-row">
+            <span className="shrink-0 text-[11px] font-semibold text-slate-400">#{request.public_number}</span>
+            <div className="min-w-0 max-w-28 flex-1 truncate text-xs font-semibold text-slate-700" title="Request owner"><RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" /></div>
+            <RequestClientContact />
+            <span className="text-slate-300">·</span>
+            <div className="min-w-0 flex-1 truncate text-sm font-bold" title={request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
           </div>
           <nav aria-label="Request progress" className="mt-1.5">
             <ol className="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
@@ -619,6 +651,7 @@ export default async function OwnerMaterialRequestPage({
           defaultZipCode={zipCodeFromAddress(request.projects?.address)}
           organizationStatus={organizationStatus}
           organizationCompletedLabel={organizationCompletedLabel}
+          currentSubstep={currentSubstep}
           supplierComparisons={primarySupplierComparison ? [primarySupplierComparison] : []}
           suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
           attachments={signedFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
@@ -730,6 +763,7 @@ export default async function OwnerMaterialRequestPage({
             routeSelections={routeSelections}
             projectAddress={request.projects?.address || ""}
             currentStage={currentStage}
+            currentSubstep={currentSubstep}
             comparisons={comparisonSummaries}
             clientReplyCompleted={clientReplyCompleted}
             step2CompletedOverride={workflowOverrides.get(2) ?? null}

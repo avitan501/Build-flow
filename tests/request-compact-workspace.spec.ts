@@ -11,15 +11,15 @@ const statusPath = path.join(root, "components/buildflow/customer-request-status
 const activityPath = path.join(root, "components/buildflow/request-activity-log.tsx")
 const workflowActionsPath = path.join(root, "app/preview-admin/workflow-actions.ts")
 
-test("request identity, client contact, assignee, and status share one compact header", async () => {
+test("request identity, client contact, assignee, and status use two compact header rows", async () => {
   const [page, assignee, status] = await Promise.all([
     readFile(requestPagePath, "utf8"),
     readFile(assigneePath, "utf8"),
     readFile(statusPath, "utf8"),
   ])
 
-  expect(page).toContain("flex min-w-0 items-center")
-  expect(page).toContain("overflow-x-auto")
+  expect(page).toContain('data-testid="request-header-internal-row"')
+  expect(page).toContain('data-testid="request-header-owner-row"')
   expect(page).toContain("#{request.public_number}")
   expect(page).toContain('kind="client"')
   expect(page).toContain("<RequestClientContact />")

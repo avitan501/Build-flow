@@ -221,12 +221,22 @@ export async function updateClientLanguageAction(input: { id: string; target: "l
 }
 
 export async function updateOutreachLeadStatusAction(input: { id: string; status: string }): Promise<LeadResult> {
-  const { supabase } = await requireStaffProfile("customers");
+  const { supabase, user } = await requireStaffProfile("customers");
   const status = LEAD_STATUSES.find((value) => value === input.status);
   if (!status) return { ok: false, error: "Choose a valid lead status." };
 
   const { error } = await supabase.from("manager_outreach_leads").update({ status }).eq("id", input.id);
   if (error) return { ok: false, error: "The lead status could not be updated." };
+
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "record_updated",
+    entity_type: "manager_outreach_leads",
+    entity_id: input.id,
+    page_path: "/admin/goals-progress",
+    page_label: "Lead directory",
+    metadata: { outcome: "completed", label: `Lead status changed to ${status}` },
+  });
 
   refreshOutreach();
   return { ok: true };

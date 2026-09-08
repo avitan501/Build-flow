@@ -13,6 +13,7 @@ import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyReques
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
 import { requestClientDocumentContentMatches } from "@/lib/request-client-document-version"
+import { requestWorkflowSubstep, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
@@ -46,6 +47,7 @@ export type RequestSupplierContactStatus = "not_contacted" | "request_sent" | "s
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
 const REQUEST_SUPPLIER_CONTACT_STATUSES = new Set<RequestSupplierContactStatus>(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"])
+const REQUEST_STATUS_ORDER = ["draft", "submitted", "in_review", "quoted", "closed"] as const
 
 export async function prepareRequestAttachmentUploadAction(input: {
   requestId: string
@@ -275,7 +277,7 @@ export async function updateMaterialRequestStatusAction(input: { requestId: stri
   const status = String(input.status || "") as MaterialRequestStatus
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !MATERIAL_REQUEST_STATUSES.has(status)) return { ok: false as const, error: "Choose a valid request status." }
 
-  const { supabase } = await requireStaffProfile("customers")
+  const { supabase, user } = await requireStaffProfile("customers")
   const { data: request } = await supabase
     .from("quote_requests")
     .select("id,owner_id,project_id,status")
@@ -301,6 +303,16 @@ export async function updateMaterialRequestStatusAction(input: { requestId: stri
     await supabase.from("quote_requests").update({ status: request.status }).eq("id", requestId)
     return { ok: false as const, error: "The status was not changed because its history could not be saved." }
   }
+
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "record_updated",
+    entity_type: "quote_requests",
+    entity_id: request.id,
+    page_path: `/owner/materials/requests/${request.id}`,
+    page_label: "Material request",
+    metadata: { request_id: request.id, outcome: "completed", label: `Status changed to ${status}` },
+  })
 
   revalidatePath("/owner/materials/requests")
   revalidatePath(`/owner/materials/requests/${requestId}`)
@@ -829,6 +841,73 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
     },
   })
   if (error) return { ok: false as const, error: "The workflow step could not be updated." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
+export async function updateRequestSubstepAction(input: { requestId: string; substep: RequestWorkflowSubstepId }) {
+  const requestId = String(input.requestId || "").trim()
+  const substep = requestWorkflowSubstep(input.substep)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !substep) {
+    return { ok: false as const, error: "Choose a valid workflow status." }
+  }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: request, error: requestError } = await supabase
+    .from("quote_requests")
+    .select("id,owner_id,project_id,title,status,submitted_at")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; owner_id: string; project_id: string; title: string; status: (typeof REQUEST_STATUS_ORDER)[number]; submitted_at: string | null }>()
+  if (requestError || !request) return { ok: false as const, error: "Request not found." }
+
+  const currentIndex = REQUEST_STATUS_ORDER.indexOf(request.status)
+  const minimumIndex = REQUEST_STATUS_ORDER.indexOf(substep.minimumRequestStatus)
+  const nextStatus = REQUEST_STATUS_ORDER[Math.max(currentIndex, minimumIndex)]
+  const submittedAt = request.submitted_at || (nextStatus === "draft" ? null : new Date().toISOString())
+  if (nextStatus !== request.status || submittedAt !== request.submitted_at) {
+    const { error: updateError } = await supabase
+      .from("quote_requests")
+      .update({ status: nextStatus, submitted_at: submittedAt })
+      .eq("id", requestId)
+    if (updateError) return { ok: false as const, error: "The request status could not be updated." }
+  }
+
+  const { error: historyError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `${request.title}: ${substep.label}`,
+    description: `Step ${substep.step} moved to ${substep.label}. Internal workflow status only; no customer or supplier message was sent.`,
+    metadata: {
+      quote_request_id: request.id,
+      manager_action: "request_substep_status",
+      request_substep: substep.id,
+      workflow_step: substep.step,
+      pipeline_stage: substep.pipelineStage,
+      previous_status: request.status,
+      request_status: nextStatus,
+      actor_user_id: user.id,
+    },
+  })
+  if (historyError) {
+    if (nextStatus !== request.status || submittedAt !== request.submitted_at) {
+      await supabase.from("quote_requests").update({ status: request.status, submitted_at: request.submitted_at }).eq("id", requestId)
+    }
+    return { ok: false as const, error: "The status was not changed because its activity log could not be saved." }
+  }
+
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "record_updated",
+    entity_type: "quote_requests",
+    entity_id: request.id,
+    page_path: `/owner/materials/requests/${request.id}`,
+    page_label: "Material request",
+    metadata: { request_id: request.id, outcome: "completed", label: `Workflow moved to ${substep.label}` },
+  })
+
+  revalidatePath("/admin/build-map")
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
 }

@@ -12,9 +12,11 @@ import { MaterialReviewEditor } from "@/components/buildflow/material-review-edi
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
+import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
 import { RequestSupplierRouteEditor, type RequestRouteSupplier } from "@/components/buildflow/request-supplier-route-editor"
 import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 
 export type RequestWorktableComparison = {
   id: string
@@ -57,6 +59,7 @@ export function RequestMaterialWorktable({
   defaultZipCode = "11516",
   organizationStatus,
   organizationCompletedLabel,
+  currentSubstep,
   supplierComparisons,
   suppliers,
   attachments,
@@ -67,6 +70,7 @@ export function RequestMaterialWorktable({
   defaultZipCode?: string
   organizationStatus: string
   organizationCompletedLabel?: string
+  currentSubstep: RequestWorkflowSubstepId
   supplierComparisons: RequestWorktableComparison[]
   suppliers: RequestRouteSupplier[]
   attachments: Array<{ id: string; file_name: string; url: string | null }>
@@ -168,6 +172,8 @@ export function RequestMaterialWorktable({
           </div>
         </details>
       </div>
+
+      <RequestSubstepFunnel requestId={requestId} step={1} currentSubstep={currentSubstep} />
 
       {organizationCompletedLabel ? <p className="border-b border-slate-100 px-4 py-1.5 text-[10px] font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}
       <p className="sr-only" role="status" aria-live="polite">{copyNotice}</p>

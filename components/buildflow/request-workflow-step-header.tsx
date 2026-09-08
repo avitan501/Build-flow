@@ -1,4 +1,5 @@
 import { BadgeDollarSign, Check, ChevronDown, ClipboardList, CreditCard, ListChecks, MessageSquareText } from "lucide-react"
+import type { ReactNode } from "react"
 import { RequestWorkflowStepToggle } from "@/components/buildflow/request-workflow-step-toggle"
 
 type WorkflowStepStatus = "complete" | "active" | "upcoming"
@@ -31,7 +32,7 @@ const statusStyles: Record<WorkflowStepStatus, { number: string; label: string; 
 }
 
 export function workflowStepCardClass() {
-  return "group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
+  return "group relative overflow-visible rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] focus-within:z-40"
 }
 
 export function RequestWorkflowStepHeader({
@@ -43,6 +44,7 @@ export function RequestWorkflowStepHeader({
   icon,
   totalSteps = 3,
   allowManualCompletion = true,
+  tools,
 }: {
   requestId: string
   step: 1 | 2 | 3 | 4
@@ -52,13 +54,13 @@ export function RequestWorkflowStepHeader({
   icon: WorkflowStepIcon
   totalSteps?: number
   allowManualCompletion?: boolean
+  tools?: ReactNode
 }) {
   const Icon = icons[icon]
   const styles = statusStyles[status]
 
   return (
-    <>
-      <summary className={`flex min-h-[4.5rem] cursor-pointer list-none items-center gap-3 border-l-[3px] px-3 py-2.5 pr-14 sm:px-4 sm:pr-36 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
+      <summary className={`flex min-h-[4.5rem] cursor-pointer list-none items-center gap-3 border-l-[3px] px-3 py-2.5 pr-32 sm:px-4 sm:pr-40 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
         <span className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-xl font-black tabular-nums ${styles.number}`} aria-label={`Step ${step}`}>
           {step}
           {status === "complete" ? <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-700 text-white"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span> : null}
@@ -69,8 +71,7 @@ export function RequestWorkflowStepHeader({
           <span className="mt-0.5 block line-clamp-2 text-xs font-medium text-slate-500 sm:line-clamp-1 sm:text-sm">{detail}</span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
+        {allowManualCompletion || tools ? <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} allowManualCompletion={allowManualCompletion}>{tools}</RequestWorkflowStepToggle> : null}
       </summary>
-      {allowManualCompletion ? <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} /> : null}
-    </>
   )
 }

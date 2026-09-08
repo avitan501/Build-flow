@@ -158,7 +158,7 @@ export async function returnRequestToDraftAction(requestId: string): Promise<Man
 }
 
 export async function updateRequestStatusAction(input: { requestId: string; status: QuoteRequestStatus }): Promise<ManagerResult> {
-  const { supabase } = await requireStaffProfile("customers")
+  const { supabase, user } = await requireStaffProfile("customers")
   const allowed: QuoteRequestStatus[] = ["draft", "submitted", "in_review", "quoted", "closed"]
   if (!allowed.includes(input.status)) return { ok: false, error: "Choose a valid request status." }
 
@@ -203,6 +203,15 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
     await supabase.from("quote_requests").update({ status: current.status, submitted_at: current.submitted_at }).eq("id", input.requestId)
     return { ok: false, error: "The status was not changed because its activity log could not be saved." }
   }
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "record_updated",
+    entity_type: "quote_requests",
+    entity_id: input.requestId,
+    page_path: `/owner/materials/requests/${input.requestId}`,
+    page_label: "Material request",
+    metadata: { request_id: input.requestId, outcome: "completed", label: `Status changed to ${input.status}` },
+  })
   revalidatePath("/admin/vendors")
   revalidatePath("/admin/users")
   revalidatePath(`/owner/materials/requests/${input.requestId}`)

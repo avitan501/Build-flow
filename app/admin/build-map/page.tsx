@@ -215,7 +215,7 @@ export default async function AdminDashboardPage({
     if (metadata.manager_action === "request_queue_state" && !latestQueueState.has(requestId)) {
       latestQueueState.set(requestId, normalizeManagerRequestQueueState(metadata.queue_state));
     }
-    if (metadata.manager_action === "request_pipeline_stage" && !latestStageOverride.has(requestId)) {
+    if (["request_pipeline_stage", "request_substep_status"].includes(String(metadata.manager_action || "")) && !latestStageOverride.has(requestId)) {
       const override = String(metadata.pipeline_stage || "");
       if (pipelineStages.some((item) => item.id === override)) latestStageOverride.set(requestId, override as ManagerPipelineStage);
     }
