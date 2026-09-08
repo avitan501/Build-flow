@@ -13,13 +13,18 @@ test("communications use delta updates instead of full-page polling", () => {
     path.join(root, "app/api/admin/communications/updates/route.ts"),
     "utf8",
   );
+  const broker = readFileSync(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
   expect(inbox).toContain("/api/admin/communications/updates?after=");
   expect(inbox).not.toContain("window.setInterval(refresh, 10_000)");
   expect(inbox).toContain('table: "aura_communications"');
   expect(inbox).toContain('channel("aura-communications-live")');
   expect(inbox).toContain("setLiveCommunications");
   expect(inbox).toContain("markCommunicationConversationReadAction");
-  expect(updates).toContain('.gt("last_event_at", cursor)');
+  expect(updates).toContain('action: "load_communication_updates"');
+  expect(broker).toContain("communication.last_event_at > ${after}::timestamptz");
   expect(updates).toContain("Server-Timing");
 });
 
@@ -119,11 +124,11 @@ test("conversation assignment keeps contact notes and uses structured links", ()
     broker.indexOf('if (input.action === "link_communication_contact")'),
     broker.indexOf('if (input.action === "quality_check_sms_ai")'),
   );
-  expect(action).toContain("addAuraCommunicationLinks");
-  expect(action).toContain("notes: null");
+  expect(action).toContain('action: "link_communication_contact"');
   expect(action).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("notes =");
+  expect(brokerAction).toContain("insert into public.aura_communication_links");
   expect(page).toContain("loadCommunicationHistoryPage");
   expect(page).not.toContain("createAdminClient");
   expect(history).toContain(

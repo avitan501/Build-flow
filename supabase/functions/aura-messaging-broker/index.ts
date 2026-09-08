@@ -9011,8 +9011,6 @@ async function linkManagerConversationContact(
   if (!phone && !email)
     throw new Error("This conversation has no phone or email to link.");
   const digits = phone?.replace(/\D/g, "") || "";
-  const notes = `Avantia link:${target.kind}:${target.sourceId}`;
-
   return await sql.begin(async (transaction) => {
     await transaction`select pg_advisory_xact_lock(hashtextextended(${`manager-contact-link:${phone || email}`}, 0))`;
     const existing = phone
@@ -9032,16 +9030,16 @@ async function linkManagerConversationContact(
         update public.aura_contacts
         set full_name = ${target.name.slice(0, 160)},
           company = ${target.company.slice(0, 160) || null},
-          notes = ${notes}, updated_at = now()
+          updated_at = now()
         where id = ${contactId}::uuid
       `;
     } else {
       await transaction`
         insert into public.aura_contacts
-          (id, full_name, company, normalized_phone, email, notes)
+          (id, full_name, company, normalized_phone, email)
         values (
           ${contactId}::uuid, ${target.name.slice(0, 160)},
-          ${target.company.slice(0, 160) || null}, ${phone}, ${email}, ${notes}
+          ${target.company.slice(0, 160) || null}, ${phone}, ${email}
         )
       `;
     }

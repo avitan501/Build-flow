@@ -260,7 +260,8 @@ test("lead and customer actions offer confirmed WhatsApp video attachments", asy
   expect(broker).toContain("build\\.avantiap\\.com\\/");
   expect(videos).toContain("How to Request Materials");
   expect(videos).toContain("Why Contractors Hire Avantia");
-  expect(videos).toContain("https://wa.me/13479378665");
+  expect(videos).toContain("https://wa.me/15169901990");
+  expect(videos).toContain("(516) 990-1990");
   expect(videos).toContain("welcome to Avantia Build");
   for (const asset of assets) {
     const details = await stat(path.join(process.cwd(), "public/videos", asset));
