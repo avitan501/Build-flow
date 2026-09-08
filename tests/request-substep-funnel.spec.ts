@@ -141,6 +141,7 @@ test("each workflow step has one compact Tools menu and its own sub-funnel", asy
   expect(step3).toContain("<RequestSubstepFunnel requestId={requestId} step={3} currentSubstep={currentSubstep} />")
 
   expect(stepHeader).toContain("tools?: ReactNode")
+  expect(stepHeader).toContain("min-w-0 w-full overflow-visible")
   expect(stepHeader).toContain("allowManualCompletion || tools")
   const stepSummary = stepHeader.slice(stepHeader.indexOf("<summary"), stepHeader.indexOf("</summary>"))
   expect(stepSummary).toContain("RequestWorkflowStepToggle")

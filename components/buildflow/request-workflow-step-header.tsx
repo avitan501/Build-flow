@@ -32,7 +32,7 @@ const statusStyles: Record<WorkflowStepStatus, { number: string; label: string; 
 }
 
 export function workflowStepCardClass() {
-  return "group relative overflow-visible rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] focus-within:z-40"
+  return "group relative min-w-0 w-full overflow-visible rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] focus-within:z-40"
 }
 
 export function RequestWorkflowStepHeader({
