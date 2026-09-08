@@ -89,7 +89,8 @@ test("customer images use the existing bounded fetch path without leaking the Qu
   const visionFetcher = broker.slice(start, end)
 
   expect(broker).toContain("safeExternalMediaUrl")
-  expect(broker).toContain("!safeExternalMediaUrl(item.url)")
+  expect(broker).toContain("function usableMediaSource")
+  expect(visionFetcher).toContain("fetchSafeExternalMedia(item.url)")
   expect(broker).toContain('download.headers.get("content-length")')
   expect(visionFetcher).toContain("boundedResponseBytes(response, 10 * 1024 * 1024)")
   expect(visionFetcher).not.toContain("Authorization")

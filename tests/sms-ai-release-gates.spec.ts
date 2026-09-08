@@ -57,6 +57,17 @@ test("real siding intake asks for photos before delivery details", () => {
   expect(smsSidingFirstStepReply("Need 40 squares siding")).toBeNull()
 })
 
+test("siding and street-type replies bypass the slower model path", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  const analyzer = broker.slice(
+    broker.indexOf("async function analyzeCustomerSms"),
+    broker.indexOf("async function evaluateCustomerSmsCases"),
+  )
+  expect(analyzer.indexOf("smsSidingFirstStepReply(latestCustomerMessage)")).toBeGreaterThan(-1)
+  expect(analyzer.indexOf("smsMissingStreetTypeQuestion(latestCustomerMessage)")).toBeGreaterThan(-1)
+  expect(analyzer.indexOf("deterministic-siding-first-step")).toBeLessThan(analyzer.indexOf("secretNames.openaiKey"))
+})
+
 test("attachment verification reads only the latest customer message", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(broker).toMatch(/accurateAttachmentReply\(\s*latestCustomerMessage,/)

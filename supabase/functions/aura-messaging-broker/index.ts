@@ -4332,6 +4332,41 @@ async function analyzeCustomerSms(
   persistedOrderState: PersistedSmsOrderState | null = null,
 ): Promise<CustomerSmsAnalysis> {
   const startedAt = Date.now();
+  const missingStreetTypeReply =
+    forcedEvent === "message"
+      ? smsMissingStreetTypeQuestion(latestCustomerMessage)
+      : null;
+  const sidingFirstStepReply =
+    forcedEvent === "message"
+      ? smsSidingFirstStepReply(latestCustomerMessage)
+      : null;
+  const immediateIntakeReply = missingStreetTypeReply || sidingFirstStepReply;
+  if (immediateIntakeReply) {
+    return finalizeCustomerSmsAnalysis({
+      result: {
+        reply: immediateIntakeReply,
+        autoSafe: true,
+        safetyReason: missingStreetTypeReply
+          ? "The address is missing only its street type; ask that one precise question and do not repeat the full address request."
+          : "A new siding inquiry needs house photos before delivery details; ask for the useful first input without delaying on a model call.",
+        isMaterialRequest: Boolean(sidingFirstStepReply),
+        request: null,
+        customerName: null,
+        customerAddress: null,
+        participantRole: "lead",
+      },
+      model: missingStreetTypeReply
+        ? "deterministic-address-street-type"
+        : "deterministic-siding-first-step",
+      message: latestCustomerMessage,
+      conversationText,
+      persistedExactListOnly,
+      persistedDeliveryAddressKnown,
+      media,
+      event: forcedEvent,
+      startedAt,
+    });
+  }
   const contextualQuantityAnswer =
     forcedEvent === "message"
       ? smsContextualQuantityAnswerReply(
