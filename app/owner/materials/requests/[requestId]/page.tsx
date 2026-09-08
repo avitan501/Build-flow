@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
+import { RequestActivityLog } from "@/components/buildflow/request-activity-log";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestLiveSync } from "@/components/buildflow/request-live-sync";
 import { RequestInlineNameEditor } from "@/components/buildflow/request-inline-name-editor";
@@ -17,10 +18,7 @@ import type {
   MaterialQuestionnaireResponse,
   MaterialRequestAnswer,
 } from "@/lib/material-questionnaires";
-import {
-  quoteRequestStatusLabel,
-  type QuoteRequestStatus,
-} from "@/lib/quote-requests";
+import type { QuoteRequestStatus } from "@/lib/quote-requests";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import {
   analyzeQuoteComparison,
@@ -28,7 +26,7 @@ import {
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
-import { managerPipelineStage } from "@/lib/manager-dashboard";
+import { managerPipelineStage, managerPipelineStageWithOverride, type ManagerPipelineStage } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
 import { formatSiteDateTime } from "@/lib/site-date-time";
@@ -118,6 +116,13 @@ type CurrentClientDocumentView = {
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
 }
+
+const requestProgress: Array<{ stage: ManagerPipelineStage; label: string }> = [
+  { stage: "received", label: "Received" },
+  { stage: "pricing", label: "Pricing" },
+  { stage: "approval", label: "Client" },
+  { stage: "delivery", label: "Delivery" },
+];
 
 export default async function OwnerMaterialRequestPage({
   params,
@@ -418,11 +423,15 @@ export default async function OwnerMaterialRequestPage({
     request.projects?.name === "Material Requests"
       ? request.projects.address
       : request.projects?.name;
-  const currentStage = managerPipelineStage(
+  const calculatedStage = managerPipelineStage(
     request,
     comparisons ?? [],
     (packages ?? []).map((pkg) => ({ request_id: request.id, ...pkg })),
   );
+  const pipelineOverride = (clientActionEvents ?? []).find(
+    (event) => event.metadata?.manager_action === "request_pipeline_stage",
+  )?.metadata?.pipeline_stage;
+  const currentStage = managerPipelineStageWithOverride(calculatedStage, pipelineOverride);
   const comparisonSummaries: RequestComparisonSummary[] = (
     comparisons ?? []
   ).map((comparison) => {
@@ -582,42 +591,26 @@ export default async function OwnerMaterialRequestPage({
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
       <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
-        <header className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">
-                  {quoteRequestStatusLabel(request.status)}
-                </p>
-                <span className="text-xs text-slate-400">
-                  Request #{request.public_number}
-                </span>
-              </div>
-              <div className="mt-0.5 min-w-0"><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
-              {projectLabel ? (
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {projectLabel}
-                  {request.projects?.name !== "Material Requests" &&
-                  request.projects?.address
-                    ? ` · ${request.projects.address}`
-                    : ""}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex min-w-0 flex-wrap items-end gap-2 border-t border-slate-100 pt-3 text-sm lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-              <div className="min-w-28 flex-1 pb-1 lg:flex-none">
-                <p className="text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Client</p>
-                <RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" />
-              </div>
-              <RequestClientContact />
-              <div className="w-44"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact /></div>
-              <CustomerRequestStatus
-                requestId={request.id}
-                status={request.status}
-                currentStage={currentStage}
-              />
-            </div>
+        <header className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 sm:gap-2">
+            <span className="shrink-0 text-[11px] font-semibold text-slate-400">#{request.public_number}</span>
+            <div className="min-w-0 max-w-40 flex-1 truncate text-xs font-semibold text-slate-700 sm:flex-none" title="Client"><RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" /></div>
+            <RequestClientContact />
+            <span className="hidden text-slate-300 sm:inline">·</span>
+            <div className="min-w-[8rem] flex-1 truncate text-sm font-bold" title={projectLabel || request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
+            <div className="w-28 shrink-0"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact hideLabel /></div>
+            <div className="w-36 shrink-0"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} hideLabel /></div>
           </div>
+          <nav aria-label="Request progress" className="mt-1.5">
+            <ol className="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+              {requestProgress.map((step, index) => {
+                const currentIndex = requestProgress.findIndex((candidate) => candidate.stage === currentStage);
+                const active = step.stage === currentStage;
+                const complete = index < currentIndex;
+                return <li key={step.stage} aria-current={active ? "step" : undefined} className={`truncate border-r border-slate-200 px-1.5 py-1 text-center text-[9px] font-bold last:border-r-0 ${active ? "bg-slate-950 text-white" : complete ? "bg-emerald-50 text-emerald-700" : "text-slate-400"}`}>{index + 1}. {step.label}</li>;
+              })}
+            </ol>
+          </nav>
         </header>
         <RequestMaterialWorktable
           requestId={request.id}
@@ -749,35 +742,12 @@ export default async function OwnerMaterialRequestPage({
             supplierEmails={supplierEmails}
           />
         </div>
-        <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">
-              Activity log
-            </h2>
-            {activityEvents.length ? <div className="mt-3 divide-y divide-slate-100">
-              {activityEvents.map((event) => (
-                <article key={event.id} className="py-3 first:pt-0 last:pb-0">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {event.title}
-                    </h3>
-                    <time className="text-xs text-slate-500">
-                      {formatSiteDateTime(event.created_at, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                  </div>
-                  {event.description ? (
-                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                      {event.description}
-                    </p>
-                  ) : null}
-                </article>
-              ))}
-            </div> : <p className="mt-2 text-sm text-slate-500">No activity recorded yet.</p>}
-          </section>
+        <RequestActivityLog events={activityEvents.map((event) => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          createdAt: event.created_at,
+        }))} />
       </div>
     </main>
   );

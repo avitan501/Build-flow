@@ -162,6 +162,14 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
   const allowed: QuoteRequestStatus[] = ["draft", "submitted", "in_review", "quoted", "closed"]
   if (!allowed.includes(input.status)) return { ok: false, error: "Choose a valid request status." }
 
+  const { data: current, error: currentError } = await supabase
+    .from("quote_requests")
+    .select("project_id,owner_id,title,status,submitted_at")
+    .eq("id", input.requestId)
+    .maybeSingle<{ project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; submitted_at: string | null }>()
+  if (currentError || !current) return { ok: false, error: "Could not find the request." }
+  if (current.status === input.status) return { ok: true }
+
   const patch = {
     status: input.status,
     submitted_at: input.status === "draft" ? null : new Date().toISOString(),
@@ -182,15 +190,19 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
     quoted: "Payment received; waiting for supplier delivery",
     closed: "Request completed",
   }
-  await createProjectEvent({
-    supabase,
-    projectId: request.project_id,
-    ownerId: request.owner_id,
-    eventType: "status_changed",
+  const { error: historyError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
     source: "admin",
     title: `${request.title}: ${statusDescriptions[input.status]}`,
-    metadata: { quote_request_id: input.requestId, request_status: input.status },
+    description: `Request status changed from ${statusDescriptions[current.status]} to ${statusDescriptions[input.status]}.`,
+    metadata: { quote_request_id: input.requestId, previous_status: current.status, request_status: input.status },
   })
+  if (historyError) {
+    await supabase.from("quote_requests").update({ status: current.status, submitted_at: current.submitted_at }).eq("id", input.requestId)
+    return { ok: false, error: "The status was not changed because its activity log could not be saved." }
+  }
   revalidatePath("/admin/vendors")
   revalidatePath("/admin/users")
   revalidatePath(`/owner/materials/requests/${input.requestId}`)

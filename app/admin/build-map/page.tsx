@@ -20,6 +20,10 @@ import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboa
 import { GoogleMeetLauncher } from "@/components/buildflow/google-meet-launcher";
 import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 import {
+  RequestQuickActionsList,
+  type ManagerRequestQuickRow,
+} from "@/components/buildflow/request-quick-actions-list";
+import {
   DAILY_WORK_SUMMARY_PREFIX,
   parseDailyWorkSummary,
 } from "@/lib/daily-work-summary";
@@ -30,7 +34,10 @@ import {
 } from "@/lib/manager-command-center";
 import {
   managerPipelineStage,
+  managerPipelineStageWithOverride,
+  normalizeManagerRequestQueueState,
   type ManagerPipelineStage,
+  type ManagerRequestQueueState,
 } from "@/lib/manager-dashboard";
 import { formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time";
 
@@ -68,6 +75,13 @@ type DashboardGoalRecord = ManagerGoalRecord & {
   created_at: string;
   updated_at: string;
 };
+
+type RequestQuickEventRow = {
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+const REQUEST_QUICK_ACTION_FEATURE = "manager_request_quick_actions";
 
 const pipelineTone: Record<ManagerPipelineStage, string> = {
   received: "border-amber-200 bg-amber-50 text-amber-700",
@@ -144,6 +158,7 @@ export default async function AdminDashboardPage({
     requestsResult,
     comparisonsResult,
     packagesResult,
+    quickEventsResult,
     goalsResult,
     clientsResult,
   ] = await Promise.all([
@@ -165,6 +180,13 @@ export default async function AdminDashboardPage({
       .order("updated_at", { ascending: false })
       .limit(500)
       .returns<SupplierPackageRow[]>(),
+    supabase
+      .from("project_events")
+      .select("metadata,created_at")
+      .contains("metadata", { manager_feature: REQUEST_QUICK_ACTION_FEATURE })
+      .order("created_at", { ascending: false })
+      .limit(1000)
+      .returns<RequestQuickEventRow[]>(),
     goalsQuery.returns<DashboardGoalRecord[]>(),
     supabase
       .from("profiles")
@@ -184,10 +206,29 @@ export default async function AdminDashboardPage({
   const packages = packagesResult.data ?? [];
   const clients = clientsResult.data ?? [];
   const clientMap = new Map(clients.map((client) => [client.id, client]));
-  const stagedRequests = requests.map((request) => ({
-    request,
-    stage: managerPipelineStage(request, comparisons, packages),
-  }));
+  const latestQueueState = new Map<string, ManagerRequestQueueState>();
+  const latestStageOverride = new Map<string, ManagerPipelineStage>();
+  for (const event of quickEventsResult.data ?? []) {
+    const metadata = event.metadata ?? {};
+    const requestId = String(metadata.quote_request_id || "");
+    if (!requestId) continue;
+    if (metadata.manager_action === "request_queue_state" && !latestQueueState.has(requestId)) {
+      latestQueueState.set(requestId, normalizeManagerRequestQueueState(metadata.queue_state));
+    }
+    if (metadata.manager_action === "request_pipeline_stage" && !latestStageOverride.has(requestId)) {
+      const override = String(metadata.pipeline_stage || "");
+      if (pipelineStages.some((item) => item.id === override)) latestStageOverride.set(requestId, override as ManagerPipelineStage);
+    }
+  }
+  const queueRank: Record<ManagerRequestQueueState, number> = { rush: 0, queued: 1, normal: 2 };
+  const stagedRequests = requests.map((request) => {
+    const calculatedStage = managerPipelineStage(request, comparisons, packages);
+    return {
+      request,
+      stage: managerPipelineStageWithOverride(calculatedStage, latestStageOverride.get(request.id)),
+      queueState: latestQueueState.get(request.id) ?? "normal" as ManagerRequestQueueState,
+    };
+  }).sort((left, right) => queueRank[left.queueState] - queueRank[right.queueState]);
   const stageCounts = new Map<ManagerPipelineStage, number>(
     pipelineStages.map((item) => [
       item.id,
@@ -200,7 +241,21 @@ export default async function AdminDashboardPage({
       : stagedRequests
   ).slice(0, 10);
   const pipelineAvailable =
-    !requestsResult.error && !comparisonsResult.error && !packagesResult.error;
+    !requestsResult.error && !comparisonsResult.error && !packagesResult.error && !quickEventsResult.error;
+
+  const quickRows: ManagerRequestQuickRow[] = visibleRequests.map(({ request, stage: requestStage, queueState }) => {
+    const client = clientMap.get(request.owner_id);
+    const stageInfo = pipelineStages.find((item) => item.id === requestStage)!;
+    return {
+      id: request.id,
+      title: request.title,
+      clientLabel: client?.full_name || client?.email || "Client",
+      stage: requestStage,
+      stageLabel: stageInfo.label,
+      updatedLabel: formatUpdated(request.updated_at),
+      queueState,
+    };
+  });
 
   const goals = goalsResult.data ?? [];
   const dashboardHistory = parseDashboardAiHistory(
@@ -391,42 +446,7 @@ export default async function AdminDashboardPage({
           </div>
           <div id="open-requests" className="border-t border-slate-200">
           {visibleRequests.length ? (
-            <div>
-              {visibleRequests.map(({ request, stage: requestStage }) => {
-                const client = clientMap.get(request.owner_id);
-                const stageInfo = pipelineStages.find(
-                  (item) => item.id === requestStage,
-                )!;
-                const StatusIcon = stageInfo.icon;
-                return (
-                  <Link
-                    key={request.id}
-                    href={`/owner/materials/requests/${request.id}`}
-                    className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"
-                  >
-                    <span
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${pipelineTone[requestStage]}`}
-                      title={stageInfo.symbolLabel}
-                    >
-                      <StatusIcon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">
-                        {request.title}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
-                        {client?.full_name || client?.email || "Client"} ·{" "}
-                        {stageInfo.label}
-                      </span>
-                    </span>
-                    <span className="hidden shrink-0 text-xs text-slate-400 sm:block">
-                      {formatUpdated(request.updated_at)}
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
-                  </Link>
-                );
-              })}
-            </div>
+            <RequestQuickActionsList rows={quickRows} />
           ) : (
             <p className="px-4 py-8 text-center text-sm text-slate-500">
               No open requests in this stage.

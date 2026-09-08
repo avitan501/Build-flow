@@ -11,18 +11,177 @@ import {
   type DashboardAiHistoryItem,
 } from "@/lib/manager-command-center"
 import { SYSTEM_GOAL_STATUS_PREFIX } from "@/lib/manager-goal-status"
+import {
+  managerNextPipelineStage,
+  managerPipelineStage,
+  managerPipelineStageWithOverride,
+  type ManagerPipelineStage,
+} from "@/lib/manager-dashboard"
 
 type SearchResult =
   | { ok: true; answer: string; history: DashboardAiHistoryItem[] }
   | { ok: false; error: string }
 
 type TaskResult = { ok: true } | { ok: false; error: string }
+export type ManagerRequestQuickAction = "normal" | "queue" | "rush" | "next" | "archive"
+type RequestQuickActionResult =
+  | { ok: true; changed: number; archived: number }
+  | { ok: false; error: string }
 
 const DASHBOARD_AI_MODELS = new Set(["luna", "terra", "sol"])
 const DASHBOARD_AI_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+const REQUEST_QUICK_ACTIONS = new Set<ManagerRequestQuickAction>(["normal", "queue", "rush", "next", "archive"])
+const REQUEST_QUICK_ACTION_FEATURE = "manager_request_quick_actions"
 
 function clean(value: unknown, limit: number) {
   return String(value ?? "").trim().slice(0, limit)
+}
+
+function validRequestIds(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.map((id) => String(id || "").trim()))]
+    .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+    .slice(0, 25)
+}
+
+export async function applyManagerRequestQuickAction(input: {
+  requestIds: string[]
+  action: ManagerRequestQuickAction
+}): Promise<RequestQuickActionResult> {
+  const requestIds = validRequestIds(input?.requestIds)
+  const action = String(input?.action || "") as ManagerRequestQuickAction
+  if (!requestIds.length || !REQUEST_QUICK_ACTIONS.has(action)) {
+    return { ok: false, error: "Choose at least one request and a valid action." }
+  }
+
+  const { supabase, access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false, error: "Customer request access is required." }
+
+  const { data: requestRows, error: requestError } = await supabase
+    .from("quote_requests")
+    .select("id,project_id,owner_id,title,status")
+    .in("id", requestIds)
+    .returns<Array<{ id: string; project_id: string; owner_id: string; title: string; status: string }>>()
+  const requests = (requestRows ?? []).filter((request) => request.status !== "draft" && request.status !== "closed")
+  if (requestError || !requests.length) return { ok: false, error: "The selected requests could not be updated." }
+
+  const timestamp = new Date().toISOString()
+  if (action === "normal" || action === "queue" || action === "rush") {
+    const queueState = action === "queue" ? "queued" : action
+    const title = action === "rush" ? "Request marked Rush" : action === "queue" ? "Request added to Queue" : "Request priority cleared"
+    const { error } = await supabase.from("project_events").insert(requests.map((request) => ({
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      event_type: "note_added",
+      source: "admin",
+      title,
+      description: action === "rush" ? "Manager moved this request to the urgent work queue." : action === "queue" ? "Manager added this request to the standard work queue." : "Manager removed the request queue flag.",
+      metadata: {
+        quote_request_id: request.id,
+        manager_feature: REQUEST_QUICK_ACTION_FEATURE,
+        manager_action: "request_queue_state",
+        queue_state: queueState,
+        changed_at: timestamp,
+      },
+    })))
+    if (error) return { ok: false, error: "The request priority could not be saved." }
+    revalidatePath("/admin/build-map")
+    return { ok: true, changed: requests.length, archived: 0 }
+  }
+
+  if (action === "archive") {
+    const previousStatuses = new Map(requests.map((request) => [request.id, request.status]))
+    const ids = requests.map((request) => request.id)
+    const { error: updateError } = await supabase.from("quote_requests").update({ status: "closed" }).in("id", ids)
+    if (updateError) return { ok: false, error: "The selected requests could not be archived." }
+    const { error: eventError } = await supabase.from("project_events").insert(requests.map((request) => ({
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      event_type: "status_changed",
+      source: "admin",
+      title: "Material request archived",
+      description: `Manager archived ${request.title}. It can be restored from the request page.`,
+      metadata: {
+        quote_request_id: request.id,
+        manager_feature: REQUEST_QUICK_ACTION_FEATURE,
+        manager_action: "request_status",
+        previous_status: request.status,
+        request_status: "closed",
+      },
+    })))
+    if (eventError) {
+      for (const status of new Set(previousStatuses.values())) {
+        const restoreIds = ids.filter((id) => previousStatuses.get(id) === status)
+        await supabase.from("quote_requests").update({ status }).in("id", restoreIds)
+      }
+      return { ok: false, error: "Nothing was archived because its history could not be saved." }
+    }
+    revalidatePath("/admin/build-map")
+    revalidatePath("/owner/materials/requests")
+    return { ok: true, changed: requests.length, archived: requests.length }
+  }
+
+  const ids = requests.map((request) => request.id)
+  const [comparisonsResult, packagesResult, eventsResult] = await Promise.all([
+    supabase.from("quote_comparisons").select("request_id,status,client_quote_status").in("request_id", ids),
+    supabase.from("supplier_packages").select("request_id,status").in("request_id", ids),
+    supabase.from("project_events").select("metadata,created_at").contains("metadata", { manager_feature: REQUEST_QUICK_ACTION_FEATURE }).order("created_at", { ascending: false }).limit(1000),
+  ])
+  if (comparisonsResult.error || packagesResult.error || eventsResult.error) {
+    return { ok: false, error: "The current request stages could not be verified." }
+  }
+  const latestOverride = new Map<string, ManagerPipelineStage>()
+  for (const event of eventsResult.data ?? []) {
+    const metadata = event.metadata as Record<string, unknown> | null
+    const requestId = String(metadata?.quote_request_id || "")
+    const stage = metadata?.pipeline_stage
+    if (requestId && !latestOverride.has(requestId) && ["received", "pricing", "approval", "delivery"].includes(String(stage))) {
+      latestOverride.set(requestId, stage as ManagerPipelineStage)
+    }
+  }
+
+  const nextEvents: Array<Record<string, unknown>> = []
+  const archiveRequests: typeof requests = []
+  for (const request of requests) {
+    const calculated = managerPipelineStage(
+      request,
+      comparisonsResult.data ?? [],
+      packagesResult.data ?? [],
+    )
+    const currentStage = managerPipelineStageWithOverride(calculated, latestOverride.get(request.id))
+    const nextStage = managerNextPipelineStage(currentStage)
+    if (!nextStage) {
+      archiveRequests.push(request)
+      continue
+    }
+    nextEvents.push({
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      event_type: "note_added",
+      source: "admin",
+      title: `Request moved to ${nextStage}`,
+      description: `Manager moved this request from ${currentStage} to ${nextStage} on the internal work board.`,
+      metadata: {
+        quote_request_id: request.id,
+        manager_feature: REQUEST_QUICK_ACTION_FEATURE,
+        manager_action: "request_pipeline_stage",
+        previous_pipeline_stage: currentStage,
+        pipeline_stage: nextStage,
+        changed_at: timestamp,
+      },
+    })
+  }
+
+  if (nextEvents.length) {
+    const { error } = await supabase.from("project_events").insert(nextEvents)
+    if (error) return { ok: false, error: "The requests could not move to the next step." }
+  }
+  if (archiveRequests.length) {
+    const archiveResult = await applyManagerRequestQuickAction({ requestIds: archiveRequests.map((request) => request.id), action: "archive" })
+    if (!archiveResult.ok) return archiveResult
+  }
+  revalidatePath("/admin/build-map")
+  return { ok: true, changed: requests.length, archived: archiveRequests.length }
 }
 
 function liveSearchFallback(query: string, collections: Array<{ label: string; rows: Array<Record<string, unknown>> }>) {

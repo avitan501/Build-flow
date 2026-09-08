@@ -364,7 +364,7 @@ test("request header is compact and request text edits directly on click", async
   expect(page).not.toContain("Back to Customer Requests")
   expect(page).toContain("MaterialRequestAssigneeControl")
   expect(page).toContain("CustomerRequestStatus")
-  expect(page).toContain("Activity log")
+  expect(page).toContain("RequestActivityLog")
   expect(page).not.toContain("Next:")
   expect(worktable).toContain("<FileText")
   expect(worktable).toContain("Documents <span")

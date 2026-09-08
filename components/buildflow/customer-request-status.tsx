@@ -26,10 +26,12 @@ export function CustomerRequestStatus({
   requestId,
   status,
   currentStage,
+  hideLabel = false,
 }: {
   requestId: string;
   status: QuoteRequestStatus;
   currentStage: ManagerPipelineStage;
+  hideLabel?: boolean;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -65,12 +67,13 @@ export function CustomerRequestStatus({
         <label className="grid gap-1">
           <span
             id="request-status-heading"
-            className="text-[10px] font-bold uppercase tracking-[.12em] text-slate-500"
+            className={hideLabel ? "sr-only" : "text-[10px] font-bold uppercase tracking-[.12em] text-slate-500"}
           >
             Request status
           </span>
           <select
             aria-label="Change request status"
+            title="Change request status"
             value={selectedStatus}
             disabled={isPending}
             onChange={(event) =>
