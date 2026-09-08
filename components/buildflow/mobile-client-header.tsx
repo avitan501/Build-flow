@@ -255,14 +255,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
               >
                 Beat My Quote
               </Link>
-              <details className="group relative">
-                <summary className="cursor-pointer list-none rounded-full px-3 py-2 text-[13px] leading-none font-medium text-[#6e6e73] marker:content-none transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">
-                  More
-                </summary>
-                <div className="absolute right-0 top-[calc(100%+.5rem)] w-56 rounded-2xl border border-[#e7e7ea] bg-white p-2 shadow-[0_12px_48px_rgba(15,23,42,0.18)]">
-                  <Link href="/ai/renovation-estimator" className={`flex min-h-11 items-center justify-between rounded-md px-3 text-sm font-semibold ${pathname.startsWith("/ai/renovation-estimator") ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50"}`}><span>Renovation AI</span><span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">New</span></Link>
-                </div>
-              </details>
             </nav>
           ) : null}
 

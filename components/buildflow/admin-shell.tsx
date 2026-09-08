@@ -230,6 +230,14 @@ function ManagerNavigation({
             <NavigationTooltip id="manager-nav-expand-tooltip" label="Expand" />
           </button>
         ) : null}
+        <div className="mb-1">
+          <ManagerGlobalSearch
+            access={access}
+            compact={collapsed}
+            enableKeyboardShortcut={Boolean(onCollapsedChange)}
+            onNavigate={onNavigate}
+          />
+        </div>
         {links.map((link) => <NavigationLink key={link.href} link={link} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />)}
       </nav>
 
@@ -301,12 +309,8 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
               <Menu className="h-5 w-5" />
             </button>
           </div>
-          <ManagerGlobalSearch access={access} mobile />
           <ManagerNotificationCenter compact />
         </header>
-        <div className="sticky top-0 z-40 hidden h-14 items-center border-b border-slate-200 bg-[#f5f5f7]/95 px-5 backdrop-blur lg:flex">
-          <ManagerGlobalSearch access={access} />
-        </div>
         {children}
       </div>
 

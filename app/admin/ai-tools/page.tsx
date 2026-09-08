@@ -24,6 +24,7 @@ export default async function AdminAiToolsPage() {
     ...(access.customers ? [{ href: "/admin/ai-tools/quick-add-lead", title: "Quick Add Lead", description: "Small manual fallback for a new lead when no screenshot is available.", icon: UserPlus, badge: "Fallback" }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/material-list", title: "Material List Organizer", description: "Turn field notes and supplier lists into editable rows and CSV.", icon: ListTree },
+    { href: "/admin/ai-tools/renovation-estimator", title: "Renovation AI", description: "Build a material-only apartment renovation budget by unit, finish class, scope, and state.", icon: Calculator, badge: "New" },
     { href: "/shop/wood-floor/flooring-calculator", title: "Wood Floor Calculator", description: "Room takeoff, waste allowance, and marked-plan workflow.", icon: Calculator },
     ...(access.owner ? [{ href: "/admin/abc", title: "ABC Private Pricing", description: "Check owner-only ABC account pricing.", icon: Store }] : []),
     ...(access.traffic ? [{ href: "/admin/traffic", title: "Website Traffic", description: "Review production visitors and traffic status.", icon: BarChart3 }] : []),

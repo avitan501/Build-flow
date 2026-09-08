@@ -4,13 +4,6 @@ import { getSessionWithProfile } from "@/lib/auth";
 
 const aiOptions = [
   {
-    title: "Apartment Renovation Estimator",
-    description: "Build a material-only quantity plan and budget for one apartment or a multi-unit portfolio.",
-    href: "/ai/renovation-estimator",
-    accent: "from-sky-500/15 to-cyan-500/10",
-    public: true,
-  },
-  {
     title: "Start Project",
     description: "Open the guided project flow before you upload anything.",
     href: "/start-project",
@@ -53,7 +46,7 @@ export default async function AvantiaBuildAiPage() {
         <div className="p-6 sm:p-8">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {aiOptions.map((option) => {
-              const href = option.public ? option.href : option.title === "Start Project" ? projectHref : option.title === "Upload Plans" ? uploadHref : reviewHref;
+              const href = option.title === "Start Project" ? projectHref : option.title === "Upload Plans" ? uploadHref : reviewHref;
 
               return (
                 <Link

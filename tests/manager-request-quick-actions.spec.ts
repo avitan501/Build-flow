@@ -49,6 +49,10 @@ test("each request menu assigns David or Carlos and keeps the workflow status re
   expect(list).toContain("aria-checked={selectedAssignee}")
   expect(list).toContain('aria-label={`Status: ${row.stageLabel}`}')
   expect(list).toContain("Request status: ${row.stageLabel}")
+  expect(list).toContain("compactRequestStatus")
+  expect(list).toContain('if (normalized === "payment received / delivery") return "Payment"')
+  expect(list).toContain("w-[3.4rem]")
+  expect(list).toContain("{compactStatus}")
   expect(list).toContain("{row.clientLabel}</span>")
   expect(list).not.toContain("{row.clientLabel} · {row.stageLabel}")
 

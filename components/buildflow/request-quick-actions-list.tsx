@@ -77,6 +77,19 @@ const quickActions: Array<{
   { value: "normal", label: "Clear flag", icon: RotateCcw },
 ]
 
+function compactRequestStatus(label: string) {
+  const normalized = label.trim().toLocaleLowerCase()
+  if (normalized === "received / needs shopping") return "Received"
+  if (normalized === "priced / not sent") return "Pricing"
+  if (normalized === "waiting for client") return "Client"
+  if (normalized === "payment received / delivery") return "Payment"
+  if (normalized === "ai organized") return "AI"
+  if (normalized === "supplier route" || normalized === "route selected") return "Route"
+  if (normalized === "requests sent") return "Sent"
+  if (normalized === "quotes received") return "Quotes"
+  return label.trim()
+}
+
 export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow[] }) {
   const router = useRouter()
   const touchStartX = useRef<number | null>(null)
@@ -179,6 +192,7 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
       {rows.map((row) => {
         const presentation = stagePresentation[row.stage]
         const StatusIcon = presentation.icon
+        const compactStatus = compactRequestStatus(row.stageLabel)
         const isSelected = selected.has(row.id)
         return (
           <div
@@ -201,8 +215,13 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
                 <Check className="h-4 w-4" />
               </button>
             ) : (
-              <span className={`mr-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${presentation.tone}`}>
-                <StatusIcon className="h-4 w-4" aria-hidden="true" />
+              <span
+                aria-label={`Status: ${row.stageLabel}`}
+                title={`Request status: ${row.stageLabel}`}
+                className={`mr-3 inline-flex h-10 w-[3.4rem] shrink-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-md border px-1 ${presentation.tone}`}
+              >
+                <StatusIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="block max-w-full truncate text-[7px] font-black uppercase leading-none tracking-[.03em]">{compactStatus}</span>
               </span>
             )}
 
@@ -222,13 +241,6 @@ export function RequestQuickActionsList({ rows }: { rows: ManagerRequestQuickRow
                 ) : row.queueState === "queued" ? (
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-600">Queue</span>
                 ) : null}
-                <span
-                  aria-label={`Status: ${row.stageLabel}`}
-                  title={`Request status: ${row.stageLabel}`}
-                  className={`max-w-32 shrink-0 truncate rounded border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide ${presentation.tone}`}
-                >
-                  {row.stageLabel}
-                </span>
               </span>
               <span className="mt-0.5 block truncate text-xs text-slate-500">{row.clientLabel}</span>
             </Link>

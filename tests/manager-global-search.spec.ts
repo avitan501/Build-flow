@@ -25,13 +25,16 @@ test("database query removes PostgREST filter control characters", () => {
   expect(safeManagerDatabaseSearchTerm("משה קרמר")).toBe("משה קרמר")
 })
 
-test("admin shell exposes global search on desktop and phone", async () => {
+test("admin shell exposes one global search inside manager navigation", async () => {
   const [shell, route] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/api/admin/global-search/route.ts"), "utf8"),
   ])
-  expect(shell).toContain("ManagerGlobalSearch access={access}")
-  expect(shell).toContain("ManagerGlobalSearch access={access} mobile")
+  expect(shell.match(/<ManagerGlobalSearch/g)).toHaveLength(1)
+  expect(shell).toContain("compact={collapsed}")
+  expect(shell).toContain("onNavigate={onNavigate}")
+  expect(shell).not.toContain("ManagerGlobalSearch access={access} mobile")
+  expect(shell).not.toContain('className="sticky top-0 z-40')
   expect(route).toContain("requireManagerPortalProfile")
   expect(route).toContain('Cache-Control": "private, no-store')
 })

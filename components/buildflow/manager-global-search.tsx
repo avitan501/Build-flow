@@ -7,7 +7,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { managerPageSearchResults, type ManagerSearchAccess, type ManagerSearchResult } from "@/lib/manager-global-search"
 
-export function ManagerGlobalSearch({ access, mobile = false }: { access: ManagerSearchAccess; mobile?: boolean }) {
+export function ManagerGlobalSearch({ access, compact = false, enableKeyboardShortcut = false, onNavigate }: {
+  access: ManagerSearchAccess
+  compact?: boolean
+  enableKeyboardShortcut?: boolean
+  onNavigate?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [records, setRecords] = useState<ManagerSearchResult[]>([])
@@ -24,7 +29,7 @@ export function ManagerGlobalSearch({ access, mobile = false }: { access: Manage
   }, [open])
 
   useEffect(() => {
-    if (mobile) return
+    if (!enableKeyboardShortcut) return
     function openFromKeyboard(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "k" && window.matchMedia("(min-width: 1024px)").matches) {
         event.preventDefault()
@@ -33,7 +38,7 @@ export function ManagerGlobalSearch({ access, mobile = false }: { access: Manage
     }
     window.addEventListener("keydown", openFromKeyboard)
     return () => window.removeEventListener("keydown", openFromKeyboard)
-  }, [mobile])
+  }, [enableKeyboardShortcut])
 
   useEffect(() => {
     if (!open || query.trim().length < 2) return
@@ -59,6 +64,11 @@ export function ManagerGlobalSearch({ access, mobile = false }: { access: Manage
     setRecords([])
   }
 
+  function closeAndNavigate() {
+    close()
+    onNavigate?.()
+  }
+
   const results = [...pages, ...records]
 
   const dialog = open ? <div className="fixed inset-0 z-[120] bg-slate-950/45 px-3 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm sm:px-6 sm:pt-[8vh]" role="dialog" aria-modal="true" aria-label="Search Avantia management" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
@@ -70,7 +80,7 @@ export function ManagerGlobalSearch({ access, mobile = false }: { access: Manage
       </div>
       <div className="max-h-[calc(84vh-3.6rem)] overflow-y-auto p-2">
         {!query.trim() ? <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[.12em] text-slate-400">Quick access</p> : null}
-        {results.length ? <div>{results.map((item) => <Link key={item.id} href={item.href} onClick={close} className="group flex min-h-14 items-center gap-3 rounded-lg px-3 py-2 outline-none hover:bg-sky-50 focus-visible:bg-sky-50">
+        {results.length ? <div>{results.map((item) => <Link key={item.id} href={item.href} onClick={closeAndNavigate} className="group flex min-h-14 items-center gap-3 rounded-lg px-3 py-2 outline-none hover:bg-sky-50 focus-visible:bg-sky-50">
           <span className="inline-flex min-w-16 justify-center rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 group-hover:bg-white group-hover:text-[#0066cc]">{item.category}</span>
           <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{item.title}</strong><span className="mt-0.5 block truncate text-xs text-slate-500">{item.description}</span></span>
           <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 group-hover:translate-x-0.5 group-hover:text-[#0066cc]" />
@@ -80,8 +90,17 @@ export function ManagerGlobalSearch({ access, mobile = false }: { access: Manage
   </div> : null
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} aria-label="Search clients and manager tools" className={mobile ? "flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-left text-xs text-slate-500" : "mx-auto flex min-h-10 w-full max-w-xl items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm text-slate-500 shadow-sm transition hover:border-sky-300 hover:shadow"}>
-      <Search className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">Search clients or anything…</span>{mobile ? null : <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold"><Command className="h-3 w-3" />K</span>}
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      aria-label="Search clients and manager tools"
+      title={compact ? "Search" : undefined}
+      className={compact
+        ? "group relative mx-auto flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 outline-none transition hover:border-sky-300 hover:bg-sky-50 hover:text-[#0066cc] focus-visible:ring-2 focus-visible:ring-[#0071e3]"
+        : "flex min-h-10 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-left text-xs font-semibold text-slate-500 outline-none transition hover:border-sky-300 hover:bg-white hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-[#0071e3]"}
+    >
+      <Search className="h-4 w-4 shrink-0" />
+      {compact ? <span className="sr-only">Search</span> : <><span className="min-w-0 flex-1 truncate">Search</span>{enableKeyboardShortcut ? <span className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-1 py-0.5 text-[9px] font-semibold"><Command className="h-2.5 w-2.5" />K</span> : null}</>}
     </button>
 
     {dialog && typeof document !== "undefined" ? createPortal(dialog, document.body) : null}
