@@ -25,6 +25,7 @@ test("the supplier page loads tombstones and hides deleted trial vendors", async
   expect(actions).toContain('supabase.rpc("staff_load_supplier_directory_snapshot")')
   expect(manager).toContain("deletedSupplierIdSet.has(`trial-${entry.sourceId}`)")
   expect(manager).toContain("setDeletedSupplierIds(result.deletedSupplierIds)")
+  expect(manager).toContain("setSupplierProfileOpen(false)")
   expect(manager).toContain("Verified Suppliers")
   expect(manager).toContain("Trial Suppliers")
   expect(manager).toContain("Add {supplierDirectoryGroup} supplier")

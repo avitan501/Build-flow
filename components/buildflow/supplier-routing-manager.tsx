@@ -738,6 +738,7 @@ export function SupplierRoutingManager({
         setDeletedSupplierIds(latest.deletedSupplierIds)
         writeShopQualificationSettings(latest.settings)
         setSelectedSupplierId(latest.settings.suppliers[0]?.id ?? "")
+        setSupplierProfileOpen(false)
         setSupplierDirty(false)
         setDirectoryNotice(`${supplier?.name || "That vendor"} had already been deleted. The directory is now synchronized with ${latest.settings.suppliers.length} active vendor${latest.settings.suppliers.length === 1 ? "" : "s"}.`)
         return
@@ -755,6 +756,7 @@ export function SupplierRoutingManager({
       setDeletedSupplierIds((current) => [...new Set([...current, ...result.deletedSupplierIds, supplierId])])
       writeShopQualificationSettings(nextSettings)
       setSelectedSupplierId(nextSettings.suppliers[0]?.id ?? "")
+      setSupplierProfileOpen(false)
       setSupplierDirty(false)
       setDirectorySaveState("saved")
       if (nextSettings.suppliers.some((entry) => entry.id === supplierId) || (latest.ok && (removedNow.length !== 1 || removedNow[0]?.id !== supplierId))) {
