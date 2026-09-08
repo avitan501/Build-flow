@@ -72,8 +72,10 @@ const EMPTY_CANDIDATE_REVIEW = {
 
 export function SupplierNetworkWorkspace({
   rows,
+  canDiscover = false,
 }: {
   rows: SupplierNetworkRow[];
+  canDiscover?: boolean;
 }) {
   const [stage, setStage] = useState<SupplierNetworkView>("contact");
   const [source, setSource] = useState<SupplierNetworkSource | "All">("All");
@@ -112,6 +114,8 @@ export function SupplierNetworkWorkspace({
   const [discoveryNotice, setDiscoveryNotice] = useState("");
   const [discoveryPending, setDiscoveryPending] = useState(false);
   const [discoveryContext, setDiscoveryContext] = useState({ department: "", zipCode: "" });
+  const [exaApprovalToken, setExaApprovalToken] = useState("");
+  const [exaAvailable, setExaAvailable] = useState(false);
   const [reviewingCandidate, setReviewingCandidate] = useState<SupplierDiscoveryCandidate | null>(null);
   const [reviewedSupplierName, setReviewedSupplierName] = useState("");
   const [candidateReview, setCandidateReview] = useState(EMPTY_CANDIDATE_REVIEW);
@@ -168,11 +172,12 @@ export function SupplierNetworkWorkspace({
     saveRow(row, { ...current, channels }, current);
   }
 
-  async function discoverSuppliers(more = false) {
+  async function discoverSuppliers(more = false, selectedProvider: "primary" | "exa" = "primary") {
     if (!discoveryDepartment.trim() || !/^\d{5}(?:-\d{4})?$/.test(discoveryZip)) {
       setDiscoveryError("Enter a department and a valid ZIP code.");
       return;
     }
+    if (selectedProvider === "exa" && !window.confirm("Exa may incur a search charge. Run the Exa fallback now?")) return;
     setDiscoveryPending(true);
     setDiscoveryError("");
     setDiscoveryNotice("");
@@ -192,14 +197,19 @@ export function SupplierNetworkWorkspace({
       const response = await fetch("/api/admin/suppliers/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ department, zipCode: discoveryZip, excludeIdentities }),
+        body: JSON.stringify({ department, zipCode: discoveryZip, excludeIdentities, provider: selectedProvider, exaApprovalToken: selectedProvider === "exa" ? exaApprovalToken : undefined }),
       });
       const payload = await response.json() as {
         ok?: boolean;
         error?: string;
         suppliers?: SupplierDiscoveryCandidate[];
         partial?: boolean;
+        provider?: "codex_openclaw" | "exa_fallback";
+        fallbackAvailable?: boolean;
+        exaApprovalToken?: string;
       };
+      setExaAvailable(Boolean(payload.fallbackAvailable && payload.exaApprovalToken));
+      setExaApprovalToken(payload.exaApprovalToken || "");
       if (!response.ok || !payload.ok) setDiscoveryError(payload.error || "Supplier discovery is temporarily unavailable.");
       else {
         const suppliers = payload.suppliers ?? [];
@@ -445,7 +455,7 @@ export function SupplierNetworkWorkspace({
             </button>
           ))}
         </div>
-        <details className="group border-t border-slate-100 bg-sky-50/60">
+        {canDiscover ? <details className="group border-t border-slate-100 bg-sky-50/60">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-bold text-sky-950">
             <Sparkles className="h-4 w-4 text-[#0071e3]" />
             Find 10 suppliers with AI
@@ -486,7 +496,7 @@ export function SupplierNetworkWorkspace({
               </label>
               <button
                 type="button"
-                onClick={() => void discoverSuppliers(false)}
+                onClick={() => void discoverSuppliers(false, "primary")}
                 disabled={discoveryPending}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-50"
               >
@@ -508,6 +518,7 @@ export function SupplierNetworkWorkspace({
                 {discoveryNotice}
               </p>
             ) : null}
+            {exaAvailable ? <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2"><p className="text-[10px] font-semibold text-amber-900">OpenClaw was unavailable or returned fewer verified suppliers.</p><button type="button" onClick={() => void discoverSuppliers(false, "exa")} disabled={discoveryPending} className="h-8 shrink-0 rounded-md border border-amber-300 bg-white px-2.5 text-[10px] font-bold text-amber-900">Use Exa · may charge</button></div> : null}
             {discoveryResults.length ? (
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {discoveryResults.map((supplier) => {
@@ -645,7 +656,7 @@ export function SupplierNetworkWorkspace({
               </button>
             ) : null}
           </div>
-        </details>
+        </details> : null}
         </div>
       ) : null}
 

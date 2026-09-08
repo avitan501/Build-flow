@@ -152,6 +152,11 @@ test("supplier discovery UI and server actions enforce review without outreach",
   );
   expect(route).toContain("selectSafeSupplierCandidates");
   expect(route).toContain("excludeIdentities");
+  expect(route).toContain('job: "find_suppliers"');
+  expect(route).toContain("verifyDiscoveryFallbackToken");
+  expect(route).toContain('provider = "exa_fallback"');
+  expect(workspace).toContain("Use Exa · may charge");
+  expect(workspace).toContain("canDiscover");
   expect(route).not.toContain("salesContacts");
   expect(`${workspace}\n${actions}\n${route}`).not.toContain("send-supplier-quote");
 });

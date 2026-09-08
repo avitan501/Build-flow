@@ -3,15 +3,107 @@
 import { revalidatePath } from "next/cache";
 
 import { requireStaffProfile } from "@/lib/auth";
+import { verifyDiscoveryCandidateToken } from "@/lib/discovery-fallback";
+import { selectLeadDiscoveryCandidates, type LeadDepartment } from "@/lib/lead-discovery";
+import { requireOwnerAccess } from "@/lib/owner-access";
+import type { ShopQualificationSettings } from "@/lib/shop-qualification";
 
 type LeadResult = { ok: true } | { ok: false; error: string };
 
 const LEAD_STATUSES = ["new", "contacted", "qualified", "not_interested"] as const;
 const CLIENT_LANGUAGES = ["en", "es"] as const;
+const DISCOVERY_PROVIDERS = ["codex_openclaw", "exa_fallback"] as const;
 
 function refreshOutreach() {
   revalidatePath("/admin/goals-progress");
   revalidatePath("/admin/users");
+}
+
+function sourceDomains(values: Array<string | null | undefined>) {
+  return values.flatMap((value) => {
+    if (!value) return [];
+    try { return [new URL(value).hostname.toLowerCase().replace(/^www\./, "")]; } catch { return []; }
+  });
+}
+
+export async function approveGeneratedLeadAction(input: {
+  companyName: string;
+  email: string | null;
+  phone: string | null;
+  sourceUrl: string;
+  category: string;
+  location: string;
+  matchExplanation: string;
+  department: LeadDepartment;
+  zipCode: string;
+  provider: string;
+  approvalToken: string;
+}): Promise<LeadResult> {
+  const { supabase, user } = await requireOwnerAccess("/admin/users?view=leads");
+  const provider = DISCOVERY_PROVIDERS.find((value) => value === input.provider);
+  const department = Number(input.department);
+  if (!provider || ![1, 2, 3].includes(department) || !/^\d{5}$/.test(input.zipCode)) return { ok: false, error: "This discovery result is not valid." };
+
+  const signedIdentity = {
+    userId: user.id,
+    companyName: input.companyName,
+    email: input.email,
+    phone: input.phone,
+    sourceUrl: input.sourceUrl,
+    category: input.category,
+    location: input.location,
+    matchExplanation: input.matchExplanation,
+    department,
+    zipCode: input.zipCode,
+    provider,
+  };
+  if (!verifyDiscoveryCandidateToken(input.approvalToken, signedIdentity)) return { ok: false, error: "This discovery result expired or was changed. Run Find Leads again." };
+
+  const companyName = input.companyName.trim().replace(/\s+/g, " ").slice(0, 160);
+  const email = input.email?.trim().toLowerCase().slice(0, 320) || null;
+  const phone = input.phone?.trim().slice(0, 40) || null;
+  if (!companyName || (!email && !phone)) return { ok: false, error: "A verified public email or phone is required before adding this lead." };
+
+  const [leadsResult, customersResult, supplierResult] = await Promise.all([
+    supabase.from("manager_outreach_leads").select("email,phone,notes").limit(5_000).returns<Array<{ email: string | null; phone: string | null; notes: string | null }>>(),
+    supabase.from("profiles").select("email,phone").limit(5_000).returns<Array<{ email: string | null; phone: string | null }>>(),
+    supabase.rpc("staff_load_supplier_directory_snapshot"),
+  ]);
+  if (leadsResult.error || customersResult.error || supplierResult.error) return { ok: false, error: "The lead could not be checked. Please try again." };
+  const suppliers = ((supplierResult.data as { settings?: ShopQualificationSettings } | null)?.settings?.suppliers ?? []);
+  const existingLeads = leadsResult.data ?? [];
+  const existingCustomers = customersResult.data ?? [];
+  const sourceUrls = existingLeads.map((lead) => lead.notes?.match(/Source:\s+(https:\/\/\S+)/i)?.[1]);
+  const candidate = selectLeadDiscoveryCandidates({
+    sources: [{ title: companyName, url: input.sourceUrl, text: [email, phone].filter(Boolean).join(" ") }],
+    existingEmails: [...existingLeads.flatMap((lead) => lead.email ? [lead.email] : []), ...existingCustomers.flatMap((customer) => customer.email ? [customer.email] : []), ...suppliers.flatMap((supplier) => [supplier.email, ...(supplier.additionalContacts ?? []).map((contact) => contact.email)].filter(Boolean) as string[])],
+    existingPhones: [...existingLeads.flatMap((lead) => lead.phone ? [lead.phone] : []), ...existingCustomers.flatMap((customer) => customer.phone ? [customer.phone] : []), ...suppliers.flatMap((supplier) => [supplier.phone, supplier.whatsapp, ...(supplier.additionalContacts ?? []).map((contact) => contact.phone)].filter(Boolean) as string[])],
+    existingDomains: [...sourceDomains(sourceUrls), ...sourceDomains(suppliers.map((supplier) => supplier.portalUrl))],
+    limit: 1,
+  })[0];
+  if (!candidate) return { ok: false, error: "This lead already exists or its public source could not be verified." };
+
+  const note = [
+    `Generated lead · ${input.category.slice(0, 100)} · ZIP ${input.zipCode}`,
+    input.location ? `Location: ${input.location.slice(0, 160)}` : "",
+    `Provider: ${provider}`,
+    input.matchExplanation.slice(0, 360),
+    `Source: ${candidate.sourceUrl}`,
+  ].filter(Boolean).join(" · ").slice(0, 1_000);
+  const { error } = await supabase.from("manager_outreach_leads").insert({
+    full_name: candidate.companyName,
+    company_name: candidate.companyName,
+    email: candidate.email,
+    phone: candidate.phone,
+    notes: note,
+    status: "new",
+    relationship_level: department,
+    preferred_language: "en",
+    created_by: user.id,
+  });
+  if (error) return { ok: false, error: "The lead could not be added. Please try again." };
+  refreshOutreach();
+  return { ok: true };
 }
 
 export async function createOutreachLeadAction(input: {

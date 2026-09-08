@@ -1,11 +1,12 @@
 "use client";
 
-import { LoaderCircle, Pencil, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { CheckCircle2, ExternalLink, LoaderCircle, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  approveGeneratedLeadAction,
   createOutreachLeadAction,
   deleteOutreachLeadAction,
   updateClientLanguageAction,
@@ -15,7 +16,7 @@ import {
 } from "@/app/admin/goals-progress/lead-actions";
 import { ContactActions } from "@/components/buildflow/contact-actions";
 import { ContactConversation, type DirectoryConversationEntry } from "@/components/buildflow/contact-conversation";
-import { effectiveLeadDepartment, LEAD_DEPARTMENTS, leadDepartmentLabel, type LeadDepartment } from "@/lib/lead-discovery";
+import { effectiveLeadDepartment, LEAD_DEPARTMENTS, leadDepartmentLabel, type LeadDepartment, type LeadDiscoveryPreview } from "@/lib/lead-discovery";
 
 export type OutreachLeadRecord = {
   id: string;
@@ -146,28 +147,46 @@ function LeadGenerationBar({ department }: { department: 1 | 2 | 3 }) {
   const [zipCode, setZipCode] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  type ReviewCandidate = LeadDiscoveryPreview & { approvalToken: string };
+  const [candidates, setCandidates] = useState<ReviewCandidate[]>([]);
+  const [provider, setProvider] = useState<"codex_openclaw" | "exa_fallback">("codex_openclaw");
+  const [exaApprovalToken, setExaApprovalToken] = useState("");
+  const [exaAvailable, setExaAvailable] = useState(false);
 
-  async function generate() {
+  async function generate(selectedProvider: "primary" | "exa" = "primary") {
     if (!/^\d{5}$/.test(zipCode)) {
       setNotice("Enter a five-digit ZIP code.");
       return;
     }
+    if (selectedProvider === "exa" && !window.confirm("Exa may incur a search charge. Run the Exa fallback now?")) return;
     setPending(true);
     setNotice(null);
     try {
       const response = await fetch("/api/admin/leads/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ department, zipCode }),
+        body: JSON.stringify({ department, zipCode, provider: selectedProvider, exaApprovalToken: selectedProvider === "exa" ? exaApprovalToken : undefined }),
       });
-      const payload = await response.json() as { ok?: boolean; added?: number; error?: string };
+      const payload = await response.json() as {
+        ok?: boolean;
+        candidates?: ReviewCandidate[];
+        error?: string;
+        provider?: "codex_openclaw" | "exa_fallback";
+        fallbackAvailable?: boolean;
+        exaApprovalToken?: string;
+        exaMayIncurCharge?: boolean;
+      };
+      setExaAvailable(Boolean(payload.fallbackAvailable && payload.exaApprovalToken));
+      setExaApprovalToken(payload.exaApprovalToken || "");
       if (!response.ok || !payload.ok) {
         setNotice(payload.error || "Lead search is temporarily unavailable.");
         return;
       }
-      const added = payload.added ?? 0;
-      setNotice(added ? `${added} new leads added.` : "No new verified business contacts were found.");
-      router.refresh();
+      const nextCandidates = payload.candidates ?? [];
+      setCandidates(nextCandidates);
+      setProvider(payload.provider || "codex_openclaw");
+      setNotice(nextCandidates.length ? `${nextCandidates.length} verified contacts ready for your review. Nothing was saved.` : "No new verified business contacts were found.");
     } catch {
       setNotice("Lead search is temporarily unavailable.");
     } finally {
@@ -175,16 +194,53 @@ function LeadGenerationBar({ department }: { department: 1 | 2 | 3 }) {
     }
   }
 
+  async function addCandidate(candidate: ReviewCandidate) {
+    setSavingId(candidate.sourceUrl);
+    setNotice(null);
+    try {
+      const result = await approveGeneratedLeadAction({
+        companyName: candidate.companyName,
+        email: candidate.email,
+        phone: candidate.phone,
+        sourceUrl: candidate.sourceUrl,
+        category: candidate.category,
+        location: candidate.location,
+        matchExplanation: candidate.matchExplanation,
+        department,
+        zipCode,
+        provider,
+        approvalToken: candidate.approvalToken,
+      });
+      if (!result.ok) setNotice(result.error);
+      else {
+        setCandidates((current) => current.filter((item) => item.sourceUrl !== candidate.sourceUrl));
+        setNotice(`${candidate.companyName} added. Nobody was contacted.`);
+        router.refresh();
+      }
+    } catch {
+      setNotice("The lead could not be added. Please try again.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   return <section className="mt-2 rounded-md border border-slate-200 bg-white p-2" aria-label={`Generate ${leadDepartmentLabel(department)} leads`}>
     <div className="grid gap-2 sm:grid-cols-[8rem_auto_minmax(0,1fr)] sm:items-center">
       <label className="relative"><span className="sr-only">ZIP code</span><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={zipCode} onChange={(event) => setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))} onKeyDown={(event) => { if (event.key === "Enter") void generate(); }} inputMode="numeric" autoComplete="postal-code" placeholder="ZIP code" className="h-9 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-semibold outline-none focus:border-[#0071e3]" /></label>
-      <button type="button" onClick={() => void generate()} disabled={pending || zipCode.length !== 5} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}{pending ? "Finding leads…" : "Generate 50 leads"}</button>
-      <p className={`truncate text-[10px] font-semibold ${notice?.includes("unavailable") || notice?.startsWith("Enter") ? "text-rose-700" : "text-slate-500"}`}>{notice || "Public business contacts only. Nothing is contacted automatically."}</p>
+      <button type="button" onClick={() => void generate("primary")} disabled={pending || zipCode.length !== 5} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}{pending ? "Finding leads…" : "Generate 50 leads"}</button>
+      <p className={`text-[10px] font-semibold ${notice?.includes("unavailable") || notice?.includes("reconnect") || notice?.startsWith("Enter") ? "text-rose-700" : "text-slate-500"}`}>{notice || "Owner only · OpenClaw first · review before saving."}</p>
     </div>
+    {exaAvailable ? <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2"><p className="text-[10px] font-semibold text-amber-900">Low-cost search was unavailable or incomplete.</p><button type="button" onClick={() => void generate("exa")} disabled={pending} className="h-8 shrink-0 rounded-md border border-amber-300 bg-white px-2.5 text-[10px] font-bold text-amber-900">Use Exa · may charge</button></div> : null}
+    {candidates.length ? <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+      {candidates.map((candidate) => <article key={candidate.sourceUrl} className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+        <div className="min-w-0"><div className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" /><p className="truncate text-xs font-bold">{candidate.companyName}</p></div><p className="mt-1 truncate text-[10px] text-slate-500">{[candidate.location, candidate.email, candidate.phone].filter(Boolean).join(" · ")}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600">{candidate.matchExplanation}</p></div>
+        <div className="flex items-center justify-between gap-2"><a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3" />Source</a><button type="button" onClick={() => void addCandidate(candidate)} disabled={savingId !== null} className="inline-flex h-8 items-center gap-1 rounded bg-slate-950 px-2.5 text-[10px] font-bold text-white disabled:opacity-40">{savingId === candidate.sourceUrl ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}Add lead</button></div>
+      </article>)}
+    </div> : null}
   </section>;
 }
 
-export function LeadDepartmentDirectory({ leads, conversations, senderName, activeDepartment }: { leads: OutreachLeadRecord[]; conversations: Record<string, DirectoryConversationEntry[]>; senderName: string; activeDepartment: LeadDepartment }) {
+export function LeadDepartmentDirectory({ leads, conversations, senderName, activeDepartment, canGenerateLeads = false }: { leads: OutreachLeadRecord[]; conversations: Record<string, DirectoryConversationEntry[]>; senderName: string; activeDepartment: LeadDepartment; canGenerateLeads?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const counts = Object.fromEntries(LEAD_DEPARTMENTS.map((department) => [department.value, leads.filter((lead) => effectiveLeadDepartment(lead) === department.value).length]));
@@ -201,7 +257,7 @@ export function LeadDepartmentDirectory({ leads, conversations, senderName, acti
     <nav className="flex gap-1 overflow-x-auto rounded-md border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Lead departments">
       {LEAD_DEPARTMENTS.map((department) => <button key={department.value} type="button" onClick={() => selectDepartment(department.value)} aria-pressed={activeDepartment === department.value} className={`inline-flex h-9 min-w-max flex-1 items-center justify-center gap-1.5 rounded px-2.5 text-[11px] font-bold transition ${activeDepartment === department.value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span>{department.label}</span><span className={`rounded-full px-1.5 py-0.5 text-[9px] ${activeDepartment === department.value ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"}`}>{counts[department.value] || 0}</span></button>)}
     </nav>
-    {activeDepartment <= 3 ? <LeadGenerationBar department={activeDepartment as 1 | 2 | 3} /> : null}
+    {canGenerateLeads && activeDepartment <= 3 ? <LeadGenerationBar department={activeDepartment as 1 | 2 | 3} /> : null}
     <div className="mt-2"><OutreachLeadDirectory leads={visibleLeads} conversations={conversations} senderName={senderName} /></div>
   </section>;
 }

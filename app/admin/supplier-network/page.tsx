@@ -70,7 +70,7 @@ export default async function SupplierNetworkPage() {
           </div>
         </header>
 
-        <SupplierNetworkWorkspace rows={rows} />
+        <SupplierNetworkWorkspace rows={rows} canDiscover={access.owner} />
 
         <div className="mt-3 flex justify-end">
           <Link

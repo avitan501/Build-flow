@@ -66,20 +66,33 @@ test("separate OpenStreetMap businesses are not collapsed into one source", () =
   expect(results).toHaveLength(2)
 })
 
-test("lead generation is staff-only, source-backed, and never sends messages", async () => {
-  const route = await readFile(path.join(process.cwd(), "app/api/admin/leads/generate/route.ts"), "utf8")
+test("lead generation is owner-only, previews results, and gates paid fallback", async () => {
+  const [route, component, actions, client] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/admin/leads/generate/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/client-target-outreach.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "app/admin/goals-progress/lead-actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "lib/openclaw-job-client.ts"), "utf8"),
+  ])
 
-  expect(route).toContain('requireStaffProfile("customers")')
-  expect(route).toContain("nominatim.openstreetmap.org")
-  expect(route).toContain('placePayload[0]?.type !== "postcode"')
-  expect(route).toContain("overpass.kumi.systems")
-  expect(route).toContain("overpass-api.de")
-  expect(route).toContain("Source: ${lead.sourceUrl}")
-  expect(route).toContain('relationship_level: parsed.data.department')
-  expect(route).toContain('domain === "openstreetmap.org" ? `${domain}${url.pathname}` : domain')
-  expect(route).not.toContain("send-message")
-  expect(route).not.toContain("whatsapp")
-  expect(route).not.toContain("sms")
+  expect(route).toContain("getOwnerAccessSession")
+  expect(route).toContain("Only David can run Find Leads")
+  expect(route).toContain('provider: z.enum(["primary", "exa"])')
+  expect(route).toContain("verifyDiscoveryFallbackToken")
+  expect(route).toContain('provider = "exa_fallback"')
+  expect(route).toContain("saved: 0")
+  expect(route).not.toContain('.from("manager_outreach_leads").insert')
+  expect(component).toContain("Nothing was saved")
+  expect(component).toContain("Use Exa · may charge")
+  expect(component).toContain("Add lead")
+  expect(actions).toContain("approveGeneratedLeadAction")
+  expect(actions).toContain("requireOwnerAccess")
+  expect(route).toContain("createDiscoveryCandidateToken")
+  expect(actions).toContain("verifyDiscoveryCandidateToken")
+  expect(client).toContain('job: OpenClawJobKind')
+  expect(client).toContain('createHmac("sha256", signingSecret)')
+  expect(`${route}\n${component}\n${actions}`).not.toContain("send-message")
+  expect(route).not.toContain("sendWhatsApp")
+  expect(route).not.toContain("sendSms")
 })
 
 test("manual lead entry defaults safely and rejects an existing email or phone", async () => {

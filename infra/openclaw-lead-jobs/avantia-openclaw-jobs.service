@@ -1,0 +1,26 @@
+[Unit]
+Description=Avantia signed OpenClaw lead and supplier jobs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/avantia-openclaw-jobs
+LoadCredentialEncrypted=avantia_job_signing_secret:/etc/credstore.encrypted/avantia_job_signing_secret
+Environment=PORT=18992
+Environment=OPENCLAW_BIN=/usr/bin/openclaw
+Environment=OPENCLAW_AUTH_PROFILES=/root/.openclaw/agents/main/agent/auth-profiles.json
+ExecStart=/bin/sh -c 'AVANTIA_JOB_SIGNING_SECRET="$$(cat "$${CREDENTIALS_DIRECTORY}/avantia_job_signing_secret")" exec /usr/bin/node /opt/avantia-openclaw-jobs/server.mjs'
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/root/.openclaw
+ReadWritePaths=/root/.openclaw
+
+[Install]
+WantedBy=multi-user.target

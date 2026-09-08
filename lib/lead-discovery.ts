@@ -25,6 +25,22 @@ export type LeadDiscoveryCandidate = {
   sourceDomain: string
 }
 
+export type LeadDiscoveryPreview = LeadDiscoveryCandidate & {
+  category: string
+  location: string
+  website: string | null
+  matchExplanation: string
+  verificationStatus: "verified-public-source" | "needs-contact-enrichment"
+}
+
+export type StructuredLeadDiscoverySource = LeadDiscoverySource & {
+  category?: unknown
+  location?: unknown
+  website?: unknown
+  matchExplanation?: unknown
+  verificationStatus?: unknown
+}
+
 const blockedDomains = new Set([
   "angi.com",
   "bbb.org",
@@ -155,4 +171,32 @@ export function selectLeadDiscoveryCandidates(input: {
   }
 
   return candidates
+}
+
+export function selectLeadDiscoveryPreviews(input: {
+  sources: StructuredLeadDiscoverySource[]
+  existingEmails?: Iterable<string>
+  existingPhones?: Iterable<string>
+  existingDomains?: Iterable<string>
+  limit?: number
+}) {
+  const candidates = selectLeadDiscoveryCandidates(input)
+  const sourceByUrl = new Map(
+    input.sources.flatMap((source) => {
+      const safe = safeSource(source.url)
+      return safe ? [[safe.url, source] as const] : []
+    }),
+  )
+  return candidates.map<LeadDiscoveryPreview>((candidate) => {
+    const source = sourceByUrl.get(candidate.sourceUrl)
+    const website = safeSource(source?.website)?.url ?? candidate.sourceUrl
+    return {
+      ...candidate,
+      category: clean(source?.category, 100) || "Business",
+      location: clean(source?.location, 160),
+      website,
+      matchExplanation: clean(source?.matchExplanation, 360) || "Matched from a verified public business source.",
+      verificationStatus: candidate.email || candidate.phone ? "verified-public-source" : "needs-contact-enrichment",
+    }
+  })
 }

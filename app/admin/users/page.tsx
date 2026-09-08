@@ -256,7 +256,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             {filteredCustomers.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customers match this search.</p> : null}
           </section>
         ) : view === "leads" ? (
-          <div className="mt-3"><LeadDepartmentDirectory leads={filteredLeads} conversations={leadConversations} senderName={senderName} activeDepartment={activeLeadDepartment} /></div>
+          <div className="mt-3"><LeadDepartmentDirectory leads={filteredLeads} conversations={leadConversations} senderName={senderName} activeDepartment={activeLeadDepartment} canGenerateLeads={isOwner} /></div>
         ) : (
           <section className="mt-3 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
