@@ -90,9 +90,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: "/images/avantia/avantia-app-icon-512.png",
-    shortcut: "/images/avantia/avantia-app-icon-512.png",
-    apple: "/images/avantia/avantia-app-icon-512.png",
+    icon: [{ url: "/favicon.ico", sizes: "96x96", type: "image/x-icon" }],
+    shortcut: [{ url: "/favicon.ico", sizes: "96x96", type: "image/x-icon" }],
+    apple: [{ url: "/images/avantia/avantia-app-icon-512.png", sizes: "512x512", type: "image/png" }],
   },
   openGraph: {
     title: "Avantia Build | Materials Priced & Delivered",
