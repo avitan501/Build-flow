@@ -437,7 +437,7 @@ export async function updateMaterialRequestTitleAction(input: { requestId: strin
   const { error: eventError } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
-    event_type: "request_updated",
+    event_type: "note_added",
     source: "admin",
     title: "Material request renamed",
     description: `${request.title} → ${title}`,
@@ -469,7 +469,7 @@ export async function updateMaterialRequestClientNameAction(input: { requestId: 
   const { error: eventError } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
-    event_type: "request_updated",
+    event_type: "note_added",
     source: "admin",
     title: "Client name updated",
     description: `${profile?.full_name || "Client"} → ${clientName}`,
