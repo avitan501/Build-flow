@@ -7,14 +7,14 @@ import { supplierFollowUpAction } from "../lib/supplier-follow-up-policy"
 
 const root = process.cwd()
 
-test("request timelines distinguish client replies from supplier replies", async () => {
+test("request timeline keeps client replies while supplier activity stays hidden", async () => {
   const [timeline, panel] = await Promise.all([
     readFile(path.join(root, "components/buildflow/related-email-timeline.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
   ])
 
   expect(timeline).toContain('party === "supplier" ? "Supplier replied" : "Client replied"')
-  expect(panel).toContain('party="supplier"')
+  expect(panel).not.toContain('party="supplier"')
   expect(panel).toContain('party="client"')
 })
 

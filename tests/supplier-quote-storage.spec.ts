@@ -507,7 +507,7 @@ test("request workspace keeps pricing steps and makes client contact globally av
   expect(management).toContain(
     "Client, payment & delivery",
   );
-  expect(management).toContain("Supplier route<br />Contact &amp; files");
+  expect(management).toContain("Supplier · note · contact");
   expect(management).not.toContain("step={4}");
   expect(management).toContain("step={3}");
   expect(management).not.toContain('id="contact-client"');

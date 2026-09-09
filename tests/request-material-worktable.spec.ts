@@ -235,7 +235,7 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).toContain("Compare supplier route")
   expect(supplierQuoteActions).toContain('contact_status: "quote_received"')
   expect(supplierQuoteActions).toContain('revalidatePath(`/owner/materials/requests/${comparison.request_id}`)')
-  expect(management).toContain("Contact &amp; files")
+  expect(management).toContain("Supplier · note · contact")
   expect(management).toContain("price comparisons")
   expect(management).toContain("Exact supplier · current request")
   expect(management).toContain("requestSupplierFolderContents(comparisons, supplier.id)")
@@ -248,6 +248,31 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).not.toContain("Add or change suppliers")
   expect(management).not.toContain('title="Supplier email"')
   expect(management, "supplier bids should not be isolated in repeated large comparison cards").not.toContain("comparisons.map((comparison) => <article")
+})
+
+test("website supplier defects use compact autosave, contact menus, and movable groups", async () => {
+  const [worktable, management, actions, stepHeader] = await Promise.all([
+    source(worktablePath),
+    source(managementPath),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+    source(path.join(root, "components/buildflow/request-workflow-step-header.tsx")),
+  ])
+
+  expect(management).toContain("SupplierNoteAutosave")
+  expect(management).toContain("Supplier · note · contact")
+  expect(management).toContain("No contact saved")
+  expect(management).not.toContain('title="Supplier activity"')
+  expect(management).not.toContain("Supplier messages")
+  expect(management).not.toContain("saveSupplierProgressNote(")
+  expect(management).toContain("badges={<>")
+  expect(stepHeader).toContain("badges?: ReactNode")
+  expect(worktable).toContain("moveRequestItemDepartmentAction")
+  expect(worktable).toContain("draggable={groupSimilar && !movePending}")
+  expect(worktable).toContain("Drop here")
+  expect(worktable).toContain("Move group…")
+  expect(actions).toContain("export async function moveRequestItemDepartmentAction")
+  expect(actions).toContain('update({ department })')
+  expect(actions).toContain("previous_department")
 })
 
 test("supplier routes are alphabetical checklists with per-item or whole-request scope", async () => {

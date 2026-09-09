@@ -115,6 +115,40 @@ function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection
   }))]
 }
 
+function SupplierNoteAutosave({ requestId, supplierId, supplierName, initialNote }: { requestId: string; supplierId: string; supplierName: string; initialNote: string }) {
+  const [note, setNote] = useState(initialNote)
+  const [message, setMessage] = useState("")
+  const lastSaved = useRef(initialNote)
+  const versionRef = useRef(0)
+  const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (note === lastSaved.current) return
+    const version = ++versionRef.current
+    const timer = window.setTimeout(() => {
+      const value = note
+      startTransition(async () => {
+        try {
+          const result = await saveRequestSupplierProgressNoteAction({ requestId, supplierId, note: value })
+          if (version !== versionRef.current) return
+          if (result.ok) {
+            lastSaved.current = value
+            setMessage("Saved")
+          } else {
+            setMessage(result.error)
+          }
+        } catch {
+          if (version !== versionRef.current) return
+          setMessage("The supplier note was not saved. Check the connection and try again.")
+        }
+      })
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [note, requestId, supplierId])
+
+  const saveLabel = pending ? "Saving…" : message === "Saved" ? "Saved" : message ? "Not saved" : ""
+  return <div className="relative"><input aria-label={`Note for ${supplierName}`} value={note} onChange={(event) => { setNote(event.target.value); setMessage("") }} placeholder="Supplier note" maxLength={2000} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 pr-14 text-[11px] text-slate-800" /><span aria-live="polite" aria-label={message || saveLabel} title={message || undefined} className={`pointer-events-none absolute inset-y-0 right-2 flex items-center text-[9px] font-bold ${message && message !== "Saved" ? "text-rose-700" : "text-emerald-700"}`}>{saveLabel}</span></div>
+}
 function savedDocumentTotal(documentData: RequestClientDocumentSnapshot["documentData"]) {
   const subtotal = (documentData.lines ?? []).reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0)
   const deliveryCharge = Number(documentData.deliveryCharge || 0)
@@ -186,7 +220,6 @@ export function RequestManagementPanel({
   initialClientDocuments,
   initialSupplierRecommendations,
   clientEmails,
-  supplierEmails,
   requestAttachments,
   supplierRequestFiles,
   supplierRequestItemLinks,
@@ -223,7 +256,6 @@ export function RequestManagementPanel({
   const recommendedSupplierIds = [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])]
   const supplierContactStatuses = useMemo<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])), [initialSupplierRecommendations])
   const [supplierContactStatusOverrides, setSupplierContactStatusOverrides] = useState<Record<string, { base: RequestSupplierContactStatus; value: RequestSupplierContactStatus }>>({})
-  const [supplierNoteDrafts, setSupplierNoteDrafts] = useState<Record<string, string>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.note || ""])))
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
   const [replyNote, setReplyNote] = useState("")
@@ -506,26 +538,6 @@ export function RequestManagementPanel({
         })
         setFeedbackError(true)
         setFeedback("The supplier status was not saved. Check the connection and try again.")
-      }
-    })
-  }
-
-  function saveSupplierProgressNote(supplierId: string) {
-    setFeedback("")
-    startTransition(async () => {
-      try {
-        const result = await saveRequestSupplierProgressNoteAction({ requestId, supplierId, note: supplierNoteDrafts[supplierId] || "" })
-        if (!result.ok) {
-          setFeedbackError(true)
-          setFeedback(result.error)
-          return
-        }
-        setFeedbackError(false)
-        setFeedback("Supplier note saved.")
-        router.refresh()
-      } catch {
-        setFeedbackError(true)
-        setFeedback("The supplier note was not saved. Check the connection and try again.")
       }
     })
   }
@@ -928,7 +940,7 @@ export function RequestManagementPanel({
       return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
     }
     if (workflow.step2Action === "choose-suppliers") {
-      return <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={compactWorkflowClass}><Route className="h-4 w-4" />Choose supplier route in Step 1</button>
+      return null
     }
     if (workflow.step2Action === "contact-suppliers") {
       return <button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={compactWorkflowClass}><Route className="h-4 w-4" />Contact {selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</button>
@@ -966,7 +978,11 @@ export function RequestManagementPanel({
   return (
     <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0">
       <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" tools={<>
+        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" badges={<>
+          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">{pricingSummaryItems.length} items</span>
+          <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">{selectedSupplierNames.length} suppliers</span>
+          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quotes</span>
+        </>} tools={<>
           <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={stepToolClass}><Route className="h-4 w-4" />Choose supplier route</button>
           <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={stepToolClass}><Paperclip className="h-4 w-4" />Upload supplier quote</a>
           <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Plus className="h-4 w-4" />Enter pricing manually</button>
@@ -988,18 +1004,7 @@ export function RequestManagementPanel({
               <p className="px-1 text-[9px] text-slate-500">Received from a supplier. Link it to the correct supplier when adding the quote.</p>
             </div>
           </details> : null}
-          <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-bold">
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{pricingSummaryItems.length} item{pricingSummaryItems.length === 1 ? "" : "s"}</span>
-            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-800">{selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</span>
-            <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
-          </div>
-
-          <details className="mb-3 rounded-lg border border-slate-200 bg-white">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-bold text-slate-800"><span>Supplier messages</span><span className="rounded-full bg-sky-50 px-2 py-1 text-[10px] text-sky-800">{supplierEmails.length}</span></summary>
-            <div className="border-t border-slate-200 px-2 pb-2"><RelatedEmailTimeline title="Supplier activity" emails={supplierEmails} party="supplier" /></div>
-          </details>
-
-          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-visible rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem] gap-2 rounded-t-lg border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier · note · contact</span><span role="columnheader">Status</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
             const persistedContactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] : undefined
             const statusOverride = row.supplier ? supplierContactStatusOverrides[row.supplier.id] : undefined
             const contactStatus = row.supplier
@@ -1012,13 +1017,11 @@ export function RequestManagementPanel({
             const displayContactStatus = ["request_sent", "awaiting_supplier_reply"].includes(contactStatus) && row.note?.includes("No response after two follow-ups")
               ? "no_response"
               : contactStatus
-            return <article role="row" key={row.name} className="grid min-h-16 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem] sm:items-center">
+            return <article role="row" key={row.name} className="grid min-h-16 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem] sm:items-center">
               <div role="cell" className="flex min-w-0 items-start justify-between gap-2">
-                <div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p><p className="mt-0.5 text-[10px] font-bold text-slate-500">{row.routedItems.length} routed{row.sentItemIds.length ? ` · ${row.sentItemIds.length} sent` : ""}{row.bid ? ` · ${row.bid.pricedItemCount} quoted${row.bid.unavailableItemCount ? ` · ${row.bid.unavailableItemCount} unavailable` : ""}` : ""}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}<details className="mt-1"><summary className="cursor-pointer text-[10px] font-bold text-[#0066cc]">View item status</summary><div className="mt-1 grid gap-1">{(row.bid?.items.length ? row.bid.items : row.routedItems.map((item) => ({ id: item.id, sourceRequestItemId: item.id, name: item.organized || item.original, status: "waiting" as const }))).map((item) => <div key={item.id} className="flex items-center justify-between gap-2 rounded bg-slate-50 px-2 py-1 text-[10px]"><span className="min-w-0 truncate font-semibold">{item.name}</span><span className={`shrink-0 font-bold ${item.status === "quoted" ? "text-emerald-700" : item.status === "unavailable" ? "text-rose-700" : "text-amber-700"}`}>{item.status === "quoted" ? "Price received" : item.status === "unavailable" ? "They don’t have it" : row.sentItemIds.includes(item.sourceRequestItemId || item.id) || row.supplierPackage ? "Sent · waiting" : "Routed"}</span></div>)}</div></details></div>
-                <div className="flex shrink-0 justify-end gap-1.5 sm:hidden">{renderSupplierRouteActions(row)}</div>
+                <div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><details className="group/supplier relative min-w-0 shrink"><summary className="inline-flex max-w-full cursor-pointer list-none items-center gap-1 text-sm font-black text-[#12263f] [&::-webkit-details-marker]:hidden"><span className="truncate">{row.name}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open/supplier:rotate-180" /></summary><div className="absolute left-0 top-[calc(100%+.25rem)] z-30 flex gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">{renderSupplierRouteActions(row)}{!row.supplier?.phone && !row.supplier?.email && !row.comparisonCount ? <span className="whitespace-nowrap px-2 py-2 text-[10px] font-semibold text-slate-500">No contact saved</span> : null}</div></details>{row.supplier ? <div className="min-w-24 max-w-44 flex-1"><SupplierNoteAutosave requestId={requestId} supplierId={row.supplier.id} supplierName={row.name} initialNote={row.note} /></div> : null}</div><p className="mt-0.5 text-[10px] font-bold text-slate-500">{row.routedItems.length} routed{row.sentItemIds.length ? ` · ${row.sentItemIds.length} sent` : ""}{row.bid ? ` · ${row.bid.pricedItemCount} quoted${row.bid.unavailableItemCount ? ` · ${row.bid.unavailableItemCount} unavailable` : ""}` : ""}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}<details className="mt-1"><summary className="cursor-pointer text-[10px] font-bold text-[#0066cc]">View item status</summary><div className="mt-1 grid gap-1">{(row.bid?.items.length ? row.bid.items : row.routedItems.map((item) => ({ id: item.id, sourceRequestItemId: item.id, name: item.organized || item.original, status: "waiting" as const }))).map((item) => <div key={item.id} className="flex items-center justify-between gap-2 rounded bg-slate-50 px-2 py-1 text-[10px]"><span className="min-w-0 truncate font-semibold">{item.name}</span><span className={`shrink-0 font-bold ${item.status === "quoted" ? "text-emerald-700" : item.status === "unavailable" ? "text-rose-700" : "text-amber-700"}`}>{item.status === "quoted" ? "Price received" : item.status === "unavailable" ? "They don’t have it" : row.sentItemIds.includes(item.sourceRequestItemId || item.id) || row.supplierPackage ? "Sent · waiting" : "Routed"}</span></div>)}</div></details></div>
               </div>
-              <div role="cell" className="grid gap-1.5"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={displayContactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(displayContactStatus)}`}>{displayContactStatus === "no_response" ? <option value="no_response" disabled>No response</option> : null}{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
-              <div role="cell" className="hidden justify-end gap-1.5 sm:flex">{renderSupplierRouteActions(row)}</div>
+              <div role="cell"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={displayContactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(displayContactStatus)}`}>{displayContactStatus === "no_response" ? <option value="no_response" disabled>No response</option> : null}{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
 

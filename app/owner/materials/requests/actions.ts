@@ -631,6 +631,44 @@ export async function saveOriginalMaterialItemAction(input: {
   return { ok: true as const, version }
 }
 
+export async function moveRequestItemDepartmentAction(input: {
+  requestId: string
+  itemId: string
+  department: string
+}) {
+  const requestId = String(input.requestId || "").trim()
+  const itemId = String(input.itemId || "").trim()
+  const department = String(input.department || "").trim().replace(/[-_]+/g, " ").replace(/\s+/g, " ").slice(0, 100)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(itemId) || !department) {
+    return { ok: false as const, error: "Choose a valid item and department." }
+  }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: item } = await supabase
+    .from("quote_request_items")
+    .select("id,name,department,project_id,owner_id")
+    .eq("id", itemId)
+    .eq("request_id", requestId)
+    .maybeSingle<{ id: string; name: string; department: string | null; project_id: string; owner_id: string }>()
+  if (!item) return { ok: false as const, error: "This request item is no longer available." }
+  if ((item.department || "").trim().toLocaleLowerCase() === department.toLocaleLowerCase()) return { ok: true as const, department }
+
+  const { error } = await supabase.from("quote_request_items").update({ department }).eq("id", itemId).eq("request_id", requestId)
+  if (error) return { ok: false as const, error: "The item could not be moved. Please try again." }
+
+  await supabase.from("project_events").insert({
+    project_id: item.project_id,
+    owner_id: item.owner_id,
+    event_type: "note_added",
+    source: "admin",
+    title: `${item.name} moved to ${department}`,
+    description: `Moved from ${item.department || "Unassigned"} to ${department}.`,
+    metadata: { quote_request_id: requestId, quote_request_item_id: itemId, department, previous_department: item.department, updated_by: user.id },
+  })
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const, department }
+}
+
 export async function saveRequestItemSupplierRouteAction(input: {
   requestId: string
   itemIds: string[]
