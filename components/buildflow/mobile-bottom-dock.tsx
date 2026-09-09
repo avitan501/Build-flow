@@ -93,7 +93,7 @@ export function MobileBottomDock() {
               <path d="M7 9h10M7 13h6" />
             </svg>
           </DockItem>
-          <DockItem href="/beat-a-quote" label="Beat a Supplier Quote" active={isActivePath(pathname, "/beat-a-quote")}>
+          <DockItem href="/beat-a-quote" label="Free Quote Check" active={isActivePath(pathname, "/beat-a-quote")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.5 2.7 4 3.2 4 1.5 4 3.3-1.8 3.5-4 3.5-4-1.3-4-3" />
             </svg>

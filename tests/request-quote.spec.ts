@@ -233,22 +233,41 @@ test("custom glass explains the options and opens an editable detail request", a
   );
 });
 
-test("beat a quote is a dedicated upload request", async ({ page }) => {
+test("free quote check reveals contact details after upload", async ({ page }) => {
   await page.goto("/beat-a-quote");
 
   await expect(
     page.getByRole("heading", {
-      name: "Upload a Quote. We'll Try to Beat It.",
+      name: "Upload Your Quote. We'll Check It Free.",
     }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Back to Home" }),
   ).toHaveAttribute("href", "/");
-  await expect(page.getByLabel("Attach supplier quotes")).toBeVisible();
+  await expect(page.getByLabel("Upload supplier quote")).toBeVisible();
   await expect(page.locator('input[name="requestKind"]')).toHaveValue(
     "beat_quote",
   );
-  await expect(page.getByRole("button", { name: "Send quote" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Name" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Send for free review" }),
+  ).toHaveCount(0);
+
+  await page.getByLabel("Upload supplier quote").setInputFiles({
+    name: "supplier-quote.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("test quote"),
+  });
+
+  await expect(page.getByText("Quote ready")).toBeVisible();
+  await expect(page.getByText("supplier-quote.pdf")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Name" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Phone" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Company" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Send for free review" }),
+  ).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Framing" })).toHaveCount(0);
   await expect(
     page.getByRole("navigation", { name: "Mobile homepage" }),
@@ -263,8 +282,8 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
   await expect(
     page
       .getByRole("navigation", { name: "Mobile full navigation" })
-      .getByRole("link", { name: /Beat My Quote/ }),
-  ).toBeVisible();
+      .getByRole("link", { name: /Free Quote Check/ }),
+    ).toBeVisible();
 });
 
 test("plan over the storage limit stays on the form and shows a useful error", async ({

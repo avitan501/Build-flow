@@ -5,8 +5,8 @@ import { QuoteRequestForm } from "@/components/buildflow/quote-request-form"
 import { pageMetadata } from "@/lib/site-metadata"
 
 export const metadata = pageMetadata({
-  title: "Beat a Material Quote | Avantia Build",
-  description: "Upload an existing material quote for a comparison of products, quantities, pricing, and delivery terms.",
+  title: "Free Material Quote Check | Avantia Build",
+  description: "Upload an existing material quote for a free review of products, quantities, pricing, and delivery terms.",
   path: "/beat-a-quote",
 })
 
@@ -20,8 +20,8 @@ export default function BeatAQuotePage() {
             Back to Home
           </Link>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Avantia Build</p>
-          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Upload a Quote. We&apos;ll Try to Beat It.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">Upload a current supplier quote. We&apos;ll compare the materials, quantities, and delivery terms for a better option.</p>
+          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Upload Your Quote. We&apos;ll Check It Free.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">First, upload a current supplier quote. Then add your contact details and we&apos;ll review the products, quantities, pricing, and delivery terms.</p>
         </div>
       </section>
       <div className="mx-auto max-w-5xl py-6 sm:px-6 sm:py-8">

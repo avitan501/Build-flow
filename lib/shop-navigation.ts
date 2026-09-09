@@ -13,8 +13,8 @@ export type ShopNavigationItem = {
 export const SHOP_SERVICE_LINKS: ShopNavigationItem[] = [
   {
     href: "/beat-a-quote",
-    label: "Beat Any Material Quote",
-    description: "Send a supplier quote and let Avantia find a better option.",
+    label: "Free Quote Check",
+    description: "Upload a supplier quote for a free review.",
     imageUrl: "/images/buildflow-retail/orders.jpg",
     imageAlt: "Construction material quote review at a jobsite office",
   },

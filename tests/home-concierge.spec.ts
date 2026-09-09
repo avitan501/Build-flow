@@ -200,7 +200,7 @@ test("primary customer routes remain available in Menu", async ({ page }) => {
     navigation.getByRole("link", { name: /Request Material Pricing/ }),
   ).toHaveAttribute("href", "/request-quote");
   await expect(
-    navigation.getByRole("link", { name: /Beat My Quote/ }),
+    navigation.getByRole("link", { name: /Free Quote Check/ }),
   ).toHaveAttribute("href", "/beat-a-quote");
   await expect(
     drawer.getByRole("link", { name: "Account", exact: true }),

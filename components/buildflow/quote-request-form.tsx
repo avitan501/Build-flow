@@ -45,7 +45,11 @@ function SubmitButton({
       ) : (
         <Send className="h-4 w-4" />
       )}
-      {pending ? "Sending..." : beatQuote ? "Send quote" : "Send request"}
+      {pending
+        ? "Sending..."
+        : beatQuote
+          ? "Send for free review"
+          : "Send request"}
     </button>
   );
 }
@@ -204,7 +208,7 @@ export function QuoteRequestForm({
           href={beatQuote ? "/beat-a-quote" : "/request-quote"}
           className="mt-5 inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900"
         >
-          {beatQuote ? "Upload another quote" : "Send another request"}
+          {beatQuote ? "Check another quote" : "Send another request"}
         </a>
       </section>
     );
@@ -279,7 +283,89 @@ export function QuoteRequestForm({
         <input type="hidden" name="departments" value={defaultDepartment} />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
+      {beatQuote ? (
+        <div>
+          <label className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-sky-300 bg-sky-50/70 px-5 py-7 text-center transition hover:border-[#0071e3] hover:bg-sky-50 focus-within:border-[#0071e3] focus-within:ring-2 focus-within:ring-sky-100">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0071e3] shadow-sm">
+              <FileUp className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <span className="mt-3 text-base font-semibold text-slate-950">
+              {selectedFiles.length ? "Add or change quote" : "Choose quote to upload"}
+            </span>
+            <span className="mt-1 text-xs leading-5 text-slate-600">
+              PDF or photo · up to 10 files · 25 MB each
+            </span>
+            <input
+              ref={attachmentRef}
+              aria-label="Upload supplier quote"
+              type="file"
+              name="attachment"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              multiple
+              onChange={(event) => {
+                const files = Array.from(event.currentTarget.files ?? []);
+                setSelectedFiles(files);
+                setFormError("");
+                validateAttachments(files);
+              }}
+              className="sr-only"
+            />
+          </label>
+
+          {selectedFiles.length ? (
+            <div className="mt-3" aria-live="polite">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                Quote ready
+              </p>
+              <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${file.lastModified}-${index}`}
+                    className="flex min-w-0 items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 px-2.5 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700">
+                      {file.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-white"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {(!beatQuote || (selectedFiles.length > 0 && !fileError)) ? (
+        <div className={beatQuote ? "mt-6 border-t border-slate-200 pt-5" : ""}>
+          {beatQuote ? (
+            <div className="mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0071e3]">
+                Next
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">
+                How can we reach you?
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-600">
+                Add your name and either phone or email. Company is optional.
+              </p>
+            </div>
+          ) : null}
+
+      <div
+        className={
+          beatQuote
+            ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
+            : "grid grid-cols-2 gap-2"
+        }
+      >
         <label>
           <span className="sr-only">Name</span>
           <input
@@ -287,17 +373,20 @@ export function QuoteRequestForm({
             name="fullName"
             onChange={() => setFormError("")}
             autoComplete="name"
-            placeholder="Name (optional)"
+            placeholder={beatQuote ? "Name" : "Name (optional)"}
             className={inputClass}
           />
         </label>
-        <label>
-          <span className="sr-only">Company</span>
+        <label className={beatQuote ? "" : "order-none"}>
+          <span className="sr-only">{beatQuote ? "Phone" : "Company"}</span>
           <input
-            aria-label="Company"
-            name="company"
-            autoComplete="organization"
-            placeholder="Company (optional)"
+            aria-label={beatQuote ? "Phone" : "Company"}
+            name={beatQuote ? "phone" : "company"}
+            type={beatQuote ? "tel" : "text"}
+            onChange={beatQuote ? () => setFormError("") : undefined}
+            inputMode={beatQuote ? "tel" : undefined}
+            autoComplete={beatQuote ? "tel" : "organization"}
+            placeholder={beatQuote ? "Phone" : "Company (optional)"}
             className={inputClass}
           />
         </label>
@@ -314,20 +403,24 @@ export function QuoteRequestForm({
           />
         </label>
         <label>
-          <span className="sr-only">Phone</span>
+          <span className="sr-only">{beatQuote ? "Company" : "Phone"}</span>
           <input
-            aria-label="Phone"
-            name="phone"
-            type="tel"
-            onChange={() => setFormError("")}
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="Phone"
+            aria-label={beatQuote ? "Company" : "Phone"}
+            name={beatQuote ? "company" : "phone"}
+            type={beatQuote ? "text" : "tel"}
+            onChange={beatQuote ? undefined : () => setFormError("")}
+            inputMode={beatQuote ? undefined : "tel"}
+            autoComplete={beatQuote ? "organization" : "tel"}
+            placeholder={beatQuote ? "Company (optional)" : "Phone"}
             className={inputClass}
           />
         </label>
-        <p className="col-span-2 text-xs font-medium text-slate-500">
-          Use one name and email or phone. With no name, enter both.
+        <p
+          className={`${beatQuote ? "sm:col-span-2" : "col-span-2"} text-xs font-medium text-slate-500`}
+        >
+          {beatQuote
+            ? "We only use this to follow up about your quote."
+            : "Use one name and email or phone. With no name, enter both."}
         </p>
       </div>
 
@@ -349,7 +442,7 @@ export function QuoteRequestForm({
         />
       </label>
 
-      <div className="mt-3">
+      {!beatQuote ? <div className="mt-3">
         <div className="flex min-w-0 items-center gap-2">
           <label className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 hover:border-[#0071e3]">
             <FileUp className="h-4 w-4 text-[#0071e3]" />
@@ -407,7 +500,7 @@ export function QuoteRequestForm({
             ))}
           </div>
         ) : null}
-      </div>
+      </div> : null}
 
       <fieldset className="mt-4">
         <legend className="text-xs font-semibold text-slate-600">
@@ -431,6 +524,8 @@ export function QuoteRequestForm({
           ))}
         </div>
       </fieldset>
+        </div>
+      ) : null}
 
       {fileError ? (
         <div
@@ -472,12 +567,12 @@ export function QuoteRequestForm({
         </p>
       ) : null}
 
-      <div className="mt-4">
+      {(!beatQuote || (selectedFiles.length > 0 && !fileError)) ? <div className="mt-4">
         <SubmitButton
           pending={pending || uploadPending || uploading}
           beatQuote={beatQuote}
         />
-      </div>
+      </div> : null}
     </form>
   );
 }
