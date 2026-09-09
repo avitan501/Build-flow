@@ -54,7 +54,25 @@ type BrokerResult = {
   duplicate?: boolean;
   callbackUrl?: string;
   verifyToken?: string;
+  health?: AuraWhatsAppHealth;
+  retry?: { found?: number; processed?: number };
 };
+export type AuraWhatsAppHealth = {
+  status: "healthy" | "degraded" | "down";
+  checkedAt: string;
+  callbackActive: boolean;
+  businessAccountSubscribed: boolean;
+  phoneReady: boolean;
+  phoneQuality: string | null;
+  lastInboundAt: string | null;
+  failedEvents: number;
+  pendingNotifications: number;
+  repaired: boolean;
+  error: string | null;
+};
+export type AuraWhatsAppHealthResult =
+  | { ok: true; health: AuraWhatsAppHealth; retried: number }
+  | { ok: false; error: string };
 export type ConfigureAuraProviderResult =
   | { ok: true; callbackUrl?: string; verifyToken?: string }
   | { ok: false; error: string };
@@ -1083,6 +1101,32 @@ export async function optimizeAuraMetaWhatsAppAction(): Promise<ConfigureAuraPro
         error instanceof Error
           ? error.message
           : "WhatsApp could not be optimized.",
+    };
+  }
+}
+
+export async function checkAuraMetaWhatsAppHealthAction(
+  repair = true,
+): Promise<AuraWhatsAppHealthResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura/connect");
+  try {
+    const result = await invokeMessagingBroker(supabase, {
+      action: "check_meta_whatsapp_health",
+      repair,
+    });
+    if (!result.health) throw new Error("WhatsApp did not return a health report.");
+    revalidatePath("/owner/aura");
+    revalidatePath("/owner/aura/connect");
+    revalidatePath("/admin/communications");
+    return {
+      ok: true,
+      health: result.health,
+      retried: Number(result.retry?.processed || 0),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "WhatsApp health check failed.",
     };
   }
 }

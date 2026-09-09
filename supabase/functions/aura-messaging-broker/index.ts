@@ -148,6 +148,7 @@ const secretNames = {
   openaiKey: "openai_supplier_quote_api_key",
   publicStartTextSigningSecret: "public_start_text_signing_secret",
   smsAutomationDispatchSecret: "sms_automation_dispatch_secret",
+  whatsappHealthDispatchSecret: "aura_whatsapp_health_dispatch_secret",
 } as const;
 
 function customerReplyModel(escalated = false) {
@@ -2216,6 +2217,110 @@ async function handleMetaWhatsAppVerification(req: Request) {
   return new Response(challenge, { status: 200, headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" } });
 }
 
+type MetaWhatsAppMetadata = {
+  display_phone_number?: string;
+  phone_number_id?: string;
+};
+
+async function processMetaWhatsAppMessage(
+  message: MetaWhatsAppMessage,
+  metadata: MetaWhatsAppMetadata | undefined,
+  config: NonNullable<Awaited<ReturnType<typeof metaWhatsAppWebhookConfig>>>,
+) {
+  const remotePhone = normalizePhone(message.from);
+  if (!message.id || !remotePhone) return { processed: false, ignored: true };
+  const eventPayload = { message, metadata: metadata || null };
+  const webhookEvents = await sql<{ processed_at: string | null }[]>`
+    insert into public.aura_webhook_events
+      (provider, external_event_id, event_type, activity_id, raw_payload, error_message, attempts, next_retry_at)
+    values (
+      'whatsapp', ${message.id}, 'whatsapp.message.received', ${message.id},
+      ${sql.json(eventPayload)}, null, 1, null
+    )
+    on conflict (provider, external_event_id) do update
+      set raw_payload = excluded.raw_payload,
+          attempts = public.aura_webhook_events.attempts + 1,
+          next_retry_at = null
+    returning processed_at
+  `;
+  if (webhookEvents[0]?.processed_at) return { processed: false, duplicate: true };
+
+  let communicationId: string;
+  try {
+    await ensureIncomingSmsContact(remotePhone);
+    communicationId = await storeCommunication({
+      provider: "whatsapp",
+      channel: "whatsapp",
+      externalId: message.id,
+      direction: "incoming",
+      counterpartyPhone: remotePhone,
+      businessPhone: config.from,
+      body: metaMessageBody(message),
+      status: "received",
+      media: metaMessageMedia(message),
+      occurredAt: /^\d+$/.test(message.timestamp || "")
+        ? new Date(Number(message.timestamp) * 1000).toISOString()
+        : null,
+    });
+    await sql`
+      update public.aura_webhook_events
+      set processed_at = now(), error_message = null, next_retry_at = null
+      where provider = 'whatsapp' and external_event_id = ${message.id}
+    `;
+  } catch (error) {
+    const messageText = error instanceof Error
+      ? error.message.slice(0, 500)
+      : "whatsapp_message_processing_failed";
+    await sql`
+      update public.aura_webhook_events
+      set error_message = ${messageText},
+          next_retry_at = now() + interval '5 minutes'
+      where provider = 'whatsapp' and external_event_id = ${message.id}
+    `;
+    throw error;
+  }
+
+  EdgeRuntime.waitUntil(
+    (async () => {
+      const rawMedia = metaMessageMedia(message);
+      if (rawMedia.length) {
+        try {
+          const persisted = await persistMetaWhatsAppMedia({ message, communicationId, config });
+          await sql`
+            update public.aura_communications
+            set media = ${sql.json(persisted.media)},
+                transcript = coalesce(${persisted.transcript}, transcript),
+                updated_at = now()
+            where id = ${communicationId}::uuid
+          `;
+        } catch (error) {
+          await sql`
+            update public.aura_communications
+            set media = ${sql.json(rawMedia.map((item) => ({ ...item, processingStatus: "failed" })))},
+                updated_at = now()
+            where id = ${communicationId}::uuid
+          `;
+          await sql`
+            insert into public.aura_audit_log (action, details)
+            values ('whatsapp_media_processing_failed', ${sql.json({
+              communicationId,
+              error_code: error instanceof Error ? error.message : "meta_media_processing_failed",
+            })})
+          `;
+          return;
+        }
+      }
+      scheduleMaterialShadowAssessment(communicationId);
+      await linkIncomingCommunicationToRequestState(remotePhone, communicationId, "whatsapp");
+      await enqueueSmsAutomation(communicationId);
+      await dispatchSmsAutomationWorker(communicationId);
+    })().catch((error) =>
+      console.error("Aura WhatsApp request-state link failed or AI dispatch failed", error)
+    ),
+  );
+  return { processed: true, communicationId };
+}
+
 async function handleMetaWhatsAppWebhook(req: Request) {
   const config = await metaWhatsAppWebhookConfig();
   if (!config) return json({ error: "Meta WhatsApp is not configured" }, 503);
@@ -2240,102 +2345,7 @@ async function handleMetaWhatsAppWebhook(req: Request) {
       const value = change.value;
       if (value?.metadata?.phone_number_id !== config.phoneNumberId) return json({ error: "Business number not allowed" }, 403);
       for (const message of value.messages || []) {
-        const remotePhone = normalizePhone(message.from);
-        if (!message.id || !remotePhone) continue;
-        const webhookEvents = await sql<{ processed_at: string | null }[]>`
-          insert into public.aura_webhook_events
-            (provider, external_event_id, event_type, activity_id, raw_payload, error_message)
-          values (
-            'whatsapp', ${message.id}, 'whatsapp.message.received', ${message.id},
-            ${sql.json({
-              messageId: message.id,
-              messageType: message.type || "unknown",
-              sender: remotePhone,
-              phoneNumberId: value.metadata?.phone_number_id || null,
-            })}, null
-          )
-          on conflict (provider, external_event_id) do update
-            set raw_payload = excluded.raw_payload
-          returning processed_at
-        `;
-        if (webhookEvents[0]?.processed_at) continue;
-
-        let communicationId: string;
-        try {
-          await ensureIncomingSmsContact(remotePhone);
-          communicationId = await storeCommunication({
-            provider: "whatsapp",
-            channel: "whatsapp",
-            externalId: message.id,
-            direction: "incoming",
-            counterpartyPhone: remotePhone,
-            businessPhone: config.from,
-            body: metaMessageBody(message),
-            status: "received",
-            media: metaMessageMedia(message),
-            occurredAt: /^\d+$/.test(message.timestamp || "") ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
-          });
-          await sql`
-            update public.aura_webhook_events
-            set processed_at = now(), error_message = null
-            where provider = 'whatsapp' and external_event_id = ${message.id}
-          `;
-        } catch (error) {
-          await sql`
-            update public.aura_webhook_events
-            set error_message = ${error instanceof Error ? error.message.slice(0, 500) : "whatsapp_message_processing_failed"}
-            where provider = 'whatsapp' and external_event_id = ${message.id}
-          `;
-          throw error;
-        }
-        EdgeRuntime.waitUntil(
-          (async () => {
-            const rawMedia = metaMessageMedia(message);
-            if (rawMedia.length) {
-              try {
-                const persisted = await persistMetaWhatsAppMedia({
-                  message,
-                  communicationId,
-                  config,
-                });
-                await sql`
-                  update public.aura_communications
-                  set media = ${sql.json(persisted.media)},
-                      transcript = coalesce(${persisted.transcript}, transcript),
-                      updated_at = now()
-                  where id = ${communicationId}::uuid
-                `;
-              } catch (error) {
-                await sql`
-                  update public.aura_communications
-                  set media = ${sql.json(rawMedia.map((item) => ({
-                    ...item,
-                    processingStatus: "failed",
-                  })))}, updated_at = now()
-                  where id = ${communicationId}::uuid
-                `;
-                await sql`
-                  insert into public.aura_audit_log (action, details)
-                  values ('whatsapp_media_processing_failed', ${sql.json({
-                    communicationId,
-                    error_code: error instanceof Error ? error.message : "meta_media_processing_failed",
-                  })})
-                `;
-                return;
-              }
-            }
-            scheduleMaterialShadowAssessment(communicationId);
-            await linkIncomingCommunicationToRequestState(
-              remotePhone,
-              communicationId,
-              "whatsapp",
-            );
-            await enqueueSmsAutomation(communicationId);
-            await dispatchSmsAutomationWorker(communicationId);
-          })().catch((error) =>
-            console.error("Aura WhatsApp request-state link failed or AI dispatch failed", error),
-          ),
-        );
+        await processMetaWhatsAppMessage(message, value.metadata, config);
       }
       for (const receipt of value.statuses || []) {
         const status = ["sent", "delivered", "read", "failed"].includes(receipt.status || "") ? receipt.status! : null;
@@ -2363,6 +2373,50 @@ async function optimizeMetaWhatsAppWebhook() {
   const config = await metaWhatsAppConfig(false);
   if (!config) throw new Error("Meta WhatsApp is not configured");
   const appAccessToken = `${META_WHATSAPP_APP_ID}|${config.appSecret}`;
+  // Repair the WABA binding first. Account reactivation can remove this
+  // binding while the app-level webhook remains valid; re-verifying the
+  // callback first would unnecessarily depend on Meta's short callback timeout.
+  const wabaSubscription = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.accessToken}` },
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+  const wabaSubscriptionPayload = await wabaSubscription.json().catch(() => ({})) as {
+    success?: boolean;
+    error?: { code?: number; message?: string };
+  };
+  if (!wabaSubscription.ok || wabaSubscriptionPayload.success !== true)
+    throw new Error(
+      `Meta did not subscribe the Avantia app to the WhatsApp account${wabaSubscriptionPayload.error?.code ? ` (${wabaSubscriptionPayload.error.code})` : ""}${wabaSubscriptionPayload.error?.message ? `: ${wabaSubscriptionPayload.error.message.slice(0, 240)}` : ""}`,
+    );
+
+  const currentSubscriptionsResponse = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
+    { headers: { Authorization: `Bearer ${appAccessToken}` }, signal: AbortSignal.timeout(15_000) },
+  );
+  if (currentSubscriptionsResponse.ok) {
+    const currentSubscriptions = await currentSubscriptionsResponse.json() as {
+      data?: Array<{ object?: string; callback_url?: string; active?: boolean; fields?: Array<string | { name?: string }> }>;
+    };
+    const currentWebhookIsHealthy = currentSubscriptions.data?.some((subscription) =>
+      subscription.object === "whatsapp_business_account" &&
+      subscription.callback_url === META_WHATSAPP_DIRECT_CALLBACK &&
+      subscription.active !== false &&
+      subscription.fields?.some((field) => (typeof field === "string" ? field : field.name) === "messages"
+      )
+    ) === true;
+    if (currentWebhookIsHealthy) {
+      return {
+        callbackUrl: META_WHATSAPP_DIRECT_CALLBACK,
+        appWebhookActive: true,
+        businessAccountSubscribed: true,
+      };
+    }
+  }
+
   const response = await fetch(
     `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
     {
@@ -2387,23 +2441,6 @@ async function optimizeMetaWhatsAppWebhook() {
   if (!response.ok || responsePayload.success !== true)
     throw new Error(
       `Meta did not accept the direct WhatsApp webhook${responsePayload.error?.code ? ` (${responsePayload.error.code})` : ""}${responsePayload.error?.message ? `: ${responsePayload.error.message.slice(0, 240)}` : ""}`,
-    );
-
-  const wabaSubscription = await fetch(
-    `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.accessToken}` },
-      signal: AbortSignal.timeout(20_000),
-    },
-  );
-  const wabaSubscriptionPayload = await wabaSubscription.json().catch(() => ({})) as {
-    success?: boolean;
-    error?: { code?: number; message?: string };
-  };
-  if (!wabaSubscription.ok || wabaSubscriptionPayload.success !== true)
-    throw new Error(
-      `Meta did not subscribe the Avantia app to the WhatsApp account${wabaSubscriptionPayload.error?.code ? ` (${wabaSubscriptionPayload.error.code})` : ""}${wabaSubscriptionPayload.error?.message ? `: ${wabaSubscriptionPayload.error.message.slice(0, 240)}` : ""}`,
     );
 
   const verified = await fetch(
@@ -2437,6 +2474,251 @@ async function optimizeMetaWhatsAppWebhook() {
     appWebhookActive: true,
     businessAccountSubscribed: true,
   };
+}
+
+type WhatsAppHealthStatus = {
+  status: "healthy" | "degraded" | "down";
+  checkedAt: string;
+  callbackActive: boolean;
+  businessAccountSubscribed: boolean;
+  phoneReady: boolean;
+  phoneQuality: string | null;
+  lastInboundAt: string | null;
+  failedEvents: number;
+  pendingNotifications: number;
+  repaired: boolean;
+  error: string | null;
+};
+
+async function inspectMetaWhatsAppHealth(): Promise<WhatsAppHealthStatus> {
+  const checkedAt = new Date().toISOString();
+  const config = await metaWhatsAppConfig(false);
+  if (!config) {
+    return {
+      status: "down", checkedAt, callbackActive: false,
+      businessAccountSubscribed: false, phoneReady: false, phoneQuality: null,
+      lastInboundAt: null, failedEvents: 0, pendingNotifications: 0,
+      repaired: false, error: "Meta WhatsApp is not configured.",
+    };
+  }
+  const appAccessToken = `${META_WHATSAPP_APP_ID}|${config.appSecret}`;
+  try {
+    const [appResponse, wabaResponse, phoneResponse, operationalRows] = await Promise.all([
+      fetch(
+        `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
+        { headers: { Authorization: `Bearer ${appAccessToken}` }, signal: AbortSignal.timeout(15_000) },
+      ),
+      fetch(
+        `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps?fields=id`,
+        { headers: { Authorization: `Bearer ${config.accessToken}` }, signal: AbortSignal.timeout(15_000) },
+      ),
+      fetch(
+        `https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}?fields=id,display_phone_number,quality_rating,name_status,code_verification_status`,
+        { headers: { Authorization: `Bearer ${config.accessToken}` }, signal: AbortSignal.timeout(15_000) },
+      ),
+      sql<Array<{
+        last_inbound_at: string | null;
+        failed_events: number;
+        pending_notifications: number;
+      }>>`
+        select
+          (select max(occurred_at) from public.aura_communications
+            where channel = 'whatsapp' and direction = 'incoming') as last_inbound_at,
+          (select count(*)::int from public.aura_webhook_events
+            where provider = 'whatsapp' and processed_at is null and error_message is not null) as failed_events,
+          (select count(*)::int from public.manager_push_queue
+            where event_type = 'call_message' and processed_at is null) as pending_notifications
+      `,
+    ]);
+    if (!appResponse.ok || !wabaResponse.ok || !phoneResponse.ok)
+      throw new Error("Meta connection check was rejected.");
+    const appPayload = await appResponse.json() as {
+      data?: Array<{ object?: string; callback_url?: string; active?: boolean; fields?: Array<string | { name?: string }> }>;
+    };
+    const wabaPayload = await wabaResponse.json() as { data?: Array<{ id?: string }> };
+    const phonePayload = await phoneResponse.json() as {
+      id?: string;
+      display_phone_number?: string;
+      quality_rating?: string;
+      name_status?: string;
+      code_verification_status?: string;
+    };
+    const callbackActive = appPayload.data?.some((subscription) =>
+      subscription.object === "whatsapp_business_account" &&
+      subscription.callback_url === META_WHATSAPP_DIRECT_CALLBACK &&
+      subscription.active !== false &&
+      subscription.fields?.some((field) => (typeof field === "string" ? field : field.name) === "messages")
+    ) === true;
+    const businessAccountSubscribed = wabaPayload.data?.some((app) => app.id === META_WHATSAPP_APP_ID) === true;
+    const phoneReady = phonePayload.id === config.phoneNumberId &&
+      normalizePhone(phonePayload.display_phone_number) === META_WHATSAPP_BUSINESS_PHONE &&
+      phonePayload.code_verification_status !== "NOT_VERIFIED";
+    const failedEvents = operationalRows[0]?.failed_events || 0;
+    const status = callbackActive && businessAccountSubscribed && phoneReady
+      ? failedEvents > 0 ? "degraded" : "healthy"
+      : "down";
+    return {
+      status,
+      checkedAt,
+      callbackActive,
+      businessAccountSubscribed,
+      phoneReady,
+      phoneQuality: phonePayload.quality_rating || null,
+      lastInboundAt: operationalRows[0]?.last_inbound_at || null,
+      failedEvents,
+      pendingNotifications: operationalRows[0]?.pending_notifications || 0,
+      repaired: false,
+      error: status === "healthy" ? null : failedEvents > 0
+        ? `${failedEvents} WhatsApp event${failedEvents === 1 ? "" : "s"} need retry.`
+        : "One or more Meta connection checks failed.",
+    };
+  } catch (error) {
+    return {
+      status: "down", checkedAt, callbackActive: false,
+      businessAccountSubscribed: false, phoneReady: false, phoneQuality: null,
+      lastInboundAt: null, failedEvents: 0, pendingNotifications: 0,
+      repaired: false,
+      error: error instanceof Error ? error.message.slice(0, 300) : "WhatsApp health check failed.",
+    };
+  }
+}
+
+async function storeWhatsAppHealth(health: WhatsAppHealthStatus) {
+  const previous = await sql<Array<{ status: string }>>`
+    select status from public.aura_channel_health where channel = 'whatsapp' limit 1
+  `;
+  await sql`
+    insert into public.aura_channel_health
+      (channel, provider, status, checked_at, last_success_at, last_inbound_at, last_error, details)
+    values (
+      'whatsapp', 'meta', ${health.status}, ${health.checkedAt}::timestamptz,
+      ${health.status === "healthy" ? health.checkedAt : null}::timestamptz,
+      ${health.lastInboundAt}::timestamptz, ${health.error},
+      ${sql.json({
+        callbackActive: health.callbackActive,
+        businessAccountSubscribed: health.businessAccountSubscribed,
+        phoneReady: health.phoneReady,
+        phoneQuality: health.phoneQuality,
+        failedEvents: health.failedEvents,
+        pendingNotifications: health.pendingNotifications,
+        repaired: health.repaired,
+      })}
+    )
+    on conflict (channel) do update set
+      provider = excluded.provider,
+      status = excluded.status,
+      checked_at = excluded.checked_at,
+      last_success_at = case when excluded.status = 'healthy' then excluded.checked_at else public.aura_channel_health.last_success_at end,
+      last_inbound_at = coalesce(excluded.last_inbound_at, public.aura_channel_health.last_inbound_at),
+      last_error = excluded.last_error,
+      details = excluded.details,
+      updated_at = now()
+  `;
+  const priorStatus = previous[0]?.status || null;
+  if (health.status !== "healthy") {
+    const hour = health.checkedAt.slice(0, 13);
+    await sql`
+      insert into public.manager_push_queue (event_type, title, body, href, dedupe_key, tag)
+      values (
+        'system_alert', 'WhatsApp needs attention',
+        ${health.error || "The live WhatsApp connection check failed."},
+        '/owner/aura/connect', ${`whatsapp-health:${health.status}:${hour}`}, 'whatsapp-health'
+      ) on conflict (dedupe_key) do nothing
+    `;
+    if (priorStatus && priorStatus !== health.status) {
+      sendOperationalEmailAlert(
+        "Avantia WhatsApp needs attention",
+        `${health.error || "The live WhatsApp connection check failed."}\n\nOpen: https://avantiabuild.com/owner/aura/connect`,
+      ).catch((error) => console.error("WhatsApp backup email alert failed", error));
+    }
+  } else if (priorStatus && priorStatus !== "healthy") {
+    await sql`
+      insert into public.manager_push_queue (event_type, title, body, href, dedupe_key, tag)
+      values (
+        'system_alert', 'WhatsApp connection restored',
+        'Meta webhook, business account, and phone checks are healthy again.',
+        '/owner/aura/connect', ${`whatsapp-health:recovered:${health.checkedAt.slice(0, 10)}`}, 'whatsapp-health'
+      ) on conflict (dedupe_key) do nothing
+    `;
+  }
+}
+
+async function sendOperationalEmailAlert(subject: string, body: string) {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) return false;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: Deno.env.get("RESEND_FROM_EMAIL") || "Avantia Build <office@avantiabuild.com>",
+      to: [OWNER_EMAIL],
+      reply_to: "office@avantiabuild.com",
+      subject,
+      text: body,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Operational email returned HTTP ${response.status}.`);
+  return true;
+}
+
+async function checkAndRepairMetaWhatsApp(repair: boolean) {
+  let health = await inspectMetaWhatsAppHealth();
+  if (repair && health.status !== "healthy") {
+    try {
+      await optimizeMetaWhatsAppWebhook();
+      const checked = await inspectMetaWhatsAppHealth();
+      // Meta can return an empty subscribed_apps list immediately after a
+      // successful subscription write. The confirmed POST plus a healthy app
+      // webhook and phone is authoritative for this check cycle.
+      const repairedHealth = {
+        ...checked,
+        businessAccountSubscribed: true,
+        repaired: true,
+      };
+      health = {
+        ...repairedHealth,
+        status: repairedHealth.callbackActive && repairedHealth.phoneReady && repairedHealth.failedEvents === 0
+          ? "healthy"
+          : repairedHealth.status,
+        error: repairedHealth.callbackActive && repairedHealth.phoneReady && repairedHealth.failedEvents === 0
+          ? null
+          : repairedHealth.error,
+      };
+    } catch (error) {
+      health = {
+        ...health,
+        repaired: false,
+        error: error instanceof Error ? error.message.slice(0, 300) : "Automatic WhatsApp repair failed.",
+      };
+    }
+  }
+  await storeWhatsAppHealth(health);
+  return health;
+}
+
+async function retryFailedWhatsAppEvents(limit = 25) {
+  const config = await metaWhatsAppWebhookConfig();
+  if (!config) throw new Error("Meta WhatsApp is not configured.");
+  const failures = await sql<Array<{ raw_payload: unknown }>>`
+    select raw_payload from public.aura_webhook_events
+    where provider = 'whatsapp' and processed_at is null and error_message is not null
+      and (next_retry_at is null or next_retry_at <= now())
+    order by created_at
+    limit ${Math.max(1, Math.min(limit, 100))}
+  `;
+  let processed = 0;
+  for (const failure of failures) {
+    const payload = failure.raw_payload as { message?: MetaWhatsAppMessage; metadata?: MetaWhatsAppMetadata } | null;
+    if (!payload?.message?.id) continue;
+    try {
+      const result = await processMetaWhatsAppMessage(payload.message, payload.metadata, config);
+      if (result.processed || result.duplicate) processed += 1;
+    } catch {
+      // The event keeps its error and next retry time for a later attempt.
+    }
+  }
+  return { found: failures.length, processed };
 }
 
 type QuoWebhookPayload = {
@@ -11886,6 +12168,24 @@ Deno.serve(async (req: Request) => {
   }
   if (
     req.method === "POST" &&
+    url.searchParams.get("mode") === "whatsapp-health"
+  ) {
+    const configuredSecret = await secret(secretNames.whatsappHealthDispatchSecret);
+    const suppliedSecret = req.headers.get("x-whatsapp-health-dispatch") || "";
+    if (!configuredSecret || !constantTimeEqual(configuredSecret, suppliedSecret))
+      return json({ error: "Unauthorized" }, 401);
+    try {
+      const retry = await retryFailedWhatsAppEvents();
+      const health = await checkAndRepairMetaWhatsApp(true);
+      return json({ ok: true, health, retry });
+    } catch (error) {
+      return json({
+        error: error instanceof Error ? error.message.slice(0, 300) : "WhatsApp health check failed",
+      }, 500);
+    }
+  }
+  if (
+    req.method === "POST" &&
     url.searchParams.get("mode") === "quo-fast-poll"
   ) {
     try {
@@ -12690,13 +12990,24 @@ Deno.serve(async (req: Request) => {
       });
     }
     if (input.action === "status") {
-      const [selectedWhatsAppProvider, metaWhatsApp, twoChat, twoChatApi, sms, smsReceive] = await Promise.all([
+      const [selectedWhatsAppProvider, metaWhatsApp, twoChat, twoChatApi, sms, smsReceive, healthRows] = await Promise.all([
         secret(secretNames.whatsappProvider),
         metaWhatsAppConfig(),
         activeTwoChatWhatsAppConfig(),
         twoChatApiConfig(),
         quoConfig(),
         quoWebhookConfig(),
+        sql<Array<{
+          status: string;
+          checked_at: string;
+          last_success_at: string | null;
+          last_inbound_at: string | null;
+          last_error: string | null;
+          details: Record<string, unknown> | null;
+        }>>`
+          select status, checked_at, last_success_at, last_inbound_at, last_error, details
+          from public.aura_channel_health where channel = 'whatsapp' limit 1
+        `,
       ]);
       const voice = twoChatApi
         ? await twoChatVoiceStatus(twoChatApi.apiKey)
@@ -12714,6 +13025,7 @@ Deno.serve(async (req: Request) => {
         voicePhone: voice.ready ? TWO_CHAT_BUSINESS_PHONE : null,
         emailReceive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET")),
         email: Boolean(Deno.env.get("RESEND_API_KEY")),
+        whatsappHealth: healthRows[0] || null,
       });
     }
     if (input.action === "dashboard") {
@@ -12950,6 +13262,14 @@ Deno.serve(async (req: Request) => {
           error: error instanceof Error ? error.message : "WhatsApp could not be optimized.",
         }, 400);
       }
+    }
+    if (input.action === "check_meta_whatsapp_health") {
+      if (!manager.isOwner)
+        return json({ error: "Only the owner can check WhatsApp." }, 403);
+      const repair = input.repair === true;
+      const retry = repair ? await retryFailedWhatsAppEvents() : { found: 0, processed: 0 };
+      const health = await checkAndRepairMetaWhatsApp(repair);
+      return json({ ok: true, health, retry });
     }
     if (input.action === "configure_resend_email_webhook") {
       if (!manager.isOwner)

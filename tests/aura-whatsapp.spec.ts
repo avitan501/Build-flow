@@ -173,7 +173,7 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(broker).toContain('change.field !== "messages"');
   expect(broker).toContain('provider: "whatsapp"');
   expect(broker).toContain("'whatsapp.message.received'");
-  expect(broker).toContain("if (webhookEvents[0]?.processed_at) continue");
+  expect(broker).toContain("if (webhookEvents[0]?.processed_at) return { processed: false, duplicate: true }");
   expect(broker).toContain("set processed_at = now(), error_message = null");
   expect(broker).not.toContain("isAuraAllowedSender");
   expect(broker).toContain('where provider = \'whatsapp\' and external_activity_id = ${receipt.id}');
@@ -201,11 +201,44 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(setup).not.toContain('value="2chat"');
   expect(setup).toContain("2Chat remains only for the existing call and recording service");
   expect(setup).toContain("I verified and subscribed messages · Activate");
-  expect(setup).toContain("Optimize live WhatsApp speed");
+  expect(setup).toContain("Check & repair WhatsApp");
   expect(setup).toContain("Activate new email events");
   expect(setup).toContain('value="quo"');
   expect(dashboard).toContain("connections?.whatsapp?.provider ?? status?.whatsappProvider");
   expect(dashboard).toContain("connections?.whatsapp?.receive ?? status?.whatsapp");
+});
+
+test("Meta WhatsApp has live health monitoring, repair, retry, and private scheduled checks", async () => {
+  const [broker, actions, setup, dashboard, migration] = await Promise.all([
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/aura-connection-setup.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260909213000_add_whatsapp_health_monitor.sql"), "utf8"),
+  ]);
+
+  expect(broker).toContain("inspectMetaWhatsAppHealth");
+  expect(broker).toContain("checkAndRepairMetaWhatsApp");
+  expect(broker).toContain("retryFailedWhatsAppEvents");
+  expect(broker).toContain('input.action === "check_meta_whatsapp_health"');
+  expect(broker).toContain('url.searchParams.get("mode") === "whatsapp-health"');
+  expect(broker).toContain('req.headers.get("x-whatsapp-health-dispatch")');
+  expect(broker).toContain("processMetaWhatsAppMessage");
+  expect(broker).toContain("attempts = public.aura_webhook_events.attempts + 1");
+  expect(broker).toContain("aura_channel_health");
+  expect(broker).toContain("WhatsApp connection restored");
+  expect(broker).toContain("sendOperationalEmailAlert");
+  expect(actions).toContain("checkAuraMetaWhatsAppHealthAction");
+  expect(setup).toContain("WhatsApp is receiving");
+  expect(setup).toContain("Connection details");
+  expect(dashboard).toContain("normalizeWhatsAppHealth");
+  expect(migration).toContain("enable row level security");
+  expect(migration).toContain("revoke all on table public.aura_channel_health from public, anon, authenticated");
+  expect(migration).toContain("monitor-whatsapp-health");
+  expect(migration).toContain("*/5 * * * *");
+  expect(migration).toContain("X-WhatsApp-Health-Dispatch");
+  expect(migration).toContain("https://nprfhspwdflpqlopydmp.supabase.co");
+  expect(migration).not.toContain("adrhuwzipjvwiywjmfaa");
 });
 
 test("legacy Twilio webhooks remain verified but cannot become the active WhatsApp fallback", async () => {

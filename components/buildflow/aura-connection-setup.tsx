@@ -1,14 +1,14 @@
 "use client";
 
-import { KeyRound, MessageCircle, PhoneCall, Smartphone } from "lucide-react";
+import { AlertTriangle, CheckCircle2, KeyRound, MessageCircle, PhoneCall, RefreshCw, Smartphone } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import {
   activateAuraMetaWhatsAppAction,
   activateAuraTwoChatChannelAction,
+  checkAuraMetaWhatsAppHealthAction,
   configureAuraEmailEventsAction,
   configureAuraProviderAction,
-  optimizeAuraMetaWhatsAppAction,
 } from "@/app/owner/aura/actions";
 
 type Props = {
@@ -19,6 +19,19 @@ type Props = {
   smsReady: boolean;
   smsReceiveReady?: boolean;
   defaultOpen?: boolean;
+  whatsappHealth?: {
+    status: "healthy" | "degraded" | "down" | "unknown";
+    checkedAt: string | null;
+    lastSuccessAt: string | null;
+    lastInboundAt: string | null;
+    error: string | null;
+    callbackActive: boolean;
+    businessAccountSubscribed: boolean;
+    phoneReady: boolean;
+    phoneQuality: string | null;
+    failedEvents: number;
+    pendingNotifications: number;
+  } | null;
 };
 
 export function AuraConnectionSetup({
@@ -29,6 +42,7 @@ export function AuraConnectionSetup({
   smsReady,
   smsReceiveReady = false,
   defaultOpen = false,
+  whatsappHealth = null,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -37,6 +51,7 @@ export function AuraConnectionSetup({
     verifyToken: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [health, setHealth] = useState(whatsappHealth);
 
   function submit(formData: FormData) {
     setFeedback(null);
@@ -78,12 +93,37 @@ export function AuraConnectionSetup({
     });
   }
 
-  function optimizeMetaWhatsApp() {
+  function checkAndRepairWhatsApp() {
     setFeedback(null);
     startTransition(async () => {
-      const result = await optimizeAuraMetaWhatsAppAction();
-      setFeedback(result.ok ? "WhatsApp now reaches Aura through the fastest direct webhook." : result.error);
+      const result = await checkAuraMetaWhatsAppHealthAction(true);
+      if (!result.ok) {
+        setFeedback(result.error);
+        return;
+      }
+      setHealth({
+        ...result.health,
+        lastSuccessAt: result.health.status === "healthy" ? result.health.checkedAt : health?.lastSuccessAt || null,
+      });
+      const retried = result.retried ? ` ${result.retried} failed event${result.retried === 1 ? " was" : "s were"} recovered.` : "";
+      setFeedback(result.health.status === "healthy"
+        ? `WhatsApp passed every live check.${result.health.repaired ? " The connection was repaired automatically." : ""}${retried}`
+        : result.health.error || "WhatsApp still needs attention.");
     });
+  }
+
+  const healthTone = health?.status === "healthy"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+    : health?.status === "degraded" || health?.status === "down"
+      ? "border-amber-200 bg-amber-50 text-amber-950"
+      : "border-slate-200 bg-slate-50 text-slate-800";
+
+  function dateLabel(value: string | null | undefined) {
+    if (!value) return "Not recorded yet";
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+      timeZone: "America/New_York",
+    }).format(new Date(value));
   }
 
   function activateEmailEvents() {
@@ -123,6 +163,35 @@ export function AuraConnectionSetup({
         </span>
       </div>
 
+      {whatsappProvider === "meta" ? (
+        <div className={`mt-3 rounded-lg border p-3 ${healthTone}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              {health?.status === "healthy" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+              <div className="min-w-0">
+                <p className="text-sm font-bold">{health?.status === "healthy" ? "WhatsApp is receiving" : health ? "WhatsApp needs a check" : "Live WhatsApp check pending"}</p>
+                <p className="truncate text-[11px] opacity-75">Last message: {dateLabel(health?.lastInboundAt)}</p>
+              </div>
+            </div>
+            <button type="button" onClick={checkAndRepairWhatsApp} disabled={pending} className="inline-flex min-h-10 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-50">
+              <RefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} />
+              Check & repair
+            </button>
+          </div>
+          <details className="mt-2 text-xs">
+            <summary className="min-h-8 cursor-pointer py-1 font-semibold">Connection details</summary>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-current/10 pt-2 sm:grid-cols-4">
+              <span>Webhook: {health?.callbackActive ? "Ready" : "Check"}</span>
+              <span>Account: {health?.businessAccountSubscribed ? "Ready" : "Check"}</span>
+              <span>Phone: {health?.phoneReady ? "Ready" : "Check"}</span>
+              <span>Failed: {health?.failedEvents || 0}</span>
+              <span className="col-span-2 sm:col-span-4">Last verified: {dateLabel(health?.checkedAt)}</span>
+              {health?.error ? <span className="col-span-2 font-semibold sm:col-span-4">{health.error}</span> : null}
+            </div>
+          </details>
+        </div>
+      ) : null}
+
       {open ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div className="grid gap-3 rounded-md border border-slate-200 p-4 lg:col-span-2">
@@ -149,9 +218,7 @@ export function AuraConnectionSetup({
             </div>
             <button disabled={pending} className="min-h-11 w-fit rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-50">Validate and connect Meta</button>
             {whatsappReady && whatsappProvider === "meta" ? (
-              <button type="button" onClick={optimizeMetaWhatsApp} disabled={pending} className="min-h-10 w-fit rounded-md border border-emerald-700 bg-white px-3 text-sm font-semibold text-emerald-800 disabled:opacity-50">
-                Optimize live WhatsApp speed
-              </button>
+              <button type="button" onClick={checkAndRepairWhatsApp} disabled={pending} className="min-h-10 w-fit rounded-md border border-emerald-700 bg-white px-3 text-sm font-semibold text-emerald-800 disabled:opacity-50">Check & repair WhatsApp</button>
             ) : null}
           </form>
 

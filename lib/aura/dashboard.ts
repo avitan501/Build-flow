@@ -127,7 +127,43 @@ type AuraBrokerStatus = {
   voicePhone?: string | null;
   email?: boolean;
   emailReceive?: boolean;
+  whatsappHealth?: {
+    status?: string;
+    checked_at?: string;
+    last_success_at?: string | null;
+    last_inbound_at?: string | null;
+    last_error?: string | null;
+    details?: {
+      callbackActive?: boolean;
+      businessAccountSubscribed?: boolean;
+      phoneReady?: boolean;
+      phoneQuality?: string | null;
+      failedEvents?: number;
+      pendingNotifications?: number;
+      repaired?: boolean;
+    } | null;
+  } | null;
 };
+
+function normalizeWhatsAppHealth(status: AuraBrokerStatus | null) {
+  const health = status?.whatsappHealth;
+  return health ? {
+    status: health.status === "healthy" ? "healthy" as const
+      : health.status === "degraded" ? "degraded" as const
+      : health.status === "down" ? "down" as const
+      : "unknown" as const,
+    checkedAt: health.checked_at || null,
+    lastSuccessAt: health.last_success_at || null,
+    lastInboundAt: health.last_inbound_at || null,
+    error: health.last_error || null,
+    callbackActive: Boolean(health.details?.callbackActive),
+    businessAccountSubscribed: Boolean(health.details?.businessAccountSubscribed),
+    phoneReady: Boolean(health.details?.phoneReady),
+    phoneQuality: health.details?.phoneQuality || null,
+    failedEvents: Number(health.details?.failedEvents || 0),
+    pendingNotifications: Number(health.details?.pendingNotifications || 0),
+  } : null;
+}
 
 function normalizeBrokerConnections(status: AuraBrokerStatus | null) {
   const connections = status?.connections;
@@ -178,6 +214,7 @@ export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
         Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
         canUseTwilioWhatsApp(),
       send: brokerConnections.whatsapp.send || canSendAuraWhatsApp(),
+      health: normalizeWhatsAppHealth(brokerStatus),
     },
     email: {
       receive: brokerConnections.email.receive || Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
@@ -257,6 +294,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
           Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
           canUseTwilioWhatsApp(),
         send: brokerConnections.whatsapp.send || canSendAuraWhatsApp(),
+        health: normalizeWhatsAppHealth(brokerStatus),
       },
       email: {
         receive: brokerConnections.email.receive || Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),

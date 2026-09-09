@@ -88,7 +88,7 @@ test("an unrelated attachment response can never auto-send", () => {
 test("direct Meta WhatsApp inbound uses the durable AI and outbox routes", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   const meta = broker.slice(
-    broker.indexOf("async function handleMetaWhatsAppWebhook"),
+    broker.indexOf("async function processMetaWhatsAppMessage"),
     broker.indexOf("async function optimizeMetaWhatsAppWebhook"),
   )
   expect(meta).toContain("ensureIncomingSmsContact(remotePhone)")
