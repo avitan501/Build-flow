@@ -117,7 +117,7 @@ const META_WHATSAPP_APP_ID = "2874339416276903";
 const META_WHATSAPP_BUSINESS_ACCOUNT_ID = "1609047970612779";
 const META_WHATSAPP_PHONE_NUMBER_ID = "1266268263238386";
 const META_WHATSAPP_DIRECT_CALLBACK =
-  "https://nprfhspwdflpqlopydmp.supabase.co/functions/v1/aura-messaging-broker?mode=meta-whatsapp-webhook";
+  "https://avantiabuild.com/api/aura/whatsapp";
 const TRUSTED_SMS_COMMAND_PHONES = new Set(["+13475675077", "+15169398484"]);
 
 function isTrustedSmsCommandPhone(phone: string | null | undefined) {
@@ -2242,19 +2242,52 @@ async function handleMetaWhatsAppWebhook(req: Request) {
       for (const message of value.messages || []) {
         const remotePhone = normalizePhone(message.from);
         if (!message.id || !remotePhone) continue;
-        await ensureIncomingSmsContact(remotePhone);
-        const communicationId = await storeCommunication({
-          provider: "whatsapp",
-          channel: "whatsapp",
-          externalId: message.id,
-          direction: "incoming",
-          counterpartyPhone: remotePhone,
-          businessPhone: config.from,
-          body: metaMessageBody(message),
-          status: "received",
-          media: metaMessageMedia(message),
-          occurredAt: /^\d+$/.test(message.timestamp || "") ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
-        });
+        const webhookEvents = await sql<{ processed_at: string | null }[]>`
+          insert into public.aura_webhook_events
+            (provider, external_event_id, event_type, activity_id, raw_payload, error_message)
+          values (
+            'whatsapp', ${message.id}, 'whatsapp.message.received', ${message.id},
+            ${sql.json({
+              messageId: message.id,
+              messageType: message.type || "unknown",
+              sender: remotePhone,
+              phoneNumberId: value.metadata?.phone_number_id || null,
+            })}, null
+          )
+          on conflict (provider, external_event_id) do update
+            set raw_payload = excluded.raw_payload
+          returning processed_at
+        `;
+        if (webhookEvents[0]?.processed_at) continue;
+
+        let communicationId: string;
+        try {
+          await ensureIncomingSmsContact(remotePhone);
+          communicationId = await storeCommunication({
+            provider: "whatsapp",
+            channel: "whatsapp",
+            externalId: message.id,
+            direction: "incoming",
+            counterpartyPhone: remotePhone,
+            businessPhone: config.from,
+            body: metaMessageBody(message),
+            status: "received",
+            media: metaMessageMedia(message),
+            occurredAt: /^\d+$/.test(message.timestamp || "") ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
+          });
+          await sql`
+            update public.aura_webhook_events
+            set processed_at = now(), error_message = null
+            where provider = 'whatsapp' and external_event_id = ${message.id}
+          `;
+        } catch (error) {
+          await sql`
+            update public.aura_webhook_events
+            set error_message = ${error instanceof Error ? error.message.slice(0, 500) : "whatsapp_message_processing_failed"}
+            where provider = 'whatsapp' and external_event_id = ${message.id}
+          `;
+          throw error;
+        }
         EdgeRuntime.waitUntil(
           (async () => {
             const rawMedia = metaMessageMedia(message);
@@ -2356,6 +2389,23 @@ async function optimizeMetaWhatsAppWebhook() {
       `Meta did not accept the direct WhatsApp webhook${responsePayload.error?.code ? ` (${responsePayload.error.code})` : ""}${responsePayload.error?.message ? `: ${responsePayload.error.message.slice(0, 240)}` : ""}`,
     );
 
+  const wabaSubscription = await fetch(
+    `https://graph.facebook.com/${config.graphVersion}/${config.businessAccountId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.accessToken}` },
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+  const wabaSubscriptionPayload = await wabaSubscription.json().catch(() => ({})) as {
+    success?: boolean;
+    error?: { code?: number; message?: string };
+  };
+  if (!wabaSubscription.ok || wabaSubscriptionPayload.success !== true)
+    throw new Error(
+      `Meta did not subscribe the Avantia app to the WhatsApp account${wabaSubscriptionPayload.error?.code ? ` (${wabaSubscriptionPayload.error.code})` : ""}${wabaSubscriptionPayload.error?.message ? `: ${wabaSubscriptionPayload.error.message.slice(0, 240)}` : ""}`,
+    );
+
   const verified = await fetch(
     `https://graph.facebook.com/${config.graphVersion}/${META_WHATSAPP_APP_ID}/subscriptions`,
     {
@@ -2382,7 +2432,11 @@ async function optimizeMetaWhatsAppWebhook() {
   ) === true;
   if (!directMessagesWebhook)
     throw new Error("Meta did not persist the direct WhatsApp webhook");
-  return { callbackUrl: META_WHATSAPP_DIRECT_CALLBACK };
+  return {
+    callbackUrl: META_WHATSAPP_DIRECT_CALLBACK,
+    appWebhookActive: true,
+    businessAccountSubscribed: true,
+  };
 }
 
 type QuoWebhookPayload = {

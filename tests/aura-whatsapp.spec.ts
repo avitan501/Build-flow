@@ -158,6 +158,8 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(broker).toContain('subscription.object === "whatsapp_business_account"');
   expect(broker).toContain("META_WHATSAPP_DIRECT_CALLBACK");
   expect(broker).toContain('input.action === "optimize_meta_whatsapp_webhook"');
+  expect(broker).toContain("${config.businessAccountId}/subscribed_apps");
+  expect(broker).toContain("businessAccountSubscribed: true");
   expect(broker).toContain("expectedCallbacks.has(subscription.callback_url)");
   expect(broker).toContain('fields: "messages"');
   expect(broker).toContain('(typeof field === "string" ? field : field.name) === "messages"');
@@ -170,6 +172,10 @@ test("direct Meta WhatsApp uses Vault-backed verification and delivery without 2
   expect(broker).toContain("hmacSha256HexRawKey");
   expect(broker).toContain('change.field !== "messages"');
   expect(broker).toContain('provider: "whatsapp"');
+  expect(broker).toContain("'whatsapp.message.received'");
+  expect(broker).toContain("if (webhookEvents[0]?.processed_at) continue");
+  expect(broker).toContain("set processed_at = now(), error_message = null");
+  expect(broker).not.toContain("isAuraAllowedSender");
   expect(broker).toContain('where provider = \'whatsapp\' and external_activity_id = ${receipt.id}');
   expect(broker).toContain('whatsappProvider: activeWhatsApp ? directMetaSelected ? "meta" : "2chat" : null');
   expect(broker).toContain("aura_meta_whatsapp_access_token");
