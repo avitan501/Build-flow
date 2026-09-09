@@ -128,7 +128,7 @@ test("request specifications preserve the fields needed to distinguish same-name
     dimensions: "2 x 4 x 8 ft",
     thickness: "1.5 in",
     request_details: "Stud grade",
-  }, "Framing")).toBe("Regular SPF · 2 x 4 x 8 ft · 1.5 in · Stud grade")
+  }, "Framing")).toBe("Size / dimensions: 2 x 4 x 8 ft · Thickness: 1.5 in · Type / material: Regular SPF · Stud grade")
   expect(requestItemSpecification({}, "Framing")).toBe("Framing")
 })
 

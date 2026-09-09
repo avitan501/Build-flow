@@ -51,3 +51,15 @@ test("Start by Text retains keyboard focus without sending a message", async({pa
   await expect(trigger).toBeFocused();
   expect(sends).toBe(0);
 });
+
+test("Start by Text becomes a compact one-tap control while reading on a phone", async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto("/shop?category=Liquidation");
+  const bar=page.getByTestId("public-contact-bar");
+  await expect(bar).toHaveAttribute("data-compact","false");
+  await page.evaluate(()=>window.scrollTo(0,240));
+  await expect(bar).toHaveAttribute("data-compact","true");
+  await expect.poll(async()=> (await bar.locator("> div").boundingBox())?.width ?? 999).toBeLessThanOrEqual(50);
+  await bar.getByRole("button",{name:"Start by Text"}).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+});
