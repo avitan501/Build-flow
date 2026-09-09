@@ -30,7 +30,7 @@ export function ShopBrandShowcase({ compact = false, transparent = false, title 
               <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
                 {SHOP_BRANDS.map((brand) => (
                   <div key={`${groupIndex}-${brand.name}`} className={`${compact ? "h-10 w-24 sm:h-12 sm:w-32" : "h-20 w-36 sm:h-24 sm:w-44"} flex shrink-0 items-center justify-center px-3 sm:px-4`}>
-                    <div className={`${compact ? "h-6 max-w-20 sm:h-7 sm:max-w-24" : "h-9 max-w-28 sm:h-10 sm:max-w-32"} relative w-full`}>
+                    <div className={`${compact ? "h-8 max-w-24 sm:h-8 sm:max-w-28" : "h-9 max-w-28 sm:h-10 sm:max-w-32"} relative w-full`}>
                       <Image
                         src={brand.logo}
                         alt={groupIndex === 0 ? `${brand.name} logo` : ""}

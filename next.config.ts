@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
   async headers() {
     const privateRoutes = [
       "/account/:path*",
+      "/ai/renovation-estimator",
+      "/unavailable",
       "/admin/:path*",
       "/api/:path*",
       "/cart",
@@ -47,6 +49,7 @@ const nextConfig: NextConfig = {
       "/projects/:path*",
       "/quotes/:path*",
       "/reset-password",
+      "/requests/:path*",
       "/search",
       "/signup",
       "/takeoff-review",
@@ -54,6 +57,33 @@ const nextConfig: NextConfig = {
     ];
 
     return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self), payment=(self), usb=()" },
+          // Inventory: Next inline hydration/styles, Supabase storage/realtime,
+          // Sentry, PostHog, local/blob PDF/media and external supplier images.
+          // Report-only until authenticated calls, uploads and embeds are verified.
+          { key: "Content-Security-Policy-Report-Only", value: [
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'self' blob:",
+            "frame-ancestors 'self'",
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://us-assets.i.posthog.com https://vercel.live",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' data:",
+            "media-src 'self' blob: https:",
+            "connect-src 'self' https://nprfhspwdflpqlopydmp.supabase.co wss://nprfhspwdflpqlopydmp.supabase.co https://*.ingest.us.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com https://vercel.live",
+            "frame-src 'self' blob: https:",
+            "worker-src 'self' blob:",
+            "form-action 'self' https:",
+          ].join("; ") },
+        ],
+      },
       ...privateRoutes.map((source) => ({
         source,
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],

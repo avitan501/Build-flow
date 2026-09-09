@@ -210,7 +210,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
                 aria-label={shopQuery ? `Search materials: ${shopQuery}` : "Search materials"}
               >
                 <SearchIcon />
-                <span data-testid="shop-search-label" className="hidden min-w-0 truncate text-xs text-slate-500 min-[390px]:block min-[430px]:text-sm">
+                <span data-testid="shop-search-label" className="hidden min-w-0 truncate text-xs text-slate-600 min-[390px]:block min-[430px]:text-sm">
                   {shopQuery ? shopQuery : <><span className="min-[430px]:hidden">Search</span><span className="hidden min-[430px]:inline">Search materials</span></>}
                 </span>
               </button>

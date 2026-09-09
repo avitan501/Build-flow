@@ -46,7 +46,7 @@ export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData 
       <div
         className={hasExtendedCatalog
           ? "grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-5 sm:gap-x-6"
-          : "grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-x-5"}
+          : "grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-x-5"}
         data-testid="department-essentials"
       >
         {data.items.map((item, index) => {
@@ -67,7 +67,7 @@ export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData 
               }}
             />
           )
-          const title = <h3 className="mt-2 line-clamp-2 text-[11px] font-semibold leading-[14px] text-slate-900 sm:text-xs sm:leading-4">{name}</h3>
+          const title = <h3 className="mt-2 break-words text-xs font-semibold leading-[14px] text-slate-900 sm:text-xs sm:leading-4">{name}</h3>
 
           return (
             <article key={name} className="min-w-0 text-center">

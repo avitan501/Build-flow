@@ -283,7 +283,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
   }
 
   const buttonClass = compact
-    ? `inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white shadow-[0_10px_20px_rgba(0,113,227,0.24)] transition hover:bg-[#0066cc] ${className}`
+    ? `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white shadow-[0_10px_20px_rgba(0,113,227,0.24)] transition hover:bg-[#0066cc] ${className}`
     : `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.22)] transition hover:bg-[#0066cc] ${className}`
   const currentQuery = searchParams.toString()
   const returnPath = `${pathname}${currentQuery ? `?${currentQuery}` : ""}`
@@ -303,7 +303,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{authRequired ? "Continue Request" : created ? "Request Ready" : "Submitting Request"}</p>
                 <h2 id={`add-project-${product.id}`} className="mt-1 truncate text-xl font-semibold text-slate-950">{product.name}</h2>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl text-slate-500" aria-label="Close">
+              <button type="button" onClick={() => setOpen(false)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl text-slate-500" aria-label="Close">
                 ×
               </button>
             </header>

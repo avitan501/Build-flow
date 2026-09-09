@@ -1,5 +1,7 @@
 "use client";
 
+import { validateQuoteRequestContact, type ContactField } from "@/lib/quote-request-contact-validation";
+
 import { CheckCircle2, FileUp, LoaderCircle, Send, X } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
@@ -71,6 +73,12 @@ export function QuoteRequestForm({
   const [uploadPending, startUploadTransition] = useTransition();
   const [fileError, setFileError] = useState("");
   const [formError, setFormError] = useState("");
+  const [contactErrors, setContactErrors] = useState<Partial<Record<ContactField, string>>>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  function clearContactErrors() { setFormError(""); setContactErrors({}); }
+  function contactError(field: ContactField) {
+    return contactErrors[field] ? <span id={`contact-${field}-error`} className="mt-1 block text-xs text-red-700">{contactErrors[field]}</span> : null;
+  }
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const attachmentRef = useRef<HTMLInputElement>(null);
@@ -157,20 +165,12 @@ export function QuoteRequestForm({
     const phone = String(submission.get("phone") || "").trim();
     const details = String(submission.get("details") || "");
 
-    if (!name && (!email || !phone)) {
-      setFormError("Enter a name, or enter both email and phone.");
-      return false;
-    }
-    if (name && !email && !phone) {
-      setFormError("Enter an email address or phone number.");
-      return false;
-    }
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      setFormError("Enter a valid email address.");
-      return false;
-    }
-    if (phone && phone.replace(/\D/g, "").length < 7) {
-      setFormError("Enter a valid phone number.");
+    const errors = validateQuoteRequestContact({ fullName: name, email, phone });
+    setContactErrors(errors);
+    const first = (["fullName", "email", "phone"] as const).find((field) => errors[field]);
+    if (first) {
+      setFormError("Check the highlighted contact details.");
+      formRef.current?.querySelector<HTMLInputElement>(`[name="${first}"]`)?.focus();
       return false;
     }
     if (beatQuote && files.length === 0) {
@@ -216,6 +216,8 @@ export function QuoteRequestForm({
 
   return (
     <form
+      ref={formRef}
+      noValidate
       id="request-form"
       action={formAction}
       onSubmit={(event) => {
@@ -371,56 +373,68 @@ export function QuoteRequestForm({
           <input
             aria-label="Name"
             name="fullName"
-            onChange={() => setFormError("")}
+            aria-invalid={Boolean(contactErrors.fullName)}
+            aria-describedby={contactErrors.fullName ? "contact-fullName-error" : undefined}
+            onChange={clearContactErrors}
             autoComplete="name"
             placeholder={beatQuote ? "Name" : "Name (optional)"}
             className={inputClass}
           />
+          {contactError("fullName")}
         </label>
         <label className={beatQuote ? "" : "order-none"}>
           <span className="sr-only">{beatQuote ? "Phone" : "Company"}</span>
           <input
             aria-label={beatQuote ? "Phone" : "Company"}
             name={beatQuote ? "phone" : "company"}
+            aria-invalid={beatQuote && Boolean(contactErrors.phone)}
+            aria-describedby={beatQuote && contactErrors.phone ? "contact-phone-error" : undefined}
             type={beatQuote ? "tel" : "text"}
-            onChange={beatQuote ? () => setFormError("") : undefined}
+            onChange={beatQuote ? clearContactErrors : undefined}
             inputMode={beatQuote ? "tel" : undefined}
             autoComplete={beatQuote ? "tel" : "organization"}
             placeholder={beatQuote ? "Phone" : "Company (optional)"}
             className={inputClass}
           />
+          {beatQuote ? contactError("phone") : null}
         </label>
         <label>
           <span className="sr-only">Email</span>
           <input
             aria-label="Email"
             name="email"
+            aria-invalid={Boolean(contactErrors.email)}
+            aria-describedby={contactErrors.email ? "contact-email-error" : undefined}
             type="email"
-            onChange={() => setFormError("")}
+            onChange={clearContactErrors}
             autoComplete="email"
             placeholder="Email"
             className={inputClass}
           />
+          {contactError("email")}
         </label>
         <label>
           <span className="sr-only">{beatQuote ? "Company" : "Phone"}</span>
           <input
             aria-label={beatQuote ? "Company" : "Phone"}
             name={beatQuote ? "company" : "phone"}
+            aria-invalid={!beatQuote && Boolean(contactErrors.phone)}
+            aria-describedby={!beatQuote && contactErrors.phone ? "contact-phone-error" : undefined}
             type={beatQuote ? "text" : "tel"}
-            onChange={beatQuote ? undefined : () => setFormError("")}
+            onChange={beatQuote ? undefined : clearContactErrors}
             inputMode={beatQuote ? undefined : "tel"}
             autoComplete={beatQuote ? "organization" : "tel"}
             placeholder={beatQuote ? "Company (optional)" : "Phone"}
             className={inputClass}
           />
+          {!beatQuote ? contactError("phone") : null}
         </label>
         <p
           className={`${beatQuote ? "sm:col-span-2" : "col-span-2"} text-xs font-medium text-slate-500`}
         >
           {beatQuote
             ? "We only use this to follow up about your quote."
-            : "Use one name and email or phone. With no name, enter both."}
+            : "Enter Name + Email or Phone. Without Name, enter Email + Phone."}
         </p>
       </div>
 

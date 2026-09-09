@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Avantia Build",
     description: "Get construction materials priced and delivered to your jobsite.",
     id: "/",
-    start_url: "/admin/build-map",
+    start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "portrait-primary",

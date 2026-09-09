@@ -111,7 +111,7 @@ function ShopProductCard({ product, localOnly = false }: { product: ShopCatalogP
     </div>
   )
   const nameBlock = (
-    <span className="line-clamp-2">{product.name}</span>
+    <span className="break-words">{product.name}</span>
   )
 
   return (
@@ -607,7 +607,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                 )
               ))}
             </section>
-            {isLiquidationView ? <p className="py-2 text-center text-sm font-semibold text-slate-500">More items coming soon</p> : null}
+            {isLiquidationView ? <p className="py-2 text-center text-sm font-semibold text-slate-600">More items coming soon</p> : null}
           </>
         ) : (
           <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-5 py-12 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">

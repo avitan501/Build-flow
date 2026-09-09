@@ -33,6 +33,13 @@ function sanitizeNextPath(value: string | null | undefined) {
 }
 
 export async function proxy(request: NextRequest) {
+  // These legacy categories have no active catalog/page. Set the status before
+  // the async root layout streams, otherwise Next's notFound() becomes a 200.
+  if (["/shop/bathroom", "/shop/flip-package", "/shop/interior-finish", "/unavailable"].includes(request.nextUrl.pathname)) {
+    const response = NextResponse.rewrite(new URL("/unavailable", request.url), { status: 404 });
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  }
   let response = NextResponse.next({
     request: {
       headers: request.headers,

@@ -27,22 +27,22 @@ export function SiteFooter() {
                   <AvantiaBuildLockup header loading="lazy" />
                 </Link>
                 <p className="mt-3 max-w-md text-xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-3xl">You build. We handle the materials.</p>
-                <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Plans · Pricing · Ordering · Delivery</p>
+                <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/65">Plans · Pricing · Ordering · Delivery</p>
               </div>
-              <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
+              <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
                 <a href="mailto:office@avantiabuild.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
-                  <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">office@avantiabuild.com</span></span><span aria-hidden="true">↗</span>
+                  <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="break-all">office@avantiabuild.com</span></span><span aria-hidden="true">↗</span>
                 </a>
                   <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
                     <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 990-1990</span>
                   </a>
-                  <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-10 w-10 items-center justify-center border border-white/25 text-white transition-colors hover:border-white hover:bg-white hover:text-black">
+                  <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-11 w-11 items-center justify-center border border-white/25 text-white transition-colors hover:border-white hover:bg-white hover:text-black">
                     <WhatsAppIcon className="h-5 w-5" />
                   </a>
               </nav>
             </div>
             <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <nav aria-label="Policies" className="flex max-w-full flex-nowrap gap-5 overflow-x-auto whitespace-nowrap pb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-white/48 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <nav aria-label="Policies" className="flex max-w-full flex-wrap gap-x-5 gap-y-3 pb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-white/65 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <Link href="/privacy" className="transition hover:text-white">Privacy</Link>
                 <Link href="/terms" className="transition hover:text-white">Terms</Link>
                 <Link href="/returns" className="transition hover:text-white">Returns</Link>
@@ -52,7 +52,7 @@ export function SiteFooter() {
                 <Link href="/accessibility" className="transition hover:text-white">Accessibility</Link>
                 <Link href="/shop#shop-faq" className="transition hover:text-white">Ordering FAQ</Link>
               </nav>
-              <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">Serving all 50 states</p>
+              <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-white/65">Serving all 50 states</p>
             </div>
           </div>
         </footer>
@@ -73,14 +73,14 @@ export function SiteFooter() {
             <p className="mt-0.5 hidden text-xs text-slate-500 sm:block">Plans, pricing, ordering, and jobsite delivery.</p>
           </div>
         </div>
-        <nav aria-label="Avantia contact" className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 border-t border-slate-200 pt-3 sm:flex sm:border-t-0 sm:pt-0">
-          <a href="mailto:office@avantiabuild.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
-            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@avantiabuild.com</span>
+        <nav aria-label="Avantia contact" className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 border-t border-slate-200 pt-3 sm:flex sm:border-t-0 sm:pt-0">
+          <a href="mailto:office@avantiabuild.com" className="inline-flex min-h-11 min-w-0 items-center gap-2 col-span-2 sm:col-auto rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
+            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="break-all">office@avantiabuild.com</span>
           </a>
-          <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
+          <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
             <Phone className="h-4 w-4" aria-hidden="true" /><span className="whitespace-nowrap text-[11px] font-semibold sm:text-sm">(516) 990-1990</span>
           </a>
-          <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="group relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#128c7e] text-white transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+          <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="group relative inline-flex h-11 w-11 items-center justify-center rounded-lg bg-[#128c7e] text-white transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
             <WhatsAppIcon className="h-5 w-5" />
             <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               WhatsApp us

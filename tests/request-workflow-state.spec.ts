@@ -96,5 +96,5 @@ test("the request page exposes a direct estimate without requiring supplier comp
   )
 
   expect(source).toContain('onClick={() => openDocument("estimate")}')
-  expect(source).toContain("Direct estimate")
+  expect(source).toContain("Create direct estimate")
 })

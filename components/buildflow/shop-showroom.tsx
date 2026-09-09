@@ -94,7 +94,7 @@ export function ShopShowroom({ embedded = false }: { embedded?: boolean }) {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-xl font-semibold leading-tight sm:text-3xl">Shop Materials</span>
-              <span className="mt-1 block truncate text-sm text-black/50 sm:text-base">Browse eight construction departments</span>
+              <span className="mt-1 block text-sm text-black/65 sm:text-base">Browse eight construction departments</span>
             </span>
             <span className="hidden shrink-0 text-sm font-semibold text-[#0066cc] sm:block">View departments</span>
             <ChevronDown className="h-5 w-5 shrink-0 text-black/55 transition-transform duration-300 group-open/showroom:rotate-180" aria-hidden="true" />
@@ -111,8 +111,8 @@ export function ShopShowroom({ embedded = false }: { embedded?: boolean }) {
           <summary className="flex min-h-[72px] cursor-pointer list-none items-center gap-4 px-4 py-3 outline-none transition hover:bg-black/[.025] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0071e3] [&::-webkit-details-marker]:hidden sm:min-h-[82px] sm:px-7">
             <span className="w-7 shrink-0 text-[11px] font-semibold tabular-nums text-black/35">{String(departmentIndex + 1).padStart(2, "0")}</span>
             <span className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-6">
-              <h2 id={`department-${departmentIndex}`} className="truncate text-lg font-semibold leading-tight sm:w-[19rem] sm:shrink-0 sm:text-2xl">{department.title}</h2>
-              <span className="mt-1 block truncate text-sm text-black/50 sm:mt-0 sm:text-base">{department.description}</span>
+              <h2 id={`department-${departmentIndex}`} className="break-words text-lg font-semibold leading-tight sm:w-[19rem] sm:shrink-0 sm:text-2xl">{department.title}</h2>
+              <span className="mt-1 block text-sm text-black/65 sm:mt-0 sm:text-base">{department.description}</span>
             </span>
             <span className="hidden shrink-0 text-xs font-semibold text-[#0066cc] sm:block">View materials</span>
             <ChevronDown className="h-5 w-5 shrink-0 text-black/55 transition-transform duration-300 group-open/department:rotate-180" aria-hidden="true" />

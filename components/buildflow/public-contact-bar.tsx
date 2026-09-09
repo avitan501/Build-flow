@@ -89,6 +89,7 @@ export function PublicContactBar() {
   const titleId = useId();
   const phoneId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const demoVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
   const startTextAttemptKeyRef = useRef<string | null>(null);
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
@@ -102,18 +103,32 @@ export function PublicContactBar() {
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpenPanel(null);
+      if (event.key === "Escape") { event.preventDefault(); setOpenPanel(null); }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
+      ) ?? []).filter((element) => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first || !last) return;
+      if (!dialogRef.current?.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
+      previousFocus?.focus();
     };
   }, [open]);
 
@@ -220,6 +235,7 @@ export function PublicContactBar() {
 
   return (
     <>
+      <div aria-hidden="true" className="h-[calc(5.5rem+env(safe-area-inset-bottom))] shrink-0" />
       <div
         data-testid="public-contact-bar"
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] px-4 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-5 sm:pb-4"
@@ -261,6 +277,7 @@ export function PublicContactBar() {
             aria-label="Close contact options"
           />
           <section
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}

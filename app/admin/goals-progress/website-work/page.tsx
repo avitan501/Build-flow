@@ -91,6 +91,7 @@ export default async function DavidDashboardPage() {
       .from("website_work_items")
       .select("id,task_key,title,category,status,assigned_agent,progress_percent,summary,next_step,resolution_cost,updated_at,source_chat_title,item_kind,published_to_carlos")
       .not("status", "in", "(completed,superseded,archived)")
+      .not("task_key", "like", "blueprint-%")
       .order("priority")
       .order("sort_order")
       .order("updated_at", { ascending: false })

@@ -46,7 +46,7 @@ test("public requests accept one name and require both contacts only when name i
   expect(form).not.toContain('name="email" required');
   expect(form).not.toContain('name="phone" required');
   expect(form).toContain(
-    "Use one name and email or phone. With no name, enter both.",
+    "Enter Name + Email or Phone. Without Name, enter Email + Phone.",
   );
   expect(form).not.toContain('name="fullName" required');
   expect(action).toContain("if (!fullNameInput && (!email || !phone))");
@@ -90,7 +90,7 @@ test("quote request is a compact contact and material workflow", async ({
   );
   await expect(
     page.getByText(
-      "Use one name and email or phone. With no name, enter both.",
+      "Enter Name + Email or Phone. Without Name, enter Email + Phone.",
     ),
   ).toBeVisible();
   await expect(page.getByLabel("Company", { exact: true })).toHaveAttribute(

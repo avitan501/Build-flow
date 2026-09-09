@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 type CustomerRequestsPageProps = {
-  searchParams: Promise<{ access?: string; account?: string; request?: string }>;
+  searchParams: Promise<{ access?: string; account?: string; request?: string; show?: string }>;
 };
 
 const requestStages = ["Received", "Pricing", "Approval", "Delivery"] as const;
@@ -54,9 +54,11 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
     );
 
   const selectedRequest = query.request?.trim() || "";
+  const showingArchived = query.show === "archived";
+  const archivedCount = portal.requests.filter(request => request.status === "closed").length;
   const requests = selectedRequest
     ? [...portal.requests].sort((left, right) => Number(String(right.publicNumber) === selectedRequest) - Number(String(left.publicNumber) === selectedRequest))
-    : portal.requests;
+    : portal.requests.filter(request => showingArchived ? request.status === "closed" : request.status !== "closed");
   const openedRequest = selectedRequest
     ? requests.find((request) => String(request.publicNumber) === selectedRequest) ?? null
     : null;
@@ -79,6 +81,7 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
         </header>
 
         {!openedRequest ? <section className="mt-4 flex flex-wrap gap-2" aria-label="Account quick actions">
+          <Link href={showingArchived ? "/requests" : "/requests?show=archived"} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">{showingArchived ? "Active requests" : `Archived (${archivedCount})`}</Link>
           <Link href="/shop" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-3 text-xs font-bold text-white transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><Plus className="h-3.5 w-3.5" aria-hidden="true" />New request</Link>
           <a href={`sms:${AVANTIA_QUO_CALLER_ID}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-sky-300 hover:text-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />Text Avantia</a>
           <Link href="/account" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-sky-300 hover:text-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />Security</Link>

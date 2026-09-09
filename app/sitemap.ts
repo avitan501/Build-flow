@@ -28,7 +28,6 @@ const pages: SitemapPage[] = [
   { path: "/shop/appliances", changeFrequency: "weekly", priority: 0.8 },
   { path: "/shop/services", changeFrequency: "monthly", priority: 0.7 },
   { path: "/shop/paper-work", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/ai/renovation-estimator", changeFrequency: "monthly", priority: 0.7 },
   { path: "/shop/sheet-rock/drywall-calculator", changeFrequency: "monthly", priority: 0.7 },
   { path: "/shop/tile-work/thinset-calculator", changeFrequency: "monthly", priority: 0.7 },
   { path: "/shop/wood-floor/flooring-calculator", changeFrequency: "monthly", priority: 0.7 },

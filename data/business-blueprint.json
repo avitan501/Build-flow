@@ -1,0 +1,1101 @@
+[
+  {
+    "id": "page-accessibility",
+    "title": "Accessibility",
+    "group": "Customer",
+    "source": "app/accessibility/page.tsx",
+    "href": "/accessibility"
+  },
+  {
+    "id": "page-account-abc",
+    "title": "Abc",
+    "group": "Customer",
+    "source": "app/account/abc/page.tsx",
+    "href": "/account/abc"
+  },
+  {
+    "id": "page-account",
+    "title": "Account",
+    "group": "Customer",
+    "source": "app/account/page.tsx",
+    "href": "/account"
+  },
+  {
+    "id": "page-admin-abc",
+    "title": "Manager Abc",
+    "group": "Management",
+    "source": "app/admin/abc/page.tsx",
+    "href": "/admin/abc"
+  },
+  {
+    "id": "page-admin-ai-tools-construction-amazon-deals",
+    "title": "Construction Amazon Deals",
+    "group": "Management",
+    "source": "app/admin/ai-tools/construction-amazon-deals/page.tsx",
+    "href": "/admin/ai-tools/construction-amazon-deals"
+  },
+  {
+    "id": "page-admin-ai-tools-construction-knowledge",
+    "title": "Construction Knowledge",
+    "group": "Management",
+    "source": "app/admin/ai-tools/construction-knowledge/page.tsx",
+    "href": "/admin/ai-tools/construction-knowledge"
+  },
+  {
+    "id": "page-admin-ai-tools-estimate-converter",
+    "title": "Estimate Converter",
+    "group": "Management",
+    "source": "app/admin/ai-tools/estimate-converter/page.tsx",
+    "href": "/admin/ai-tools/estimate-converter"
+  },
+  {
+    "id": "page-admin-ai-tools-internal-library",
+    "title": "Internal Library",
+    "group": "Management",
+    "source": "app/admin/ai-tools/internal-library/page.tsx",
+    "href": "/admin/ai-tools/internal-library"
+  },
+  {
+    "id": "page-admin-ai-tools-lead-drafts",
+    "title": "Lead Drafts",
+    "group": "Management",
+    "source": "app/admin/ai-tools/lead-drafts/page.tsx",
+    "href": "/admin/ai-tools/lead-drafts"
+  },
+  {
+    "id": "page-admin-ai-tools-material-list",
+    "title": "Material List",
+    "group": "Management",
+    "source": "app/admin/ai-tools/material-list/page.tsx",
+    "href": "/admin/ai-tools/material-list"
+  },
+  {
+    "id": "page-admin-ai-tools-order-test",
+    "title": "Order Test",
+    "group": "Management",
+    "source": "app/admin/ai-tools/order-test/page.tsx",
+    "href": "/admin/ai-tools/order-test"
+  },
+  {
+    "id": "page-admin-ai-tools",
+    "title": "Ai Tools",
+    "group": "Management",
+    "source": "app/admin/ai-tools/page.tsx",
+    "href": "/admin/ai-tools"
+  },
+  {
+    "id": "page-admin-ai-tools-quick-add-lead",
+    "title": "Quick Add Lead",
+    "group": "Management",
+    "source": "app/admin/ai-tools/quick-add-lead/page.tsx",
+    "href": "/admin/ai-tools/quick-add-lead"
+  },
+  {
+    "id": "page-admin-ai-tools-renovation-estimator",
+    "title": "Renovation Estimator",
+    "group": "Management",
+    "source": "app/admin/ai-tools/renovation-estimator/page.tsx",
+    "href": "/admin/ai-tools/renovation-estimator"
+  },
+  {
+    "id": "page-admin-ai-tools-sms-replies",
+    "title": "Sms Replies",
+    "group": "Management",
+    "source": "app/admin/ai-tools/sms-replies/page.tsx",
+    "href": "/admin/ai-tools/sms-replies"
+  },
+  {
+    "id": "page-admin-ai-tools-website-defects",
+    "title": "Website Defects",
+    "group": "Management",
+    "source": "app/admin/ai-tools/website-defects/page.tsx",
+    "href": "/admin/ai-tools/website-defects"
+  },
+  {
+    "id": "page-admin-ai-tools-work-browser",
+    "title": "Work Browser",
+    "group": "Management",
+    "source": "app/admin/ai-tools/work-browser/page.tsx",
+    "href": "/admin/ai-tools/work-browser"
+  },
+  {
+    "id": "page-admin-build-map",
+    "title": "Build Map",
+    "group": "Management",
+    "source": "app/admin/build-map/page.tsx",
+    "href": "/admin/build-map"
+  },
+  {
+    "id": "page-admin-carlos-activity",
+    "title": "Carlos Activity",
+    "group": "Management",
+    "source": "app/admin/carlos-activity/page.tsx",
+    "href": "/admin/carlos-activity"
+  },
+  {
+    "id": "page-admin-catalog",
+    "title": "Catalog",
+    "group": "Management",
+    "source": "app/admin/catalog/page.tsx",
+    "href": "/admin/catalog"
+  },
+  {
+    "id": "page-admin-communications",
+    "title": "Communications",
+    "group": "Management",
+    "source": "app/admin/communications/page.tsx",
+    "href": "/admin/communications"
+  },
+  {
+    "id": "page-admin-daily-summary",
+    "title": "Daily Summary",
+    "group": "Management",
+    "source": "app/admin/daily-summary/page.tsx",
+    "href": "/admin/daily-summary"
+  },
+  {
+    "id": "page-admin-documents",
+    "title": "Documents",
+    "group": "Management",
+    "source": "app/admin/documents/page.tsx",
+    "href": "/admin/documents"
+  },
+  {
+    "id": "page-admin-goals-progress-beat-your-quote-flyer",
+    "title": "Your Quote Flyer",
+    "group": "Management",
+    "source": "app/admin/goals-progress/beat-your-quote-flyer/page.tsx",
+    "href": "/admin/goals-progress/beat-your-quote-flyer"
+  },
+  {
+    "id": "page-admin-goals-progress",
+    "title": "Goals Progress",
+    "group": "Management",
+    "source": "app/admin/goals-progress/page.tsx",
+    "href": "/admin/goals-progress"
+  },
+  {
+    "id": "page-admin-orders",
+    "title": "Orders",
+    "group": "Management",
+    "source": "app/admin/orders/page.tsx",
+    "href": "/admin/orders"
+  },
+  {
+    "id": "page-admin-payments",
+    "title": "Payments",
+    "group": "Management",
+    "source": "app/admin/payments/page.tsx",
+    "href": "/admin/payments"
+  },
+  {
+    "id": "page-admin-quote-comparison",
+    "title": "Quote Comparison",
+    "group": "Management",
+    "source": "app/admin/quote-comparison/page.tsx",
+    "href": "/admin/quote-comparison"
+  },
+  {
+    "id": "page-admin-quotes",
+    "title": "Quotes",
+    "group": "Management",
+    "source": "app/admin/quotes/page.tsx",
+    "href": "/admin/quotes"
+  },
+  {
+    "id": "page-admin-settings",
+    "title": "Settings",
+    "group": "Management",
+    "source": "app/admin/settings/page.tsx",
+    "href": "/admin/settings"
+  },
+  {
+    "id": "page-admin-share-ads",
+    "title": "Share Ads",
+    "group": "Management",
+    "source": "app/admin/share-ads/page.tsx",
+    "href": "/admin/share-ads"
+  },
+  {
+    "id": "page-admin-supplier-approvals",
+    "title": "Supplier Approvals",
+    "group": "Management",
+    "source": "app/admin/supplier-approvals/page.tsx",
+    "href": "/admin/supplier-approvals"
+  },
+  {
+    "id": "page-admin-supplier-network",
+    "title": "Supplier Network",
+    "group": "Management",
+    "source": "app/admin/supplier-network/page.tsx",
+    "href": "/admin/supplier-network"
+  },
+  {
+    "id": "page-admin-supplier-quotes",
+    "title": "Supplier Quotes",
+    "group": "Management",
+    "source": "app/admin/supplier-quotes/page.tsx",
+    "href": "/admin/supplier-quotes"
+  },
+  {
+    "id": "page-admin-supplier-requests",
+    "title": "Supplier Requests",
+    "group": "Management",
+    "source": "app/admin/supplier-requests/page.tsx",
+    "href": "/admin/supplier-requests"
+  },
+  {
+    "id": "page-admin-traffic",
+    "title": "Traffic",
+    "group": "Management",
+    "source": "app/admin/traffic/page.tsx",
+    "href": "/admin/traffic"
+  },
+  {
+    "id": "page-admin-users",
+    "title": "Users",
+    "group": "Management",
+    "source": "app/admin/users/page.tsx",
+    "href": "/admin/users"
+  },
+  {
+    "id": "page-admin-vendors",
+    "title": "Vendors",
+    "group": "Management",
+    "source": "app/admin/vendors/page.tsx",
+    "href": "/admin/vendors"
+  },
+  {
+    "id": "page-admin-whatsapp-settings",
+    "title": "Manager Settings",
+    "group": "Management",
+    "source": "app/admin/whatsapp/settings/page.tsx",
+    "href": "/admin/whatsapp/settings"
+  },
+  {
+    "id": "page-affiliate-disclosure",
+    "title": "Affiliate Disclosure",
+    "group": "Customer",
+    "source": "app/affiliate-disclosure/page.tsx",
+    "href": "/affiliate-disclosure"
+  },
+  {
+    "id": "page-ai",
+    "title": "Ai",
+    "group": "Customer",
+    "source": "app/ai/page.tsx",
+    "href": "/ai"
+  },
+  {
+    "id": "page-beat-a-quote",
+    "title": "Beat A Quote",
+    "group": "Customer",
+    "source": "app/beat-a-quote/page.tsx",
+    "href": "/beat-a-quote"
+  },
+  {
+    "id": "page-dashboard",
+    "title": "Dashboard",
+    "group": "Customer",
+    "source": "app/dashboard/page.tsx",
+    "href": "/dashboard"
+  },
+  {
+    "id": "page-delivery-policy",
+    "title": "Delivery Policy",
+    "group": "Customer",
+    "source": "app/delivery-policy/page.tsx",
+    "href": "/delivery-policy"
+  },
+  {
+    "id": "page-how-it-works",
+    "title": "How It Works",
+    "group": "Customer",
+    "source": "app/how-it-works/page.tsx",
+    "href": "/how-it-works"
+  },
+  {
+    "id": "page-how-we-select-materials",
+    "title": "We Select Materials",
+    "group": "Customer",
+    "source": "app/how-we-select-materials/page.tsx",
+    "href": "/how-we-select-materials"
+  },
+  {
+    "id": "page-login",
+    "title": "Login",
+    "group": "Customer",
+    "source": "app/login/page.tsx",
+    "href": "/login"
+  },
+  {
+    "id": "page-materials",
+    "title": "Materials",
+    "group": "Customer",
+    "source": "app/materials/page.tsx",
+    "href": "/materials"
+  },
+  {
+    "id": "page-owner-ai-inbox",
+    "title": "Ai Inbox",
+    "group": "Owner",
+    "source": "app/owner/ai-inbox/page.tsx",
+    "href": "/owner/ai-inbox"
+  },
+  {
+    "id": "page-owner-aura-connect",
+    "title": "Connect",
+    "group": "Owner",
+    "source": "app/owner/aura/connect/page.tsx",
+    "href": "/owner/aura/connect"
+  },
+  {
+    "id": "page-owner-aura",
+    "title": "Aura",
+    "group": "Owner",
+    "source": "app/owner/aura/page.tsx",
+    "href": "/owner/aura"
+  },
+  {
+    "id": "page-owner-delivery-requests",
+    "title": "Delivery Requests",
+    "group": "Owner",
+    "source": "app/owner/delivery-requests/page.tsx",
+    "href": "/owner/delivery-requests"
+  },
+  {
+    "id": "page-owner-materials",
+    "title": "Owner Materials",
+    "group": "Owner",
+    "source": "app/owner/materials/page.tsx",
+    "href": "/owner/materials"
+  },
+  {
+    "id": "page-owner-materials-requests",
+    "title": "Requests",
+    "group": "Owner",
+    "source": "app/owner/materials/requests/page.tsx",
+    "href": "/owner/materials/requests"
+  },
+  {
+    "id": "page-owner-partnerships",
+    "title": "Partnerships",
+    "group": "Owner",
+    "source": "app/owner/partnerships/page.tsx",
+    "href": "/owner/partnerships"
+  },
+  {
+    "id": "homepage",
+    "title": "Homepage",
+    "group": "Customer",
+    "source": "app/page.tsx",
+    "href": "/"
+  },
+  {
+    "id": "page-privacy",
+    "title": "Privacy",
+    "group": "Customer",
+    "source": "app/privacy/page.tsx",
+    "href": "/privacy"
+  },
+  {
+    "id": "page-projects-new",
+    "title": "New",
+    "group": "Customer",
+    "source": "app/projects/new/page.tsx",
+    "href": "/projects/new"
+  },
+  {
+    "id": "page-projects",
+    "title": "Projects",
+    "group": "Customer",
+    "source": "app/projects/page.tsx",
+    "href": "/projects"
+  },
+  {
+    "id": "page-request-quote",
+    "title": "Request Quote",
+    "group": "Customer",
+    "source": "app/request-quote/page.tsx",
+    "href": "/request-quote"
+  },
+  {
+    "id": "page-reset-password",
+    "title": "Reset Password",
+    "group": "Customer",
+    "source": "app/reset-password/page.tsx",
+    "href": "/reset-password"
+  },
+  {
+    "id": "page-returns",
+    "title": "Returns",
+    "group": "Customer",
+    "source": "app/returns/page.tsx",
+    "href": "/returns"
+  },
+  {
+    "id": "page-shop-appliances",
+    "title": "Appliances",
+    "group": "Materials",
+    "source": "app/shop/appliances/page.tsx",
+    "href": "/shop/appliances"
+  },
+  {
+    "id": "page-shop-concrete-masonry",
+    "title": "Concrete Masonry",
+    "group": "Materials",
+    "source": "app/shop/concrete-masonry/page.tsx",
+    "href": "/shop/concrete-masonry"
+  },
+  {
+    "id": "page-shop-door-and-molding",
+    "title": "Door And Molding",
+    "group": "Materials",
+    "source": "app/shop/door-and-molding/page.tsx",
+    "href": "/shop/door-and-molding"
+  },
+  {
+    "id": "page-shop-eitan",
+    "title": "Eitan",
+    "group": "Materials",
+    "source": "app/shop/eitan/page.tsx",
+    "href": "/shop/eitan"
+  },
+  {
+    "id": "page-shop-electrical",
+    "title": "Electrical",
+    "group": "Materials",
+    "source": "app/shop/electrical/page.tsx",
+    "href": "/shop/electrical"
+  },
+  {
+    "id": "page-shop-exterior",
+    "title": "Exterior",
+    "group": "Materials",
+    "source": "app/shop/exterior/page.tsx",
+    "href": "/shop/exterior"
+  },
+  {
+    "id": "page-shop-framing",
+    "title": "Framing",
+    "group": "Materials",
+    "source": "app/shop/framing/page.tsx",
+    "href": "/shop/framing"
+  },
+  {
+    "id": "page-shop-kitchen",
+    "title": "Kitchen",
+    "group": "Materials",
+    "source": "app/shop/kitchen/page.tsx",
+    "href": "/shop/kitchen"
+  },
+  {
+    "id": "page-shop",
+    "title": "Shop",
+    "group": "Materials",
+    "source": "app/shop/page.tsx",
+    "href": "/shop"
+  },
+  {
+    "id": "page-shop-paper-work",
+    "title": "Paper Work",
+    "group": "Materials",
+    "source": "app/shop/paper-work/page.tsx",
+    "href": "/shop/paper-work"
+  },
+  {
+    "id": "page-shop-roofing",
+    "title": "Roofing",
+    "group": "Materials",
+    "source": "app/shop/roofing/page.tsx",
+    "href": "/shop/roofing"
+  },
+  {
+    "id": "page-shop-services",
+    "title": "Services",
+    "group": "Materials",
+    "source": "app/shop/services/page.tsx",
+    "href": "/shop/services"
+  },
+  {
+    "id": "page-shop-sheet-rock-drywall-calculator",
+    "title": "Drywall Calculator",
+    "group": "Materials",
+    "source": "app/shop/sheet-rock/drywall-calculator/page.tsx",
+    "href": "/shop/sheet-rock/drywall-calculator"
+  },
+  {
+    "id": "page-shop-sheet-rock",
+    "title": "Sheet Rock",
+    "group": "Materials",
+    "source": "app/shop/sheet-rock/page.tsx",
+    "href": "/shop/sheet-rock"
+  },
+  {
+    "id": "page-shop-siding",
+    "title": "Siding",
+    "group": "Materials",
+    "source": "app/shop/siding/page.tsx",
+    "href": "/shop/siding"
+  },
+  {
+    "id": "page-shop-tile-work",
+    "title": "Tile Work",
+    "group": "Materials",
+    "source": "app/shop/tile-work/page.tsx",
+    "href": "/shop/tile-work"
+  },
+  {
+    "id": "page-shop-tile-work-thinset-calculator",
+    "title": "Thinset Calculator",
+    "group": "Materials",
+    "source": "app/shop/tile-work/thinset-calculator/page.tsx",
+    "href": "/shop/tile-work/thinset-calculator"
+  },
+  {
+    "id": "page-shop-window",
+    "title": "Window",
+    "group": "Materials",
+    "source": "app/shop/window/page.tsx",
+    "href": "/shop/window"
+  },
+  {
+    "id": "page-shop-wood-floor-flooring-calculator",
+    "title": "Flooring Calculator",
+    "group": "Materials",
+    "source": "app/shop/wood-floor/flooring-calculator/page.tsx",
+    "href": "/shop/wood-floor/flooring-calculator"
+  },
+  {
+    "id": "page-shop-wood-floor",
+    "title": "Wood Floor",
+    "group": "Materials",
+    "source": "app/shop/wood-floor/page.tsx",
+    "href": "/shop/wood-floor"
+  },
+  {
+    "id": "page-signup",
+    "title": "Signup",
+    "group": "Customer",
+    "source": "app/signup/page.tsx",
+    "href": "/signup"
+  },
+  {
+    "id": "page-takeoff-review",
+    "title": "Takeoff Review",
+    "group": "Customer",
+    "source": "app/takeoff-review/page.tsx",
+    "href": "/takeoff-review"
+  },
+  {
+    "id": "page-terms",
+    "title": "Terms",
+    "group": "Customer",
+    "source": "app/terms/page.tsx",
+    "href": "/terms"
+  },
+  {
+    "id": "page-upload",
+    "title": "Upload",
+    "group": "Customer",
+    "source": "app/upload/page.tsx",
+    "href": "/upload"
+  },
+  {
+    "id": "feature-client-quote-import",
+    "title": "Quote Import",
+    "group": "Operations",
+    "source": "lib/client-quote-import.ts",
+    "href": null
+  },
+  {
+    "id": "feature-client-quote-pdf",
+    "title": "Quote PDF",
+    "group": "Operations",
+    "source": "lib/client-quote-pdf.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-client-quote-pdf",
+    "title": "Request PDF",
+    "group": "Operations",
+    "source": "lib/request-client-quote-pdf.ts",
+    "href": null
+  },
+  {
+    "id": "feature-customer-request-confirmation",
+    "title": "Customer Confirmation",
+    "group": "Operations",
+    "source": "lib/customer-request-confirmation.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-extraction",
+    "title": "Quote Extraction",
+    "group": "Operations",
+    "source": "lib/supplier-quote-extraction.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-document-intelligence",
+    "title": "Document Intelligence",
+    "group": "Operations",
+    "source": "lib/manager-document-intelligence.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-discovery",
+    "title": "Supplier Discovery",
+    "group": "Operations",
+    "source": "lib/supplier-discovery.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-document-validation",
+    "title": "File Validation",
+    "group": "Operations",
+    "source": "lib/manager-document-validation.ts",
+    "href": null
+  },
+  {
+    "id": "feature-payment-link",
+    "title": "Payment Links",
+    "group": "Operations",
+    "source": "lib/payment-link.ts",
+    "href": null
+  },
+  {
+    "id": "feature-delivery-address",
+    "title": "Address Validation",
+    "group": "Operations",
+    "source": "lib/delivery-address.ts",
+    "href": null
+  },
+  {
+    "id": "feature-delivery-pricing",
+    "title": "Delivery Pricing",
+    "group": "Operations",
+    "source": "lib/delivery-pricing.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-routing",
+    "title": "Line Routing",
+    "group": "Operations",
+    "source": "lib/supplier-quote-routing.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-client-payment",
+    "title": "Payment Evidence",
+    "group": "Operations",
+    "source": "lib/request-client-payment.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-supplier-folder",
+    "title": "Supplier Folders",
+    "group": "Operations",
+    "source": "lib/request-supplier-folder.ts",
+    "href": null
+  },
+  {
+    "id": "feature-customer-material-request-pdf",
+    "title": "Material List PDF",
+    "group": "Operations",
+    "source": "lib/customer-material-request-pdf.ts",
+    "href": null
+  },
+  {
+    "id": "feature-delivery-status-update",
+    "title": "Delivery Status",
+    "group": "Operations",
+    "source": "lib/delivery-status-update.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-client-document-data",
+    "title": "Document Data",
+    "group": "Operations",
+    "source": "lib/request-client-document-data.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-worktable-matching",
+    "title": "Similar Items",
+    "group": "Operations",
+    "source": "lib/request-worktable-matching.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-client-document-acceptance",
+    "title": "Document Acceptance",
+    "group": "Operations",
+    "source": "lib/request-client-document-acceptance.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-material-chart",
+    "title": "Material Chart",
+    "group": "Operations",
+    "source": "lib/request-material-chart.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-document-catalog",
+    "title": "Document Catalog",
+    "group": "Operations",
+    "source": "lib/manager-document-catalog.ts",
+    "href": null
+  },
+  {
+    "id": "feature-auth-phone",
+    "title": "Phone Login",
+    "group": "Operations",
+    "source": "lib/auth-phone.ts",
+    "href": null
+  },
+  {
+    "id": "feature-owner-materials-quote",
+    "title": "Material Quotes",
+    "group": "Operations",
+    "source": "lib/owner-materials-quote.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-supplier-comparison",
+    "title": "Supplier Comparison",
+    "group": "Operations",
+    "source": "lib/request-supplier-comparison.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-pricing",
+    "title": "Quote Arithmetic",
+    "group": "Operations",
+    "source": "lib/supplier-quote-pricing.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-workflow-state",
+    "title": "Workflow State",
+    "group": "Operations",
+    "source": "lib/request-workflow-state.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-directory-search",
+    "title": "Supplier Search",
+    "group": "Operations",
+    "source": "lib/supplier-directory-search.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-canonical",
+    "title": "Supplier Deduplication",
+    "group": "Operations",
+    "source": "lib/supplier-canonical.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-workflow-substeps",
+    "title": "Workflow Substeps",
+    "group": "Operations",
+    "source": "lib/request-workflow-substeps.ts",
+    "href": null
+  },
+  {
+    "id": "feature-material-request-organization",
+    "title": "List Organization",
+    "group": "Operations",
+    "source": "lib/material-request-organization.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-identity",
+    "title": "Supplier Identity",
+    "group": "Operations",
+    "source": "lib/supplier-identity.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-department-essentials",
+    "title": "Department Essentials",
+    "group": "Operations",
+    "source": "lib/request-department-essentials.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-supplier",
+    "title": "Source Attribution",
+    "group": "Operations",
+    "source": "lib/supplier-quote-supplier.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-directory-persistence",
+    "title": "Supplier Persistence",
+    "group": "Operations",
+    "source": "lib/supplier-directory-persistence.ts",
+    "href": null
+  },
+  {
+    "id": "feature-browser-document-extraction",
+    "title": "Browser Extraction",
+    "group": "Operations",
+    "source": "lib/browser-document-extraction.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-parser",
+    "title": "Quote Parsing",
+    "group": "Operations",
+    "source": "lib/supplier-quote-parser.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-item-fields",
+    "title": "Item Details",
+    "group": "Operations",
+    "source": "lib/request-item-fields.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-quote-ai",
+    "title": "Quote Review",
+    "group": "Operations",
+    "source": "lib/supplier-quote-ai.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-client-document-version",
+    "title": "Document Versions",
+    "group": "Operations",
+    "source": "lib/request-client-document-version.ts",
+    "href": null
+  },
+  {
+    "id": "feature-customer-request-portal",
+    "title": "Customer Portal",
+    "group": "Operations",
+    "source": "lib/customer-request-portal.ts",
+    "href": null
+  },
+  {
+    "id": "feature-request-attachment-upload",
+    "title": "Private Uploads",
+    "group": "Operations",
+    "source": "lib/request-attachment-upload.ts",
+    "href": null
+  },
+  {
+    "id": "feature-email-delivery-fallback",
+    "title": "Email Fallback",
+    "group": "Operations",
+    "source": "lib/email-delivery-fallback.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-follow-up-policy",
+    "title": "Follow-up Policy",
+    "group": "Operations",
+    "source": "lib/supplier-follow-up-policy.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-program-channels",
+    "title": "Supplier Channels",
+    "group": "Operations",
+    "source": "lib/supplier-program-channels.ts",
+    "href": null
+  },
+  {
+    "id": "feature-owner-identity",
+    "title": "Owner Permissions",
+    "group": "Operations",
+    "source": "lib/owner-identity.ts",
+    "href": null
+  },
+  {
+    "id": "feature-site-date-time",
+    "title": "New York Time",
+    "group": "Operations",
+    "source": "lib/site-date-time.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-push-notifications",
+    "title": "Manager Alerts",
+    "group": "Operations",
+    "source": "lib/manager-push-notifications.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-notification-store",
+    "title": "Notification History",
+    "group": "Operations",
+    "source": "lib/manager-notification-store.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-catalog",
+    "title": "Product Catalog",
+    "group": "Operations",
+    "source": "lib/shop-catalog.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-i18n",
+    "title": "Spanish Translation",
+    "group": "Operations",
+    "source": "lib/shop-i18n.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-navigation",
+    "title": "Shop Navigation",
+    "group": "Operations",
+    "source": "lib/shop-navigation.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-qualification",
+    "title": "Item Specifications",
+    "group": "Operations",
+    "source": "lib/shop-qualification.ts",
+    "href": null
+  },
+  {
+    "id": "feature-material-questionnaires",
+    "title": "Material Questions",
+    "group": "Operations",
+    "source": "lib/material-questionnaires.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-activity-server",
+    "title": "Recent Materials",
+    "group": "Operations",
+    "source": "lib/shop-activity-server.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-partners-catalog",
+    "title": "Partner Catalog",
+    "group": "Operations",
+    "source": "lib/supplier-partners/catalog.ts",
+    "href": null
+  },
+  {
+    "id": "feature-supplier-partners-store",
+    "title": "Partner Storage",
+    "group": "Operations",
+    "source": "lib/supplier-partners/store.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-communication-navigation",
+    "title": "Conversation Navigation",
+    "group": "Operations",
+    "source": "lib/aura/communication-navigation.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-communication-history-cursor",
+    "title": "History Pagination",
+    "group": "Operations",
+    "source": "lib/aura/communication-history-cursor.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-inbound-supplier-quote",
+    "title": "Inbound Quotes",
+    "group": "Operations",
+    "source": "lib/aura/inbound-supplier-quote.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-material-request-detection",
+    "title": "Request Detection",
+    "group": "Operations",
+    "source": "lib/aura/material-request-detection.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-communication-next-action",
+    "title": "Communication Actions",
+    "group": "Operations",
+    "source": "lib/aura/communication-next-action.ts",
+    "href": null
+  },
+  {
+    "id": "feature-aura-communication-history",
+    "title": "Conversation History",
+    "group": "Operations",
+    "source": "lib/aura/communication-history.ts",
+    "href": null
+  },
+  {
+    "id": "feature-analytics-private-performance",
+    "title": "Private Performance",
+    "group": "Operations",
+    "source": "lib/analytics/private-performance.ts",
+    "href": null
+  },
+  {
+    "id": "feature-analytics-route-context",
+    "title": "Analytics Privacy",
+    "group": "Operations",
+    "source": "lib/analytics/route-context.ts",
+    "href": null
+  },
+  {
+    "id": "feature-monitoring-sentry-privacy",
+    "title": "Error Redaction",
+    "group": "Operations",
+    "source": "lib/monitoring/sentry-privacy.ts",
+    "href": null
+  },
+  {
+    "id": "feature-monitoring-sentry-config",
+    "title": "Error Monitoring",
+    "group": "Operations",
+    "source": "lib/monitoring/sentry-config.ts",
+    "href": null
+  },
+  {
+    "id": "feature-ai-sms-training-privacy",
+    "title": "Training Privacy",
+    "group": "Operations",
+    "source": "lib/ai/sms-training-privacy.ts",
+    "href": null
+  },
+  {
+    "id": "feature-manager-dashboard",
+    "title": "Request Pipeline",
+    "group": "Operations",
+    "source": "lib/manager-dashboard.ts",
+    "href": null
+  },
+  {
+    "id": "feature-daily-work-summary",
+    "title": "Daily Wins",
+    "group": "Operations",
+    "source": "lib/daily-work-summary.ts",
+    "href": null
+  },
+  {
+    "id": "feature-department-essentials",
+    "title": "Common Materials",
+    "group": "Operations",
+    "source": "lib/department-essentials.ts",
+    "href": null
+  },
+  {
+    "id": "feature-shop-search",
+    "title": "Catalog Search",
+    "group": "Operations",
+    "source": "lib/shop-search.ts",
+    "href": null
+  }
+]

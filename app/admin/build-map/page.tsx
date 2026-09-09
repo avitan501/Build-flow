@@ -1,3 +1,4 @@
+import { BusinessBlueprint } from "@/components/buildflow/business-blueprint";
 import {
   ArrowRight,
   BadgeDollarSign,
@@ -153,13 +154,20 @@ function formatUpdated(value: string) {
 export default async function AdminDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ stage?: string; section?: string }>;
+  searchParams: Promise<{ stage?: string; section?: string; view?: string }>;
 }) {
-  const { stage = "", section = "" } = await searchParams;
+  const { stage = "", section = "", view = "" } = await searchParams;
   const selectedStage = pipelineStages.some((item) => item.id === stage)
     ? (stage as ManagerPipelineStage)
     : null;
   const { supabase, access } = await requireManagerPortalProfile();
+  if (view === "blueprint" && access.owner) {
+    const { data, error } = await supabase.from("website_work_items")
+      .select("task_key,progress_percent,summary").like("task_key", "blueprint-%").eq("published_to_carlos", false);
+    if (error) throw new Error("Business Blueprint notes could not load.");
+    return <BusinessBlueprint savedRows={data ?? []} />;
+  }
+
   let goalsQuery = supabase
     .from("manager_goals")
     .select("id,assignee,title,details,status,is_focus,created_at,updated_at")
@@ -398,7 +406,7 @@ export default async function AdminDashboardPage({
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
       <div className="mx-auto max-w-7xl">
         <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-slate-200 pb-3">
-          <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
+          <div><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>{access.owner ? <Link href="/admin/build-map?view=blueprint" className="inline-flex min-h-11 items-center text-xs font-semibold text-[#0066cc]">Business Blueprint</Link> : null}</div>
           {access.owner ? <Link href="/admin/carlos-activity" title="Open Carlos activity history"><EmployeeClockStatus
               compact
               checkInAt={todaySummary?.checkInAt ?? null}

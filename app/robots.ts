@@ -9,6 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/account/",
+        "/ai/renovation-estimator",
         "/admin/",
         "/api/",
         "/cart",
@@ -22,6 +23,7 @@ export default function robots(): MetadataRoute.Robots {
         "/projects/",
         "/quotes",
         "/reset-password",
+        "/requests",
         "/search",
         "/signup",
         "/takeoff-review",
