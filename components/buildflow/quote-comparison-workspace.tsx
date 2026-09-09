@@ -129,6 +129,7 @@ export function QuoteComparisonWorkspace({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : comparison.awarded_bid_id ? 4 : 2);
   const [showItemForm, setShowItemForm] = useState(items.length === 0);
   const [showSupplierForm, setShowSupplierForm] = useState(bids.length === 0);
   const [selectedBidId, setSelectedBidId] = useState(comparison.awarded_bid_id || "");
@@ -218,11 +219,23 @@ export function QuoteComparisonWorkspace({
     return [bid.id, { clientTotal, supplierTotal, profit, marginPercent: clientTotal > 0 ? (profit / clientTotal) * 100 : 0, comparableRows }];
   })), [liveBids, liveItems]);
   const unfinishedOptions = analyses.filter((analysis) => !analysis.eligible && !analysis.blocked).length;
-  const hasMissingValues = !clientReady.complete || unfinishedOptions > 0 || (!mixedAnalysis.complete && bids.length > 1);
+  const hasMissingSupplierValues = unfinishedOptions > 0 || (!mixedAnalysis.complete && bids.length > 1);
   const locked = !previewMode && (comparison.status === "awarded" || comparison.status === "archived");
   const canManageStructure = !previewMode && !locked;
   const canManageRequestItems = canManageStructure && !comparison.request_id;
   const selectedBid = liveBids.find((bid) => bid.id === selectedBidId) ?? null;
+  const pricedSupplierLines = liveBids.reduce((total, bid) => total + (bid.quote_comparison_prices ?? []).filter((price) => price.is_available && price.unit_price !== null && Number.isFinite(price.unit_price)).length, 0);
+  const totalSupplierLines = items.length * bids.length;
+
+  function routeReady(optionId: string) {
+    if (optionId === "mixed") return mixedAnalysis.complete;
+    return analyses.some((analysis) => analysis.bidId === optionId && analysis.eligible);
+  }
+
+  function routeMissing(optionId: string) {
+    if (optionId === "mixed") return mixedAnalysis.missingFields;
+    return analyses.find((analysis) => analysis.bidId === optionId)?.missingFields ?? ["supplier prices"];
+  }
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, successMessage: string, after?: () => void) {
     setError("");
@@ -326,13 +339,14 @@ export function QuoteComparisonWorkspace({
 
   function awardBid(bidId: string, supplierName: string) {
     const option = buyingOptions.find((entry) => entry.id === bidId);
-    if (!option?.selectable) {
+    if (!option || !routeReady(bidId)) {
       setError(`Finish missing values before selecting ${supplierName}.`);
       window.requestAnimationFrame(() => document.getElementById("quote-inputs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
       return;
     }
     if (!window.confirm(`Select ${supplierName} as the supplier for this comparison?`)) return;
     const showClientQuote = () => window.requestAnimationFrame(() => {
+      setActiveStep(4);
       document.getElementById("client-quote-builder")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     if (previewMode) {
@@ -395,30 +409,38 @@ export function QuoteComparisonWorkspace({
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] pb-24 text-slate-950">
-      <div className="border-b border-slate-200 bg-white px-4 py-5 sm:px-8 lg:px-10">
+      <div className="border-b border-slate-200 bg-white px-3 py-3 sm:px-8 sm:py-5 lg:px-10">
         <div className="mx-auto max-w-[96rem]">
-          {previewMode ? <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Public design preview</span> : <Link href="/admin/quote-comparison" className="inline-flex items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> All comparisons</Link>}
-          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
-              <AvantiaBuildLockup compact className="shrink-0" />
+          {previewMode ? <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Preview</span> : <Link href="/admin/quote-comparison" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Comparisons</Link>}
+          <div className="mt-2 flex items-end justify-between gap-3 sm:mt-4">
+            <div className="flex min-w-0 items-center gap-4">
+              <AvantiaBuildLockup compact className="hidden shrink-0 sm:flex" />
               <div className="min-w-0 border-slate-200 sm:border-l sm:pl-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{comparison.title}</h1>
-                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${statusTone(comparison.status)}`}>{quoteComparisonStatusLabel(comparison.status)}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate text-lg font-bold tracking-tight sm:text-3xl">{comparison.title}</h1>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em] sm:px-2.5 sm:py-1 sm:text-[10px] ${statusTone(comparison.status)}`}>{quoteComparisonStatusLabel(comparison.status)}</span>
               </div>
-              <p className="mt-2 text-sm text-slate-600">{comparison.job_address || "No delivery address"} · {comparison.department || "General materials"}</p>
+              <p className="mt-1 truncate text-[10px] text-slate-500 sm:mt-2 sm:text-sm">{comparison.job_address || "No delivery address"} · {comparison.department || "General materials"}</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {canManageStructure ? <button type="button" onClick={() => setShowDetails((value) => !value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800">Edit details</button> : null}
-              {locked && !previewMode ? <button type="button" onClick={() => run(() => reopenQuoteComparisonAction(comparison.id), "Comparison reopened.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><RotateCcw className="h-4 w-4" /> Reopen</button> : null}
-              {!previewMode && comparison.status !== "archived" ? <button type="button" onClick={() => run(() => archiveQuoteComparisonAction(comparison.id), "Comparison archived.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><Archive className="h-4 w-4" /> Archive</button> : null}
-            </div>
+            {!previewMode ? <details className="group relative shrink-0"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold">Tools <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary><div className="absolute right-0 top-11 z-30 grid min-w-40 gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+              {canManageStructure ? <button type="button" onClick={() => setShowDetails((value) => !value)} className="min-h-10 rounded-lg px-3 text-left text-xs font-bold hover:bg-slate-50">Edit details</button> : null}
+              {locked ? <button type="button" onClick={() => run(() => reopenQuoteComparisonAction(comparison.id), "Comparison reopened.")} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-bold hover:bg-slate-50"><RotateCcw className="h-4 w-4" /> Reopen</button> : null}
+              {comparison.status !== "archived" ? <button type="button" onClick={() => run(() => archiveQuoteComparisonAction(comparison.id), "Comparison archived.")} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-bold hover:bg-slate-50"><Archive className="h-4 w-4" /> Archive</button> : null}
+            </div></details> : null}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[96rem] px-4 py-5 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-[96rem] px-2.5 py-3 sm:px-8 sm:py-5 lg:px-10">
+        <nav className="sticky top-2 z-20 mb-4 grid grid-cols-4 overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur" aria-label="Quote comparison steps">
+          {([
+            { step: 1 as const, label: "Materials", meta: `${items.length}` },
+            { step: 2 as const, label: "Quotes", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
+            { step: 3 as const, label: "Route", meta: selectedBidId ? "✓" : "" },
+            { step: 4 as const, label: "Client", meta: selectedBidId ? "Ready" : "Locked" },
+          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !selectedBidId} className={`min-h-11 min-w-0 rounded-lg px-1.5 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block truncate text-[10px] font-black uppercase tracking-[.06em] sm:text-xs">{entry.step}. {entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
+        </nav>
         {showDetails ? (
           <section className="mb-5 border border-slate-200 bg-white p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -436,7 +458,7 @@ export function QuoteComparisonWorkspace({
         {previewMode ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 
-        <section className="mt-5 border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
+        {activeStep === 1 ? <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div><h2 id="materials-heading" className="text-lg font-bold">Material list</h2><p className="mt-1 text-xs text-slate-500">Every supplier is compared against the same quantities.</p></div>
             {canManageRequestItems ? <button type="button" onClick={() => setShowItemForm((value) => !value)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><PackagePlus className="h-4 w-4" /> Add material</button> : comparison.request_id ? <span className="text-xs font-semibold text-slate-500">Locked to client request</span> : null}
@@ -451,18 +473,21 @@ export function QuoteComparisonWorkspace({
             </div>
           ) : null}
           {items.length ? <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-3 sm:px-6"><div><p className="text-sm font-bold">{item.description}</p>{item.specification ? <p className="mt-0.5 text-xs text-slate-500">{item.specification}</p> : null}<p className="mt-1 text-xs font-semibold text-[#0071e3]">{item.quantity.toLocaleString()} {item.unit}</p></div>{canManageRequestItems ? <button type="button" onClick={() => window.confirm(`Remove ${item.description}?`) && run(() => deleteQuoteComparisonItemAction({ comparisonId: comparison.id, itemId: item.id }), "Material removed.")} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label={`Remove ${item.description}`}><Trash2 className="h-4 w-4" /></button> : null}</div>)}</div> : <p className="px-5 py-8 text-center text-sm text-slate-500">Add at least one material to begin comparing prices.</p>}
-        </section>
+          <div className="border-t border-slate-200 p-3 text-right"><button type="button" onClick={() => setActiveStep(2)} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Continue to quotes</button></div>
+        </section> : null}
 
-        <section id="quote-inputs" className="mt-5 scroll-mt-4 border border-slate-200 bg-white shadow-sm" aria-labelledby="quotes-heading">
+        {activeStep === 2 ? <section id="quote-inputs" className="mt-4 scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="quotes-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div><h2 id="quotes-heading" className="text-lg font-bold">Client target and supplier prices</h2><p className="mt-1 text-xs text-slate-500">Unit prices are per listed unit. Delivery, tax, and totals are for the whole order.</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">Step 2</p><h2 id="quotes-heading" className="mt-0.5 text-lg font-bold">Supplier prices</h2><p className="mt-1 text-xs text-slate-500">Enter each supplier’s price, delivery, tax, and lead time.</p></div>
             {!locked ? <div className="flex flex-wrap gap-2">
               {canManageStructure ? <button type="button" onClick={() => setShowSupplierForm((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><Store className="h-4 w-4" /> Add supplier</button> : null}
               <button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save entered prices</button>
             </div> : null}
           </div>
 
-          {comparison.request_id ? <div className="border-b border-amber-200 bg-amber-50/70 px-5 py-4 sm:px-6">
+          {comparison.request_id ? <details className="group border-b border-amber-200 bg-amber-50/70">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-xs font-bold text-amber-950 sm:px-6"><span>Client price reference</span><span className="text-[10px] text-amber-700"><span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></span></summary>
+            <div className="border-t border-amber-200 px-4 py-3 sm:px-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black uppercase tracking-[0.08em] text-amber-900">Client quote for this request</p>
@@ -478,12 +503,13 @@ export function QuoteComparisonWorkspace({
                 <button type="button" onClick={pullClientQuotePrices} disabled={pending || locked || !selectedClientQuoteSourceId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-950 px-4 text-sm font-bold text-white disabled:opacity-40"><FileInput className="h-4 w-4" /> Pull client prices</button>
               </> : <p className="rounded-lg border border-dashed border-amber-300 bg-white px-4 py-3 text-xs font-bold text-amber-900">No client quote is attached yet. Add it under Documents &amp; photos in Step 1, then return here.</p>}
             </div>
-          </div> : null}
+            </div>
+          </details> : null}
 
           {showSupplierForm && canManageStructure ? <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:px-6"><label className="grid flex-1 gap-1 text-xs font-bold text-slate-600">Supplier<select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Choose from Supplier Directory</option>{availableSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name} · {trustLabel(supplier.trustLevel || "not-reviewed")}</option>)}</select></label><button type="button" onClick={addSupplier} disabled={pending || !supplierId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4" /> Add supplier</button></div> : null}
 
           {bids.length > 0 && items.length > 0 ? (
-            <div className="overflow-x-auto">
+            <><div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[860px] border-collapse text-left">
                 <thead><tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 z-10 min-w-64 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{comparison.request_id ? "Client request" : "Material"}</th><th className="min-w-48 border-l border-amber-200 bg-amber-50 px-4 py-3 align-top text-xs font-bold text-amber-950">Client Ready to Pay<span className="mt-1 block text-[10px] font-medium text-amber-800">Client unit price</span></th>{bids.map((bid) => <th key={bid.id} className="min-w-56 border-l border-slate-200 px-4 py-3 align-top"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold normal-case tracking-normal text-slate-950">{bid.supplier_name_snapshot}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Supplier unit price · {trustLabel(bid.trust_level_snapshot)}</p></div>{canManageStructure ? <button type="button" onClick={() => window.confirm(`Remove ${bid.supplier_name_snapshot} from this comparison?`) && run(() => removeQuoteComparisonSupplierAction({ comparisonId: comparison.id, bidId: bid.id }), "Supplier removed.")} className="text-slate-400 hover:text-rose-600" aria-label={`Remove ${bid.supplier_name_snapshot}`}><X className="h-4 w-4" /></button> : null}</div></th>)}</tr></thead>
                 <tbody>
@@ -511,33 +537,50 @@ export function QuoteComparisonWorkspace({
                 </tbody>
               </table>
             </div>
+            <div className="divide-y divide-slate-200 md:hidden">{liveBids.map((bid, bidIndex) => {
+              const prices = bid.quote_comparison_prices ?? [];
+              const pricedCount = prices.filter((price) => price.is_available && price.unit_price !== null).length;
+              return <details key={bid.id} open={bidIndex === 0} className="group bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2"><span className="min-w-0"><span className="block truncate text-sm font-bold">{bid.supplier_name_snapshot}</span><span className="mt-0.5 block text-[10px] font-semibold text-slate-500">{pricedCount}/{items.length} priced · {bid.lead_time_days === null ? "Lead time missing" : `${bid.lead_time_days} days`}</span></span><span className="shrink-0 text-[10px] font-bold text-[#0066cc]"><span className="group-open:hidden">Open</span><span className="hidden group-open:inline">Close</span></span></summary><div className="border-t border-slate-100 bg-slate-50 p-2">
+                <div className="grid gap-2">{items.map((item) => {
+                  const key = `${bid.id}:${item.id}`;
+                  const price = priceDrafts[key] ?? { unitPrice: "", isAvailable: true, notes: "" };
+                  const lowest = lowestPrices.get(item.id);
+                  const isLowest = Boolean(price.isAvailable && price.unitPrice !== "" && lowest?.bidId === bid.id);
+                  const matchStatus = quoteLineMatchStatus(item, price.notes);
+                  return <div key={item.id} className={`rounded-lg border p-2.5 ${isLowest ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white"}`}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-bold">{item.description}</p><p className="mt-0.5 text-[10px] text-slate-500">{item.quantity.toLocaleString()} {item.unit}</p></div>{isLowest ? <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-800">Lowest</span> : null}</div><div className="mt-2 flex items-center gap-2"><div className="relative min-w-0 flex-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="Supplier price" aria-label={`${bid.supplier_name_snapshot} mobile price for ${item.description}`} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-2 text-right text-sm font-bold disabled:bg-slate-100" /></div><label className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} />No stock</label></div>{!locked && ["possible", "review"].includes(matchStatus) ? <button type="button" onClick={() => confirmMatch(key, bid.id, item.id)} disabled={pending} className="mt-2 text-[10px] font-bold text-[#0066cc] underline underline-offset-2">Confirm item match</button> : null}</div>;
+                })}</div>
+                <div className="mt-2 grid grid-cols-3 gap-2"><label className="grid gap-1 text-[9px] font-bold uppercase text-slate-500">Delivery<input aria-label={`${bid.supplier_name_snapshot} mobile delivery charge`} type="number" min="0" step="0.01" value={bidDrafts[bid.id]?.deliveryCharge ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], deliveryCharge: event.target.value } }))} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-right text-xs font-bold" /></label><label className="grid gap-1 text-[9px] font-bold uppercase text-slate-500">Tax %<input aria-label={`${bid.supplier_name_snapshot} mobile tax`} type="number" min="0" max="100" step="0.001" value={bidDrafts[bid.id]?.taxPercent ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], taxPercent: event.target.value } }))} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-right text-xs font-bold" /></label><label className="grid gap-1 text-[9px] font-bold uppercase text-slate-500">Days<input aria-label={`${bid.supplier_name_snapshot} mobile lead time`} type="number" min="0" step="1" value={bidDrafts[bid.id]?.leadTimeDays ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], leadTimeDays: event.target.value } }))} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-right text-xs font-bold" /></label></div>
+                {canManageStructure ? <button type="button" onClick={() => window.confirm(`Remove ${bid.supplier_name_snapshot} from this comparison?`) && run(() => removeQuoteComparisonSupplierAction({ comparisonId: comparison.id, bidId: bid.id }), "Supplier removed.")} className="mt-3 text-[10px] font-bold text-rose-700">Remove supplier</button> : null}
+              </div></details>;
+            })}</div></>
           ) : <div className="px-5 py-10 text-center text-sm text-slate-500">{items.length === 0 ? "Add materials before entering supplier prices." : "Add at least one supplier from the directory."}</div>}
-        </section>
+          <div className="flex gap-2 border-t border-slate-200 p-3"><button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold disabled:opacity-40">Save prices</button><button type="button" onClick={() => setActiveStep(3)} disabled={!bids.length} className="min-h-11 flex-1 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Compare routes</button></div>
+        </section> : null}
 
-        <section className="mt-5" aria-labelledby="analysis-heading">
+        {activeStep === 3 ? <section className="mt-4" aria-labelledby="analysis-heading">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">One client amount, every option</p><h2 id="analysis-heading" className="mt-1 text-2xl font-bold">Buying option comparison</h2><p className="mt-1 text-xs leading-5 text-slate-500">Estimated gross profit is the client pre-tax amount minus the supplier total. It does not include overhead.</p></div>
-            {hasMissingValues && !locked ? <button type="button" onClick={() => document.getElementById("quote-inputs")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="min-h-10 shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-900">Finish missing values</button> : null}
+            <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Step 3 · Purchase decision</p><h2 id="analysis-heading" className="mt-1 text-2xl font-bold">Choose the route</h2><p className="mt-1 text-xs leading-5 text-slate-500">Compare landed supplier cost, coverage, delivery, tax, and lead time before preparing client pricing.</p></div>
+            {hasMissingSupplierValues && !locked ? <button type="button" onClick={() => setActiveStep(2)} className="min-h-10 shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-900">Finish supplier prices</button> : null}
           </div>
 
-          <div className={`mt-4 border p-4 shadow-sm ${clientReady.complete ? "border-amber-300 bg-amber-50" : "border-amber-300 bg-white"}`}>
+          {clientReady.complete ? <div className="mt-4 border border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-amber-950">Client Ready to Pay</h3><p className="mt-1 text-xs text-amber-800">Same final whole-order amount for every complete buying option.</p></div><p className="text-2xl font-bold tabular-nums text-amber-950">{clientReady.complete ? formatComparisonMoney(clientReady.finalTotal) : "Incomplete"}</p></div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><div><dt className="text-amber-800">Material · whole order</dt><dd className="mt-1 font-bold tabular-nums">{formatComparisonMoney(clientReady.materialSubtotal)}</dd></div><div><dt className="text-amber-800">Delivery · whole order</dt><dd className="mt-1 font-bold tabular-nums">{formatComparisonMoney(clientReady.deliveryCharge)}</dd></div><div><dt className="text-amber-800">Tax · whole order</dt><dd className="mt-1 font-bold tabular-nums">{formatComparisonMoney(clientReady.taxAmount)} ({clientReady.taxPercent.toFixed(3).replace(/\.?0+$/, "")}%)</dd></div><div><dt className="text-amber-800">Lead time</dt><dd className="mt-1 font-bold">Derived per option below</dd></div></dl>
             {!clientReady.complete ? <p className="mt-3 text-xs font-bold text-amber-900">Missing: {clientReady.missingFields.join(", ")}.</p> : null}
-          </div>
+          </div> : null}
 
           {buyingOptions.length > 0 ? <>
             <div className="mt-4 hidden overflow-hidden border border-slate-200 bg-white shadow-sm md:block">
               <table className="w-full border-collapse text-left text-sm">
                 <thead><tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500"><th className="px-4 py-3">Option / Supplier</th><th className="px-3 py-3 text-right">Supplier total</th><th className="px-3 py-3 text-right">Client total</th><th className="px-3 py-3 text-right">Estimated gross profit</th><th className="px-3 py-3 text-right">Margin</th><th className="px-3 py-3 text-right">Lead time</th><th className="px-4 py-3 text-right">Select</th></tr></thead>
-                <tbody>{buyingOptions.map((option) => <tr key={option.id} className={`border-b border-slate-100 last:border-b-0 ${option.isLowestCost ? "bg-emerald-50/60" : ""}`}><td className="px-4 py-3 align-top"><p className="font-bold">{option.label} {option.isLowestCost ? <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-800">Lowest complete cost</span> : null}</p><p className={`mt-1 text-xs font-semibold ${option.complete ? "text-emerald-700" : "text-amber-700"}`}>{option.complete ? option.kind === "mixed" ? option.supplierNames.join(" + ") : "Complete" : `Missing: ${option.missingFields.join(", ") || "required values"}`}</p><details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer font-bold text-[#0066cc]">Details</summary><div className="mt-2 grid gap-1"><span>Supplier material: {formatComparisonMoney(option.supplierMaterialSubtotal)}</span><span>Supplier delivery: {formatComparisonMoney(option.supplierDeliveryCharge)}</span><span>Supplier tax: {formatComparisonMoney(option.supplierTaxAmount)}</span><span>Client material: {formatComparisonMoney(option.clientMaterialSubtotal)}</span><span>Client delivery: {formatComparisonMoney(option.clientDeliveryCharge)}</span><span>Client tax: {formatComparisonMoney(option.clientTaxAmount)}</span></div></details></td><td className="px-3 py-3 text-right align-top font-bold tabular-nums">{option.complete ? formatComparisonMoney(option.supplierTotal) : "—"}</td><td className="px-3 py-3 text-right align-top font-bold tabular-nums">{clientReady.complete ? formatComparisonMoney(option.clientTotal) : "—"}</td><td className={`px-3 py-3 text-right align-top font-bold tabular-nums ${option.estimatedGrossProfit < 0 ? "text-rose-700" : "text-emerald-700"}`}>{option.complete ? formatComparisonMoney(option.estimatedGrossProfit) : "—"}</td><td className={`px-3 py-3 text-right align-top font-bold tabular-nums ${option.grossMarginPercent < 0 ? "text-rose-700" : ""}`}>{option.complete ? `${option.grossMarginPercent.toFixed(1)}%` : "—"}</td><td className="px-3 py-3 text-right align-top font-semibold">{option.leadTimeDays === null ? "Missing" : `${option.leadTimeDays} day${option.leadTimeDays === 1 ? "" : "s"}`}</td><td className="px-4 py-3 text-right align-top">{option.kind === "mixed" ? <span className="text-xs font-semibold text-slate-500" title="The current record supports one awarded supplier.">Review only</span> : selectedBidId === option.id ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><Check className="h-4 w-4" /> Selected</span> : !locked ? <button type="button" onClick={() => awardBid(option.id, option.label)} disabled={pending || !option.selectable} className="min-h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500">Select</button> : null}</td></tr>)}</tbody>
+                <tbody>{buyingOptions.map((option) => { const ready = routeReady(option.id); const missing = routeMissing(option.id); return <tr key={option.id} className={`border-b border-slate-100 last:border-b-0 ${option.isLowestCost ? "bg-emerald-50/60" : ""}`}><td className="px-4 py-3 align-top"><p className="font-bold">{option.label} {option.isLowestCost ? <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-800">Lowest complete cost</span> : null}</p><p className={`mt-1 text-xs font-semibold ${ready ? "text-emerald-700" : "text-amber-700"}`}>{ready ? option.kind === "mixed" ? option.supplierNames.join(" + ") : "Complete" : `Missing: ${missing.join(", ") || "required values"}`}</p><details className="mt-2 text-xs text-slate-600"><summary className="cursor-pointer font-bold text-[#0066cc]">Cost details</summary><div className="mt-2 grid gap-1"><span>Material: {formatComparisonMoney(option.supplierMaterialSubtotal)}</span><span>Delivery: {formatComparisonMoney(option.supplierDeliveryCharge)}</span><span>Tax: {formatComparisonMoney(option.supplierTaxAmount)}</span></div></details></td><td className="px-3 py-3 text-right align-top font-bold tabular-nums">{ready ? formatComparisonMoney(option.supplierTotal) : "—"}</td><td className="px-3 py-3 text-right align-top font-bold tabular-nums">{clientReady.complete ? formatComparisonMoney(option.clientTotal) : "Later"}</td><td className={`px-3 py-3 text-right align-top font-bold tabular-nums ${option.estimatedGrossProfit < 0 ? "text-rose-700" : "text-emerald-700"}`}>{ready && clientReady.complete ? formatComparisonMoney(option.estimatedGrossProfit) : "Later"}</td><td className="px-3 py-3 text-right align-top font-bold tabular-nums">{ready && clientReady.complete ? `${option.grossMarginPercent.toFixed(1)}%` : "Later"}</td><td className="px-3 py-3 text-right align-top font-semibold">{option.leadTimeDays === null ? "Missing" : `${option.leadTimeDays} day${option.leadTimeDays === 1 ? "" : "s"}`}</td><td className="px-4 py-3 text-right align-top">{option.kind === "mixed" ? <span className="text-xs font-semibold text-slate-500" title="Mixed routing remains a review view until each supplier route is confirmed.">Review split</span> : selectedBidId === option.id ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><Check className="h-4 w-4" /> Selected</span> : !locked ? <button type="button" onClick={() => awardBid(option.id, option.label)} disabled={pending || !ready} className="min-h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500">Select</button> : null}</td></tr>})}</tbody>
               </table>
             </div>
-            <div className="mt-4 grid gap-3 md:hidden">{buyingOptions.map((option) => <article key={option.id} className={`border bg-white p-4 shadow-sm ${option.isLowestCost ? "border-emerald-300" : "border-slate-200"}`}><div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{option.label}</h3><p className={`mt-1 text-xs font-semibold ${option.complete ? "text-emerald-700" : "text-amber-700"}`}>{option.complete ? option.isLowestCost ? "Lowest complete cost" : "Complete" : `Missing: ${option.missingFields.join(", ") || "required values"}`}</p></div><p className="text-right text-lg font-bold tabular-nums">{option.complete ? formatComparisonMoney(option.supplierTotal) : "Incomplete"}<span className="block text-[10px] font-semibold text-slate-500">Supplier total</span></p></div><dl className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><dt className="text-slate-500">Client total</dt><dd className="mt-1 font-bold tabular-nums">{clientReady.complete ? formatComparisonMoney(option.clientTotal) : "—"}</dd></div><div><dt className="text-slate-500">Lead time</dt><dd className="mt-1 font-bold">{option.leadTimeDays === null ? "Missing" : `${option.leadTimeDays} days`}</dd></div><div><dt className="text-slate-500">Estimated gross profit</dt><dd className={`mt-1 font-bold tabular-nums ${option.estimatedGrossProfit < 0 ? "text-rose-700" : "text-emerald-700"}`}>{option.complete ? formatComparisonMoney(option.estimatedGrossProfit) : "—"}</dd></div><div><dt className="text-slate-500">Gross margin</dt><dd className={`mt-1 font-bold tabular-nums ${option.grossMarginPercent < 0 ? "text-rose-700" : ""}`}>{option.complete ? `${option.grossMarginPercent.toFixed(1)}%` : "—"}</dd></div></dl><details className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-600"><summary className="cursor-pointer font-bold text-[#0066cc]">Details</summary><div className="mt-2 grid grid-cols-2 gap-2"><span>Supplier material<br /><b>{formatComparisonMoney(option.supplierMaterialSubtotal)}</b></span><span>Supplier delivery<br /><b>{formatComparisonMoney(option.supplierDeliveryCharge)}</b></span><span>Supplier tax<br /><b>{formatComparisonMoney(option.supplierTaxAmount)}</b></span><span>Client material<br /><b>{formatComparisonMoney(option.clientMaterialSubtotal)}</b></span></div></details>{option.kind === "mixed" ? <p className="mt-4 text-xs font-semibold text-slate-500">Review only · current records support one awarded supplier.</p> : selectedBidId === option.id ? <p className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-emerald-700"><Check className="h-4 w-4" /> Selected</p> : !locked ? <button type="button" onClick={() => awardBid(option.id, option.label)} disabled={pending || !option.selectable} className="mt-4 min-h-11 w-full rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:bg-slate-200 disabled:text-slate-500">Select supplier</button> : null}</article>)}</div>
+            <div className="mt-3 grid gap-2 md:hidden">{buyingOptions.map((option) => { const ready = routeReady(option.id); const missing = routeMissing(option.id); return <article key={option.id} className={`rounded-xl border bg-white p-3 shadow-sm ${option.isLowestCost ? "border-emerald-300" : "border-slate-200"}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{option.label}</h3><p className={`mt-1 text-[10px] font-semibold ${ready ? "text-emerald-700" : "text-amber-700"}`}>{ready ? option.isLowestCost ? "Lowest landed cost" : `${items.length}/${items.length} covered` : `Missing: ${missing.join(", ")}`}</p></div><p className="shrink-0 text-right text-lg font-black tabular-nums">{ready ? formatComparisonMoney(option.supplierTotal) : "—"}<span className="block text-[9px] font-semibold text-slate-500">Landed cost</span></p></div><dl className="mt-3 grid grid-cols-3 gap-2 text-[10px]"><div><dt className="text-slate-500">Delivery</dt><dd className="mt-0.5 font-bold">{formatComparisonMoney(option.supplierDeliveryCharge)}</dd></div><div><dt className="text-slate-500">Lead time</dt><dd className="mt-0.5 font-bold">{option.leadTimeDays === null ? "Missing" : `${option.leadTimeDays} days`}</dd></div><div><dt className="text-slate-500">Suppliers</dt><dd className="mt-0.5 font-bold">{option.supplierNames.length}</dd></div></dl>{option.kind === "mixed" ? <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[10px] font-semibold text-slate-600">Review split: {option.supplierNames.join(" + ")}</p> : selectedBidId === option.id ? <button type="button" onClick={() => setActiveStep(4)} className="mt-3 min-h-11 w-full rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Selected · Continue</button> : !locked ? <button type="button" onClick={() => awardBid(option.id, option.label)} disabled={pending || !ready} className="mt-3 min-h-11 w-full rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:bg-slate-200 disabled:text-slate-500">Choose route</button> : null}</article>})}</div>
           </> : <div className="mt-4 border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><p className="text-sm font-bold">Enter supplier prices to compare them.</p></div>}
-        </section>
+        </section> : null}
 
-        <ClientQuoteBuilder
+        {activeStep === 4 && selectedBid ? <div className="mt-4 overflow-hidden rounded-xl"><ClientQuoteBuilder
           key={selectedBidId || "no-supplier"}
           comparison={{ ...comparison, client_delivery_charge: clientReady.deliveryCharge, client_tax_percent: clientReady.taxPercent }}
           items={liveItems}
@@ -545,7 +588,7 @@ export function QuoteComparisonWorkspace({
           clients={clients}
           initialAttachments={clientQuoteAttachments}
           previewMode={previewMode}
-        />
+        /></div> : null}
 
         {!previewMode ? <details className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details> : null}
       </div>

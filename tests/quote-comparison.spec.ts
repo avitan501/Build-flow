@@ -303,15 +303,33 @@ test("selecting a supplier saves the current price draft before awarding it", as
 
   expect(saveCall).toBeGreaterThan(-1);
   expect(awardCall).toBeGreaterThan(saveCall);
-  expect(workspace).toContain("Select supplier");
+  expect(workspace).toContain("Choose route");
   expect(workspace).toContain("prices saved and supplier selected");
-  expect(workspace).toContain("Buying option comparison");
+  expect(workspace).toContain("Choose the route");
   expect(workspace).not.toContain("Best single supplier");
   expect(workspace).not.toContain("All supplier totals");
   expect(workspace).toContain("Confirm match");
   expect(workspace).toContain("Locked to client request");
   expect(actions).toContain("analysis.missingItemCount > 0");
   expect(actions).toContain("confirmQuoteComparisonPriceMatchAction");
+});
+
+test("comparison room is a compact four-step mobile funnel", async () => {
+  const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
+
+  expect(workspace).toContain('aria-label="Quote comparison steps"');
+  expect(workspace).toContain('{ step: 1 as const, label: "Materials"');
+  expect(workspace).toContain('{ step: 2 as const, label: "Quotes"');
+  expect(workspace).toContain('{ step: 3 as const, label: "Route"');
+  expect(workspace).toContain('{ step: 4 as const, label: "Client"');
+  expect(workspace).toContain("Supplier prices");
+  expect(workspace).toContain("Choose the route");
+  expect(workspace).toContain("Lowest landed cost");
+  expect(workspace).toContain("No stock");
+  expect(workspace).toContain("activeStep === 4 && selectedBid");
+  expect(workspace).toContain('className="divide-y divide-slate-200 md:hidden"');
+  expect(workspace).toContain("Finish supplier prices");
+  expect(workspace).not.toContain("hasMissingValues");
 });
 
 test("supplier quote workspace captures tax as a percentage", async () => {
@@ -324,7 +342,7 @@ test("supplier quote workspace captures tax as a percentage", async () => {
   expect(actions).toContain("p_tax_percent: cleanTaxPercent(input.taxPercent)");
 });
 
-test("supplier comparison captures the client's ready-to-pay target beside supplier prices", async () => {
+test("supplier costs and client pricing are separated into focused steps", async () => {
   const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
   const actions = await readFile(path.join(process.cwd(), "app/admin/quote-comparison/actions.ts"), "utf8");
 
@@ -338,10 +356,10 @@ test("supplier comparison captures the client's ready-to-pay target beside suppl
   expect(workspace).toContain("Save entered prices")
   expect(workspace).toContain("Unfilled rows remain open for later")
   expect(workspace).not.toContain("Finish the missing client and supplier values before saving the comparison")
-  expect(workspace).toContain("Gross margin");
-  expect(workspace).toContain("Finish missing values");
-  expect(workspace).toContain('className="mt-4 hidden');
-  expect(workspace).toContain('className="mt-4 grid gap-3 md:hidden"');
+  expect(workspace).toContain("Finish supplier prices");
+  expect(workspace).toContain('className="hidden overflow-x-auto md:block"');
+  expect(workspace).toContain('className="divide-y divide-slate-200 md:hidden"');
+  expect(workspace).toContain("activeStep === 4 && selectedBid");
   expect(workspace).toContain("saveQuoteComparisonClientTargetsAction");
   expect(actions).toContain("client_unit_price: value");
   expect(actions).toContain("client_delivery_charge: cleanMoney(input.clientDeliveryCharge)");

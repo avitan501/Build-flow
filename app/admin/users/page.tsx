@@ -4,6 +4,7 @@ import Link from "next/link"
 import { approvePendingUser, changeUserRole, rejectUser, suspendUser } from "@/app/admin/users/actions"
 import { AddTargetClient } from "@/components/buildflow/add-target-client"
 import { AddOutreachLead, LeadDepartmentDirectory, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach"
+import { ArchivedRequestRestoreButton } from "@/components/buildflow/archived-request-restore-button"
 import { CustomerContactForm } from "@/components/buildflow/customer-contact-form"
 import { ContactActions } from "@/components/buildflow/contact-actions"
 import { ContactConversation, type DirectoryConversationEntry } from "@/components/buildflow/contact-conversation"
@@ -190,6 +191,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     const customer = customerMap.get(request.owner_id)
     return [request.public_number, request.title, request.projects?.name, request.projects?.address, customer?.full_name, customer?.email].filter(Boolean).join(" ").toLowerCase().includes(search)
   }).sort((left, right) => sort === "alphabetical" ? left.title.localeCompare(right.title) : sort === "oldest" ? left.created_at.localeCompare(right.created_at) : right.created_at.localeCompare(left.created_at))
+  const activeFilteredRequests = filteredRequests.filter((request) => request.status !== "closed")
+  const archivedFilteredRequests = filteredRequests.filter((request) => request.status === "closed")
   const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
   const leadStatuses = Array.from(new Set(leads.map((lead) => lead.status))).sort()
@@ -202,6 +205,20 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     : view === "leads"
       ? "Five focused lead departments in one compact workspace."
       : "Every material and service request submitted by your customers."
+
+  function requestCard(request: RequestRecord, archived = false) {
+    const customer = customerMap.get(request.owner_id)
+    const isOpen = deletableRequestStatuses.has(request.status)
+    return <article key={request.id} className={`grid gap-3 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-4 ${archived ? "border-slate-200 opacity-90" : "border-slate-200"}`}>
+      <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]">
+        <div className="flex min-w-0 items-center gap-2"><span className="shrink-0 text-xs font-bold text-[#0066cc]">#{request.public_number}</span><h2 className="truncate text-sm font-bold sm:text-base">{request.title}</h2><span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${archived ? "border-slate-200 bg-slate-100 text-slate-600" : badgeTone(request.status)}`}>{archived ? "Archived" : request.status.replaceAll("_", " ")}</span></div>
+        <p className="mt-1 truncate text-xs text-slate-600 sm:text-sm">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p>
+        <p className="mt-1 text-[11px] text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p>
+        {!archived ? <div className="mt-2 flex flex-wrap gap-1.5">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-2 py-1 text-[10px] font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-[10px] font-semibold text-slate-400">Manual material list</span>}</div> : null}
+      </Link>
+      {archived ? <ArchivedRequestRestoreButton requestId={request.id} /> : isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : null}
+    </article>
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
@@ -260,11 +277,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         ) : (
           <section className="mt-3 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
-            {filteredRequests.map((request) => { const customer = customerMap.get(request.owner_id); const isOpen = deletableRequestStatuses.has(request.status); return <article key={request.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-[#0066cc]">#{request.public_number}</span><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">Manual material list</span>}</div></Link>
-              {isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : <span className="text-xs font-semibold text-slate-400">Closed requests are retained</span>}
-            </article> })}
+            {activeFilteredRequests.map((request) => requestCard(request))}
             {filteredRequests.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No requests match these filters.</p> : null}
+            {activeFilteredRequests.length === 0 && archivedFilteredRequests.length > 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">No active requests match. Archived requests are available below.</p> : null}
+            {archivedFilteredRequests.length ? <details open={status === "closed"} className="group mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold text-slate-700 sm:px-4"><span>Archived requests</span><span className="text-xs text-slate-500">{archivedFilteredRequests.length} · <span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></span></summary><div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2 sm:p-3"><p className="px-1 text-[11px] text-slate-500">Open a request to review it, or restore it directly to active work.</p>{archivedFilteredRequests.map((request) => requestCard(request, true))}</div></details> : null}
           </section>
         )}
 
