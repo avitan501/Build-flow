@@ -983,10 +983,10 @@ export function RequestManagementPanel({
           <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">{selectedSupplierNames.length} suppliers</span>
           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quotes</span>
         </>} tools={<>
-          <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={stepToolClass}><Route className="h-4 w-4" />Choose supplier route</button>
+          <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={stepToolClass}><Route className="h-4 w-4" />Manage supplier route</button>
           <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={stepToolClass}><Paperclip className="h-4 w-4" />Upload supplier quote</a>
           <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Plus className="h-4 w-4" />Enter pricing manually</button>
-          <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Compare supplier route</button>
+          <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Open supplier comparison</button>
           {!estimateSent ? <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Create direct estimate</button> : null}
         </>} />
         <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
@@ -1004,7 +1004,7 @@ export function RequestManagementPanel({
               <p className="px-1 text-[9px] text-slate-500">Received from a supplier. Link it to the correct supplier when adding the quote.</p>
             </div>
           </details> : null}
-          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-visible rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem] gap-2 rounded-t-lg border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier · note · contact</span><span role="columnheader">Status</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 mt-3 overflow-visible rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap gap-1.5 rounded-t-lg border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold"><span>{selectedSupplierNames.length} suppliers</span><span className="text-slate-300">·</span><span className="text-emerald-700">{supplierQuoteCount} quotes received</span><span className="text-slate-300">·</span><span className="text-rose-700">{supplierProgressRows.filter((row) => row.bid?.unavailableItemCount).length} unavailable</span></div><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier · note · contact</span><span role="columnheader">Status</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
             const persistedContactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] : undefined
             const statusOverride = row.supplier ? supplierContactStatusOverrides[row.supplier.id] : undefined
             const contactStatus = row.supplier

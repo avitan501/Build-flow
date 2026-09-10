@@ -478,7 +478,7 @@ export function QuoteComparisonWorkspace({
 
         {activeStep === 2 ? <section id="quote-inputs" className="mt-4 scroll-mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="quotes-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">Step 2</p><h2 id="quotes-heading" className="mt-0.5 text-lg font-bold">Supplier prices</h2><p className="mt-1 text-xs text-slate-500">Enter each supplier’s price, delivery, tax, and lead time.</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-[#0066cc]">Step 2</p><h2 id="quotes-heading" className="mt-0.5 text-lg font-bold">Supplier prices</h2><p className="mt-1 text-xs text-slate-500">Enter each supplier’s price, delivery, tax, and lead time.</p><p className="mt-1 text-[10px] font-bold text-[#0066cc]">{pricedSupplierLines} of {totalSupplierLines} prices entered · {Math.max(totalSupplierLines - pricedSupplierLines, 0)} remaining</p></div>
             {!locked ? <div className="flex flex-wrap gap-2">
               {canManageStructure ? <button type="button" onClick={() => setShowSupplierForm((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><Store className="h-4 w-4" /> Add supplier</button> : null}
               <button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save entered prices</button>
@@ -554,7 +554,7 @@ export function QuoteComparisonWorkspace({
               </div></details>;
             })}</div></>
           ) : <div className="px-5 py-10 text-center text-sm text-slate-500">{items.length === 0 ? "Add materials before entering supplier prices." : "Add at least one supplier from the directory."}</div>}
-          <div className="flex gap-2 border-t border-slate-200 p-3"><button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold disabled:opacity-40">Save prices</button><button type="button" onClick={() => setActiveStep(3)} disabled={!bids.length} className="min-h-11 flex-1 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Compare routes</button></div>
+          <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 flex gap-2 border border-slate-200 bg-white/95 p-3 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur"><button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold disabled:opacity-40">Save prices</button><button type="button" onClick={() => setActiveStep(3)} disabled={!bids.length} className="min-h-11 flex-1 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Compare routes</button></div>
         </section> : null}
 
         {activeStep === 3 ? <section className="mt-4" aria-labelledby="analysis-heading">

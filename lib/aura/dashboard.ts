@@ -223,6 +223,24 @@ export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
   };
 }
 
+export function initialAuraConnectionStatus() {
+  return {
+    voice: { receive: false, send: false, recording: false, phone: null },
+    quo: {
+      receive: Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
+      send: canSendAuraQuoText(),
+    },
+    whatsapp: {
+      receive: Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) || canUseTwilioWhatsApp(),
+      send: canSendAuraWhatsApp(),
+    },
+    email: {
+      receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
+      send: canSendAuraEmail(),
+    },
+  };
+}
+
 export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: SupabaseClient = supabase) {
   const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, customersResult, brokerResult] = await Promise.all([
     supabase

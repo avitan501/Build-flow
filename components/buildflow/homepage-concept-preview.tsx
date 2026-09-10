@@ -5,8 +5,18 @@ import Link from "next/link"
 import { ArrowUpRight, Check, ChevronDown, MapPin, MessageSquareText, Pause, Play, Send, Upload } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
-import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
 import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
+
+const homepageBrands = [
+  ["Andersen", "/images/brands/andersen.svg", "scale-95"],
+  ["GAF", "/images/brands/gaf.svg", "scale-110"],
+  ["Pella", "/images/brands/pella.png", "scale-125"],
+  ["QUIKRETE", "/images/brands/quikrete.gif", "scale-95"],
+  ["USG", "/images/brands/usg.svg", "scale-95"],
+  ["Georgia-Pacific", "/images/brands/georgia-pacific.svg", "scale-105"],
+  ["TimberTech", "/images/brands/timbertech.svg", "scale-95"],
+  ["Trex", "/images/brands/trex.svg", "scale-75"],
+] as const
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
@@ -82,14 +92,32 @@ function HomepageReviewSections() {
 
   return <>
     <div id="brands" className="border-y border-black/8 bg-[#f4efe6] py-3 text-slate-950">
-      <ShopBrandShowcase compact transparent title="" />
+      <section aria-label="Construction material brands" className="mx-auto max-w-[88rem] overflow-hidden bg-transparent">
+        <div className="mx-auto w-full max-w-7xl px-4 py-2.5 sm:px-8 sm:py-3 lg:px-10">
+          <div className="brand-marquee" data-testid="shop-brand-grid">
+            <div className="brand-marquee-track">
+              {[0, 1].map((groupIndex) => (
+                <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
+                  {homepageBrands.map(([name, logo, scale]) => (
+                    <div key={`${groupIndex}-${name}`} className="flex h-10 w-24 shrink-0 items-center justify-center px-3 sm:h-12 sm:w-32 sm:px-4">
+                      <div className="relative h-8 w-full max-w-24 sm:max-w-28">
+                        <Image src={logo} alt={groupIndex === 0 ? `${name} logo` : ""} fill sizes="(max-width: 640px) 96px, 112px" loading="lazy" className={`object-contain ${scale}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
       <p className="mx-auto -mt-0.5 flex max-w-[88rem] items-center justify-center gap-1.5 px-5 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-600">
         <MapPin className="h-3.5 w-3.5 text-[#1677ff]" aria-hidden="true" />
         Serving all 50 states
       </p>
     </div>
 
-    <section className="overflow-hidden bg-[#f4efe6] px-5 py-14 text-slate-950 sm:px-8 sm:py-20" aria-labelledby="text-request-heading">
+    <section className="overflow-hidden bg-[#f4efe6] px-5 py-14 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_50rem] sm:px-8 sm:py-20" aria-labelledby="text-request-heading">
       <div className="mx-auto grid max-w-6xl items-center gap-9 lg:grid-cols-[0.82fr_1.18fr] lg:gap-16">
         <div className="max-w-lg">
           <h2 id="text-request-heading" className="text-4xl font-semibold leading-[0.94] tracking-[-0.055em] text-balance sm:text-6xl">Tell us what you need.</h2>
@@ -116,7 +144,7 @@ function HomepageReviewSections() {
       </div>
     </section>
 
-    <section className="border-t border-black/8 bg-[#eef0f2] py-14 text-slate-950 sm:py-20" aria-labelledby="service-rail-heading">
+    <section className="border-t border-black/8 bg-[#eef0f2] py-14 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_44rem] sm:py-20" aria-labelledby="service-rail-heading">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0066cc]">Start with what you have</p>
         <div className="mt-2 flex items-end justify-between gap-6">
@@ -139,7 +167,7 @@ function HomepageReviewSections() {
       </div>
     </section>
 
-    <section className="border-t border-white/10 bg-[#030507] px-5 py-10 text-white sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
+    <section className="border-t border-white/10 bg-[#030507] px-5 py-10 text-white [content-visibility:auto] [contain-intrinsic-size:auto_24rem] sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
       <div className="mx-auto max-w-7xl">
         <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why Avantia?</h2>
         <div className="mt-6 grid gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-3">

@@ -137,7 +137,7 @@ test("each workflow step has one compact Tools menu and its own sub-funnel", asy
   const step3 = panel.slice(step3Start)
   expect(step2Start).toBeGreaterThan(-1)
   expect(step3Start).toBeGreaterThan(step2Start)
-  for (const label of ["Choose supplier route", "Upload supplier quote", "Enter pricing manually", "Compare supplier route", "Create direct estimate"]) {
+  for (const label of ["Manage supplier route", "Upload supplier quote", "Enter pricing manually", "Open supplier comparison", "Create direct estimate"]) {
     expect(step2).toContain(label)
   }
   for (const label of ["Contact client", "Estimate", "Invoice", "Receipt", "Payment link", "Delivery schedule"]) {

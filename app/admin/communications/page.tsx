@@ -3,7 +3,7 @@ import { after } from "next/server"
 import type { SmsReplyDraft } from "@/app/admin/communications/actions"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
-import { loadAuraConnectionStatus, normalizeAuraCommunications, type AuraContactRow } from "@/lib/aura/dashboard"
+import { initialAuraConnectionStatus, normalizeAuraCommunications, type AuraContactRow } from "@/lib/aura/dashboard"
 import {
   COMMUNICATION_HISTORY_PAGE_SIZE,
   loadCommunicationHistoryPage,
@@ -29,20 +29,17 @@ type ManagerAuraData = {
 async function loadManagerAura(
   supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"],
 ): Promise<ManagerAuraData | null> {
-  const [contactsResult, connections] = await Promise.all([
-    supabase
+  const contactsResult = await supabase
       .from("aura_contacts")
       .select("id,full_name,normalized_phone,email,company,notes,sms_ai_mode,sms_ai_style,auto_create_request_drafts,created_at")
       .order("created_at", { ascending: false })
       .limit(500)
-      .returns<AuraContactRow[]>(),
-    loadAuraConnectionStatus(supabase),
-  ])
+      .returns<AuraContactRow[]>()
   if (contactsResult.error) return null
   return {
     ok: true,
     contacts: contactsResult.data ?? [],
-    connections,
+    connections: initialAuraConnectionStatus(),
   }
 }
 

@@ -12,7 +12,7 @@ import {
 } from "@/lib/aura/communication-history-cursor";
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity";
 
-export const COMMUNICATION_HISTORY_PAGE_SIZE = 80;
+export const COMMUNICATION_HISTORY_PAGE_SIZE = 50;
 
 const HISTORY_CHANNELS = new Set(["call", "sms", "whatsapp", "email"]);
 export type CommunicationHistoryPage = {

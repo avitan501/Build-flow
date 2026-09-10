@@ -342,6 +342,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const updatesCursorRef = useRef(initialCursor)
   const syncCountRef = useRef(0)
   const [liveCommunications, setLiveCommunications] = useState(communications)
+  const [liveConnections, setLiveConnections] = useState(connections)
   const [imagePreview, setImagePreview] = useState<{ url: string; label: string } | null>(null)
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
@@ -390,6 +391,17 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [templateComposerOpen, setTemplateComposerOpen] = useState(false)
   const [utilityTemplateName, setUtilityTemplateName] = useState<AuraWhatsAppUtilityTemplateName>("quote_request_received")
   const [utilityTemplateValues, setUtilityTemplateValues] = useState<string[]>(["", ""])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetch("/api/admin/communications/status", { cache: "no-store", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result: { connections?: Connections } | null) => {
+        if (result?.connections) setLiveConnections(result.connections)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     let stopped = false
@@ -693,7 +705,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (initialCommunicationId ? conversations.find((conversation) => conversation.messages.some((message) => message.id === initialCommunicationId)) : undefined) || (activeKey !== "__new__" ? conversations[0] : undefined)
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
-  const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send)
+  const selectedChannelReady = channel === "call" || (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
   const activeThreadHasMore = Boolean(activeConversation && (activeThreadHistory?.hasMore ?? true))
 
@@ -1426,12 +1438,12 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
               <div className="mt-1.5 grid grid-cols-2 gap-1 text-[9px] font-semibold">
                 {(
                   [
-                    { label: "WhatsApp", state: connections.whatsapp },
-                    { label: "Text", state: connections.quo },
-                    { label: "Email", state: connections.email },
+                    { label: "WhatsApp", state: liveConnections.whatsapp },
+                    { label: "Text", state: liveConnections.quo },
+                    { label: "Email", state: liveConnections.email },
                     {
                       label: "Calls",
-                      state: connections.voice || {
+                      state: liveConnections.voice || {
                         receive: false,
                         send: false,
                       },
@@ -1576,7 +1588,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   {activeResponseMetric ? <p className="mt-0.5 truncate text-[9px] font-semibold text-sky-700">{activeResponseMetric}</p> : null}
                 </div>
                 {activeConversation.phone ? (
-                  <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={connections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}>
+                  <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={liveConnections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}>
                     <Phone className="h-4 w-4" />
                   </button>
                 ) : null}

@@ -171,7 +171,8 @@ export default async function AdminDashboardPage({
   let goalsQuery = supabase
     .from("manager_goals")
     .select("id,assignee,title,details,status,is_focus,created_at,updated_at")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
 
   const [
@@ -205,7 +206,7 @@ export default async function AdminDashboardPage({
       .select("metadata,created_at")
       .or(`metadata->>manager_feature.eq.${REQUEST_QUICK_ACTION_FEATURE},metadata->>manager_action.eq.request_substep_status`)
       .order("created_at", { ascending: false })
-      .limit(1000)
+      .limit(400)
       .returns<RequestQuickEventRow[]>(),
     goalsQuery.returns<DashboardGoalRecord[]>(),
     supabase
