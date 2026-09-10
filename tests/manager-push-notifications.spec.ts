@@ -46,12 +46,14 @@ test("manager push notifications stay private and cover business events", async 
   expect(control).toContain("Send test notification");
   expect(center).toContain('fetch("/api/manager-notifications?history=1"');
   expect(center).toContain("Notifications & activity");
-  expect(center).toContain('action: "mark_all_read"');
-  expect(center).toContain("summarizeManagerNotifications(events)");
+  expect(center).toContain('action: "mark_read"');
+  expect(center).not.toContain('action: "mark_all_read"');
+  expect(center).toContain("summarizeManagerNotifications(events, loadedAt || undefined)");
   expect(center).toContain("managerNotificationCategory(event)");
   expect(center).toContain("managerNotificationCategoryLabel(category)");
-  expect(center).toContain('type NotificationFilter = "all" | "requests" | "communications" | "actions"');
-  expect(center).toContain('aria-label="Filter notifications"');
+  expect(center).toContain('type NotificationFilter = "all" | "texts" | "calls" | "email" | "requests" | "actions"');
+  expect(center).toContain('aria-label="Filter notifications by category"');
+  expect(center).toContain('aria-label="Filter notifications by status"');
   expect(center).toContain("filteredEvents.map");
   expect(center).not.toContain("localStorage");
   expect(serviceWorker).toContain('self.addEventListener("push"');
@@ -98,7 +100,7 @@ test("manager notification feed is per user, queue-backed, and links to the exac
   expect(store).toContain('.from("manager_notification_reads")');
   expect(communicationsPage).not.toContain("createAdminClient");
   expect(communicationsPage).toContain("loadCommunicationHistoryPage");
-  expect(communicationsPage).toContain("loadManagerAura(supabase)");
+  expect(communicationsPage).toContain("loadManagerAura()");
   expect(communicationsPage).toContain("initialCommunicationId=");
   expect(communicationsPage).toContain("communicationInboxNavigationKey({");
   expect(communicationsPage).toContain("key={inboxNavigationKey}");

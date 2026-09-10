@@ -18,6 +18,8 @@ test("homepage defers below-the-fold branding and secondary hero photos", async 
   expect(footer.match(/loading="lazy"/g)).toHaveLength(2);
   expect(homepage).not.toContain("ShopBrandShowcase");
   expect(homepage).toContain("[content-visibility:auto]");
+  expect(homepage).toContain("videoRequested ? <source");
+  expect(homepage).toContain('aria-label="Play material request video"');
   expect(homepage).toContain('window.addEventListener("load", loadRemainingHeroPhotos');
   expect(homepage).toContain('window.setTimeout(() => setHeroDeckReady(true), 4000)');
   expect(homepage).toContain("!heroDeckReady || paused");

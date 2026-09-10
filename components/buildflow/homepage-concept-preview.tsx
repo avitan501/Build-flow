@@ -75,20 +75,7 @@ function Actions({ primary, secondary, dark = false, compact = false }: { primar
 }
 
 function HomepageReviewSections() {
-  const videoCardRef = useRef<HTMLDivElement>(null)
-  const [videoInView, setVideoInView] = useState(false)
-
-  useEffect(() => {
-    const card = videoCardRef.current
-    if (!card) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => setVideoInView(entry.isIntersecting),
-      { threshold: 0.35 },
-    )
-    observer.observe(card)
-    return () => observer.disconnect()
-  }, [])
+  const [videoRequested, setVideoRequested] = useState(false)
 
   return <>
     <div id="brands" className="border-y border-black/8 bg-[#f4efe6] py-3 text-slate-950">
@@ -127,14 +114,12 @@ function HomepageReviewSections() {
           </Link>
         </div>
 
-        <div
-          ref={videoCardRef}
-          className={`relative mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(15,23,42,.2)] transition-[transform,opacity] duration-700 ease-out motion-reduce:transform-none ${videoInView ? "scale-100 opacity-100" : "scale-[0.965] opacity-90"}`}
-        >
+        <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(15,23,42,.2)]">
           <div className="relative aspect-[4/5] overflow-hidden rounded-[1.55rem] bg-slate-900 sm:aspect-[16/10]">
-            <video key={videoInView ? "playing" : "poster"} autoPlay muted loop playsInline preload="none" poster="/images/buildflow-homepage/process-text-request-v6.webp" className="h-full w-full object-cover object-center" aria-label="A contractor texts a same-day material list and receives the delivery at the jobsite">
-              {videoInView ? <source src="/videos/homepage-material-process-v2.mp4" type="video/mp4" /> : null}
+            <video key={videoRequested ? "playing" : "poster"} autoPlay={videoRequested} muted loop playsInline preload="none" poster="/images/buildflow-homepage/process-text-request-v6.webp" className="h-full w-full object-cover object-center" aria-label="A contractor texts a same-day material list and receives the delivery at the jobsite">
+              {videoRequested ? <source src="/videos/homepage-material-process-v2.mp4" type="video/mp4" /> : null}
             </video>
+            {!videoRequested ? <button type="button" onClick={() => setVideoRequested(true)} className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/80" aria-label="Play material request video"><span className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/50 bg-black/65 px-5 text-sm font-bold backdrop-blur-md"><Play className="h-4 w-4 fill-current" />Play video</span></button> : null}
             <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
               <MessageSquareText className="h-4 w-4 text-[#e7b85d]" aria-hidden="true" />
               Text or WhatsApp your material list
