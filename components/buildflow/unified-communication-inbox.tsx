@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Bot, CheckCheck, ChevronDown, CircleAlert, ClipboardList, Clock3, Mail, MapPin, MessageCircle, Paperclip, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
+import { ArrowLeft, Bot, CheckCheck, ChevronDown, CircleAlert, ClipboardList, Clock3, ExternalLink, Mail, MapPin, MessageCircle, Paperclip, Pencil, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
@@ -362,6 +362,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   } | null>(null)
   const [linkTarget, setLinkTarget] = useState("")
   const [emailLinkTarget, setEmailLinkTarget] = useState("")
+  const [contactPanelOpen, setContactPanelOpen] = useState(false)
   const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "auto_safe")
   const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_style || "friendly")
   const [requestReview, setRequestReview] = useState<SmsRequestProposal | null>(null)
@@ -775,6 +776,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       setChannel(draftSource?.channel === "whatsapp" ? "whatsapp" : "sms")
     }
     setFeedback(null)
+    setContactPanelOpen(false)
     updateConversationDeepLink(conversation)
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
     setSmsAiMode(auraContact?.sms_ai_mode || "auto_safe")
@@ -961,11 +963,17 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setTeachAi(false)
     setCorrectionReasons([])
     setFeedback(null)
+    setContactPanelOpen(false)
     const url = new URL(window.location.href)
     url.searchParams.delete("thread")
     url.searchParams.delete("q")
     url.searchParams.delete("draft")
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }
+
+  function newWhatsAppConversation() {
+    newConversation()
+    setChannel("whatsapp")
   }
 
   function selectNewRecipient(id: string) {
@@ -1294,6 +1302,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const activeEmailLinks = activeConversation ? [...new Map(activeConversation.messages.flatMap((item) => item.links ?? []).map((link) => [`${link.entity_type}:${link.entity_id}`, link])).values()] : []
   const activeHasEmail = activeConversation?.messages.some((item) => item.channel === "email") ?? false
+  const activeProfileHref = activeConversation?.kind === "customer"
+    ? `/admin/users?view=customers&q=${encodeURIComponent(activeConversation.name)}`
+    : activeConversation?.kind === "lead"
+      ? `/admin/users?view=leads&q=${encodeURIComponent(activeConversation.name)}`
+      : activeConversation?.kind === "supplier"
+        ? `/admin/vendors?q=${encodeURIComponent(activeConversation.company || activeConversation.name)}`
+        : null
   const requestCandidateId = activeConversation ? ([...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null) : null
   const activeSmsDraft = activeDraftId ? smsReplyDrafts.find((draft) => draft.id === activeDraftId) || null : null
   const activeDraftEdited = Boolean(activeSmsDraft && message.trim() !== activeSmsDraft.reply_text.trim())
@@ -1346,6 +1361,9 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                 <Link href="/admin/ai-tools/sms-replies" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sky-700" aria-label="AI reply settings" title="AI reply settings">
                   <Bot className="h-4 w-4" />
                 </Link>
+                <button type="button" onClick={newWhatsAppConversation} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 md:h-9 md:w-9" aria-label="New WhatsApp message" title="New WhatsApp message">
+                  <MessageCircle className="h-4 w-4" />
+                </button>
                 <button type="button" onClick={newConversation} className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0071e3] text-white md:h-9 md:w-9" aria-label="New conversation">
                   <Plus className="h-4 w-4" />
                 </button>
@@ -1537,7 +1555,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                 </button>
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span>
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-sm font-bold">{activeConversation.name}</h2>
+                  <button type="button" onClick={() => setContactPanelOpen((open) => !open)} className="group flex max-w-full items-center gap-1 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]" aria-expanded={contactPanelOpen} aria-controls="communication-contact-panel" title="View, edit, or link this contact">
+                    <h2 className="truncate text-sm font-bold group-hover:text-[#0066cc]">{activeConversation.name}</h2>
+                    <Pencil className="h-3 w-3 shrink-0 text-slate-400 group-hover:text-[#0066cc]" />
+                  </button>
                   <div className="mt-0.5 flex items-center gap-2">
                     <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span>
                     <span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span>
@@ -1550,6 +1571,34 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                   </button>
                 ) : null}
               </div>
+              {contactPanelOpen ? (
+                <section id="communication-contact-panel" className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2" aria-label="Contact details and links">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                    {activeConversation.phone ? <span className="rounded bg-white px-2 py-1 font-semibold text-slate-700">{activeConversation.phone}</span> : null}
+                    {activeConversation.email ? <span className="max-w-full truncate rounded bg-white px-2 py-1 font-semibold text-slate-700">{activeConversation.email}</span> : null}
+                    {activeConversation.company ? <span className="max-w-full truncate rounded bg-white px-2 py-1 font-semibold text-slate-700">{activeConversation.company}</span> : null}
+                    {activeProfileHref ? (
+                      <Link href={activeProfileHref} className="inline-flex min-h-7 items-center gap-1 rounded bg-slate-950 px-2.5 py-1 font-bold text-white">
+                        Open profile <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="mt-2 flex gap-2 border-t border-slate-200 pt-2">
+                    <select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} aria-label="Link conversation to an existing person" className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs">
+                      <option value="">Link to another person…</option>
+                      {directory.entries.filter((entry) => entry.kind !== "contact" && entry.key !== activeConversation.key).map((entry) => (
+                        <option key={entry.key} value={entry.key}>{contactKindLabel(entry.kind)} · {entry.name}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-40">Link</button>
+                  </div>
+                  {activeConversation.email && !activeEmailLinks.some((link) => link.entity_type === "supplier") ? (
+                    <button type="button" onClick={addEmailAsSupplier} disabled={pending} className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-[10px] font-bold text-emerald-800 disabled:opacity-50">
+                      <Plus className="h-3 w-3" /> Add as new supplier
+                    </button>
+                  ) : null}
+                </section>
+              ) : null}
               {activeConversation.phone && activeConversation.identityStatus === "unknown" ? (
                 <details className="mt-2 rounded-md border border-slate-200 bg-white">
                   <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700">

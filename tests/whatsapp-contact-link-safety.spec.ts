@@ -75,3 +75,14 @@ test("the new conversation button supports every channel and a new recipient", a
   expect(inbox).toContain('setChannel("whatsapp")')
   expect(inbox).toContain('setAttachments([])')
 })
+
+test("the compact inbox header exposes WhatsApp and contact management", async () => {
+  const inbox = await read("components/buildflow/unified-communication-inbox.tsx")
+
+  expect(inbox).toContain('aria-label="New WhatsApp message"')
+  expect(inbox).toContain('title="View, edit, or link this contact"')
+  expect(inbox).toContain('aria-label="Contact details and links"')
+  expect(inbox).toContain("Open profile")
+  expect(inbox).toContain("Link to another person…")
+  expect(inbox).toContain("Add as new supplier")
+})
