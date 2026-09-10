@@ -241,6 +241,16 @@ function messageText(message: AuraCommunicationRow) {
   return message.channel === "call" ? "Phone call" : "Message"
 }
 
+function isAdvertisingCampaignMessage(message: AuraCommunicationRow) {
+  if (message.direction !== "outgoing" || message.channel !== "sms") return false
+  const text = messageText(message).toLowerCase()
+  return text.includes("avantiabuild.com") || text.includes("avantia build") && (
+    text.includes("free price check") ||
+    text.includes("material quote") ||
+    text.includes("material list")
+  )
+}
+
 function messageCanStartMaterialRequest(message: AuraCommunicationRow) {
   if (message.direction === "incoming" && ["sms", "whatsapp"].includes(message.channel) && message.media?.some((item) => item.processingStatus === "ready" && /^(?:image\/|audio\/|application\/pdf$)/i.test(item.type || ""))) return true
   return looksLikeMaterialRequestMessage(message.channel, message.direction, messageText(message))
@@ -1806,6 +1816,11 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
                           </button>
                         ) : null}
                         <div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400">
+                          {isAdvertisingCampaignMessage(item) ? (
+                            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-bold text-violet-700" title="Advertising campaign message">
+                              Ad campaign
+                            </span>
+                          ) : null}
                           <span>{channelIcon(item.channel, "h-3 w-3")}</span>
                           <time>{formatMessageTime(item.occurred_at)}</time>
                           {item.duration_seconds ? (

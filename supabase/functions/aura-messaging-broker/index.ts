@@ -8835,13 +8835,17 @@ async function ingestPolledQuoMessage(
         ? message.body.trim()
         : "";
   const media = quoPolledMedia(message);
-  const counterpartyPhone = normalizePhone(message.from);
+  const direction = message.direction === "outgoing" ? "outgoing" : "incoming";
+  const counterpartyPhone = direction === "outgoing"
+    ? (Array.isArray(message.to) ? message.to : []).map(normalizePhone).find((phone) => phone && phone !== businessPhone) || ""
+    : normalizePhone(message.from);
   const isTrustedIntake =
+    direction === "incoming" &&
     isTrustedSmsCommandPhone(counterpartyPhone) &&
     (isTrustedSmsCommand(body) || trustedAttachmentMedia(media).length > 0);
   if (
     !/^AC[A-Za-z0-9_-]+$/.test(activityId) ||
-    message.direction !== "incoming" ||
+    !["incoming", "outgoing"].includes(message.direction || "") ||
     (!body && trustedAttachmentMedia(media).length === 0) ||
     !counterpartyPhone ||
     counterpartyPhone === businessPhone
@@ -8851,7 +8855,7 @@ async function ingestPolledQuoMessage(
   const pollEventId = `poll:${activityId}`;
   await sql`
     insert into public.aura_webhook_events (provider, external_event_id, event_type, activity_id, raw_payload, error_message)
-    values ('quo', ${pollEventId}, 'message.received', ${activityId}, ${sql.json({ provider: "quo-fast-poll", activityId, conversationId })}, null)
+    values ('quo', ${pollEventId}, ${direction === "incoming" ? "message.received" : "message.synced"}, ${activityId}, ${sql.json({ provider: "quo-fast-poll", activityId, conversationId, direction })}, null)
     on conflict (provider, external_event_id) do nothing
   `;
   const existing = await sql<
@@ -8895,7 +8899,7 @@ async function ingestPolledQuoMessage(
     }
     await sql`
       update public.aura_webhook_events set processed_at = coalesce(processed_at, now())
-      where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
+      where provider = 'quo' and external_event_id = ${pollEventId}
     `;
     return false;
   }
@@ -8906,7 +8910,7 @@ async function ingestPolledQuoMessage(
       provider, channel, external_activity_id, external_conversation_id, contact_id, direction,
       counterparty_phone, business_phone, body, media, status, occurred_at, last_event_at
     ) values (
-      'quo', 'sms', ${activityId}, ${conversationId}, ${contactId}, 'incoming',
+      'quo', 'sms', ${activityId}, ${conversationId}, ${contactId}, ${direction},
       ${counterpartyPhone}, ${businessPhone}, ${body || null}, ${sql.json(media)}, ${message.status || "received"},
       ${safeIso(message.createdAt, new Date().toISOString())}, ${safeIso(message.updatedAt, message.createdAt || new Date().toISOString())}
     )
@@ -8915,9 +8919,22 @@ async function ingestPolledQuoMessage(
   `;
   await sql`
     update public.aura_webhook_events set processed_at = coalesce(processed_at, now())
-    where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
+    where provider = 'quo' and external_event_id = ${pollEventId}
   `;
   if (!inserted[0]?.id) return false;
+  if (direction === "outgoing") {
+    await sql`update public.aura_contacts set sms_ai_mode = 'off', updated_at = now() where normalized_phone = ${counterpartyPhone}`;
+    await sql`
+      update public.aura_sms_unanswered_followups
+      set status = 'cancelled', cancel_reason = 'manager took over conversation', updated_at = now()
+      where counterparty_phone = ${counterpartyPhone} and status in ('pending', 'processing')
+    `;
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_ai_human_takeover', ${sql.json({ communicationId: inserted[0].id, route: "quo_outgoing_poll" })})
+    `;
+    return true;
+  }
   scheduleMaterialShadowAssessment(inserted[0].id);
   await enqueueSmsAutomation(inserted[0].id);
   await dispatchSmsAutomationWorker(inserted[0].id);
@@ -9006,14 +9023,14 @@ async function pollRecentQuoMessagesOnce() {
     const messagesPayload = (await messagesResponse.json()) as {
       data?: QuoPolledMessage[];
     };
-    const incoming = (messagesPayload.data || [])
-      .filter((message) => message.direction === "incoming")
+    const messages = (messagesPayload.data || [])
+      .filter((message) => ["incoming", "outgoing"].includes(message.direction || ""))
       .sort((left, right) =>
         String(left.createdAt || "").localeCompare(
           String(right.createdAt || ""),
         ),
       );
-    const candidateIds = incoming
+    const candidateIds = messages
       .map((message) =>
         typeof message.id === "string" ? message.id.trim() : "",
       )
@@ -9027,7 +9044,7 @@ async function pollRecentQuoMessagesOnce() {
     const storedIds = new Set(
       alreadyStored.map((row) => row.external_activity_id),
     );
-    for (const message of incoming) {
+    for (const message of messages) {
       const activityId =
         typeof message.id === "string" ? message.id.trim() : "";
       if (
