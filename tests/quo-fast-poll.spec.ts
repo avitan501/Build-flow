@@ -28,6 +28,8 @@ test("Quo fast ingress is authenticated, bounded, and idempotent", async () => {
   expect(pollingFunction).toContain('new URL("https://api.quo.com/v1/conversations")')
   expect(pollingFunction).toContain('new URL("https://api.quo.com/v1/messages")')
   expect(pollingFunction).toContain('searchParams.append("participants", participant)')
+  expect(pollingFunction).toContain('PRIMARY_QUO_SMS_BUSINESS_PHONE')
+  expect(pollingFunction).toContain('conversation.phoneNumberId === webhook.phoneNumberId')
   expect(pollingFunction).toContain("[\"incoming\", \"outgoing\"]")
   expect(ingestionFunction).toContain('direction === "outgoing"')
   expect(ingestionFunction).toContain('"message.synced"')

@@ -113,6 +113,7 @@ const STAFF_EMAILS = new Set([
 ]);
 const TWO_CHAT_BUSINESS_PHONE = "+13479378665";
 const META_WHATSAPP_BUSINESS_PHONE = "+15169901990";
+const PRIMARY_QUO_SMS_BUSINESS_PHONE = "+15169901990";
 const META_WHATSAPP_APP_ID = "2874339416276903";
 const META_WHATSAPP_BUSINESS_ACCOUNT_ID = "1609047970612779";
 const META_WHATSAPP_PHONE_NUMBER_ID = "1266268263238386";
@@ -8979,6 +8980,8 @@ async function pollRecentQuoMessagesOnce() {
   // webhook delivery gaps.
   const conversationsUrl = new URL("https://api.quo.com/v1/conversations");
   conversationsUrl.searchParams.append("phoneNumbers", api.from);
+  if (api.from !== PRIMARY_QUO_SMS_BUSINESS_PHONE)
+    conversationsUrl.searchParams.append("phoneNumbers", PRIMARY_QUO_SMS_BUSINESS_PHONE);
   conversationsUrl.searchParams.set("updatedAfter", updatedAfter);
   conversationsUrl.searchParams.set("excludeInactive", "true");
   conversationsUrl.searchParams.set("maxResults", "25");
@@ -9000,9 +9003,12 @@ async function pollRecentQuoMessagesOnce() {
   let ingested = 0;
   const changedConversations = (conversationsPayload.data || []).slice(0, 8);
   for (const conversation of changedConversations) {
+    const conversationBusinessPhone = conversation.phoneNumberId === webhook.phoneNumberId
+      ? PRIMARY_QUO_SMS_BUSINESS_PHONE
+      : api.from;
     const participant = (conversation.participants || [])
       .map(normalizePhone)
-      .find((phone) => phone && phone !== api.from);
+      .find((phone) => phone && phone !== conversationBusinessPhone);
     if (!participant) continue;
     const messagesUrl = new URL("https://api.quo.com/v1/messages");
     messagesUrl.searchParams.set(
@@ -9064,7 +9070,7 @@ async function pollRecentQuoMessagesOnce() {
       )
         continue;
       if (
-        await ingestPolledQuoMessage(message, conversation.id || null, api.from)
+        await ingestPolledQuoMessage(message, conversation.id || null, conversationBusinessPhone)
       )
         ingested += 1;
     }
