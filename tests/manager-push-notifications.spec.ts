@@ -50,6 +50,9 @@ test("manager push notifications stay private and cover business events", async 
   expect(center).toContain("summarizeManagerNotifications(events)");
   expect(center).toContain("managerNotificationCategory(event)");
   expect(center).toContain("managerNotificationCategoryLabel(category)");
+  expect(center).toContain('type NotificationFilter = "all" | "requests" | "communications" | "actions"');
+  expect(center).toContain('aria-label="Filter notifications"');
+  expect(center).toContain("filteredEvents.map");
   expect(center).not.toContain("localStorage");
   expect(serviceWorker).toContain('self.addEventListener("push"');
   expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
@@ -99,8 +102,8 @@ test("manager notification feed is per user, queue-backed, and links to the exac
   expect(communicationsPage).toContain("initialCommunicationId=");
   expect(communicationsPage).toContain("communicationInboxNavigationKey({");
   expect(communicationsPage).toContain("key={inboxNavigationKey}");
-  expect(communicationsPage).toContain('.from("aura_communications")');
-  expect(communicationsPage).toContain('.eq("id", exactCommunicationId)');
+  expect(communicationsPage).toContain('action: "load_communication_by_id"');
+  expect(communicationsPage).toContain("communicationId: exactCommunicationId");
   expect(inbox).toContain("communications.find((communication) => communication.id === initialCommunicationId)");
   expect(inbox).toContain("Boolean(initialDraft || ((initialCommunicationId || initialThread) && initialCommunication))");
   expect(inbox).toContain("exactCommunicationRef.current?.scrollIntoView");
@@ -118,7 +121,7 @@ test("publishes the installable web app and protected notification endpoint", as
   const manifest = await manifestResponse.json();
   expect(manifest.name).toBe("Avantia Build");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("/admin/build-map");
+  expect(manifest.start_url).toBe("/");
 
   expect(workerResponse.ok()).toBeTruthy();
   expect(workerResponse.headers()["cache-control"]).toContain("no-cache");

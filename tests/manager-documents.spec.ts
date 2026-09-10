@@ -305,7 +305,7 @@ test("a reviewed document can be linked directly to a request quote comparison",
   expect(review).toContain("lineId ? [lineId] : undefined");
   expect(review).toContain("Add to Request Compare");
   expect(worktable).toContain("Original request");
-  expect(worktable).toContain("Missing info / AI notes");
+  expect(worktable).toContain("AI review");
   expect(worktable).toContain("Supplier route");
   expect(worktable).not.toContain("supplierColumns.map");
 });
