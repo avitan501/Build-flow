@@ -14,21 +14,37 @@ test("history cursor is stable, composite, and rejects malformed input", () => {
     id: "00000000-0000-4000-8000-000000000123",
     occurred_at: "2026-09-02T15:30:00.000Z",
   });
-  expect(cursor).toBe("2026-09-02T15:30:00.000Z~00000000-0000-4000-8000-000000000123");
+  expect(cursor).toBe(
+    "2026-09-02T15:30:00.000Z~00000000-0000-4000-8000-000000000123",
+  );
   expect(parseCommunicationHistoryCursor(cursor)).toEqual({
     occurredAt: "2026-09-02T15:30:00.000Z",
     id: "00000000-0000-4000-8000-000000000123",
   });
-  expect(parseCommunicationHistoryCursor("2026-09-02T15:30:00.000Z")).toBeNull();
-  expect(parseCommunicationHistoryCursor("invalid~00000000-0000-4000-8000-000000000123")).toBeNull();
+  expect(
+    parseCommunicationHistoryCursor("2026-09-02T15:30:00.000Z"),
+  ).toBeNull();
+  expect(
+    parseCommunicationHistoryCursor(
+      "invalid~00000000-0000-4000-8000-000000000123",
+    ),
+  ).toBeNull();
 });
 
 test("database history uses true keyset pagination and retains communication links", async () => {
-  const migration = await read("supabase/migrations/20260902154000_add_communication_history_pagination.sql");
+  const migration = await read(
+    "supabase/migrations/20260902154000_add_communication_history_pagination.sql",
+  );
 
-  expect(migration).toContain("(communication.occurred_at, communication.id) < (p_before_occurred_at, p_before_id)");
-  expect(migration).toContain("order by communication.occurred_at desc, communication.id desc");
-  expect(migration).toContain("limit least(greatest(coalesce(p_page_size, 80), 1), 100) + 1");
+  expect(migration).toContain(
+    "(communication.occurred_at, communication.id) < (p_before_occurred_at, p_before_id)",
+  );
+  expect(migration).toContain(
+    "order by communication.occurred_at desc, communication.id desc",
+  );
+  expect(migration).toContain(
+    "limit least(greatest(coalesce(p_page_size, 80), 1), 100) + 1",
+  );
   expect(migration).toContain("aura_communications_history_cursor_idx");
   expect(migration).toContain("aura_communications_channel_history_cursor_idx");
   expect(migration).toContain("aura_communication_links as link");
@@ -46,16 +62,22 @@ test("history endpoint is manager-only and pages every supported channel", async
   expect(route).toContain("managerCapabilities");
   expect(route).toContain("if (!access.customers)");
   expect(route).toContain("}, session.supabase)");
-  expect(route).toContain('new Set(["all", "call", "sms", "whatsapp", "email"])');
+  expect(route).toContain(
+    'new Set(["all", "call", "sms", "whatsapp", "email"])',
+  );
   expect(route).toContain('"Cache-Control", "private, no-store"');
-  expect(loader).toContain('reader.rpc("staff_load_aura_communication_history_page"');
+  expect(loader).toContain(
+    'reader.rpc("staff_load_aura_communication_history_page"',
+  );
   expect(loader).not.toContain("createAdminClient");
   expect(loader).toContain("normalized.length > pageSize");
   expect(loader).toContain("communications[communications.length - 1]");
 });
 
 test("authenticated managers can read history without a Vercel service-role dependency", async () => {
-  const migration = await read("supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql");
+  const migration = await read(
+    "supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql",
+  );
 
   expect(migration).toContain("private.has_staff_capability('customers')");
   expect(migration).toContain("private.is_admin()");
@@ -64,9 +86,10 @@ test("authenticated managers can read history without a Vercel service-role depe
 });
 
 test("communications page starts small and preserves an exact thread deep link", async () => {
-  const [page, inbox] = await Promise.all([
+  const [page, inbox, directory] = await Promise.all([
     read("app/admin/communications/page.tsx"),
     read("components/buildflow/unified-communication-inbox.tsx"),
+    read("app/api/admin/communications/directory/route.ts"),
   ]);
 
   expect(page).toContain("COMMUNICATION_HISTORY_PAGE_SIZE");
@@ -74,8 +97,10 @@ test("communications page starts small and preserves an exact thread deep link",
   expect(page).toContain("initialHistoryCursor");
   expect(page).toContain("initialHistoryHasMore");
   expect(page).toContain("initialThread={exactThread}");
-  expect(page).toContain("loadCommunicationHistoryPage({ pageSize: 60, phone: exactPhone, email: exactEmail }, supabase)\n              .catch(() => null)");
-  expect(page).toContain("loadCommunicationHistoryPage({ pageSize: 60, query: requestedSearch }, supabase)\n                .catch(() => null)");
+  expect(page).toContain(
+    "{ pageSize: 60, phone: exactPhone, email: exactEmail }",
+  );
+  expect(page).toContain("{ pageSize: 60, query: requestedSearch }");
   expect(page).toContain("initialAuraConnectionStatus");
   const status = await read("app/api/admin/communications/status/route.ts");
   expect(status).toContain("loadAuraConnectionStatus");
@@ -85,7 +110,16 @@ test("communications page starts small and preserves an exact thread deep link",
   expect(inbox).toContain('loadOlderHistory("all")');
   expect(inbox).toContain('loadOlderHistory("thread")');
   expect(inbox).toContain("/api/admin/communications/history?");
-  expect(inbox).toContain("mergeCommunicationRows(current, result.communications || [])");
+  expect(inbox).toContain(
+    "mergeCommunicationRows(current, result.communications || [])",
+  );
+  expect(inbox).toContain("COMMUNICATION_DIRECTORY_CACHE_MS");
+  expect(inbox).toContain('fetch("/api/admin/communications/directory"');
+  expect(inbox).toContain("if (hasFreshCache) return");
+  expect(directory).toContain("getSessionWithProfile");
+  expect(directory).toContain("managerCapabilities");
+  expect(directory).toContain('"Cache-Control", "private, no-store"');
+  expect(page).not.toContain('.from("aura_contacts")');
 });
 
 test("incremental history leaves live delta polling in place", async () => {

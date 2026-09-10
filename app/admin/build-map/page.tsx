@@ -1,5 +1,6 @@
 import { BusinessBlueprint } from "@/components/buildflow/business-blueprint";
 import {
+  AlertTriangle,
   ArrowRight,
   BadgeDollarSign,
   ChevronDown,
@@ -87,6 +88,15 @@ type RequestQuickEventRow = {
   created_at: string;
 };
 
+type AttentionCommunicationRow = {
+  id: string;
+  channel: string;
+  counterparty_phone: string | null;
+  counterparty_email: string | null;
+  status: string | null;
+  occurred_at: string;
+};
+
 const REQUEST_QUICK_ACTION_FEATURE = "manager_request_quick_actions";
 
 const pipelineTone: Record<ManagerPipelineStage, string> = {
@@ -162,8 +172,11 @@ export default async function AdminDashboardPage({
     : null;
   const { supabase, access } = await requireManagerPortalProfile();
   if (view === "blueprint" && access.owner) {
-    const { data, error } = await supabase.from("website_work_items")
-      .select("task_key,progress_percent,summary").like("task_key", "blueprint-%").eq("published_to_carlos", false);
+    const { data, error } = await supabase
+      .from("website_work_items")
+      .select("task_key,progress_percent,summary")
+      .like("task_key", "blueprint-%")
+      .eq("published_to_carlos", false);
     if (error) throw new Error("Business Blueprint notes could not load.");
     return <BusinessBlueprint savedRows={data ?? []} />;
   }
@@ -182,6 +195,8 @@ export default async function AdminDashboardPage({
     quickEventsResult,
     goalsResult,
     clientsResult,
+    failedMessagesResult,
+    unreadMessagesResult,
   ] = await Promise.all([
     supabase
       .from("quote_requests")
@@ -204,7 +219,9 @@ export default async function AdminDashboardPage({
     supabase
       .from("project_events")
       .select("metadata,created_at")
-      .or(`metadata->>manager_feature.eq.${REQUEST_QUICK_ACTION_FEATURE},metadata->>manager_action.eq.request_substep_status`)
+      .or(
+        `metadata->>manager_feature.eq.${REQUEST_QUICK_ACTION_FEATURE},metadata->>manager_action.eq.request_substep_status`,
+      )
       .order("created_at", { ascending: false })
       .limit(400)
       .returns<RequestQuickEventRow[]>(),
@@ -217,6 +234,30 @@ export default async function AdminDashboardPage({
       .order("created_at", { ascending: false })
       .limit(500)
       .returns<ClientRow[]>(),
+    access.communications
+      ? supabase
+          .from("aura_communications")
+          .select(
+            "id,channel,counterparty_phone,counterparty_email,status,occurred_at",
+          )
+          .eq("direction", "outgoing")
+          .in("status", ["failed", "undelivered", "bounced"])
+          .order("occurred_at", { ascending: false })
+          .limit(5)
+          .returns<AttentionCommunicationRow[]>()
+      : Promise.resolve({ data: [] }),
+    access.communications
+      ? supabase
+          .from("aura_communications")
+          .select(
+            "id,channel,counterparty_phone,counterparty_email,status,occurred_at",
+          )
+          .eq("direction", "incoming")
+          .is("read_at", null)
+          .order("occurred_at", { ascending: false })
+          .limit(5)
+          .returns<AttentionCommunicationRow[]>()
+      : Promise.resolve({ data: [] }),
   ]);
 
   const requests = (requestsResult.data ?? []).filter(
@@ -235,8 +276,14 @@ export default async function AdminDashboardPage({
     const metadata = event.metadata ?? {};
     const requestId = String(metadata.quote_request_id || "");
     if (!requestId) continue;
-    if (metadata.manager_action === "request_queue_state" && !latestQueueState.has(requestId)) {
-      latestQueueState.set(requestId, normalizeManagerRequestQueueState(metadata.queue_state));
+    if (
+      metadata.manager_action === "request_queue_state" &&
+      !latestQueueState.has(requestId)
+    ) {
+      latestQueueState.set(
+        requestId,
+        normalizeManagerRequestQueueState(metadata.queue_state),
+      );
     }
   }
   for (const event of quickEventsResult.data ?? []) {
@@ -251,26 +298,48 @@ export default async function AdminDashboardPage({
     const metadata = event.metadata ?? {};
     const requestId = String(metadata.quote_request_id || "");
     if (!requestId || latestStageOverride.has(requestId)) continue;
-    if (!["request_pipeline_stage", "request_substep_status"].includes(String(metadata.manager_action || ""))) continue;
+    if (
+      !["request_pipeline_stage", "request_substep_status"].includes(
+        String(metadata.manager_action || ""),
+      )
+    )
+      continue;
     const override = String(metadata.pipeline_stage || "");
     if (pipelineStages.some((item) => item.id === override)) {
       latestStageOverride.set(requestId, override as ManagerPipelineStage);
-      latestStageAllowsRegression.set(requestId, metadata.workflow_reopened === true);
+      latestStageAllowsRegression.set(
+        requestId,
+        metadata.workflow_reopened === true,
+      );
     }
   }
-  const queueRank: Record<ManagerRequestQueueState, number> = { rush: 0, queued: 1, normal: 2 };
-  const stagedRequests = requests.map((request) => {
-    const calculatedStage = managerPipelineStage(request, comparisons, packages);
-    return {
-      request,
-      stage: managerPipelineStageWithOverride(
-        calculatedStage,
-        latestStageOverride.get(request.id),
-        latestStageAllowsRegression.get(request.id) === true,
-      ),
-      queueState: latestQueueState.get(request.id) ?? "normal" as ManagerRequestQueueState,
-    };
-  }).sort((left, right) => queueRank[left.queueState] - queueRank[right.queueState]);
+  const queueRank: Record<ManagerRequestQueueState, number> = {
+    rush: 0,
+    queued: 1,
+    normal: 2,
+  };
+  const stagedRequests = requests
+    .map((request) => {
+      const calculatedStage = managerPipelineStage(
+        request,
+        comparisons,
+        packages,
+      );
+      return {
+        request,
+        stage: managerPipelineStageWithOverride(
+          calculatedStage,
+          latestStageOverride.get(request.id),
+          latestStageAllowsRegression.get(request.id) === true,
+        ),
+        queueState:
+          latestQueueState.get(request.id) ??
+          ("normal" as ManagerRequestQueueState),
+      };
+    })
+    .sort(
+      (left, right) => queueRank[left.queueState] - queueRank[right.queueState],
+    );
   const stageCounts = new Map<ManagerPipelineStage, number>(
     pipelineStages.map((item) => [
       item.id,
@@ -283,25 +352,33 @@ export default async function AdminDashboardPage({
       : stagedRequests
   ).slice(0, 10);
   const pipelineAvailable =
-    !requestsResult.error && !comparisonsResult.error && !packagesResult.error && !quickEventsResult.error;
+    !requestsResult.error &&
+    !comparisonsResult.error &&
+    !packagesResult.error &&
+    !quickEventsResult.error;
 
-  const quickRows: ManagerRequestQuickRow[] = visibleRequests.map(({ request, stage: requestStage, queueState }) => {
-    const client = clientMap.get(request.owner_id);
-    const savedSubstep = requestWorkflowSubstep(latestSubstep.get(request.id));
-    const statusLabel = savedSubstep?.pipelineStage === requestStage
-      ? requestWorkflowSubstepLabel(savedSubstep.id)
-      : compactPipelineLabels[requestStage];
-    return {
-      id: request.id,
-      title: request.title,
-      clientLabel: client?.full_name || client?.email || "Client",
-      stage: requestStage,
-      stageLabel: statusLabel || compactPipelineLabels[requestStage],
-      updatedLabel: formatUpdated(request.updated_at),
-      queueState,
-      assignee: request.manager_assignee === "david" ? "david" : "carlos",
-    };
-  });
+  const quickRows: ManagerRequestQuickRow[] = visibleRequests.map(
+    ({ request, stage: requestStage, queueState }) => {
+      const client = clientMap.get(request.owner_id);
+      const savedSubstep = requestWorkflowSubstep(
+        latestSubstep.get(request.id),
+      );
+      const statusLabel =
+        savedSubstep?.pipelineStage === requestStage
+          ? requestWorkflowSubstepLabel(savedSubstep.id)
+          : compactPipelineLabels[requestStage];
+      return {
+        id: request.id,
+        title: request.title,
+        clientLabel: client?.full_name || client?.email || "Client",
+        stage: requestStage,
+        stageLabel: statusLabel || compactPipelineLabels[requestStage],
+        updatedLabel: formatUpdated(request.updated_at),
+        queueState,
+        assignee: request.manager_assignee === "david" ? "david" : "carlos",
+      };
+    },
+  );
 
   const goals = goalsResult.data ?? [];
   const dashboardHistory = parseDashboardAiHistory(
@@ -320,6 +397,58 @@ export default async function AdminDashboardPage({
   const todaySummary = todaySummaryRow
     ? parseDailyWorkSummary(todaySummaryRow)
     : null;
+  const attentionItems = [
+    ...(failedMessagesResult.data ?? []).map((message) => ({
+      key: `failed-${message.id}`,
+      tone: "rose",
+      title: `${message.channel.toUpperCase()} failed`,
+      detail:
+        message.counterparty_phone ||
+        message.counterparty_email ||
+        "Open communication",
+      href: `/admin/communications?communication=${message.id}`,
+    })),
+    ...(unreadMessagesResult.data ?? []).map((message) => ({
+      key: `unread-${message.id}`,
+      tone: "sky",
+      title: "Customer needs a reply",
+      detail:
+        message.counterparty_phone ||
+        message.counterparty_email ||
+        message.channel,
+      href: `/admin/communications?communication=${message.id}`,
+    })),
+    ...stagedRequests
+      .filter((entry) => entry.queueState === "rush")
+      .slice(0, 3)
+      .map(({ request }) => ({
+        key: `rush-${request.id}`,
+        tone: "amber",
+        title: "Rush material request",
+        detail: request.title,
+        href: `/owner/materials/requests/${request.id}`,
+      })),
+    ...stagedRequests
+      .filter((entry) => entry.stage === "approval")
+      .slice(0, 3)
+      .map(({ request }) => ({
+        key: `approval-${request.id}`,
+        tone: "violet",
+        title: "Estimate waiting for approval",
+        detail: request.title,
+        href: `/owner/materials/requests/${request.id}`,
+      })),
+    ...stagedRequests
+      .filter((entry) => entry.stage === "delivery")
+      .slice(0, 3)
+      .map(({ request }) => ({
+        key: `delivery-${request.id}`,
+        tone: "emerald",
+        title: "Payment or delivery needs attention",
+        detail: request.title,
+        href: `/owner/materials/requests/${request.id}`,
+      })),
+  ].slice(0, 8);
   const managerSections = [
     {
       title: "Customers",
@@ -407,21 +536,44 @@ export default async function AdminDashboardPage({
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
       <div className="mx-auto max-w-7xl">
         <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-slate-200 pb-3">
-          <div><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>{access.owner ? <Link href="/admin/build-map?view=blueprint" className="inline-flex min-h-11 items-center text-xs font-semibold text-[#0066cc]">Business Blueprint</Link> : null}</div>
-          {access.owner ? <Link href="/admin/carlos-activity" title="Open Carlos activity history"><EmployeeClockStatus
+          <div>
+            <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
+            {access.owner ? (
+              <Link
+                href="/admin/build-map?view=blueprint"
+                className="inline-flex min-h-11 items-center text-xs font-semibold text-[#0066cc]"
+              >
+                Business Blueprint
+              </Link>
+            ) : null}
+          </div>
+          {access.owner ? (
+            <Link
+              href="/admin/carlos-activity"
+              title="Open Carlos activity history"
+            >
+              <EmployeeClockStatus
+                compact
+                checkInAt={todaySummary?.checkInAt ?? null}
+                checkOutAt={todaySummary?.checkOutAt ?? null}
+                pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
+                pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
+              />
+            </Link>
+          ) : (
+            <EmployeeClockStatus
               compact
               checkInAt={todaySummary?.checkInAt ?? null}
               checkOutAt={todaySummary?.checkOutAt ?? null}
               pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
               pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
-            /></Link> : <EmployeeClockStatus
-              compact
-              checkInAt={todaySummary?.checkInAt ?? null}
-              checkOutAt={todaySummary?.checkOutAt ?? null}
-              pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
-              pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
-            />}
-          <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled compact />
+            />
+          )}
+          <ManagerDashboardAiSearch
+            initialHistory={dashboardHistory}
+            enabled
+            compact
+          />
         </header>
 
         {!pipelineAvailable ? (
@@ -434,7 +586,72 @@ export default async function AdminDashboardPage({
           </p>
         ) : null}
 
-        <section aria-labelledby="pipeline-heading" className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <section
+          aria-labelledby="attention-heading"
+          className="mt-5 overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm"
+        >
+          <header className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                <AlertTriangle aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2
+                  id="attention-heading"
+                  className="text-base font-semibold text-slate-950"
+                >
+                  Needs Attention
+                </h2>
+                <p className="truncate text-xs text-slate-600">
+                  Messages, rush requests, approvals, payments &amp; delivery
+                </p>
+              </div>
+            </div>
+            <span
+              className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-amber-900"
+              aria-label={`${attentionItems.length} items need attention`}
+            >
+              {attentionItems.length}
+            </span>
+          </header>
+          {attentionItems.length ? (
+            <div className="grid gap-px bg-slate-100 sm:grid-cols-2">
+              {attentionItems.map((item) => (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  className="group flex min-h-16 items-center gap-3 bg-white px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-3 w-3 shrink-0 rounded-full ${item.tone === "rose" ? "bg-rose-500" : item.tone === "sky" ? "bg-sky-500" : item.tone === "violet" ? "bg-violet-500" : item.tone === "emerald" ? "bg-emerald-500" : "bg-amber-500"}`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm text-slate-900">
+                      {item.title}
+                    </strong>
+                    <span className="block truncate text-xs text-slate-500">
+                      {item.detail}
+                    </span>
+                  </span>
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5"
+                  />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="px-4 py-4 text-sm font-medium text-emerald-700">
+              Nothing urgent right now.
+            </p>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="pipeline-heading"
+          className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -491,13 +708,13 @@ export default async function AdminDashboardPage({
             })}
           </div>
           <div id="open-requests" className="border-t border-slate-200">
-          {visibleRequests.length ? (
-            <RequestQuickActionsList rows={quickRows} />
-          ) : (
-            <p className="px-4 py-8 text-center text-sm text-slate-500">
-              No open requests in this stage.
-            </p>
-          )}
+            {visibleRequests.length ? (
+              <RequestQuickActionsList rows={quickRows} />
+            ) : (
+              <p className="px-4 py-8 text-center text-sm text-slate-500">
+                No open requests in this stage.
+              </p>
+            )}
           </div>
         </section>
 
@@ -506,7 +723,9 @@ export default async function AdminDashboardPage({
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
               <UserRound className="h-4 w-4" />
             </span>
-            <h2 id="targets-heading" className="font-semibold">Carlos Dashboard</h2>
+            <h2 id="targets-heading" className="font-semibold">
+              Carlos Dashboard
+            </h2>
           </header>
           <CarlosGoalsWorkspace embedded />
         </section>

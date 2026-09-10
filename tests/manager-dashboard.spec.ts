@@ -8,16 +8,15 @@ import { managerPipelineStage } from "@/lib/manager-dashboard";
 const root = process.cwd();
 
 test("manager dashboard is the employee daily command center", async () => {
-  const [page, goalsPage, shell, goalActions] =
-    await Promise.all([
-      readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
-      readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
-      readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
-      readFile(
-        path.join(root, "app/admin/goals-progress/goal-actions.ts"),
-        "utf8",
-      ),
-    ]);
+  const [page, goalsPage, shell, goalActions] = await Promise.all([
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(
+      path.join(root, "app/admin/goals-progress/goal-actions.ts"),
+      "utf8",
+    ),
+  ]);
 
   expect(page).toContain("requireManagerPortalProfile");
   expect(page).toContain("Received / needs shopping");
@@ -57,7 +56,13 @@ test("manager dashboard is the employee daily command center", async () => {
     page.indexOf('id="pipeline-heading"'),
   );
   expect(page).toContain("Orders &amp; Requests");
-  expect(page).not.toContain('<header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">');
+  expect(page).toContain('id="attention-heading"');
+  expect(page).toContain("Needs Attention");
+  expect(page).toContain("Customer needs a reply");
+  expect(page).toContain('["failed", "undelivered", "bounced"]');
+  expect(page).not.toContain(
+    '<header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">',
+  );
   expect(page).not.toContain(
     "Today&apos;s requests, targets, and tools in one place.",
   );
@@ -68,9 +73,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain('<GoogleMeetLauncher variant="row" />');
   expect(shell).toContain('label: "Manager Dashboard"');
   expect(shell).toContain('{ href: "/admin/users", label: "Customers"');
-  expect(shell).toContain(
-    'label: "Communications"',
-  );
+  expect(shell).toContain('label: "Communications"');
   expect(shell.indexOf("Communications")).toBeGreaterThan(
     shell.indexOf("</nav>"),
   );
