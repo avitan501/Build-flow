@@ -915,7 +915,11 @@ export function RequestManagementPanel({
   const pricingDetail = workflow.step2Complete
     ? winningBid ? `Selected: ${winningBid.supplierName}` : "Supplier pricing complete"
     : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step2Action]}`
-  const fulfillmentDetail = `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
+  const fulfillmentDetail = paymentDeliveryStatus === "upcoming"
+    ? "Finish supplier pricing first"
+    : workflow.step3Complete
+      ? "Payment complete · Delivery scheduled"
+      : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
   const clientDocuments = initialClientDocuments.filter((document) => !deletedDocumentTokens.includes(document.publicToken))
   const latestClientDocument = clientDocuments[0] ?? null
   const supplierProgressRows = selectedSupplierNames.map((name) => {
@@ -935,9 +939,17 @@ export function RequestManagementPanel({
   const compactWorkflowClass = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-[#0066cc] transition hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] disabled:opacity-45 sm:min-h-9"
   const stepToolClass = "inline-flex min-h-10 w-full items-center gap-2 rounded-md px-3 text-left text-xs font-bold text-slate-700 hover:bg-sky-50 hover:text-[#0066cc] disabled:opacity-40"
 
+  function continueToClientDelivery() {
+    const section = document.getElementById("request-client-delivery")
+    if (!(section instanceof HTMLDetailsElement)) return
+    section.open = true
+    section.focus({ preventScroll: true })
+    section.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })
+  }
+
   function renderStep2PrimaryAction() {
     if (workflow.step2Complete) {
-      return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
+      return <button type="button" onClick={continueToClientDelivery} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Step 3</button>
     }
     if (workflow.step2Action === "choose-suppliers") {
       return <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={primaryWorkflowClass}><Route className="h-4 w-4" />Choose suppliers for this request</button>
@@ -964,7 +976,7 @@ export function RequestManagementPanel({
     if (workflow.step3Action === "schedule-delivery") return <button type="button" onClick={openDeliverySchedule} className={primaryWorkflowClass}><CalendarClock className="h-4 w-4" />Schedule Delivery</button>
     return latestClientDocument && documentLinks[latestClientDocument.documentType]
       ? <a href={documentLinks[latestClientDocument.documentType]} target="_blank" rel="noreferrer" className={secondaryWorkflowClass}><CheckCircle2 className="h-4 w-4 text-emerald-700" />Open Final Document</a>
-      : <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Payment & Delivery Complete</span>
+      : <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Payment complete · Delivery scheduled</span>
   }
 
   function renderSupplierRouteActions(row: (typeof supplierProgressRows)[number]) {
@@ -977,7 +989,7 @@ export function RequestManagementPanel({
 
   return (
     <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-0">
-      <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
+      <details id="request-supplier-quotes" tabIndex={-1} open={pricingStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
         <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" badges={<>
           <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">{pricingSummaryItems.length} items</span>
           <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">{selectedSupplierNames.length} suppliers</span>
@@ -1038,7 +1050,7 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details open={paymentDeliveryStatus === "active"} className={workflowStepCardClass()}>
+      <details id="request-client-delivery" tabIndex={-1} open={paymentDeliveryStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
         <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} tools={<>
           <button type="button" onClick={() => setContactOpen(true)} className={stepToolClass}><MessageSquareText className="h-4 w-4" />Contact client</button>
           <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Estimate</button>
