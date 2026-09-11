@@ -11,7 +11,7 @@ const actionCopy = {
   "contact-suppliers": "Prepare the supplier request, then review and send.",
   "add-supplier-quote": "Waiting for prices · add a supplier reply when it arrives.",
   "review-quote": "Review the supplier prices and product matches.",
-  "compare-quotes": "Compare prices per product and save your selection.",
+  "compare-quotes": "Compare prices per product, then choose the final supplier route.",
   "send-estimate": "Review the client estimate, then send it for approval.",
   "wait-for-approval": "Waiting for the client · record approval only after confirmation.",
   "create-invoice": "Client approved · review and send the invoice.",

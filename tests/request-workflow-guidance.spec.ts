@@ -17,6 +17,8 @@ test("supplier handoff distinguishes sending and waiting", () => {
   expect(guide({ routeSupplierCount: 2 }).text).toContain("review and send")
   expect(guide({ routeSupplierCount: 2, supplierRequestCount: 1 })).toMatchObject({ step: 2, waiting: true })
   expect(guide({ supplierQuoteCount: 2 }).text).toContain("per product")
+  expect(guide({ supplierQuoteCount: 2 }).text).toContain("final supplier route")
+  expect(guide({ supplierQuoteCount: 2 }).text).not.toContain("save your selection")
 })
 test("client guidance follows saved proof from estimate to arranged delivery", () => {
   const pricing = { winningSupplierSelected: true }

@@ -917,12 +917,14 @@ export function RequestManagementPanel({
   const pricingDetail = workflow.step2Complete
     ? winningBid ? `Selected: ${winningBid.supplierName}` : "Supplier pricing complete"
     : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step2Action]}`
-  const fulfillmentDetail = paymentDeliveryStatus === "upcoming"
+  const clientDocuments = initialClientDocuments.filter((document) => !deletedDocumentTokens.includes(document.publicToken))
+  const hasClientProgress = Boolean(clientDocuments.length || estimateSent || clientApproved || invoiceSent || paymentLinkSent || paymentReceived || receiptSent || deliveryScheduled)
+  const waitingForSupplierPricing = paymentDeliveryStatus === "upcoming" && !hasClientProgress
+  const fulfillmentDetail = waitingForSupplierPricing
     ? "Finish supplier pricing first"
     : workflow.step3Complete
       ? "Payment complete · Delivery scheduled"
       : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
-  const clientDocuments = initialClientDocuments.filter((document) => !deletedDocumentTokens.includes(document.publicToken))
   const latestClientDocument = clientDocuments[0] ?? null
   const supplierProgressRows = selectedSupplierNames.map((name) => {
     const supplier = findCanonicalSupplier(availableSuppliers, { supplierId: null, name }) ?? null
@@ -969,6 +971,7 @@ export function RequestManagementPanel({
   }
 
   function renderStep3PrimaryAction() {
+    if (waitingForSupplierPricing) return <button type="button" onClick={continueToSupplierPricing} className={primaryWorkflowClass}><Route className="h-4 w-4" />Continue supplier pricing</button>
     if (workflow.step3Action === "send-estimate") return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Create & Send Estimate</button>
     if (workflow.step3Action === "wait-for-approval") return <button type="button" onClick={markClientApproved} disabled={pending} className={primaryWorkflowClass}><CheckCircle2 className="h-4 w-4" />{pending ? "Saving..." : "Mark Client Approved"}</button>
     if (workflow.step3Action === "create-invoice") return <button type="button" onClick={() => openDocument("invoice")} className={primaryWorkflowClass}><FileText className="h-4 w-4" />Create & Send Invoice</button>
@@ -979,6 +982,14 @@ export function RequestManagementPanel({
     return latestClientDocument && documentLinks[latestClientDocument.documentType]
       ? <a href={documentLinks[latestClientDocument.documentType]} target="_blank" rel="noreferrer" className={secondaryWorkflowClass}><CheckCircle2 className="h-4 w-4 text-emerald-700" />Open Final Document</a>
       : <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Payment complete · Delivery scheduled</span>
+  }
+
+  function continueToSupplierPricing() {
+    const section = document.getElementById("request-supplier-quotes")
+    if (!(section instanceof HTMLDetailsElement)) return
+    section.open = true
+    section.focus({ preventScroll: true })
+    section.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" })
   }
 
   function renderSupplierRouteActions(row: (typeof supplierProgressRows)[number]) {
@@ -1065,7 +1076,7 @@ export function RequestManagementPanel({
         <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
           <ol className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {[
-              { key: "estimate", label: "Estimate & approval", done: estimateSent && clientApproved, active: ["send-estimate", "wait-for-approval"].includes(workflow.step3Action), detail: !estimateSent ? "Not sent" : clientApproved ? "Client approved" : "Waiting for approval", icon: FileCheck2 },
+              { key: "estimate", label: "Estimate & approval", done: estimateSent && clientApproved, active: !waitingForSupplierPricing && ["send-estimate", "wait-for-approval"].includes(workflow.step3Action), detail: !estimateSent ? "Not sent" : clientApproved ? "Client approved" : "Waiting for approval", icon: FileCheck2 },
               { key: "invoice", label: "Invoice & payment link", done: invoiceSent && paymentLinkSent, active: ["create-invoice", "send-payment-link"].includes(workflow.step3Action), detail: !invoiceSent ? "Invoice not sent" : paymentLinkSent ? "Payment link sent" : "Send payment link", icon: FileText },
               { key: "receipt", label: "Payment & receipt", done: paymentReceived && receiptSent, active: ["mark-paid", "create-receipt"].includes(workflow.step3Action), detail: !paymentReceived ? "Payment pending" : receiptSent ? "Receipt sent" : "Create receipt", icon: ReceiptText },
               { key: "delivery", label: "Delivery", done: deliveryScheduled, active: workflow.step3Action === "schedule-delivery", detail: deliveryScheduled ? "Scheduled" : "Not scheduled", icon: CalendarClock },
