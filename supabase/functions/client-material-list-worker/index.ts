@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
+import { safeMaterialListFailure } from "../_shared/material-list-failure.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -19,6 +20,7 @@ type OrganizerResult = {
   status?: string
   itemCount?: number
   reviewCount?: number
+  failureCode?: unknown
 }
 
 function json(body: unknown, status = 200) {
@@ -95,7 +97,8 @@ async function runJob(job: MaterialListJob) {
     if (!response.ok || !payload?.ok || payload.status === "processing") {
       result = {
         succeeded: false,
-        error: payload?.status === "processing" ? "organizer_busy" : `organizer_http_${response.status}`,
+        error: payload?.status === "processing" ? "organizer_busy" : payload?.failureCode
+          ? safeMaterialListFailure(payload.failureCode) : safeMaterialListFailure(`organizer_http_${response.status}`),
       }
     } else {
       result = {

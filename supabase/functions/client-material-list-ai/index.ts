@@ -6,6 +6,7 @@ import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
 import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedMeasurementReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
 import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
+import { completedMaterialListOutput, MaterialListFailure, materialListFailureCode } from "../_shared/material-list-failure.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -234,11 +235,6 @@ function encodeBase64(bytes: Uint8Array) {
   return btoa(binary)
 }
 
-function responseText(response: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
-  if (response.output_text?.trim()) return response.output_text.trim()
-  return (response.output ?? []).flatMap((entry) => entry.content ?? []).map((entry) => entry.text ?? "").join("\n").trim()
-}
-
 async function openAiKey() {
   const rows = await sql<{ decrypted_secret: string }[]>`
     select decrypted_secret from vault.decrypted_secrets where name = 'openai_supplier_quote_api_key' limit 1
@@ -257,7 +253,8 @@ async function authorized(request: Request) {
 }
 
 async function updateSource(source: SourceItem, state: Record<string, unknown>) {
-  await admin.from("quote_request_items").update({ metadata: { ...(source.metadata ?? {}), ...state } }).eq("id", source.id)
+  const { error } = await admin.from("quote_request_items").update({ metadata: { ...(source.metadata ?? {}), ...state } }).eq("id", source.id)
+  if (error) throw new MaterialListFailure("source_state_update_failed")
 }
 
 async function updateSources(sources: SourceItem[], state: Record<string, unknown>) {
@@ -296,9 +293,8 @@ Deno.serve(async (request: Request) => {
   if (source.metadata?.ai_organization_status === "processing" && Number.isFinite(startedAt) && Date.now() - startedAt < 10 * 60 * 1000) {
     return json({ ok: true, status: "processing", itemCount: 0 })
   }
-  await updateSources(originalSources, { ai_organization_status: "processing", ai_organization_started_at: new Date().toISOString() })
-
   try {
+    await updateSources(originalSources, { ai_organization_status: "processing", ai_organization_started_at: new Date().toISOString() })
     const typedSource = originalSources.map((originalSource) => {
       const requestDetails = cleanMultiline(originalSource.metadata?.request_details, 20_000)
       const savedFields = savedRequestItemFields(originalSource.metadata)
@@ -316,7 +312,7 @@ Deno.serve(async (request: Request) => {
     const candidates = materialListAttachmentCandidates(attachments ?? [])
     for (const attachment of candidates) {
       const { data: file, error } = await admin.storage.from("project-uploads").download(attachment.file_path)
-      if (error || !file) continue
+      if (error || !file) throw new MaterialListFailure("attachment_unavailable")
 
       const bytes = new Uint8Array(await file.arrayBuffer())
       if (!canAddMaterialListAttachment(includedAttachmentCount, includedAttachmentBytes, bytes.byteLength)) continue
@@ -336,11 +332,13 @@ Deno.serve(async (request: Request) => {
       includedAttachmentBytes += bytes.byteLength
     }
 
+    if (!typedSource && !includedAttachmentCount) throw new MaterialListFailure("source_empty")
+
     const controller = new AbortController()
     const openAiTimeout = setTimeout(() => controller.abort(), 30_000)
-    let response: Response
+    let result: AiResult
     try {
-      response = await fetch("https://api.openai.com/v1/responses", {
+      const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         signal: controller.signal,
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -353,12 +351,21 @@ Deno.serve(async (request: Request) => {
           text: { verbosity: "low", format: { type: "json_schema", name: "client_material_list", strict: true, schema } },
         }),
       })
+      if (!response.ok) throw new MaterialListFailure(`openai_http_${response.status}`)
+      let payload: unknown
+      try { payload = await response.json() } catch {
+        if (controller.signal.aborted) throw new MaterialListFailure("openai_timeout")
+        throw new MaterialListFailure("openai_invalid_json")
+      }
+      result = completedMaterialListOutput(payload) as AiResult
+    } catch (cause) {
+      if (controller.signal.aborted) throw new MaterialListFailure("openai_timeout")
+      if (cause instanceof MaterialListFailure) throw cause
+      throw new MaterialListFailure("openai_unavailable")
     } finally {
+      // Include the response body read in the provider budget, not just headers.
       clearTimeout(openAiTimeout)
     }
-    if (!response.ok) throw new Error(`openai_${response.status}`)
-    const text = responseText(await response.json())
-    const result = JSON.parse(text) as AiResult
     const items = result.documentType === "material_list"
       ? mergeSemanticallyEquivalentMaterialItems(result.items.slice(0, 300))
       : []
@@ -366,6 +373,7 @@ Deno.serve(async (request: Request) => {
     if (!items.length) {
       await updateSources(originalSources, {
         ai_organization_status: result.documentType === "plan" ? "plan_requires_takeoff" : "needs_review",
+        ai_organization_failure_code: null,
         ai_organization_summary: clean(result.summary, 1000),
         ai_organization_completed_at: new Date().toISOString(),
       })
@@ -472,19 +480,20 @@ Deno.serve(async (request: Request) => {
       }
     })
     const { data: insertedRows, error: insertError } = await admin.from("quote_request_items").insert(rows).select("id")
-    if (insertError) throw new Error("organized_items_insert_failed")
+    if (insertError) throw new MaterialListFailure("organized_items_insert_failed")
 
     if (existing.length) {
       const { error: deleteError } = await admin.from("quote_request_items").delete().in("id", existing.map((item) => item.id))
       if (deleteError) {
         const insertedIds = (insertedRows ?? []).map((row) => row.id)
         if (insertedIds.length) await admin.from("quote_request_items").delete().in("id", insertedIds)
-        throw new Error("previous_organized_items_replace_failed")
+        throw new MaterialListFailure("previous_organized_items_replace_failed")
       }
     }
 
     await updateSources(originalSources, {
       ai_organization_status: "organized",
+      ai_organization_failure_code: null,
       ai_organization_summary: clean(result.summary, 1000),
       ai_organization_item_count: rows.length,
       ai_organization_completed_at: organizedAt,
@@ -492,8 +501,15 @@ Deno.serve(async (request: Request) => {
     const reviewCount = rows.filter((row) => row.metadata.review_status !== "ready").length
     return json({ ok: true, status: "organized", itemCount: rows.length, reviewCount })
   } catch (cause) {
-    const code = cause instanceof Error ? cause.message.slice(0, 120) : "unknown_error"
-    await updateSources(originalSources, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_completed_at: new Date().toISOString() })
-    return json({ error: "The material list could not be organized automatically." }, 502)
+    const code = materialListFailureCode(cause)
+    try {
+      await updateSources(originalSources, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_failure_code: code, ai_organization_completed_at: new Date().toISOString() })
+    } catch {
+      // Keep the original safe cause in the HTTP response so the durable worker
+      // can record it even when writing source metadata is unavailable.
+      console.error("client_material_list_state_failed", { requestId, code: "source_state_update_failed" })
+    }
+    console.error("client_material_list_failed", { requestId, code })
+    return json({ error: "The material list could not be organized automatically.", failureCode: code }, 502)
   }
 })
