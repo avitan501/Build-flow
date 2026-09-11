@@ -34,6 +34,7 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
   const [extractionStatus, setExtractionStatus] = useState("")
   const [pending, startTransition] = useTransition()
   const supplier = suppliers.find((entry) => entry.id === supplierId)
+  const connectedRequest = requests.find((request) => request.id === requestId)
   const clientRequests = requests.filter((request) => request.clientId === clientSelection)
 
   useEffect(() => {
@@ -43,7 +44,11 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
     const focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus())
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (pending) return
         setOpen(false)
+        setFileName(inboundAttachment?.fileName ?? "")
+        setError("")
+        setExtractionStatus("")
         window.setTimeout(() => document.getElementById("open-supplier-quote-upload")?.focus(), 0)
       }
     }
@@ -53,14 +58,19 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
       window.removeEventListener("keydown", onKeyDown)
       document.body.style.overflow = previousOverflow
     }
-  }, [open])
+  }, [open, pending, inboundAttachment?.fileName])
 
   function closeModal() {
+    if (pending) return
     setOpen(false)
+    setFileName(inboundAttachment?.fileName ?? "")
+    setError("")
+    setExtractionStatus("")
     window.setTimeout(() => document.getElementById("open-supplier-quote-upload")?.focus(), 0)
   }
 
   function submit(formData: FormData) {
+    if (pending || !enabled) return
     setError("")
     if (linkMode === "request" && (!clientSelection || !requestId)) {
       setError("Choose the client and one of their requests before uploading.")
@@ -82,13 +92,18 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
         }
       }
       setExtractionStatus("Saving the original and preparing extracted items...")
-      const result = await uploadSupplierQuoteAction(formData)
-      if (!result.ok) {
+      try {
+        const result = await uploadSupplierQuoteAction(formData)
+        if (!result.ok) {
+          setExtractionStatus("")
+          setError(result.error)
+          return
+        }
+        router.push(`/admin/supplier-quotes/${result.data.quoteId}`)
+      } catch {
         setExtractionStatus("")
-        setError(result.error)
-        return
+        setError("The upload could not be confirmed. Check Supplier Quotes before retrying to avoid a duplicate.")
       }
-      router.push(`/admin/supplier-quotes/${result.data.quoteId}`)
     })
   }
 
@@ -106,12 +121,28 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
               <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[#0071e3]"><FileUp className="h-5 w-5" /></span>
               <div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">AI supplier intake</p><h2 id="supplier-quote-upload-title" className="mt-1 text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Upload once. Review before saving.</h2><p id="supplier-quote-upload-description" className="mt-1 text-xs leading-5 text-slate-500 sm:text-sm">Connect the quote, add its source details, then let AI prepare the material rows for review.</p></div>
             </div>
-            <button ref={closeButtonRef} type="button" onClick={closeModal} aria-label="Close upload form" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"><X className="h-4 w-4" /></button>
+            <button ref={closeButtonRef} type="button" onClick={closeModal} disabled={pending} aria-label="Close upload form" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 disabled:opacity-40"><X className="h-4 w-4" /></button>
           </div>
           <form ref={formRef} action={submit} className="flex min-h-0 flex-1 flex-col">
             {inboundAttachment ? <><input type="hidden" name="sourceCommunicationId" value={inboundAttachment.communicationId} /><input type="hidden" name="sourceAttachmentId" value={inboundAttachment.attachmentId} /></> : null}
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
               <div className="grid min-w-0 gap-x-5 gap-y-4 sm:grid-cols-2">
+                {!inboundAttachment ? <label className="min-w-0 sm:col-span-2">
+                  <span className="flex min-h-24 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-sky-300 bg-sky-50 px-4 py-4 text-center text-sm font-semibold text-slate-700"><FileUp className="h-5 w-5 shrink-0 text-[#0071e3]" /><span className="min-w-0 break-words">{fileName || "Choose PDF, CSV, TXT, or image · 25 MB maximum"}</span></span>
+                  <input name="quoteFile" type="file" required disabled={pending} aria-label="Supplier quote file" accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    setError("")
+                    if (file && (file.size === 0 || file.size > 25 * 1024 * 1024)) {
+                      setError(file.size === 0 ? "Choose a file that is not empty." : "The quote must be 25 MB or smaller.")
+                      event.target.value = ""
+                      setFileName("")
+                      return
+                    }
+                    setFileName(file?.name ?? "")
+                  }} />
+                </label> : null}
+                <details open={!initialRequest} className="min-w-0 rounded-xl border border-sky-200 bg-sky-50/50 p-3 sm:col-span-2">
+                  <summary className="min-h-11 cursor-pointer text-sm font-semibold text-slate-800">{linkMode === "request" && connectedRequest ? `Request: ${connectedRequest.title} · Change connection` : "Choose quote connection"}</summary>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Quote connection
                   <select name="linkMode" value={linkMode} onChange={(event) => { setLinkMode(event.target.value as "unlinked" | "request"); setClientSelection(""); setRequestId(""); setError("") }} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="unlinked">Don&apos;t link it to anyone</option><option value="request">Attach to a client request</option></select>
                 </label>
@@ -120,18 +151,17 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
                   <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Client request<select name="requestId" required value={requestId} disabled={!clientSelection} onChange={(event) => { setRequestId(event.target.value); setError("") }} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm disabled:bg-slate-100"><option value="">{clientSelection ? "Choose request / case" : "Choose client first"}</option>{clientRequests.map((request) => <option key={request.id} value={request.id}>{request.caseNumber} · {request.title}{request.projectName ? ` · ${request.projectName}` : ""}</option>)}</select></label>
                   {clientSelection && !clientRequests.length ? <p className="text-xs font-semibold text-amber-800 sm:col-span-2">This client has no requests yet. Choose “Don&apos;t link it to anyone” or create a client request first.</p> : null}
                 </div> : null}
+                </details>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Supplier
                   <select name="supplierId" required value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="auto">Detect from invoice</option>{suppliers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
+                  <span className="text-xs font-normal text-slate-500">We try to identify the supplier from the document. Confirm uncertain matches or a new supplier during review.</span>
                 </label>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Department
                   <select name="department" defaultValue={initialDepartment} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((department) => <option key={department}>{department}</option>)}</select>
                 </label>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Quote number <span className="font-normal text-slate-400">Optional</span><input name="quoteNumber" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-sm" placeholder="Q-1048" /></label>
                 <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-800">Quote date <input name="quoteDate" type="date" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-sm" /></label>
-                {inboundAttachment ? <div className="min-w-0 rounded-xl border border-sky-200 bg-sky-50 px-4 py-4 sm:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0071e3]">Received supplier email</p><p className="mt-1 break-words text-sm font-bold text-slate-950">{inboundAttachment.fileName}</p><p className="mt-1 text-xs leading-5 text-slate-600">From {inboundAttachment.senderEmail || "unknown sender"}{inboundAttachment.subject ? ` · ${inboundAttachment.subject}` : ""}</p><p className="mt-2 text-xs font-semibold text-amber-800">Choose the correct client request and supplier. The extracted rows will open for review before any price is compared.</p></div> : <label className="min-w-0 sm:col-span-2">
-                  <span className="flex min-h-28 w-full min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center text-sm font-semibold text-slate-700 transition hover:border-[#0071e3] hover:bg-sky-50 sm:flex-row sm:gap-3"><FileUp className="h-5 w-5 shrink-0 text-[#0071e3]" /><span className="min-w-0 break-words">{fileName || "Choose PDF, CSV, TXT, or image · 25 MB maximum"}</span></span>
-                  <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
-                </label>}
+                {inboundAttachment ? <div className="min-w-0 rounded-xl border border-sky-200 bg-sky-50 px-4 py-4 sm:col-span-2"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0071e3]">Received supplier email</p><p className="mt-1 break-words text-sm font-bold text-slate-950">{inboundAttachment.fileName}</p><p className="mt-1 text-xs leading-5 text-slate-600">From {inboundAttachment.senderEmail || "unknown sender"}{inboundAttachment.subject ? ` · ${inboundAttachment.subject}` : ""}</p><p className="mt-2 text-xs font-semibold text-amber-800">Choose the correct client request and supplier. The extracted rows will open for review before any price is compared.</p></div> : null}
                 {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
                 <div className="grid min-w-0 gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:col-span-2 sm:grid-cols-3 sm:p-4" aria-label="Safe supplier quote import steps">
                   <p className="text-xs font-semibold leading-5 text-emerald-950"><span className="mr-1.5 text-emerald-700">1</span>Original PDF stays private</p>
@@ -143,8 +173,8 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
             <div className="flex shrink-0 flex-col gap-3 border-t border-slate-200 bg-slate-50/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
               <div className="min-w-0">{extractionStatus ? <p role="status" className="text-xs font-semibold text-[#0071e3]">{extractionStatus}</p> : <p className="text-xs text-slate-500">Nothing changes in the catalog until you review the extracted quote.</p>}</div>
               <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
-                <button type="button" onClick={closeModal} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Cancel</button>
-                <button type="submit" disabled={pending || !fileName || (linkMode === "request" && (!clientSelection || !requestId))} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button>
+                <button type="button" onClick={closeModal} disabled={pending} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40">Cancel</button>
+                <button type="submit" disabled={!enabled || pending || !fileName || (linkMode === "request" && (!clientSelection || !requestId))} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button>
               </div>
             </div>
           </form>

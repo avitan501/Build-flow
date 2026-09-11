@@ -983,9 +983,13 @@ export function RequestManagementPanel({
           <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">{selectedSupplierNames.length} suppliers</span>
           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quotes</span>
         </>} tools={<>
-          <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={stepToolClass}><Route className="h-4 w-4" />Manage supplier route</button>
-          <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={stepToolClass}><Paperclip className="h-4 w-4" />Upload supplier quote</a>
-          <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Plus className="h-4 w-4" />Enter pricing manually</button>
+          <details className="rounded-lg border border-slate-200">
+            <summary className={`${stepToolClass} cursor-pointer list-none`}><Plus className="h-4 w-4" />Add supplier quote<ChevronDown className="ml-auto h-4 w-4" /></summary>
+            <div className="grid gap-1 border-t border-slate-200 bg-slate-50 p-1">
+              <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={stepToolClass}><Paperclip className="h-4 w-4 shrink-0" /><span>Upload file or photo<span className="block text-[10px] font-normal">Detect supplier and prices from a document</span></span></a>
+              <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Pencil className="h-4 w-4 shrink-0" /><span>Enter prices manually<span className="block text-[10px] font-normal">Choose the supplier and type the prices</span></span></button>
+            </div>
+          </details>
           <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Open supplier comparison</button>
           {!estimateSent ? <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Create direct estimate</button> : null}
         </>} />
