@@ -26,6 +26,8 @@ import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { requestSupplierRouteGroupKey, supplierRouteRevision, type SupplierRouteMode } from "@/lib/request-supplier-group-route"
+import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 export type QuoteResult =
@@ -678,24 +680,39 @@ export async function saveRequestItemSupplierRouteAction(input: {
   supplierNames: string[]
   supplierNotes?: Record<string, string>
   version?: number
+  mode?: SupplierRouteMode
+  groupKey?: string
+  expectedRouteRevisions?: Record<string, number>
 }) {
   const requestId = String(input.requestId || "").trim()
-  const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
+  const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))] : []
+  const mode = input.mode ?? (itemIds.length > 1 ? "batch" : "item")
+  const groupKey = String(input.groupKey ?? "").trim().toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ")
   const requestedSupplierNames = Array.isArray(input.supplierNames) ? uniqueCanonicalSupplierNames(input.supplierNames) : []
   const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
   if (JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once.", version }
   const rawNotes = input.supplierNotes && typeof input.supplierNotes === "object" && !Array.isArray(input.supplierNotes) ? input.supplierNotes : {}
   const notesByCanonicalKey = new Map<string, string>(Object.entries(rawNotes).map(([name, note]) => [canonicalSupplierKey(name), String(note || "").trim().slice(0, 800)] as const).filter(([key, note]) => Boolean(key && note)))
-  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item.", version }
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.length > 100 || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id)) || !["item", "batch", "group", "reset"].includes(mode) || (["item", "reset"].includes(mode) && itemIds.length !== 1) || (["group", "reset"].includes(mode) && (!groupKey || groupKey.length > 120))) return { ok: false as const, error: "Choose a valid item, group, or batch of up to 100 items.", version }
   const { supabase, user } = await requireStaffProfile("customers")
   const [{ data: items }, { data: supplierData }] = await Promise.all([
-    supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>(),
+    supabase.from("quote_request_items").select("id,name,department,metadata").eq("request_id", requestId).returns<Array<{ id: string; name: string; department: string; metadata: Record<string, unknown> | null }>>(),
     supabase.rpc("staff_load_catalog_suppliers"),
   ])
-  if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available.", version }
+  const effectiveItems = effectiveRequestComparisonItems(items ?? [])
+  const selectedItems = effectiveItems.filter((item) => itemIds.includes(item.id))
+  if (!items || selectedItems.length !== itemIds.length) return { ok: false as const, error: "One of the selected material items is no longer available.", version }
+  if (mode === "group") {
+    const groupItems = effectiveItems.filter((item) => requestSupplierRouteGroupKey(item) === groupKey)
+    if (groupItems.length !== itemIds.length || groupItems.some((item) => !itemIds.includes(item.id))) return { ok: false as const, error: "This group changed. Reload before applying its default suppliers.", version }
+  }
+  if (mode === "reset" && requestSupplierRouteGroupKey(selectedItems[0]) !== groupKey) return { ok: false as const, error: "This item moved to another group. Reload before resetting its suppliers.", version }
+  if (input.mode !== undefined && (!input.expectedRouteRevisions || Object.keys(input.expectedRouteRevisions).length !== itemIds.length || itemIds.some((id) => !Object.hasOwn(input.expectedRouteRevisions!, id)))) return { ok: false as const, error: "Reload the current supplier routes before editing this item or group.", version }
+  const expectedRevisions = Object.fromEntries(selectedItems.map((item) => [item.id, input.expectedRouteRevisions?.[item.id] ?? supplierRouteRevision(item.metadata)]))
+  if (Object.values(expectedRevisions).some((revision) => !Number.isSafeInteger(revision) || revision < 0) || selectedItems.some((item) => expectedRevisions[item.id] !== supplierRouteRevision(item.metadata))) return { ok: false as const, error: "Supplier routes changed elsewhere. Reload before replacing them.", version }
   const directory = Array.isArray(supplierData) ? supplierData as SupplierRoutingOption[] : []
   const routeSuppliers: SupplierRoutingOption[] = []
-  for (const requestedName of requestedSupplierNames) {
+  for (const requestedName of mode === "reset" ? [] : requestedSupplierNames) {
     let supplier = findCanonicalSupplier(directory, { name: requestedName })
     if (!supplier) {
       const draft: SupplierRoutingOption = {
@@ -737,19 +754,22 @@ export async function saveRequestItemSupplierRouteAction(input: {
   const supplierNames = routeSuppliers.map((supplier) => supplier.name)
   const supplierNotes = Object.fromEntries(routeSuppliers.map((supplier) => [supplier.name, notesByCanonicalKey.get(canonicalSupplierKey(supplier.name)) || ""]).filter(([, note]) => Boolean(note)))
   const supplierRouteEntries = routeSuppliers.map((supplier) => ({ supplier_id: supplier.id, name: supplier.name }))
-  const { error } = await supabase.rpc("staff_save_request_item_supplier_routes", {
+  const { data: savedRoutes, error } = await supabase.rpc("staff_save_request_supplier_routes_scoped", {
     p_request_id: requestId,
     p_item_ids: itemIds,
     p_supplier_names: supplierNames,
     p_supplier_route_entries: supplierRouteEntries,
     p_supplier_notes: supplierNotes,
     p_updated_by: user.id,
+    p_mode: mode,
+    p_group_key: groupKey,
+    p_expected_revisions: expectedRevisions,
   })
   if (error) return { ok: false as const, error: "The supplier route could not be saved for every selected item.", version }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/vendors")
   revalidatePath("/admin/supplier-network")
-  return { ok: true as const, version }
+  return { ok: true as const, version, routeRevisions: savedRoutes as Record<string, number> }
 }
 
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
