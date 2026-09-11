@@ -183,7 +183,7 @@ function thicknessMeasurements(value: string) {
     .toLowerCase()
     .replace(/[\u201c\u201d]/g, '"')
     .replace(/\s+/g, " ")
-  const matches = normalized.matchAll(/(\d+\s*\/\s*\d+|\d+(?:\.\d+)?)\s*(?:[-–—]\s*)?("|in(?:\.|ch(?:es)?)?|mm|cm|mil|gauge|ga)(?=\s|$|[,;:)])/gi)
+  const matches = normalized.matchAll(/(\d+[- ]\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d+(?:\.\d+)?)\s*(?:[-–—]\s*)?("|in(?:\.|ch(?:es)?)?|mm|cm|mil|gauge|ga)(?=\s|$|[,;:)])/gi)
   return [...matches].map((match) => ({
     amount: match[1].replace(/\s+/g, ""),
     unit: /^(?:"|in)/i.test(match[2]) ? "in" : /^(?:ga|gauge)$/i.test(match[2]) ? "gauge" : match[2].toLowerCase(),
@@ -196,6 +196,11 @@ export function verifiedThickness(value: string, sourceText: string) {
   const candidateMeasurements = thicknessMeasurements(candidate)
   if (!candidateMeasurements.length) return ""
   const sourceMeasurements = thicknessMeasurements(sourceText)
+  // LVL cross-section shorthand explicitly carries its width before x.
+  const lvlWidth = /\bLVL\b/i.test(sourceText)
+    ? sourceText.match(/\b(\d+-\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*[x×]\s*\d/i)?.[1]
+    : null
+  if (lvlWidth && candidateMeasurements.some(measure => measure.unit === "in" && measure.amount === lvlWidth)) return candidate
   // Common US plywood notation explicitly states a fractional thickness even
   // when the inch suffix is omitted ("plywood 5/8 CDX"). Never infer a number.
   if (/\b(?:plywood|osb)\b/i.test(sourceText)) {
