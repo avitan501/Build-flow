@@ -1,52 +1,18 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
+import { PageLoadError } from "@/components/buildflow/page-load-error";
 
 export default function GlobalError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   return (
     <html lang="en">
-      <body>
-        <main
-          style={{
-            alignItems: "center",
-            display: "flex",
-            justifyContent: "center",
-            minHeight: "100vh",
-            padding: "24px",
-          }}
-        >
-          <section style={{ maxWidth: "460px", textAlign: "center" }}>
-            <p style={{ color: "#2463a7", fontWeight: 700 }}>AVANTIA BUILD</p>
-            <h1>Something went wrong.</h1>
-            <p>The problem was reported. Please try again.</p>
-            <button
-              onClick={reset}
-              style={{
-                background: "#060b1a",
-                border: 0,
-                borderRadius: "10px",
-                color: "white",
-                cursor: "pointer",
-                fontWeight: 700,
-                padding: "12px 18px",
-              }}
-              type="button"
-            >
-              Try again
-            </button>
-          </section>
-        </main>
+      <body style={{ margin: 0, background: "#fff", color: "#0f172a", fontFamily: "system-ui, sans-serif" }}>
+        <PageLoadError error={error} retry={retry} />
       </body>
     </html>
   );
