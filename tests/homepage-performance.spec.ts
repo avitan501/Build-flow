@@ -23,4 +23,6 @@ test("homepage defers below-the-fold branding and secondary hero photos", async 
   expect(homepage).toContain('window.addEventListener("load", loadRemainingHeroPhotos');
   expect(homepage).toContain('window.setTimeout(() => setHeroDeckReady(true), 4000)');
   expect(homepage).toContain("!heroDeckReady || paused");
+  // Keep dark hero text readable if all photography fails or is blocked.
+  expect(homepage).toContain('conceptId === 2 ? "bg-[#f4efe6] text-slate-950"');
 });

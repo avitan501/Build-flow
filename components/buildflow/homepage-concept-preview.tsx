@@ -227,7 +227,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       <button type="button" onClick={() => setApproved(concept.id)} className="inline-flex min-h-10 shrink-0 items-center gap-2 bg-[#1677ff] px-3 text-xs font-bold text-white sm:px-5 sm:text-sm"><Check className="h-4 w-4" /><span className="hidden sm:inline">Approve</span> #{concept.id}</button>
     </div></header> : null}
 
-    <section className={`relative min-h-[100svh] overflow-hidden ${conceptId === 5 ? "bg-[#edf2f7] text-slate-950" : "bg-black"}`}>
+    <section className={`relative min-h-[100svh] overflow-hidden ${conceptId === 2 ? "bg-[#f4efe6] text-slate-950" : conceptId === 5 ? "bg-[#edf2f7] text-slate-950" : "bg-black"}`}>
       {reviewOnly ? <div className="absolute inset-y-0 right-0 h-full w-full overflow-hidden sm:w-[62%]" aria-label={reviewHeroPhotos[heroPhotoIndex].label} role="img">
         {reviewHeroPhotos.map((photo, index) => index === 0 || heroDeckReady ? <Image
           key={photo.src}
