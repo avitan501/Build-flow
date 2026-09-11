@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 const labels: Record<string, string> = {
-  queued: "Queued for AI",
-  processing: "AI is reading files…",
-  retrying: "AI will retry automatically",
-  failed: "AI could not finish",
+  queued: "Waiting to split your list…",
+  processing: "Splitting your list…",
+  retrying: "Delayed · retrying automatically",
+  failed: "List not split · try again",
   draft_changed: "AI copy needs refresh",
 }
 
@@ -19,8 +19,12 @@ export function MaterialOrganizationStatus({ status }: { status: string }) {
 
   useEffect(() => {
     if (!active) return
-    const timer = window.setTimeout(() => router.refresh(), retrying ? 15_000 : 4_000)
-    return () => window.clearTimeout(timer)
+    // A refresh with unchanged status preserves this component. Keep polling
+    // until the durable job changes, instead of stopping after one refresh.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh()
+    }, retrying ? 15_000 : 4_000)
+    return () => window.clearInterval(timer)
   }, [active, retrying, router, status])
 
   const draftChanged = status === "draft_changed"

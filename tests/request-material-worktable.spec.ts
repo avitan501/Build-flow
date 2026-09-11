@@ -45,8 +45,9 @@ test("review and organization use one compact grouped item workspace", async () 
   expect(worktable).toContain("Group similar")
   expect(worktable).toContain("similarItemGroupLabel")
   expect(worktable).toContain("Select group")
-  expect(worktable).toContain("Apply supplier route")
-  expect(worktable).toContain("Choose one or more suppliers")
+  expect(worktable).toContain('mode="group"')
+  expect(worktable).toContain('mode="batch"')
+  expect(worktable).toContain("Add selected suppliers")
   expect(worktable).toContain("Generate 5 suppliers")
   expect(worktable).toContain("addDiscoveredSupplierNetworkAction")
   expect(worktable).toContain("previously requested suppliers are removed")
@@ -291,7 +292,7 @@ test("website supplier defects use compact autosave, contact menus, and movable 
   expect(management).toContain("badges={<>")
   expect(stepHeader).toContain("badges?: ReactNode")
   expect(worktable).toContain("moveRequestItemDepartmentAction")
-  expect(worktable).toContain("draggable={groupSimilar && !movePending}")
+  expect(worktable).toContain("draggable={groupSimilar && !movePending && !routingBusy}")
   expect(worktable).toContain("Drop here")
   expect(worktable).toContain("Move group…")
   expect(actions).toContain("export async function moveRequestItemDepartmentAction")
@@ -299,7 +300,7 @@ test("website supplier defects use compact autosave, contact menus, and movable 
   expect(actions).toContain("previous_department")
 })
 
-test("supplier routes are alphabetical checklists with per-item or whole-request scope", async () => {
+test("supplier routes are alphabetical checklists with group defaults and individual exceptions", async () => {
   const [page, worktable, editor, management, actions] = await Promise.all([
     source(pagePath),
     source(worktablePath),
@@ -311,10 +312,11 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(editor).toContain("supplierNameCollator")
   expect(editor).toContain('type="checkbox"')
   expect(editor).toContain("Only this item")
-  expect(editor).toContain("All items in request")
-  expect(editor).toContain("This replaces the supplier route on every item in this request.")
+  expect(editor).not.toContain("All items in request")
+  expect(editor).toContain("individual exceptions stay unchanged")
+  expect(editor).toContain("Use group suppliers again")
   expect(worktable).toContain("itemIds={groupIds}")
-  expect(worktable).toContain("orderedSuppliers.map")
+  expect(worktable).toContain("suppliers={orderedSuppliers}")
   expect(actions).toContain("p_supplier_notes: supplierNotes")
   expect(editor).toContain("canonicalSupplierKey(name) === supplierKey")
   expect(editor).toContain("Note for this supplier")
@@ -325,10 +327,10 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(management).not.toContain("routeContactSupplierIds")
   expect(management).not.toContain("Add or change suppliers")
   expect(management).toContain("Compare supplier quotes")
-  expect(worktable).toContain("{selectedRouteIds.length} items selected")
+  expect(worktable).toContain("{selectedRouteIds.length} products selected")
   expect(actions).not.toContain("].slice(0, 12)")
   expect(actions).toContain("p_supplier_route_entries: supplierRouteEntries")
-  expect(actions).toContain('supabase.rpc("staff_save_request_item_supplier_routes"')
+  expect(actions).toContain('supabase.rpc("staff_save_request_supplier_routes_scoped"')
 })
 
 test("request item edits save explicitly while supplier routes autosave safely", async () => {
