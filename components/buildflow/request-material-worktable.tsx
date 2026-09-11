@@ -342,6 +342,7 @@ export function RequestMaterialWorktable({
           <summary className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Request tools"><MoreHorizontal className="h-4 w-4" /></summary>
           <div className="absolute right-0 top-[calc(100%+.4rem)] z-40 grid w-[min(24rem,calc(100vw-2rem))] gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
             <p className="text-[10px] font-bold uppercase tracking-[.1em] text-slate-400">Request tools</p>
+            <RequestSubstepFunnel requestId={requestId} step={1} currentSubstep={currentSubstep} />
             <div className="flex flex-wrap gap-2"><OriginalRequestItemEditor requestId={requestId} mode="add" />{!rawDraft ? organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : <>{organizationStatus === "failed" ? <MaterialOrganizationStatus status="failed" /> : null}<OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} compact /></> : null}</div>
             {items.length ? <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => copyList("original")} disabled={!sourceItems.length} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 disabled:opacity-40"><Copy className="h-3.5 w-3.5" />{copied === "original" ? "Copied" : "Copy original"}</button><button type="button" onClick={() => copyList("ai")} disabled={!organizedItems.length || !aiCoversEverySource} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 text-[10px] font-bold text-[#0066cc] disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"><Copy className="h-3.5 w-3.5" />{copied === "ai" ? "Copied" : "Copy AI"}</button></div> : null}
             <div className="border-t border-slate-100 pt-2">
@@ -360,7 +361,6 @@ export function RequestMaterialWorktable({
         </div>
       </div>
 
-      {!rawDraft || aiItems.length > 0 ? <RequestSubstepFunnel requestId={requestId} step={1} currentSubstep={currentSubstep} /> : null}
 
       {rawDraft ? <div data-testid="original-request-draft" className="border-b border-slate-200 bg-slate-50/70 px-3 py-3 sm:px-4">
         <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-slate-500">Original list</p><span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${draftChanged ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{draftChanged ? "AI needs refresh" : "Saved"}</span></div><p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-slate-700">{rawDraftText || "The request is in the attached photo or document."}</p></div><OriginalRequestItemEditor requestId={requestId} item={rawDraft} buttonLabel="Edit original" /></div>

@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { communicationAttentionTitle, groupDashboardAttention, type DashboardAttentionItem } from "../lib/dashboard-attention";
 
+test("no-reply emails remain available separately, never mixed with personal unread messages", () => {
+  const items = ["no-reply@google.com", "noreply@accounts.example.com", "supplier@example.com"].map((detail, i) => ({key:`unread-${i}`,tone:"sky",title:"Unread email",detail,href:"/admin/communications"}));
+  const groups = groupDashboardAttention(items);
+  expect(groups.find(g => g.id === "automated")?.items).toHaveLength(2);
+  expect(groups.find(g => g.id === "unread")?.items.map(i => i.detail)).toEqual(["supplier@example.com"]);
+  expect(groups.flatMap(g => g.items)).toHaveLength(3);
+});
+
 test("unread never implies customer or reply required", () => {
   expect(communicationAttentionTitle("sms")).toBe("Unread text");
   expect(communicationAttentionTitle("email")).toBe("Unread email");

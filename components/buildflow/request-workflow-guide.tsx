@@ -15,13 +15,12 @@ export function RequestWorkflowGuide({ guidance }: { guidance: ReturnType<typeof
       {REQUEST_GUIDE_STEPS.map((step, index) => <li key={step.id}>
         <button type="button" onClick={() => openStep(index)} aria-current={guidance.step === index + 1 ? "step" : undefined}
           className={`min-h-11 w-full rounded-lg px-1.5 py-2 text-xs font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600 ${guidance.step === index + 1 ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"}`}>
-          <span className="block text-[10px] opacity-70">{index + 1}</span>{step.label}
+          <span className="mr-1 text-[10px] opacity-70">{index + 1}.</span>{step.label}
         </button>
       </li>)}
     </ol></nav>
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <p className="min-w-0 flex-1 basis-44 text-xs leading-5 text-slate-700" role="status"><span className="font-bold">{guidance.waiting ? "Now: " : "Next: "}</span>{guidance.text}</p>
-      <button type="button" onClick={() => openStep(guidance.step - 1)} className="min-h-11 rounded-lg border border-sky-200 px-3 text-xs font-bold text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-600">Open step {guidance.step}</button>
     </div>
     <details className="mt-1 text-xs text-slate-600">
       <summary className="w-fit cursor-pointer py-2 font-semibold">New here? See the 3 steps</summary>

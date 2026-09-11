@@ -17,9 +17,11 @@ export function communicationAttentionTitle(channel: string, status?: string | n
 }
 
 export function groupDashboardAttention(items: DashboardAttentionItem[]) {
+  const automated = (item: DashboardAttentionItem) => item.key.startsWith("unread-") && /^(?:no[-_.]?reply|do[-_.]?not[-_.]?reply)@/i.test(item.detail.trim());
   return [
     { id: "delivery", label: "Delivery issues", items: items.filter((item) => item.key.startsWith("failed-")) },
-    { id: "unread", label: "Unread messages", items: items.filter((item) => item.key.startsWith("unread-")) },
+    { id: "unread", label: "Unread messages", items: items.filter((item) => item.key.startsWith("unread-") && !automated(item)) },
+    { id: "automated", label: "Automated emails", items: items.filter(automated) },
     { id: "requests", label: "Requests", items: items.filter((item) => !item.key.startsWith("failed-") && !item.key.startsWith("unread-")) },
   ].filter((group) => group.items.length > 0);
 }

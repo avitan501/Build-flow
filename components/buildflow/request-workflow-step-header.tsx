@@ -32,7 +32,7 @@ const statusStyles: Record<WorkflowStepStatus, { number: string; label: string; 
 }
 
 export function workflowStepCardClass() {
-  return "group relative min-w-0 w-full overflow-visible rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] focus-within:z-40"
+  return "group group/step relative min-w-0 w-full overflow-visible rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)] focus-within:z-40"
 }
 
 export function RequestWorkflowStepHeader({
@@ -70,10 +70,10 @@ export function RequestWorkflowStepHeader({
         <span className="min-w-[8rem] flex-1">
           <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of {totalSteps}</span>
           <span className="mt-1 flex items-start gap-2 text-base font-black leading-5 tracking-[-0.01em] text-[#12263f] sm:items-center sm:text-lg"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#8b6a27] sm:mt-0" /><span className="line-clamp-2 sm:line-clamp-1">{title}</span></span>
-          <span className="mt-0.5 block line-clamp-2 text-xs font-medium text-slate-500 sm:line-clamp-1 sm:text-sm">{detail}</span>
-          {badges ? <span className="mt-1 flex flex-wrap gap-1">{badges}</span> : null}
+          <span className="mt-0.5 hidden text-xs font-medium text-slate-500 group-open/step:block sm:text-sm">{detail}</span>
+          {badges ? <span className="mt-1 hidden flex-wrap gap-1 group-open/step:flex">{badges}</span> : null}
         </span>
-        <ChevronDown className="hidden h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180 sm:block" aria-hidden="true" />
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open/step:rotate-180" aria-hidden="true" />
         {allowManualCompletion || tools ? <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} statusLabel={styles.label} allowManualCompletion={allowManualCompletion}>{tools}</RequestWorkflowStepToggle> : null}
       </summary>
   )

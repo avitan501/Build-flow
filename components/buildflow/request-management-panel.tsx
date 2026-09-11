@@ -212,6 +212,7 @@ export function RequestManagementPanel({
   routeSelections,
   projectAddress,
   currentSubstep,
+  itemsReadyForPricing = true,
   comparisons,
   clientReplyCompleted,
   step2CompletedOverride,
@@ -237,6 +238,7 @@ export function RequestManagementPanel({
   projectAddress: string
   currentStage: ManagerPipelineStage
   currentSubstep: RequestWorkflowSubstepId
+  itemsReadyForPricing?: boolean
   comparisons: RequestComparisonSummary[]
   clientReplyCompleted: boolean
   step2CompletedOverride: boolean | null
@@ -989,12 +991,13 @@ export function RequestManagementPanel({
 
   return (
     <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-0">
-      <details id="request-supplier-quotes" tabIndex={-1} open={pricingStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
-        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" badges={<>
+      <details id="request-supplier-quotes" tabIndex={-1} open={itemsReadyForPricing && pricingStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
+        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={itemsReadyForPricing ? pricingStatus : "upcoming"} allowManualCompletion={itemsReadyForPricing} icon="pricing" badges={<>
           <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">{pricingSummaryItems.length} items</span>
           <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">{selectedSupplierNames.length} suppliers</span>
           <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quotes</span>
         </>} tools={<>
+          <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
           <details className="rounded-lg border border-slate-200">
             <summary className={`${stepToolClass} cursor-pointer list-none`}><Plus className="h-4 w-4" />Add supplier quote<ChevronDown className="ml-auto h-4 w-4" /></summary>
             <div className="grid gap-1 border-t border-slate-200 bg-slate-50 p-1">
@@ -1005,7 +1008,6 @@ export function RequestManagementPanel({
           <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Compare supplier quotes</button>
           {!estimateSent ? <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Create direct estimate</button> : null}
         </>} />
-        <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
           <div className="mb-3">{renderStep2PrimaryAction()}</div>
           {supplierRequestFiles.length ? <details className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60">
@@ -1052,6 +1054,7 @@ export function RequestManagementPanel({
 
       <details id="request-client-delivery" tabIndex={-1} open={paymentDeliveryStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
         <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} tools={<>
+          <RequestSubstepFunnel requestId={requestId} step={3} currentSubstep={currentSubstep} />
           <button type="button" onClick={() => setContactOpen(true)} className={stepToolClass}><MessageSquareText className="h-4 w-4" />Contact client</button>
           <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Estimate</button>
           <button type="button" onClick={() => openDocument("invoice")} className={stepToolClass}><FileText className="h-4 w-4" />Invoice</button>
@@ -1059,7 +1062,6 @@ export function RequestManagementPanel({
           <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className={stepToolClass}><Send className="h-4 w-4" />Payment link</button>
           <button type="button" onClick={openDeliverySchedule} className={stepToolClass}><CalendarClock className="h-4 w-4" />Delivery schedule</button>
         </>} />
-        <RequestSubstepFunnel requestId={requestId} step={3} currentSubstep={currentSubstep} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
           <ol className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {[

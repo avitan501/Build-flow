@@ -4,6 +4,14 @@ import path from "node:path"
 
 const source = () => readFile(path.join(process.cwd(), "components/buildflow/request-management-panel.tsx"), "utf8")
 
+test("unorganized intake starts with future pricing closed and manual substeps stay in tools", async () => {
+  const component = await source()
+  expect(component).toContain('open={itemsReadyForPricing && pricingStatus === "active"}')
+  const tools = component.slice(component.indexOf('</>} tools={<>'), component.indexOf('data-testid="request-step-2"'))
+  expect(tools).toContain('<RequestSubstepFunnel')
+  expect(tools.indexOf('<RequestSubstepFunnel')).toBeLessThan(tools.indexOf('</>} />'))
+})
+
 test("completed supplier pricing continues to existing client stage without creating an estimate", async () => {
   const component = await source()
   const completedAction = component.split("if (workflow.step2Complete) {")[1].split('if (workflow.step2Action === "choose-suppliers")')[0]

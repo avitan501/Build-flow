@@ -771,6 +771,7 @@ export default async function OwnerMaterialRequestPage({
         ) : null}
         <div className="mt-2">
           <RequestManagementPanel
+            itemsReadyForPricing={!requestStep1CompletionError(items ?? [])}
             key={[
               ...routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`),
               ...(supplierRecommendations ?? []).map((entry) => `${entry.supplier_id}:${entry.contact_status}:${entry.notes}`),
