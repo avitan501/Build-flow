@@ -22,6 +22,16 @@ David prioritizes a fast, light, usable request flow over further AI extraction 
 
 ## Remaining
 
+## Follow-up verification and intake continuity
+
+- `2750f9e3` adds a light hero base when photography fails; verified image-blocked320 and slow-network390 remain readable, no overflow/errors. Homepage and comparison1440 checked visually. First release run34596241237 is still in progress at this entry; do not infer publication from push.
+- `22cc361e` extends exact anonymous route handling to `/request-quote` and `/beat-a-quote`, GET and POST. Their existing public action does not consume proxy claims. All protected/auth checks remain; nested/unlisted paths still follow existing handling. Independent read-only action audit completed before change.
+- Follow-up full build/typecheck passed;72/72 distinct focused application cases passed together. Public forms displayed at390/1440, one form each/no horizontal overflow/no JS errors. Local production first HTML chunks request-quote56ms and beat-a-quote30ms. No actual submission, upload, customer creation, email or push performed.
+- Important service evidence: read-only pg_stat_activity aggregate via production management API failed after15s with connection timeout, even while project status reports ACTIVE_HEALTHY. Do not claim the underlying incident resolved.
+- Submission remains dependent on Auth/admin user creation, DB inserts, storage, email and organization enqueue. Some external calls are unbounded; each invocation creates a new reference, so naive timeout/retry can duplicate accepted requests. Durable idempotency is required before automatic resubmission. Existing anonymous matching-contact profile updates merit a separate security review; not introduced by this release.
+
+## Remaining work (current)
+
 - Publish verified candidate, then verify live first response/phone/desktop and actual request access. Not yet published at this entry.
 - Supabase authentication/profile delays remain a separate service incident; homepage resilience does not fix login or protected request data availability.
 - Request638410 organizer job38 remains failed (`organizer_http_503`, attempts5); Vault key presence confirmed without reading out values. Two safe invalid-ID authenticated endpoint probes timed out; unauthenticated probe returned401. No extraction retry or source/HOLD quantity edits made. AI work deprioritized by David.
