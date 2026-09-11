@@ -29,6 +29,7 @@ import {
 import { managerPipelineStage, managerPipelineStageWithOverride, type ManagerPipelineStage } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
+import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion";
 import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubstepLabel, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
@@ -359,8 +360,8 @@ export default async function OwnerMaterialRequestPage({
           .returns<LinkedSupplierQuote[]>(),
       ])
     : [
-        { data: [] as QuoteComparisonItemRecord[] },
-        { data: [] as QuoteComparisonBidRecord[] },
+        { data: [] as QuoteComparisonItemRecord[], error: null },
+        { data: [] as QuoteComparisonBidRecord[], error: null },
         { data: [] as LinkedSupplierQuote[] },
       ];
   const supplierQuoteSources = await Promise.all(
@@ -385,6 +386,14 @@ export default async function OwnerMaterialRequestPage({
     }),
   );
   const clientRequestFiles = signedFiles.filter((file) => file.source_party !== "supplier");
+  const latestSelectedComparison = (comparisons ?? []).find((comparison) => comparison.status === "awarded");
+  const selectedPricingReady = Boolean(latestSelectedComparison?.awarded_bid_id
+    && !comparisonItemsResult.error && !comparisonBidsResult.error
+    && !requestStep2CompletionError(
+      items ?? [],
+      (comparisonItemsResult.data ?? []).filter((item) => item.comparison_id === latestSelectedComparison.id),
+      (comparisonBidsResult.data ?? []).find((bid) => bid.comparison_id === latestSelectedComparison.id && bid.id === latestSelectedComparison.awarded_bid_id),
+    ));
   const supplierRequestFiles = signedFiles.filter((file) => file.source_party === "supplier");
   const suppliers = canonicalSupplierDirectory(
     managerSettings?.state?.qualificationSettings?.suppliers ?? [],
@@ -688,6 +697,7 @@ export default async function OwnerMaterialRequestPage({
         </header>
         <RequestMaterialWorktable
           requestId={request.id}
+          stepCompleted={(workflowOverrides.get(1) ?? true) && !requestStep1CompletionError(items ?? [])}
           originalItems={originalItems}
           organizedItems={organizedItems}
           defaultZipCode={zipCodeFromAddress(request.projects?.address)}
@@ -808,7 +818,7 @@ export default async function OwnerMaterialRequestPage({
             currentSubstep={currentSubstep}
             comparisons={comparisonSummaries}
             clientReplyCompleted={clientReplyCompleted}
-            step2CompletedOverride={workflowOverrides.get(2) ?? null}
+            step2CompletedOverride={selectedPricingReady ? workflowOverrides.get(2) ?? null : false}
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, managerPreviewToken: entry.manager_preview_token, version: entry.version, updatedAt: entry.updated_at, lastOpenedAt: currentClientDocumentViewByVersion.get(`${entry.id}:${entry.version}`)?.last_opened_at ?? null }))}

@@ -56,7 +56,8 @@ test("step one keeps add, documents, and AI organization in one small tools menu
 
   expect(menuStart).toBeGreaterThan(-1)
   expect(menuEnd).toBeGreaterThan(menuStart)
-  expect(worktable).toContain("Step 1 · Request workspace")
+  expect(worktable).toContain(">Step 1</p>")
+  expect(worktable).toContain("RequestWorkflowStatusButton")
   expect(worktable).toContain('aria-label="Request tools"')
   expect(worktable).toContain("h-9 cursor-pointer")
   expect(toolsMenu).toContain("OriginalRequestItemEditor")

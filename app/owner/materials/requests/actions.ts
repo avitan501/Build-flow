@@ -17,6 +17,9 @@ import { requestWorkflowSubstep, type RequestWorkflowSubstepId } from "@/lib/req
 import { requestItemFieldsMetadata, type RequestItemField } from "@/lib/request-item-fields"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
+import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion"
+import type { ReviewableMaterialItem } from "@/lib/client-material-review"
+import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { buildClientLinkMessage } from "@/lib/client-link-message"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
@@ -930,6 +933,27 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
     .eq("id", requestId)
     .maybeSingle<{ id: string; owner_id: string; project_id: string; status: string }>()
   if (!request) return { ok: false as const, error: "Request not found." }
+
+  if (input.completed && (step === 1 || step === 2)) {
+    const requested = await supabase.from("quote_request_items").select("id,name,department,quantity,unit,metadata").eq("request_id", requestId).returns<ReviewableMaterialItem[]>()
+    if (requested.error) return { ok: false as const, error: "Could not check the products. Try again." }
+    if (step === 1) {
+      const reason = requestStep1CompletionError(requested.data ?? [])
+      if (reason) return { ok: false as const, error: reason }
+    } else {
+      const selected = await supabase.from("quote_comparisons").select("id,awarded_bid_id").eq("request_id", requestId).eq("status", "awarded").order("updated_at", { ascending: false }).limit(1).maybeSingle<{ id: string; awarded_bid_id: string | null }>()
+      if (selected.error) return { ok: false as const, error: "Could not check the selected prices. Try again." }
+      if (!selected.data?.awarded_bid_id) return { ok: false as const, error: "Select and save a supplier route in Compare supplier quotes first." }
+      const comparison = selected.data
+      const [items, bid] = await Promise.all([
+        supabase.from("quote_comparison_items").select("*").eq("comparison_id", comparison.id).returns<QuoteComparisonItemRecord[]>(),
+        supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", comparison.id).eq("id", comparison.awarded_bid_id!).maybeSingle<QuoteComparisonBidRecord>(),
+      ])
+      if (items.error || bid.error) return { ok: false as const, error: "Could not verify the saved prices. Try again." }
+      const reason = requestStep2CompletionError(requested.data ?? [], items.data ?? [], bid.data ?? undefined)
+      if (reason) return { ok: false as const, error: reason }
+    }
+  }
 
   if (step === 3 && input.completed) {
     const [{ data: clientEvents, error: clientEventsError }, { data: receiptDocument, error: receiptDocumentError }] = await Promise.all([

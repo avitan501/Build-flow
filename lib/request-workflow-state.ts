@@ -79,8 +79,8 @@ export function requestWorkflowState(input: RequestWorkflowStateInput): RequestW
 
   let step2Action: RequestWorkflowAction
   if (step2Complete) step2Action = "send-estimate"
-  else if (!input.routeSupplierCount) step2Action = "choose-suppliers"
   else if (input.supplierQuoteCount) step2Action = input.supplierQuoteCount === 1 ? "review-quote" : "compare-quotes"
+  else if (!input.routeSupplierCount) step2Action = "choose-suppliers"
   else if (!input.supplierRequestCount) step2Action = "contact-suppliers"
   else step2Action = "add-supplier-quote"
 

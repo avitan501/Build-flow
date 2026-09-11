@@ -16,6 +16,7 @@ import { OriginalRequestItemEditor } from "@/components/buildflow/original-reque
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
 import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
+import { RequestWorkflowStatusButton } from "@/components/buildflow/request-workflow-step-toggle"
 import { RequestSupplierRouteEditor, type RequestRouteSupplier } from "@/components/buildflow/request-supplier-route-editor"
 import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
@@ -133,6 +134,7 @@ export function RequestMaterialWorktable({
   supplierComparisons,
   suppliers,
   attachments,
+  stepCompleted = false,
 }: {
   requestId: string
   originalItems: ReviewableMaterialItem[]
@@ -144,6 +146,7 @@ export function RequestMaterialWorktable({
   supplierComparisons: RequestWorktableComparison[]
   suppliers: RequestRouteSupplier[]
   attachments: RequestWorktableAttachment[]
+  stepCompleted?: boolean
 }) {
   const router = useRouter()
   const [savedItems, setSavedItems] = useState<Record<string, ReviewableMaterialItem>>({})
@@ -319,14 +322,16 @@ export function RequestMaterialWorktable({
   }
 
   return (
-    <section className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]" aria-labelledby="request-items-heading">
+    <section className="relative mt-3 rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]" aria-labelledby="request-items-heading">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 sm:px-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Step 1 · Request workspace</p>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Step 1</p>
           <h2 id="request-items-heading" className="truncate text-base font-bold">Request items</h2>
         </div>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <RequestWorkflowStatusButton key={`${requestId}:${stepCompleted}`} requestId={requestId} step={1} completed={stepCompleted} />
         <details className="group relative shrink-0">
-          <summary className="inline-flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]" aria-label="Request tools"><MoreHorizontal className="h-4 w-4" />Tools <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary>
+          <summary className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Request tools"><MoreHorizontal className="h-4 w-4" /></summary>
           <div className="absolute right-0 top-[calc(100%+.4rem)] z-40 grid w-[min(24rem,calc(100vw-2rem))] gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
             <p className="text-[10px] font-bold uppercase tracking-[.1em] text-slate-400">Request tools</p>
             <div className="flex flex-wrap gap-2"><OriginalRequestItemEditor requestId={requestId} mode="add" />{organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : <>{organizationStatus === "failed" ? <MaterialOrganizationStatus status="failed" /> : null}<OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} compact /></>}</div>
@@ -344,6 +349,7 @@ export function RequestMaterialWorktable({
             </div>
           </div>
         </details>
+        </div>
       </div>
 
       <RequestSubstepFunnel requestId={requestId} step={1} currentSubstep={currentSubstep} />
