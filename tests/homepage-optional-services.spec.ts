@@ -39,6 +39,20 @@ test("protected paths keep claims validation and login redirects", async () => {
   }
 });
 
+test("anonymous intake routes skip optional auth for viewing and submission only on exact paths", async () => {
+  for (const path of ["/request-quote", "/beat-a-quote"]) {
+    for (const method of ["GET", "POST"]) {
+      const fixture = proxyFixture();
+      const response = await fixture.proxy(new NextRequest(`https://avantiabuild.com${path}`, { method, headers: { cookie: "sb-test-auth-token=expired" } }));
+      expect(response.status).toBe(200);
+      expect(fixture.calls()).toBe(0);
+    }
+    const fixture = proxyFixture();
+    await fixture.proxy(new NextRequest(`https://avantiabuild.com${path}/not-allowlisted`));
+    expect(fixture.calls()).toBe(1);
+  }
+});
+
 test("signed-in login and dashboard redirects remain unchanged", async () => {
   for (const path of ["/login", "/signup", "/dashboard"]) {
     const fixture = proxyFixture(true);
