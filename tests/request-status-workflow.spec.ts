@@ -54,7 +54,9 @@ test("manager status controls keep paid delivery and completion separate", async
   expect(requestStatus).toContain(
     "Mark this request completed? The customer can no longer add items",
   );
-  expect(requestStatus).toContain('className="w-44 min-w-0"');
+  // The shared mobile header lets the status control fill its allocated cell.
+  expect(requestStatus).toContain('className="w-full min-w-0"');
+  expect(requestStatus).not.toContain('className="w-44 min-w-0"');
   expect(requestStatus).not.toContain("Next:");
   expect(requestStatus).toContain("useOptimistic(status)");
   expect(requestStatus).toContain("setSelectedStatus(nextStatus)");
