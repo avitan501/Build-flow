@@ -21,6 +21,8 @@ const autosaveHookPath = path.join(root, "lib/use-sequenced-autosave.ts")
 const liveSyncPath = path.join(root, "components/buildflow/request-live-sync.tsx")
 const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902233933_atomic_request_supplier_route_autosave.sql")
 const staffWorkflowMigrationPath = path.join(root, "supabase/migrations/20260903225000_fix_staff_request_workflow.sql")
+const substepFunnelPath = path.join(root, "components/buildflow/request-substep-funnel.tsx")
+const inlineNameEditorPath = path.join(root, "components/buildflow/request-inline-name-editor.tsx")
 
 async function source(filePath: string) {
   try {
@@ -150,6 +152,28 @@ test("request actions fail visibly without throwing and stay compact with mobile
   expect(management).toContain("sm:min-h-9")
   expect(editor).toContain("min-h-11")
   expect(editor).toContain("sm:min-h-9")
+})
+
+test("mobile request detail keeps one clear next action and collapses repeated progress controls", async () => {
+  const [page, management, funnel, stepHeader, inlineNameEditor] = await Promise.all([
+    source(pagePath),
+    source(managementPath),
+    source(substepFunnelPath),
+    source(path.join(root, "components/buildflow/request-workflow-step-header.tsx")),
+    source(inlineNameEditorPath),
+  ])
+
+  expect(page).toContain("sm:flex-nowrap")
+  expect(page).toContain("basis-full")
+  expect(page).toContain('className="mt-1.5 hidden sm:block"')
+  expect(page).toContain("env(safe-area-inset-bottom)+10rem")
+  expect(funnel).toContain("Current status:")
+  expect(funnel).toContain("sm:hidden")
+  expect(funnel).toContain("hidden border-b")
+  expect(management).toContain("Choose suppliers for this request")
+  expect(management).toContain("env(safe-area-inset-bottom)+9rem")
+  expect(stepHeader).toContain("line-clamp-2 sm:line-clamp-1")
+  expect(inlineNameEditor).toContain('line-clamp-2 break-words sm:truncate')
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {

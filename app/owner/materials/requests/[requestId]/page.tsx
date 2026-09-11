@@ -659,7 +659,7 @@ export default async function OwnerMaterialRequestPage({
   });
 
   return (
-    <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
+    <main className="min-h-screen bg-[#f5f5f7] px-3 pb-[calc(env(safe-area-inset-bottom)+10rem)] pt-4 text-slate-950 sm:px-6 sm:pb-28">
       <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
         <header className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
@@ -668,14 +668,14 @@ export default async function OwnerMaterialRequestPage({
             <div className="w-28 shrink-0"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact hideLabel /></div>
             <div className="w-36 shrink-0"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} currentLabel={request.status === "closed" ? "Completed" : requestWorkflowSubstepLabel(currentSubstep) || undefined} hideLabel /></div>
           </div>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 border-t border-slate-100 pt-1.5" data-testid="request-header-owner-row">
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 border-t border-slate-100 pt-1.5 sm:flex-nowrap" data-testid="request-header-owner-row">
             <span className="shrink-0 text-[11px] font-semibold text-slate-400">#{request.public_number}</span>
             <div className="min-w-0 max-w-28 flex-1 truncate text-xs font-semibold text-slate-700" title="Request owner"><RequestInlineNameEditor requestId={request.id} value={profile?.full_name || "Client"} kind="client" /></div>
             <RequestClientContact />
             <span className="text-slate-300">·</span>
-            <div className="min-w-0 flex-1 truncate text-sm font-bold" title={request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
+            <div className="min-w-0 basis-full pt-1 text-base font-black leading-5 sm:flex-1 sm:basis-auto sm:truncate sm:pt-0 sm:text-sm sm:font-bold" title={request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
           </div>
-          <nav aria-label="Request progress" className="mt-1.5">
+          <nav aria-label="Request progress" className="mt-1.5 hidden sm:block">
             <ol className="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
               {requestProgress.map((step, index) => {
                 const currentIndex = requestProgress.findIndex((candidate) => candidate.stage === currentStage);

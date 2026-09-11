@@ -62,14 +62,14 @@ export function RequestWorkflowStepHeader({
   const styles = statusStyles[status]
 
   return (
-      <summary className={`flex min-h-[4.5rem] cursor-pointer list-none items-center gap-3 border-l-[3px] px-3 py-2.5 pr-32 sm:px-4 sm:pr-40 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
+      <summary className={`flex min-h-[4.5rem] cursor-pointer list-none items-center gap-2 border-l-[3px] px-3 py-2.5 pr-24 sm:gap-3 sm:px-4 sm:pr-40 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
         <span className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-xl font-black tabular-nums ${styles.number}`} aria-label={`Step ${step}`}>
           {step}
           {status === "complete" ? <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-700 text-white"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span> : null}
         </span>
         <span className="min-w-0 flex-1">
           <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of {totalSteps}</span>
-          <span className="mt-1 flex items-center gap-2 text-base font-black tracking-[-0.01em] text-[#12263f] sm:text-lg"><Icon className="h-4 w-4 shrink-0 text-[#8b6a27]" />{title}</span>
+          <span className="mt-1 flex items-start gap-2 text-base font-black leading-5 tracking-[-0.01em] text-[#12263f] sm:items-center sm:text-lg"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#8b6a27] sm:mt-0" /><span className="line-clamp-2 sm:line-clamp-1">{title}</span></span>
           <span className="mt-0.5 block line-clamp-2 text-xs font-medium text-slate-500 sm:line-clamp-1 sm:text-sm">{detail}</span>
           {badges ? <span className="mt-1 flex flex-wrap gap-1">{badges}</span> : null}
         </span>

@@ -940,7 +940,7 @@ export function RequestManagementPanel({
       return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
     }
     if (workflow.step2Action === "choose-suppliers") {
-      return null
+      return <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={primaryWorkflowClass}><Route className="h-4 w-4" />Choose suppliers for this request</button>
     }
     if (workflow.step2Action === "contact-suppliers") {
       return <button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={compactWorkflowClass}><Route className="h-4 w-4" />Contact {selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</button>
@@ -976,7 +976,7 @@ export function RequestManagementPanel({
   }
 
   return (
-    <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0">
+    <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-0">
       <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
         <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" badges={<>
           <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">{pricingSummaryItems.length} items</span>

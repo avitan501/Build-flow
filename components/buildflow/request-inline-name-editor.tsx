@@ -33,7 +33,7 @@ export function RequestInlineNameEditor({ requestId, value, kind }: { requestId:
     })
   }
 
-  if (!editing) return <button type="button" onClick={() => setEditing(true)} title={`Edit ${requestName ? "request" : "client"} name`} className={`group inline-flex max-w-full items-center gap-1.5 rounded-md text-left outline-none hover:text-[#0066cc] focus-visible:ring-2 focus-visible:ring-[#0071e3] ${requestName ? "text-xl font-bold sm:text-2xl" : "font-bold text-slate-950"}`}><span className="truncate">{value}</span><Pencil className="h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" /></button>
+  if (!editing) return <button type="button" onClick={() => setEditing(true)} title={`Edit ${requestName ? "request" : "client"} name`} className={`group inline-flex max-w-full items-start gap-1.5 rounded-md text-left outline-none hover:text-[#0066cc] focus-visible:ring-2 focus-visible:ring-[#0071e3] ${requestName ? "text-base font-black leading-5 sm:items-center sm:text-2xl sm:font-bold" : "items-center font-bold text-slate-950"}`}><span className={requestName ? "line-clamp-2 break-words sm:truncate" : "truncate"}>{value}</span><Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100 sm:mt-0" /></button>
 
   return <div className="grid min-w-0 gap-1">
     <div className="flex min-w-0 items-center gap-1">
