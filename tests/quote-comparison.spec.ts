@@ -314,12 +314,13 @@ test("selecting a supplier saves the current price draft before awarding it", as
   expect(actions).toContain("confirmQuoteComparisonPriceMatchAction");
 });
 
-test("comparison room is a compact four-step mobile funnel", async () => {
+test("comparison room opens with products and retains the compact editing and route flow", async () => {
   const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
 
   expect(workspace).toContain('aria-label="Quote comparison steps"');
+  expect(workspace).toContain('{ step: 0 as const, label: "Products"');
   expect(workspace).toContain('{ step: 1 as const, label: "Materials"');
-  expect(workspace).toContain('{ step: 2 as const, label: "Quotes"');
+  expect(workspace).toContain('{ step: 2 as const, label: "Edit prices"');
   expect(workspace).toContain('{ step: 3 as const, label: "Route"');
   expect(workspace).toContain('{ step: 4 as const, label: "Client"');
   expect(workspace).toContain("Supplier prices");

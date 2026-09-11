@@ -54,6 +54,7 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
+import { buildProductQuotePreview } from "@/lib/product-quote-preview";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type BidDraft = {
@@ -129,7 +130,8 @@ export function QuoteComparisonWorkspace({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
-  const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : comparison.awarded_bid_id ? 4 : 2);
+  const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
+  const [productSelections, setProductSelections] = useState<Record<string, string>>({});
   const [showItemForm, setShowItemForm] = useState(items.length === 0);
   const [showSupplierForm, setShowSupplierForm] = useState(bids.length === 0);
   const [selectedBidId, setSelectedBidId] = useState(comparison.awarded_bid_id || "");
@@ -193,6 +195,7 @@ export function QuoteComparisonWorkspace({
     client_unit_price: clientTargetDrafts[item.id] === "" || clientTargetDrafts[item.id] === undefined ? null : draftNumber(clientTargetDrafts[item.id]),
   })), [clientTargetDrafts, items]);
   const analyses = useMemo(() => analyzeQuoteComparison(liveItems, liveBids), [liveItems, liveBids]);
+  const productPreview = useMemo(() => buildProductQuotePreview(liveItems, liveBids, productSelections), [liveItems, liveBids, productSelections]);
   const lowestPrices = useMemo(() => lowestSupplierPriceByItem(liveItems, liveBids), [liveItems, liveBids]);
   const mixedAnalysis = useMemo(() => buildMixedSupplierAnalysis(liveItems, liveBids), [liveItems, liveBids]);
   const clientReady = useMemo(() => buildClientReadyToPaySummary(
@@ -433,13 +436,14 @@ export function QuoteComparisonWorkspace({
       </div>
 
       <div className="mx-auto max-w-[96rem] px-2.5 py-3 sm:px-8 sm:py-5 lg:px-10">
-        <nav className="sticky top-2 z-20 mb-4 grid grid-cols-4 overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur" aria-label="Quote comparison steps">
+        <nav className="sticky top-2 z-20 mb-4 grid grid-cols-5 overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur" aria-label="Quote comparison steps">
           {([
+            { step: 0 as const, label: "Products", meta: `${productPreview.comparableCount}/${items.length}` },
             { step: 1 as const, label: "Materials", meta: `${items.length}` },
-            { step: 2 as const, label: "Quotes", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
+            { step: 2 as const, label: "Edit prices", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
             { step: 3 as const, label: "Route", meta: selectedBidId ? "✓" : "" },
             { step: 4 as const, label: "Client", meta: selectedBidId ? "Ready" : "Locked" },
-          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !selectedBidId} className={`min-h-11 min-w-0 rounded-lg px-1.5 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block truncate text-[10px] font-black uppercase tracking-[.06em] sm:text-xs">{entry.step}. {entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
+          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !selectedBidId} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
         </nav>
         {showDetails ? (
           <section className="mb-5 border border-slate-200 bg-white p-5 shadow-sm">
@@ -457,6 +461,38 @@ export function QuoteComparisonWorkspace({
         {message ? <div role="status" className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">{message}</div> : null}
         {previewMode ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
+
+        {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="space-y-4">
+          <header className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+            <p className="text-[10px] font-black uppercase tracking-[.14em] text-[#0066cc]">Product-by-product comparison</p>
+            <h2 id="product-comparison-heading" className="mt-1 text-xl font-bold sm:text-2xl">Find the lowest price for each product</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Compare the same requested quantity across suppliers. Unconfirmed product matches are excluded from lowest-price choices.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={() => setProductSelections(productPreview.cheapestSelections)} disabled={!productPreview.comparableCount} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Draft lowest price per product</button>
+              <button type="button" onClick={() => setActiveStep(2)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">Edit prices / review matches</button>
+            </div>
+          </header>
+          <aside aria-label="Draft selection summary" className="rounded-xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-sky-950">Temporary preview · Not saved</h3><p className="mt-1 text-xs leading-5 text-sky-900">Materials only. Excludes delivery and tax.</p></div><button type="button" onClick={() => setProductSelections({})} disabled={!productPreview.selectedCount} className="min-h-11 shrink-0 rounded-lg border border-sky-200 bg-white px-3 text-xs font-bold text-sky-950 disabled:opacity-40">Clear draft</button></div>
+            <details className="mt-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Preview details and ordering checks</summary><p className="text-xs leading-5 text-sky-900">Resets on reload. Does not place an order, select a final route, or contact suppliers. Splitting products can add delivery fees, minimum-order requirements, or change quoted prices. Prices use the current request-row units; no unit conversion is performed here. Confirm units, availability and final charges before ordering. This is not a lowest delivered-order total.</p></details>
+            {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
+          </aside>
+          <div className="grid gap-4 xl:grid-cols-2">{productPreview.rows.map((row) => <article key={row.item.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-4"><h3 className="break-words text-base font-bold">{row.item.description}</h3>{row.item.specification ? <p className="mt-1 break-words text-xs leading-5 text-slate-600">{row.item.specification}</p> : null}<p className="mt-2 text-xs font-bold text-[#0066cc]">Requested: {row.item.quantity.toLocaleString()} {row.item.unit}</p>{!row.validQuantity ? <p className="mt-2 text-xs font-bold text-rose-700">Review the requested quantity before comparing.</p> : !row.lowest ? <p className="mt-2 text-xs font-bold text-amber-800">No confirmed comparable price yet.</p> : null}</div>
+            <fieldset className="divide-y divide-slate-100"><legend className="sr-only">Draft supplier choice for {row.item.description}</legend>{row.offers.map((offer) => {
+              const lowest = offer.eligible && offer.unitPrice === row.lowest?.unitPrice;
+              return <label key={offer.bid.id} className={`flex min-h-16 items-start gap-3 px-4 py-3 ${offer.eligible ? "cursor-pointer" : "cursor-not-allowed"} ${row.selected?.bid.id === offer.bid.id ? "bg-sky-50" : ""}`}>
+                <input type="radio" name={`draft-product-${row.item.id}`} value={offer.bid.id} checked={row.selected?.bid.id === offer.bid.id} disabled={!offer.eligible} onChange={() => setProductSelections((current) => ({ ...current, [row.item.id]: offer.bid.id }))} aria-label={`Choose ${offer.bid.supplier_name_snapshot} for ${row.item.description} in draft`} className="mt-1 h-5 w-5 shrink-0 accent-sky-700" />
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-bold">{offer.bid.supplier_name_snapshot}</span><span className="mt-1 flex flex-wrap gap-1 text-[10px] font-bold">{lowest ? <span className="rounded bg-emerald-100 px-2 py-1 text-emerald-800">Lowest product price</span> : null}{offer.status === "review" ? <span className="rounded bg-amber-100 px-2 py-1 text-amber-900">Match needs review · excluded</span> : null}{offer.blocked ? <span className="rounded bg-rose-100 px-2 py-1 text-rose-800">Supplier excluded</span> : null}</span>{offer.unitPrice !== null && offer.status !== "unavailable" ? <span className="mt-1 block text-xs text-slate-600">{formatComparisonMoney(offer.unitPrice)} / {row.item.unit}</span> : null}</span>
+                <span className="max-w-[40%] text-right text-sm font-bold tabular-nums">{offer.status === "unavailable" ? "Unavailable" : offer.status === "unknown" ? "No quote" : offer.lineTotal === null ? "—" : formatComparisonMoney(offer.lineTotal)}<span className="mt-1 block text-[10px] font-medium text-slate-500">{offer.status === "unknown" ? "Availability unknown" : offer.status === "unavailable" ? "Marked unavailable" : "Requested quantity total"}</span></span>
+              </label>;
+            })}{!row.offers.length ? <p className="px-4 py-5 text-sm text-slate-500">No supplier quotes have been added.</p> : null}</fieldset>
+            {row.selected ? <button type="button" onClick={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} className="min-h-11 w-full border-t border-slate-100 px-4 text-left text-xs font-bold text-sky-800">Clear this product selection</button> : null}
+          </article>)}</div>
+          {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setActiveStep(3)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Whole-order routes and client pricing</button><p className="self-center text-xs text-slate-500">Draft product selections do not change the final route.</p></div>
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_20px_rgba(15,23,42,.08)] backdrop-blur"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="mx-auto grid max-w-[92rem] grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>
+        </section> : null}
 
         {activeStep === 1 ? <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">

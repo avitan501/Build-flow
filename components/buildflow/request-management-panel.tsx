@@ -990,7 +990,7 @@ export function RequestManagementPanel({
               <button type="button" onClick={() => openManualPricing()} disabled={pending} className={stepToolClass}><Pencil className="h-4 w-4 shrink-0" /><span>Enter prices manually<span className="block text-[10px] font-normal">Choose the supplier and type the prices</span></span></button>
             </div>
           </details>
-          <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Open supplier comparison</button>
+          <button type="button" onClick={() => openManualPricing(primaryComparison?.id)} disabled={pending || (!primaryComparison && !selectedSupplierNames.length)} className={stepToolClass}><Award className="h-4 w-4" />Compare supplier quotes</button>
           {!estimateSent ? <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Create direct estimate</button> : null}
         </>} />
         <RequestSubstepFunnel requestId={requestId} step={2} currentSubstep={currentSubstep} />
