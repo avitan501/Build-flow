@@ -23,6 +23,7 @@ import {
   resolveExplicitSupplierSelection,
 } from "@/lib/supplier-quote-routing";
 import { supplierQuoteComparableUnitPrice, supplierQuoteLineTotal } from "@/lib/supplier-quote-pricing";
+import { supplierQuoteUnitBasisIssue } from "@/lib/supplier-quote-safety";
 import {
   SUPPLIER_QUOTE_BUCKET,
   type SupplierQuoteItemRecord,
@@ -1371,12 +1372,6 @@ async function createComparisonFromQuote(
     return { ok: false, error: "This supplier quote could not be found." };
   if (quote.status === "needs_review")
     return { ok: false, error: "Review and save the extracted supplier rows before adding them to a comparison." };
-  if (!quote.supplier_id) await findAndPersistQuoteSupplier(supabase, quote);
-  if (!quote.supplier_id)
-    return {
-      ok: false,
-      error: "Choose an existing supplier above, or add the detected vendor as a first-time supplier before routing this quote.",
-    };
   const selectedIds = [
     ...new Set(itemIds.filter((id) => UUID_PATTERN.test(id))),
   ].slice(0, 500);
@@ -1397,6 +1392,13 @@ async function createComparisonFromQuote(
     };
   if (items.length !== selectedIds.length || items.some((item) => item.review_status !== "ready"))
     return { ok: false, error: "Only reviewed and saved supplier rows can be compared." };
+
+  // Do not create a comparison or infer "each" for an unverified selling basis.
+  for (const item of items) {
+    const issue = supplierQuoteUnitBasisIssue(item, item);
+    if (issue) return { ok: false, error: `${item.description}: ${issue}` };
+  }
+  const reviewedQuoteItems = items;
 
   let comparison: {
     id: string;
@@ -1518,6 +1520,22 @@ async function createComparisonFromQuote(
       semanticTransfers.map(({ item, comparisonItem }) => [item.id, comparisonItem]),
     );
 
+    // Check the current request units before any sync changes sort order, rows
+    // or historical prices. Existing IDs retain explicit staff item mappings.
+    const projectedTargets = currentRequestItems.map((item) => ({
+      id: existingBySourceId.get(item.id)?.id ?? previousByNewSourceId.get(item.id)?.id ?? item.id,
+      description: clean(item.name, 500) || "Requested material",
+      specification: requestItemSpecification(item.metadata, item.department),
+      unit: item.unit,
+      units_per_pack: typeof item.metadata?.units_per_pack === "number" ? item.metadata.units_per_pack : undefined,
+    }));
+    const projectedMatches = matchSupplierQuoteItems(reviewedQuoteItems, projectedTargets);
+    if (!projectedMatches.length) return { data: null, error: new Error("No current request material matches."), unitBasisIssue: "Match the supplier rows to current request materials before importing prices." };
+    for (const match of projectedMatches) {
+      const issue = supplierQuoteUnitBasisIssue(match.item, match.comparisonItem);
+      if (issue) return { data: null, error: new Error(`${match.item.description}: ${issue}`), unitBasisIssue: `${match.item.description}: ${issue}` };
+    }
+
     // Park every saved row outside the normal sort range before rebuilding the
     // request-backed order. Otherwise the unique (comparison_id, sort_order)
     // index rejects the first newly organized row while the obsolete source row
@@ -1626,6 +1644,8 @@ async function createComparisonFromQuote(
   let comparisonItemsResult = comparison.request_id
     ? await syncComparisonItemsFromRequest()
     : await loadComparisonItems();
+  if ("unitBasisIssue" in comparisonItemsResult && comparisonItemsResult.unitBasisIssue)
+    return fail(comparisonItemsResult.unitBasisIssue);
   if (comparisonItemsResult.error)
     return fail("The client request items could not be loaded.");
   if (!comparisonItemsResult.data?.length) {
@@ -1650,6 +1670,17 @@ async function createComparisonFromQuote(
       return fail("The quote items could not be copied to the comparison.");
   }
   const comparisonItems = comparisonItemsResult.data ?? [];
+  const unitCheckedMatches = comparison.request_id
+    ? matchSupplierQuoteItems(items, comparisonItems)
+    : items.flatMap((item, index) => comparisonItems[index] ? [{ item, comparisonItem: comparisonItems[index] }] : []);
+  for (const match of unitCheckedMatches) {
+    const issue = supplierQuoteUnitBasisIssue(match.item, match.comparisonItem);
+    if (issue) return fail(`${match.item.description}: ${issue}`);
+  }
+
+  if (!quote.supplier_id) await findAndPersistQuoteSupplier(supabase, quote);
+  if (!quote.supplier_id)
+    return fail("Choose an existing supplier above, or add the detected vendor as a first-time supplier before routing this quote.");
 
   const { data: supplierData } = await supabase.rpc(
     "staff_load_catalog_suppliers",
@@ -1752,11 +1783,7 @@ async function createComparisonFromQuote(
   if (bidError || !bid)
     return fail("The supplier could not be added to the comparison.");
 
-  const matched = comparison.request_id
-    ? matchSupplierQuoteItems(items, comparisonItems)
-    : items.flatMap((item, index) => comparisonItems[index]
-      ? [{ item, comparisonItem: comparisonItems[index] }]
-      : []);
+  const matched = unitCheckedMatches;
   if (!matched.length) {
     if (!existingBid.data)
       await supabase.from("quote_comparison_bids").delete().eq("id", bid.id);
