@@ -2,6 +2,18 @@ import { expect, test } from "@playwright/test"
 
 import { mergeSemanticallyEquivalentMaterialItems, type SemanticMaterialItem } from "../supabase/functions/client-material-list-ai/semantic-merge"
 
+test("intake preserves different lengths, quantities and delivery sections", () => {
+  const rows = [
+    row({ name: "TJI I-joist", quantity: 35, sourceText: "35 pc TJI 230 20 ft", attributes: [{ key: "length", value: "20 ft", sourceText: "20 ft" }] }),
+    row({ name: "TJI I-joist", quantity: 30, sourceText: "30 pc TJI 230 26 ft", attributes: [{ key: "length", value: "26 ft", sourceText: "26 ft" }] }),
+    row({ name: "TJI I-joist", quantity: 20, sourceText: "20 pc TJI 230 20 ft", attributes: [{ key: "length", value: "20 ft", sourceText: "20 ft" }] }),
+  ]
+  expect(mergeSemanticallyEquivalentMaterialItems(rows, { preserveSourceRows: true }).map(item => item.quantity)).toEqual([35, 30, 20])
+  const sameLine = { ...rows[0], attributes: [{ key: "shipping", value: "Second floor", sourceText: "Second floor" }] }
+  expect(mergeSemanticallyEquivalentMaterialItems([rows[0], sameLine], { preserveSourceRows: true })).toHaveLength(2)
+  expect(mergeSemanticallyEquivalentMaterialItems([rows[0], rows[0]], { preserveSourceRows: true })).toHaveLength(1)
+})
+
 function row(input: Partial<SemanticMaterialItem> & Pick<SemanticMaterialItem, "name" | "quantity" | "sourceText">): SemanticMaterialItem {
   return {
     department: "Drywall",

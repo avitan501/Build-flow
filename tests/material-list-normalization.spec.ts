@@ -162,6 +162,9 @@ test("accepts thickness only when the same explicit measurement exists in the so
 })
 
 test("rejects quantities and unsupported values presented as thickness", () => {
+  expect(verifiedThickness("5/8 in", "60 pc plywood 5/8 cdx")).toBe("5/8 in")
+  expect(verifiedThickness("3/4 in", "70 pc plywood 3/4 deck")).toBe("3/4 in")
+  expect(verifiedThickness("3/4 in", "70 pc plywood")).toBe("")
   expect(verifiedThickness("12", "12 sheets of drywall")).toBe("")
   expect(verifiedThickness("1/2 in.", "12 sheets of drywall")).toBe("")
   expect(materialRequiresThickness("Sheetrock drywall")).toBe(true)

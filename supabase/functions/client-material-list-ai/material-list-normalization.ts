@@ -196,6 +196,12 @@ export function verifiedThickness(value: string, sourceText: string) {
   const candidateMeasurements = thicknessMeasurements(candidate)
   if (!candidateMeasurements.length) return ""
   const sourceMeasurements = thicknessMeasurements(sourceText)
+  // Common US plywood notation explicitly states a fractional thickness even
+  // when the inch suffix is omitted ("plywood 5/8 CDX"). Never infer a number.
+  if (/\b(?:plywood|osb)\b/i.test(sourceText)) {
+    const fractions = [...sourceText.matchAll(/\b(\d+)\s*\/\s*(\d+)\b/g)].map(match => `${match[1]}/${match[2]}`)
+    if (candidateMeasurements.some(measure => measure.unit === "in" && fractions.includes(measure.amount))) return candidate
+  }
   return candidateMeasurements.some((candidateMeasurement) => sourceMeasurements.some((sourceMeasurement) =>
     candidateMeasurement.amount === sourceMeasurement.amount && candidateMeasurement.unit === sourceMeasurement.unit
   )) ? candidate : ""

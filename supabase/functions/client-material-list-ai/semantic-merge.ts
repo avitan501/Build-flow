@@ -114,10 +114,21 @@ function worstStatus(left: SemanticMaterialItem["reviewStatus"], right: Semantic
   return rank[left] >= rank[right] ? left : right
 }
 
-export function mergeSemanticallyEquivalentMaterialItems<T extends SemanticMaterialItem>(items: T[]) {
+export function mergeSemanticallyEquivalentMaterialItems<T extends SemanticMaterialItem>(items: T[], options: { preserveSourceRows?: boolean } = {}) {
   const merged: T[] = []
   for (const item of items) {
-    const index = merged.findIndex((candidate) => compatibleSpecifications(candidate, item))
+    const index = merged.findIndex((candidate) => {
+      if (options.preserveSourceRows) {
+        // Intake must preserve each independently requested quantity. Downstream
+        // grounding reads one source row, so summing here would lose quantities.
+        if (normalize(candidate.sourceText) !== normalize(item.sourceText)) return false
+        const attributes = (row: T) => JSON.stringify((row.attributes ?? [])
+          .map(({ key, label, value }) => [key, key === "custom" ? normalize(label) : "", normalize(value)])
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))))
+        if (attributes(candidate) !== attributes(item)) return false
+      }
+      return compatibleSpecifications(candidate, item)
+    })
     if (index < 0) {
       merged.push({ ...item, reviewReasons: [...item.reviewReasons] })
       continue
