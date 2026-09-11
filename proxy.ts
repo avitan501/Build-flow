@@ -48,6 +48,11 @@ export async function proxy(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
 
+  // The public homepage has no authorization requirement. Do not hold its
+  // first byte behind an expired-session refresh or an unavailable auth API.
+  // All protected routes and auth-page redirects keep the existing checks.
+  if (pathname === "/") return response;
+
   if (!hasSupabasePublicEnv()) {
     if (!isProtectedPath(pathname)) return response;
 

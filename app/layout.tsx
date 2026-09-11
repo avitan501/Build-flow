@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 import Script from "next/script";
-import { Fragment } from "react";
+import { Fragment, Suspense } from "react";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
@@ -18,6 +19,7 @@ import { managerCapabilities, STAFF_EMAILS } from "@/lib/owner-identity";
 import { parseShopLanguage, SHOP_LANGUAGE_COOKIE } from "@/lib/shop-i18n";
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { createClient } from "@/lib/supabase/server";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
 
@@ -112,14 +114,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const { supabase, user, profile } = await getSessionWithProfile();
-  const cookieStore = await cookies();
-  const shopLanguage = parseShopLanguage(cookieStore.get(SHOP_LANGUAGE_COOKIE)?.value);
+function PublicHeaderFallback() {
+  return <MobileClientHeader isSignedIn={false} isAdmin={false} isPreviewAdminEnabled={process.env.VERCEL_ENV !== "production"} />;
+}
+
+// Optional personalization must never hold the public page's first HTML.
+// Authorization remains in each protected page/action, not in this chrome.
+async function OptionalSessionChrome() {
+  let session;
+  try {
+    session = await getSessionWithProfile();
+  } catch (error) {
+    unstable_rethrow(error);
+    return <PublicHeaderFallback />;
+  }
+  const { user, profile } = session;
   const isSignedIn = Boolean(user);
   const managerAccess = managerCapabilities({
     email: user?.email || profile?.email,
@@ -148,13 +157,42 @@ export default async function RootLayout({
       : user
         ? "client"
         : "anonymous";
+  return <>
+    <PostHogAnalytics actorId={user?.id ?? null} actorType={analyticsActorType} actorCohort={analyticsActorCohort} />
+    <TrafficTracker disabled={isAdmin} />
+    <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
+  </>;
+}
+
+async function OptionalWorkflowSettings() {
+  if (!hasSupabasePublicEnv()) return null;
+  let state: PublicWorkflowState | null = null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("workflow_public_catalog")
+      .select("state").eq("id", "singleton")
+      .abortSignal(AbortSignal.timeout(3000))
+      .maybeSingle<{ state: PublicWorkflowState }>();
+    if (error) return null;
+    state = data?.state ?? null;
+  } catch (error) {
+    unstable_rethrow(error);
+    return null;
+  }
+  return <WorkflowSettingsHydrator state={state} />;
+}
+
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const cookieStore = await cookies();
+  const shopLanguage = parseShopLanguage(cookieStore.get(SHOP_LANGUAGE_COOKIE)?.value);
   const supabaseBrowserConfig = hasSupabasePublicEnv() ? getSupabasePublicEnv() : null;
   const serializedSupabaseConfig = supabaseBrowserConfig
     ? JSON.stringify(supabaseBrowserConfig).replace(/</g, "\\u003c")
     : null;
-  const { data: publicStateRow } = supabase
-    ? await supabase.from("workflow_public_catalog").select("state").eq("id", "singleton").maybeSingle<{ state: PublicWorkflowState }>()
-    : { data: null };
 
   return (
     <html
@@ -171,11 +209,9 @@ export default async function RootLayout({
         <ShopLanguageProvider initialLanguage={shopLanguage}>
           <AvantiaBuildClientShell>
             <Fragment>
-              <PostHogAnalytics actorId={user?.id ?? null} actorType={analyticsActorType} actorCohort={analyticsActorCohort} />
               <PrivateWebVitals />
-              <TrafficTracker disabled={isAdmin} />
-              <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
-              <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
+              <Suspense fallback={null}><OptionalWorkflowSettings /></Suspense>
+              <Suspense fallback={<PublicHeaderFallback />}><OptionalSessionChrome /></Suspense>
               {children}
               <SiteFooter />
               <PublicContactBar />
