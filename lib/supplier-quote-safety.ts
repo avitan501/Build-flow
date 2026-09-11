@@ -1,4 +1,4 @@
-import { supplierQuoteComparableUnitPrice } from "@/lib/supplier-quote-pricing"
+import { normalizeSupplierQuoteUnit, supplierQuoteComparableUnitPrice } from "@/lib/supplier-quote-pricing"
 import { matchSupplierQuoteItems } from "@/lib/supplier-quote-routing"
 
 export type QuoteAvailability = "priced" | "not_quoted" | "unavailable"
@@ -47,9 +47,11 @@ export type QuoteMatchReviewItem = {
   comparison_item_id?: string | null
   description: string
   specification: string
+  unit?: string | null
+  units_per_pack?: number | null
 }
 
-export type QuoteMatchReviewTarget = { id: string; description: string; specification: string }
+export type QuoteMatchReviewTarget = { id: string; description: string; specification: string; unit?: string | null; units_per_pack?: number | null }
 export type ApprovedQuoteMatch = { quoteItemId: string; comparisonItemId: string }
 
 // Import-only normalization. The legacy matcher also transfers historical prices
@@ -109,6 +111,58 @@ function reviewReason(item: QuoteMatchReviewItem, target: QuoteMatchReviewTarget
   return "The supplier wording is not an exact verified match. Confirm the client item or alternative."
 }
 
+const PACKAGE_UNITS = new Set(["box", "pack", "case", "bundle", "pallet", "bag", "bucket", "pail", "roll"])
+
+function unitBasis(value: string | null | undefined) {
+  const raw = String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  if (!raw || /^(?:unknown|unspecified|n\/a|not provided)$/.test(raw)) return ""
+  const compact = raw.replace(/[.\s]/g, "")
+  const aliases: Record<string, string> = {
+    box: "box", boxes: "box", bx: "box", pack: "pack", packs: "pack", pk: "pack", pkg: "pack", package: "pack", packages: "pack",
+    case: "case", cases: "case", cs: "case", bundle: "bundle", bundles: "bundle", bdl: "bundle", pallet: "pallet", pallets: "pallet",
+    bag: "bag", bags: "bag", bucket: "bucket", buckets: "bucket", pail: "pail", pails: "pail", roll: "roll", rolls: "roll",
+    sheet: "sheet", sheets: "sheet", sht: "sheet", squarefeet: "sq. ft.", squarefoot: "sq. ft.", sqft: "sq. ft.", sf: "sq. ft.",
+    linearfeet: "lin. ft.", linearfoot: "lin. ft.", linealfeet: "lin. ft.", linealfoot: "lin. ft.", ft: "lin. ft.", feet: "lin. ft.", foot: "lin. ft.",
+    gallon: "gallon", gallons: "gallon", gal: "gallon", pound: "pound", pounds: "pound", lb: "pound", lbs: "pound",
+    kilogram: "kilogram", kilograms: "kilogram", kg: "kilogram", liter: "liter", liters: "liter", litre: "liter", litres: "liter",
+  }
+  const normalized = aliases[compact] || normalizeSupplierQuoteUnit(raw)
+  const supported = new Set([...Object.values(aliases), "each", "yard", "lin. ft.", "sq. ft.", "1,000 lin. ft.", "1,000 sq. ft."])
+  return supported.has(normalized) ? normalized : ""
+}
+
+function packCounts(item: QuoteMatchReviewTarget) {
+  const counts = new Set<number>()
+  if (item.units_per_pack !== null && item.units_per_pack !== undefined) {
+    if (!Number.isSafeInteger(item.units_per_pack) || item.units_per_pack <= 0) return Number.NaN
+    counts.add(item.units_per_pack)
+  }
+  const text = `${item.description} ${item.specification} ${item.unit ?? ""}`.toLowerCase()
+  for (const match of text.matchAll(/\b(\d+)\s*(?:ct\b|count\b|pcs?\s*(?:per|\/)\s*(?:box|pack|case|bundle)\b|(?:piece|pieces|units)\s*(?:per|\/)\s*(?:box|pack|case|bundle)\b)|\b(?:box|pack|case|bundle)\s+of\s+(\d+)\b|\b(\d+)\s*[- ]\s*pack\b/g)) {
+    const count = Number(match[1] || match[2] || match[3])
+    if (!Number.isSafeInteger(count) || count <= 0) return Number.NaN
+    counts.add(count)
+  }
+  return counts.size > 1 ? Number.NaN : [...counts][0] ?? null
+}
+
+/** A product/alternative checkbox cannot authorize a unit-price conversion. */
+export function supplierQuoteUnitBasisIssue(item: QuoteMatchReviewItem, target: QuoteMatchReviewTarget) {
+  const sourceUnit = unitBasis(item.unit)
+  const targetUnit = unitBasis(target.unit)
+  if (!sourceUnit || !targetUnit) return "Confirm both selling units before comparing prices; an unknown unit is not each."
+  if (sourceUnit !== targetUnit) return "Supplier and request selling units differ. Enter a verified price in the request unit before comparing; product approval cannot convert prices."
+  const sourcePack = packCounts(item)
+  const targetPack = packCounts(target)
+  const hasPackEvidence = PACKAGE_UNITS.has(sourceUnit) || sourcePack !== null || targetPack !== null
+    || item.units_per_pack !== undefined && item.units_per_pack !== null
+    || target.units_per_pack !== undefined && target.units_per_pack !== null
+  if (hasPackEvidence && (sourcePack === null || targetPack === null || sourcePack !== targetPack)) {
+    return "Confirm matching pack quantities and price basis before comparing. Missing or different pack sizes cannot be approved as the same unit price."
+  }
+  return ""
+}
+
 export function buildSupplierQuoteMatchReview<TQuote extends QuoteMatchReviewItem, TTarget extends QuoteMatchReviewTarget>(
   quoteItems: TQuote[],
   requestItems: TTarget[],
@@ -148,13 +202,15 @@ export function buildSupplierQuoteMatchReview<TQuote extends QuoteMatchReviewIte
   const matches = matchSupplierQuoteItems(normalizedItems, normalizedTargets).map(({ item: normalizedItem, comparisonItem: normalizedTarget }) => {
     const item = quoteById.get(normalizedItem.id)!
     const comparisonItem = targetById.get(normalizedTarget.id)!
-    let reason = reviewReason(item, comparisonItem)
+    const unitIssue = supplierQuoteUnitBasisIssue(item, comparisonItem)
+    if (unitIssue) issues.push(`Supplier row ${item.id}: ${unitIssue}`)
+    let reason = unitIssue || reviewReason(item, comparisonItem)
     // Check ambiguity against every original target, not just targets left after greedy allocation.
     const uniqueAutomatic = matchSupplierQuoteItems([{ ...normalizedItem, comparison_item_id: null }], normalizedTargets)
     if (!reason && !item.comparison_item_id && (uniqueAutomatic.length !== 1 || uniqueAutomatic[0].comparisonItem.id !== comparisonItem.id)) {
       reason = "More than one client item could fit this supplier row. Confirm the intended match."
     }
-    return { item, comparisonItem, needsConfirmation: Boolean(reason) && !approved.has(`${item.id}:${comparisonItem.id}`), reason }
+    return { item, comparisonItem, needsConfirmation: Boolean(unitIssue) || (Boolean(reason) && !approved.has(`${item.id}:${comparisonItem.id}`)), reason }
   })
   const matchedIds = new Set(matches.map(({ item }) => item.id))
   for (const item of validItems) {
@@ -167,4 +223,3 @@ export function buildSupplierQuoteMatchReview<TQuote extends QuoteMatchReviewIte
   }
   return { matches, issues: [...new Set(issues)] }
 }
-

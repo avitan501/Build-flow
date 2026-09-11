@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test"
-import { buildSupplierQuoteMatchReview, quoteComparisonPrice, resolveQuoteAvailability } from "../lib/supplier-quote-safety"
+import { buildSupplierQuoteMatchReview as reviewWithUnits, quoteComparisonPrice, resolveQuoteAvailability, supplierQuoteUnitBasisIssue } from "../lib/supplier-quote-safety"
 import { matchSupplierQuoteItems } from "../lib/supplier-quote-routing"
 
 const blank = { quantity: 2, unit_price: null, line_total: null }
+
+// Existing matching fixtures represent known per-piece products, not unknown units.
+const buildSupplierQuoteMatchReview: typeof reviewWithUnits = (items, targets, approvals) => reviewWithUnits(items.map((item) => ({ unit: "each", ...item })), targets.map((item) => ({ unit: "each", ...item })), approvals)
 
 test("legacy missing prices mean no quote, while totals and zero prices remain priced", () => {
   expect(resolveQuoteAvailability(blank)).toBe("not_quoted")
@@ -21,8 +24,8 @@ test("only explicit unavailable creates an unavailable comparison row", () => {
 })
 
 test("exact quote-symbol normalized specifications do not need redundant confirmation", () => {
-  const quote = [{ id: "q", description: "Valve", specification: '4"' }]
-  const request = [{ id: "r", description: "Valve", specification: "4 in" }]
+  const quote = [{ id: "q", description: "Valve", specification: '4"', unit: "each" }]
+  const request = [{ id: "r", description: "Valve", specification: "4 in", unit: "each" }]
   expect(buildSupplierQuoteMatchReview(quote, request)).toEqual({
     matches: [{ item: quote[0], comparisonItem: request[0], needsConfirmation: false, reason: "" }], issues: [],
   })
@@ -88,3 +91,57 @@ test("unresolved generic lines ask for a match rather than choosing an arbitrary
   expect(result.issues).toEqual([expect.stringContaining("Choose a client item")])
 })
 
+test("box versus each stays blocked even when matching pair IDs were approved", () => {
+  const item = { id: "q", description: "Screws", specification: "1 1/4 in", unit: "box", comparison_item_id: "r" }
+  const target = { id: "r", description: "Screws", specification: "1 1/4 in", unit: "each" }
+  const result = reviewWithUnits([item], [target], [{ quoteItemId: "q", comparisonItemId: "r" }])
+  expect(result.matches[0].needsConfirmation).toBe(true)
+  expect(result.issues[0]).toContain("selling units differ")
+})
+
+test("unit aliases compare while differing dimensions of sale do not", () => {
+  const item = { id: "q", description: "Material", specification: "" }
+  const target = { ...item, id: "r" }
+  for (const [unit, targetUnit] of [["ea", "pieces"], ["sheet", "sheets"], ["SF", "square feet"], ["LF", "linear feet"], ["lb", "pounds"]]) {
+    expect(supplierQuoteUnitBasisIssue({ ...item, unit }, { ...target, unit: targetUnit })).toBe("")
+  }
+  for (const [unit, targetUnit] of [["MSF", "SF"], ["MLF", "LF"], ["sheet", "each"], ["lb", "kg"], ["SF", "LF"]]) {
+    expect(supplierQuoteUnitBasisIssue({ ...item, unit }, { ...target, unit: targetUnit })).toContain("selling units differ")
+  }
+})
+
+test("unknown units are never silently defaulted to each", () => {
+  const item = { id: "q", description: "Valve", specification: "" }
+  for (const unit of [undefined, null, "", "unspecified", "unknown", "n/a", "box/100", "custom unit"]) {
+    expect(supplierQuoteUnitBasisIssue({ ...item, unit }, { ...item, id: "r", unit: "each" })).toContain("unknown unit")
+  }
+  expect(reviewWithUnits([item], [{ ...item, id: "r" }]).issues[0]).toContain("unknown unit")
+})
+
+test("pack count is required on both sides and must agree without conversion", () => {
+  const item = { id: "q", description: "Screws", specification: "", unit: "box" }
+  const target = { ...item, id: "r", unit: "boxes" }
+  expect(supplierQuoteUnitBasisIssue(item, target)).toContain("pack quantities")
+  expect(supplierQuoteUnitBasisIssue({ ...item, units_per_pack: 100 }, { ...target, units_per_pack: 100 })).toBe("")
+  expect(supplierQuoteUnitBasisIssue({ ...item, units_per_pack: 100 }, { ...target, units_per_pack: 50 })).toContain("pack quantities")
+  expect(supplierQuoteUnitBasisIssue({ ...item, specification: "100 count" }, { ...target, specification: "box of 100" })).toBe("")
+  expect(supplierQuoteUnitBasisIssue({ ...item, specification: "100 ct" }, { ...target, specification: "50 ct" })).toContain("pack quantities")
+  expect(supplierQuoteUnitBasisIssue({ ...item, units_per_pack: 0 }, { ...target, units_per_pack: 100 })).toContain("pack quantities")
+  expect(supplierQuoteUnitBasisIssue({ ...item, unit: "each", units_per_pack: 0 }, { ...target, unit: "each" })).toContain("pack quantities")
+  expect(supplierQuoteUnitBasisIssue({ ...item, unit: "each", specification: "100 ct / 50 ct" }, { ...target, unit: "each", specification: "100 ct / 50 ct" })).toContain("pack quantities")
+})
+
+test("partial quote quantities do not imply a unit mismatch for per-piece pricing", () => {
+  const item = { id: "q", description: "Valve", specification: "4 in", unit: "each", quantity: 2 }
+  const target = { ...item, id: "r", quantity: 12 }
+  expect(reviewWithUnits([item], [target]).issues).toEqual([])
+  expect(reviewWithUnits([item], [target]).matches[0].needsConfirmation).toBe(false)
+})
+
+test("pack mismatch remains blocking for approved exact product matches", () => {
+  const item = { id: "q", description: "Screws", specification: "1 1/4 in", unit: "pack", units_per_pack: 100, comparison_item_id: "r" }
+  const target = { ...item, id: "r", units_per_pack: 50 }
+  const result = reviewWithUnits([item], [target], [{ quoteItemId: "q", comparisonItemId: "r" }])
+  expect(result.matches[0].needsConfirmation).toBe(true)
+  expect(result.issues[0]).toContain("pack quantities")
+})

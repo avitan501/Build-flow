@@ -1,0 +1,11 @@
+# Supplier unit-basis guard — isolated candidate
+
+Branch `codex/supplier-unit-guard-20260911`, worktree `/tmp/avantia-supplier-unit-guard-20260911`, based on `90827e26` (HEAD of the dirty quote-safety tree). Baseline commit `abce5876` snapshots ONLY its existing `lib/supplier-quote-safety.ts` and `tests/supplier-quote-safety.spec.ts`; original worktree is untouched. No other draft action/UI/migration copied.
+
+Guard behavior: known unit aliases compare without arithmetic conversion; box/each, sheet/each, SF/LF, MSF/SF and other incompatible price bases block. Missing/unknown or unsupported units never become each. Package units require matching explicit pack counts on both sides, from `units_per_pack` or unambiguous count wording; unknown/different/conflicting counts block. Product/alternative approval IDs cannot bypass these hard issues. Different requested total quantities still allow a partial per-piece quote; they are not treated as pack size.
+
+This does not convert prices, implement pack extraction, make mixed-supplier awards, fix partial reimport persistence, or solve specification-version-bound approval. Count-free roll/bucket/weight-pack pricing remains blocked until an explicit comparable basis is available. This conservative limitation must be explained in integration; do not silently infer quantities.
+
+Integration dependency: every call to `buildSupplierQuoteMatchReview` must supply source and target `unit`. The dirty action's preflight target SELECT currently omits unit, as do UI target shapes; update these in the separate integration. Optional `units_per_pack` should be supplied when explicitly known. Missing data intentionally fails closed. This helper must not be deployed alone as if the full safety feature were integrated.
+
+Verification: 16 helper regression tests passed; ESLint, whitespace/secrets checks passed. No database calls, production writes, sends, browser changes or deployment. New tests include approved-ID unit/pack mismatch, aliases, unknown units, same/different/missing/conflicting pack counts, and partial requested quantities. Baseline matching tests now explicitly assume known each units. Full integration build/caller verification remains with the release owner.
