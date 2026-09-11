@@ -1,74 +1,56 @@
 "use client"
 
-import { Check } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 
-import { updateOrganizedMaterialItemAction } from "@/app/owner/materials/requests/actions"
+import { saveMaterialReviewChoiceAction } from "@/app/owner/materials/requests/actions"
 import { materialReviewRecommendation } from "@/lib/material-review-recommendations"
-import { materialQuantity, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
-
-function metadataText(item: ReviewableMaterialItem, key: string) {
-  return typeof item.metadata?.[key] === "string" ? String(item.metadata[key]) : ""
-}
-
-function initialChoice(item: ReviewableMaterialItem, field: string, recommended: string, allowedValues: string[]) {
-  if (field === "quantity") return String(materialQuantity(item))
-  if (field === "unit") return materialSalesUnit(item)
-  const metadataKey = field === "productType" ? "product_type" : field === "screwLength" ? "screw_length" : field
-  const savedValue = metadataText(item, metadataKey)
-  return allowedValues.includes(savedValue) ? savedValue : recommended
-}
+import type { ReviewableMaterialItem } from "@/lib/client-material-review"
 
 export function MaterialReviewEditor({ requestId, item, onSaved }: { requestId: string; item: ReviewableMaterialItem; onSaved?: (item: ReviewableMaterialItem) => void }) {
   const router = useRouter()
-  const recommendation = materialReviewRecommendation(item)
-  const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries(recommendation.choices.map((choice) => [choice.field, initialChoice(item, choice.field, choice.recommended, choice.options.map((option) => option.value))])))
+  const [savedItem, setSavedItem] = useState(item)
+  const recommendation = materialReviewRecommendation(savedItem)
+  const [choices, setChoices] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState("")
+  const [failed, setFailed] = useState<{ field: string; value: string } | null>(null)
   const [pending, startTransition] = useTransition()
+  const saving = useRef(false)
 
-  function save() {
+  function save(field: string, value: string) {
+    if (!value || saving.current) return
+    saving.current = true
+    setChoices((current) => ({ ...current, [field]: value }))
     setFeedback("")
+    setFailed(null)
     startTransition(async () => {
-      const formData = new FormData()
-      formData.set("requestId", requestId)
-      formData.set("itemId", item.id)
-      formData.set("name", item.name)
-      formData.set("quantity", choices.quantity || String(materialQuantity(item)))
-      formData.set("unit", choices.unit || materialSalesUnit(item))
-      formData.set("dimensions", choices.dimensions || metadataText(item, "dimensions"))
-      formData.set("thickness", choices.thickness || metadataText(item, "thickness"))
-      formData.set("productType", choices.productType || metadataText(item, "product_type"))
-      formData.set("screwLength", choices.screwLength || metadataText(item, "screw_length"))
-      formData.set("details", metadataText(item, "request_details"))
-      formData.set("markReady", String(recommendation.resolvesAllReasons))
-      const result = await updateOrganizedMaterialItemAction(formData)
-      setFeedback(result.ok ? "Saved." : result.error)
-      if (result.ok) {
-        onSaved?.({
-          ...item,
-          quantity: Number(choices.quantity || materialQuantity(item)),
-          unit: choices.unit || materialSalesUnit(item),
-          metadata: {
-            ...(item.metadata ?? {}),
-            dimensions: choices.dimensions || metadataText(item, "dimensions"),
-            thickness: choices.thickness || metadataText(item, "thickness"),
-            product_type: choices.productType || metadataText(item, "product_type"),
-            screw_length: choices.screwLength || metadataText(item, "screw_length"),
-            ...(recommendation.resolvesAllReasons ? { review_status: "ready", review_reasons: [], needs_review: false } : {}),
-          },
-        })
+      try {
+        const result = await saveMaterialReviewChoiceAction({ requestId, itemId: item.id, field, value })
+        if (!result.ok) {
+          setFailed({ field, value })
+          setFeedback(result.error)
+          return
+        }
+        setSavedItem(result.item)
+        onSaved?.(result.item)
+        setFeedback("Saved")
         router.refresh()
+      } catch {
+        setFailed({ field, value })
+        setFeedback("Not saved. Try again.")
+      } finally {
+        saving.current = false
       }
     })
   }
 
+  if (!recommendation.choices.length) return <p className="mt-2 text-xs text-slate-600">Use Details to review this item.</p>
+
   return <div className="mt-2 rounded-md bg-amber-50 p-2">
-    <div className="mb-1.5"><p className="text-[11px] font-bold text-slate-950">{recommendation.label}</p></div>
     <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:flex-wrap">
-    {recommendation.choices.map((choice) => <label key={choice.field} className="grid min-w-0 gap-0.5 text-[9px] font-bold text-slate-600 sm:min-w-32">{choice.label}<select aria-label={choice.label} value={choices[choice.field]} onChange={(event) => setChoices((current) => ({ ...current, [choice.field]: event.target.value }))} className="h-8 min-w-0 rounded-md border border-amber-300 bg-white px-1.5 text-[11px] font-semibold text-slate-950">{choice.options.map((option) => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>)}
-    {recommendation.choices.length ? <button type="button" onClick={save} disabled={pending} className="col-span-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-50 sm:col-span-1"><Check className="h-3.5 w-3.5" />{pending ? "Saving" : "Apply"}</button> : null}
+      {recommendation.choices.map((choice) => <label key={choice.field} className="grid min-w-0 gap-0.5 text-[11px] font-bold text-slate-600 sm:min-w-32">{choice.label}<select aria-label={choice.label} disabled={pending} value={choices[choice.field] || ""} onChange={(event) => save(choice.field, event.target.value)} className="min-h-11 min-w-0 rounded-md border border-amber-300 bg-white px-2 text-xs font-semibold text-slate-950 disabled:opacity-60"><option value="" disabled>Choose…</option>{choice.options.filter((option) => option.value !== "Other / confirm").map((option) => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>)}
     </div>
-    {feedback ? <p role="status" className="w-full text-[10px] font-semibold text-slate-700">{feedback}</p> : null}
+    <p role="status" aria-live="polite" className={`mt-1 text-[11px] font-semibold ${failed ? "text-rose-700" : "text-slate-600"}`}>{pending ? "Saving…" : feedback || "Saves automatically"}</p>
+    {failed ? <button type="button" onClick={() => save(failed.field, failed.value)} disabled={pending} className="mt-1 min-h-11 rounded-md border border-rose-300 bg-white px-3 text-xs font-bold text-rose-800">Retry save</button> : null}
   </div>
 }

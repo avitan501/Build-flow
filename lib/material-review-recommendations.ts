@@ -1,4 +1,5 @@
 import { materialQuantity, materialReviewReasons, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { requestItemFieldsFromMetadata } from "@/lib/request-item-fields"
 
 export type RecommendationField = "dimensions" | "thickness" | "productType" | "screwLength"
 
@@ -24,6 +25,51 @@ function option(value: string, confidence: number): RecommendationOption {
 
 function hasChoice(choices: MaterialReviewRecommendation["choices"], field: RecommendationField) {
   return choices.some((choice) => choice.field === field)
+}
+
+const reviewFieldKeys: Record<RecommendationField, { key: string; id: string }> = {
+  dimensions: { key: "dimensions", id: "dimensions" },
+  thickness: { key: "thickness", id: "thickness" },
+  productType: { key: "product_type", id: "type" },
+  screwLength: { key: "screw_length", id: "length" },
+}
+
+export function savedMaterialReviewValue(item: ReviewableMaterialItem, field: RecommendationField) {
+  const definition = reviewFieldKeys[field]
+  const value = requestItemFieldsFromMetadata(item.metadata).find((entry) => entry.id === definition.id)?.value || item.metadata?.[definition.key]
+  return typeof value === "string" && !/^(?:unknown|unspecified|n\/a|not provided)$/i.test(value.trim()) ? value.trim() : ""
+}
+
+function reasonFields(reason: string): RecommendationField[] {
+  // A general specification choice cannot verify these independent requirements.
+  if (/\b(?:grade|treatment|color|brand|match|sku|model|confirm|verify|check)\b/i.test(reason)) return []
+  return [
+    /thickness/i.test(reason) ? "thickness" : null,
+    /\b(?:type|species)\b/i.test(reason) ? "productType" : null,
+    /\b(?:size|dimensions?|width)\b/i.test(reason) ? "dimensions" : null,
+    /\b(?:screw\s+)?length\b/i.test(reason) ? "screwLength" : null,
+  ].filter((field): field is RecommendationField => field !== null)
+}
+
+export function materialReviewChoiceUpdate(item: ReviewableMaterialItem, field: string, value: string) {
+  const choice = materialReviewRecommendation(item).choices.find((entry) => entry.field === field)
+  if (!choice || !choice.options.some((entry) => entry.value === value) || value === "Other / confirm") return null
+  const definition = reviewFieldKeys[choice.field]
+  const fields = requestItemFieldsFromMetadata(item.metadata)
+  const metadata = {
+    ...item.metadata,
+    [definition.key]: value,
+    request_item_fields: [...fields.filter((entry) => entry.id !== definition.id), { id: definition.id, label: choice.label, value }],
+  }
+  const updated = { ...item, metadata }
+  const remaining = materialReviewReasons(item).filter((reason) => {
+    const required = reasonFields(reason)
+    return !required.length || !required.every((entry) => Boolean(savedMaterialReviewValue(updated, entry)))
+  })
+  const reviewedMetadata: Record<string, unknown> & { review_reasons: string[]; review_status: string; needs_review: boolean } = {
+    ...metadata, review_reasons: remaining, review_status: remaining.length ? "missing" : "ready", needs_review: remaining.length > 0,
+  }
+  return { ...updated, metadata: reviewedMetadata }
 }
 
 export function materialReviewRecommendation(item: ReviewableMaterialItem): MaterialReviewRecommendation {
@@ -109,7 +155,8 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
 
   return {
     label: isSheetMaterial || isDrywallScrew || choices.length > 1 ? "Confirm order details" : "Confirm item detail",
-    choices,
+    choices: choices.filter((choice) => !savedMaterialReviewValue(item, choice.field)
+      && reasons.some((reason) => reasonFields(reason).includes(choice.field))),
     resolvesAllReasons,
   }
 }

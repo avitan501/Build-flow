@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { materialReviewRecommendation } from "../lib/material-review-recommendations"
+import { materialReviewChoiceUpdate, materialReviewRecommendation, savedMaterialReviewValue } from "../lib/material-review-recommendations"
 import { materialQuantity, materialReviewReasons, materialSalesUnit } from "../lib/client-material-review"
 
 const base = {
@@ -17,7 +17,6 @@ test("recommends common residential drywall specifications without silently appr
     resolvesAllReasons: true,
   })
   expect(materialReviewRecommendation(base).choices).toEqual(expect.arrayContaining([
-    expect.objectContaining({ field: "productType", options: expect.arrayContaining([expect.objectContaining({ value: "Regular drywall", confidence: 65 })]) }),
     expect.objectContaining({ field: "thickness", options: expect.arrayContaining([expect.objectContaining({ value: "1/2 in.", confidence: 72 })]) }),
     expect.objectContaining({ field: "dimensions", options: expect.arrayContaining([expect.objectContaining({ value: "4 x 8 ft.", confidence: 70 })]) }),
   ]))
@@ -42,10 +41,49 @@ test("defaults an absent quantity and sales unit without asking for confirmation
   expect(materialQuantity(item)).toBe(1)
   expect(materialSalesUnit(item)).toBe("boxes")
   expect(materialReviewReasons(item)).toHaveLength(0)
-  expect(recommendation.choices).toEqual(expect.arrayContaining([expect.objectContaining({ field: "screwLength" })]))
+  expect(recommendation.choices).toHaveLength(0)
   expect(recommendation.choices.map((choice) => choice.field)).not.toContain("quantity")
   expect(recommendation.choices.map((choice) => choice.field)).not.toContain("unit")
   expect(recommendation.resolvesAllReasons).toBe(true)
+})
+
+test("known exact 5/8 thickness asks only for missing plywood sheet size", () => {
+  const item = { ...base, name: "CDX plywood", metadata: { thickness: "5/8", ai_organized: true, review_status: "missing", review_reasons: ["Plywood sheet dimensions are missing"] } }
+  expect(materialReviewRecommendation(item).choices.map((entry) => entry.field)).toEqual(["dimensions"])
+  const updated = materialReviewChoiceUpdate(item, "dimensions", "4 x 8 ft.")!
+  expect(updated.metadata.thickness).toBe("5/8")
+  expect(updated.metadata.review_status).toBe("ready")
+  expect(updated.quantity).toBe(item.quantity)
+  expect(materialReviewChoiceUpdate(item, "thickness", "1/2 in.")).toBeNull()
+  expect(materialReviewChoiceUpdate(item, "dimensions", "")).toBeNull()
+})
+
+test("structured saved fields retain non-preset thickness and custom dimensions", () => {
+  const item = { ...base, name: "CDX plywood", metadata: { request_item_fields: [{ id: "thickness", label: "Thickness", value: '5/8"' }, { id: "dimensions", label: "Sheet size", value: "Custom 4 x 9" }], review_reasons: ["Sheet size is missing", "Thickness is missing"] } }
+  expect(savedMaterialReviewValue(item, "thickness")).toBe('5/8"')
+  expect(materialReviewRecommendation(item).choices).toHaveLength(0)
+  expect(materialReviewChoiceUpdate(item, "dimensions", "4 x 8 ft.")).toBeNull()
+})
+
+test("saving one missing field leaves other missing details unresolved", () => {
+  const updated = materialReviewChoiceUpdate(base, "dimensions", "4 x 8 ft.")!
+  expect(updated.metadata.review_reasons).toEqual(["Thickness is missing"])
+  expect(updated.metadata.review_status).toBe("missing")
+  expect(materialReviewRecommendation(updated).choices.map((entry) => entry.field)).toEqual(["thickness"])
+  expect(materialReviewChoiceUpdate(updated, "thickness", "5/8 in.")!.metadata.review_status).toBe("ready")
+})
+
+test("unrelated uncertainty and grade cannot be cleared by choosing a sheet size", () => {
+  const item = { ...base, metadata: { ...base.metadata, review_reasons: ["Size is missing", "Confirm grade", "Check product match"] } }
+  expect(materialReviewChoiceUpdate(item, "dimensions", "4 x 8 ft.")!.metadata.review_reasons).toEqual(["Confirm grade", "Check product match"])
+  expect(materialReviewRecommendation({ ...base, metadata: { review_reasons: ["Grade and thickness are missing"] } }).choices).toHaveLength(0)
+})
+
+test("unknown choices and unspecified confirmations never become persisted defaults", () => {
+  expect(materialReviewChoiceUpdate(base, "dimensions", "99 x 99")).toBeNull()
+  expect(materialReviewChoiceUpdate(base, "__proto__", "x")).toBeNull()
+  const lumber = { ...base, name: "Framing lumber", metadata: { review_reasons: ["Lumber type is missing"] } }
+  expect(materialReviewChoiceUpdate(lumber, "productType", "Other / confirm")).toBeNull()
 })
 
 test("offers material-specific controls for WonderBoard and drywall screws", () => {

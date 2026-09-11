@@ -19,6 +19,7 @@ import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sani
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion"
 import type { ReviewableMaterialItem } from "@/lib/client-material-review"
+import { materialReviewChoiceUpdate } from "@/lib/material-review-recommendations"
 import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { buildClientLinkMessage } from "@/lib/client-link-message"
@@ -502,6 +503,24 @@ export async function organizeClientMaterialRequestAction(formData: FormData) {
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/supplier-quotes")
   return { ok: true as const, status: queued.status, itemCount: 0, reviewCount: 0 }
+}
+
+export async function saveMaterialReviewChoiceAction(input: { requestId: string; itemId: string; field: string; value: string }) {
+  const { requestId, itemId, field, value } = input
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(itemId)) return { ok: false as const, error: "This item could not be identified." }
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: item } = await supabase.from("quote_request_items").select("id,name,department,quantity,unit,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<ReviewableMaterialItem>()
+  if (!item || item.metadata?.ai_organized !== true) return { ok: false as const, error: "Only organized materials can be reviewed here." }
+  const updated = materialReviewChoiceUpdate(item, field, value)
+  if (!updated) return { ok: false as const, error: "This detail changed. Refresh and check Details before editing." }
+  const metadata = { ...updated.metadata, manually_reviewed_at: new Date().toISOString(), manually_reviewed_by: user.id }
+  const { data: saved, error } = await supabase.from("quote_request_items")
+    .update({ metadata, qualification_status: metadata.needs_review ? "pending" : "not_required" })
+    .eq("id", itemId).eq("request_id", requestId).eq("metadata", JSON.stringify(item.metadata))
+    .select("id").maybeSingle()
+  if (error || !saved) return { ok: false as const, error: "Not saved. The item may have changed; refresh and try again." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const, item: { ...updated, metadata } }
 }
 
 export async function updateOrganizedMaterialItemAction(formData: FormData) {
