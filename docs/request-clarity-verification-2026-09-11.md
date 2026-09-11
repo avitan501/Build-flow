@@ -1,5 +1,14 @@
 # Request clarity and screenshot fixes — 2026-09-11
 
+## Latest screenshot follow-up (supersedes older pending notes below)
+
+- `dbe2ea15`: moved manual substep controls into existing tools, removed duplicate Open step CTA, compact three-step navigation; unresolved intake keeps Step 2 closed and marked Not started, with no premature completion control. Closed step headers hide detail/badges while remaining accessible. No-reply unread emails are retained under Automated emails, separate from personal unread messages; failures are not hidden.
+- Supplier unit guard integrated narrowly via `6d754b66`, `b2e273a4`, `40df5a8b`: validates source/current request/actual comparison selling units before tested mutation paths. Full dirty supplier safety draft was NOT adopted; no schema change. Partial reimport replacement, concurrent edits and alternative approvals remain separate unresolved work.
+- Latest final checks: 160 focused helper/static/action-mock tests, 7 release guards, changed-file lint, whitespace/secret-pattern review and production build including TypeScript/153 pages all passed.
+- Existing Chrome shared-component fixture verified at320/390/1440: AI visible, future pricing initially closed, no visible duplicate status rows, correct navigation opens Step2, no overflow. Initial exact accessible-name locator was incorrect; corrected scoped navigation selector passed. Final390 screenshot visually reviewed: `/tmp/avantia-minimal-request-top-390.png` (synthetic local content/public fixture shell, not production staff screenshot). Temporaryfixture removed; devcache moved recoverably to `/tmp/avantia-clarity-dev-cache-20260911-minimal`.
+- Authenticated LIVE read-only review now succeeded: Dashboard, request638408 and WebsiteDefects load at390 without overflow. Defectqueue shows1open (#35) /34resolved; required checks4/10passed, clientrequest/routes/contact/invoice/sync nottested and sendingproposal blocked on authorized inbox. No tickets/checks were falsely marked passed. No new live test request, supplier message, price mutation or deployment occurred.
+- Candidate is NOT published. Owner publication approval and candidate live end-to-end/persistence verification remain required. Older Google login blocker is resolved using the saved Build account; GoogleMeet configuration itself remains undone.
+
 ## Scope and release boundary
 
 David prioritized a short, readable request intake flow with minimal controls. Candidate branch `codex/request-clarity-20260911`, isolated worktree `/tmp/avantia-request-clarity-20260911`, starts from live website `9ce50cdd`. Only `https://avantiabuild.com` is in scope. This package is local, not deployed; a new release approval and authenticated verification remain required.
