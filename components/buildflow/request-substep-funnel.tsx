@@ -22,7 +22,7 @@ export function RequestSubstepFunnel({
   const [error, setError] = useState("")
   const [pending, startTransition] = useTransition()
   const selectedGlobalIndex = REQUEST_WORKFLOW_SUBSTEPS.findIndex((substep) => substep.id === selected)
-  const selectedLabel = substeps.find((substep) => substep.id === selected)?.label || "View status"
+  const selectedLabel = REQUEST_WORKFLOW_SUBSTEPS.find((substep) => substep.id === selected)?.label || "Not started"
 
   function selectSubstep(substep: (typeof substeps)[number]) {
     if (substep.id === selected || pending) return
@@ -65,11 +65,11 @@ export function RequestSubstepFunnel({
   </>
 
   return <>
-    <details className="group border-b border-slate-200 bg-slate-50/70 sm:hidden" aria-label={`Step ${step} progress`}>
+    <details className="group/substeps border-b border-slate-200 bg-slate-50/70 sm:hidden" aria-label={`Step ${step} progress`}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold text-slate-700 [&::-webkit-details-marker]:hidden">
         <span>Current status: <span className="text-slate-950">{selectedLabel}</span></span>
-        <span className="text-[10px] font-black text-[#0066cc] group-open:hidden">Change</span>
-        <span className="hidden text-[10px] font-black text-[#0066cc] group-open:inline">Close</span>
+        <span className="text-[10px] font-black text-[#0066cc] group-open/substeps:hidden">Change status</span>
+        <span className="hidden text-[10px] font-black text-[#0066cc] group-open/substeps:inline">Close</span>
       </summary>
       <div className="border-t border-slate-200 px-2 py-2">{controls}</div>
     </details>
