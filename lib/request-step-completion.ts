@@ -2,6 +2,7 @@ import { materialReviewStatus, type ReviewableMaterialItem } from "@/lib/client-
 import { analyzeQuoteComparison, quoteLineMatchStatus, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import { effectiveRequestComparisonItems, requestItemSpecification } from "@/lib/supplier-quote-routing"
 import { normalizeSupplierQuoteUnit } from "@/lib/supplier-quote-pricing"
+import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
 
 function normalized(value: unknown) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : ""
@@ -14,7 +15,7 @@ function validUnit(value: unknown) {
 function currentItemsError(requestItems: ReviewableMaterialItem[]) {
   const unfinished = requestItems.filter((item) => ["queued", "processing", "retrying", "draft_changed", "failed"].includes(normalized(item.metadata?.ai_organization_status)))
   if (unfinished.length) return `Finish organizing ${unfinished.length} changed or pending request source(s).`
-  const rawSources = requestItems.filter((item) => normalized(item.name) === "free-text material list")
+  const rawSources = requestItems.filter(isRequestIntakePlaceholder)
   const represented = new Set(requestItems.filter((item) => item.metadata?.ai_organized === true).map((item) => item.metadata?.source_item_id))
   const unresolved = rawSources.filter((item) => !represented.has(item.id))
   if (unresolved.length) return `Organize or replace ${unresolved.length} free-text request source(s) with material rows.`

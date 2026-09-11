@@ -1,6 +1,5 @@
 import { BusinessBlueprint } from "@/components/buildflow/business-blueprint";
 import {
-  AlertTriangle,
   ArrowRight,
   BadgeDollarSign,
   ChevronDown,
@@ -16,6 +15,8 @@ import {
 import Link from "next/link";
 
 import { CarlosGoalsWorkspace } from "@/app/admin/goals-progress/page";
+import { DashboardAttention } from "@/components/buildflow/dashboard-attention";
+import { communicationAttentionTitle } from "@/lib/dashboard-attention";
 import type { ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
@@ -245,7 +246,7 @@ export default async function AdminDashboardPage({
           .order("occurred_at", { ascending: false })
           .limit(5)
           .returns<AttentionCommunicationRow[]>()
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
     access.communications
       ? supabase
           .from("aura_communications")
@@ -257,7 +258,7 @@ export default async function AdminDashboardPage({
           .order("occurred_at", { ascending: false })
           .limit(5)
           .returns<AttentionCommunicationRow[]>()
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const requests = (requestsResult.data ?? []).filter(
@@ -401,7 +402,8 @@ export default async function AdminDashboardPage({
     ...(failedMessagesResult.data ?? []).map((message) => ({
       key: `failed-${message.id}`,
       tone: "rose",
-      title: `${message.channel.toUpperCase()} failed`,
+      title: communicationAttentionTitle(message.channel, message.status),
+      occurredAt: message.occurred_at,
       detail:
         message.counterparty_phone ||
         message.counterparty_email ||
@@ -411,7 +413,8 @@ export default async function AdminDashboardPage({
     ...(unreadMessagesResult.data ?? []).map((message) => ({
       key: `unread-${message.id}`,
       tone: "sky",
-      title: "Customer needs a reply",
+      title: communicationAttentionTitle(message.channel),
+      occurredAt: message.occurred_at,
       detail:
         message.counterparty_phone ||
         message.counterparty_email ||
@@ -448,7 +451,7 @@ export default async function AdminDashboardPage({
         detail: request.title,
         href: `/owner/materials/requests/${request.id}`,
       })),
-  ].slice(0, 8);
+  ];
   const managerSections = [
     {
       title: "Customers",
@@ -574,67 +577,10 @@ export default async function AdminDashboardPage({
           </p>
         ) : null}
 
-        <section
-          aria-labelledby="attention-heading"
-          className="mt-5 overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm"
-        >
-          <header className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-                <AlertTriangle aria-hidden="true" className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h2
-                  id="attention-heading"
-                  className="text-base font-semibold text-slate-950"
-                >
-                  Needs Attention
-                </h2>
-                <p className="truncate text-xs text-slate-600">
-                  Messages, rush requests, approvals, payments &amp; delivery
-                </p>
-              </div>
-            </div>
-            <span
-              className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-amber-900"
-              aria-label={`${attentionItems.length} items need attention`}
-            >
-              {attentionItems.length}
-            </span>
-          </header>
-          {attentionItems.length ? (
-            <div className="grid gap-px bg-slate-100 sm:grid-cols-2">
-              {attentionItems.map((item) => (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  className="group flex min-h-16 items-center gap-3 bg-white px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`h-3 w-3 shrink-0 rounded-full ${item.tone === "rose" ? "bg-rose-500" : item.tone === "sky" ? "bg-sky-500" : item.tone === "violet" ? "bg-violet-500" : item.tone === "emerald" ? "bg-emerald-500" : "bg-amber-500"}`}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <strong className="block truncate text-sm text-slate-900">
-                      {item.title}
-                    </strong>
-                    <span className="block truncate text-xs text-slate-500">
-                      {item.detail}
-                    </span>
-                  </span>
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5"
-                  />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="px-4 py-4 text-sm font-medium text-emerald-700">
-              Nothing urgent right now.
-            </p>
-          )}
-        </section>
+        <DashboardAttention
+          items={attentionItems}
+          unavailable={Boolean(failedMessagesResult.error || unreadMessagesResult.error)}
+        />
 
         <section
           aria-labelledby="pipeline-heading"

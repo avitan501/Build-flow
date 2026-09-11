@@ -49,7 +49,7 @@ export function OrganizeMaterialListButton({ requestId, refresh = false, compact
   return (
     <div className="grid justify-items-start gap-2">
       <button type="button" onClick={organize} disabled={isPending} className={`${compact ? "min-h-11 rounded-md px-3 text-xs" : "min-h-11 rounded-lg px-4 text-sm"} bg-slate-950 font-bold text-white disabled:cursor-wait disabled:opacity-60`}>
-        {isPending ? "Starting…" : refresh ? "Refresh products" : "Split list"}
+        {isPending ? "Starting AI…" : refresh ? "Refresh with AI" : "Organize with AI"}
       </button>
       {error ? <p role="alert" className="max-w-sm text-xs font-semibold text-rose-700">{error}</p> : null}
       {notice ? <p role="status" className="max-w-sm text-xs font-semibold text-emerald-700">{notice}</p> : null}

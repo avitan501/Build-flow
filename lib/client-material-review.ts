@@ -1,4 +1,5 @@
 import { requestItemFieldSummary } from "@/lib/request-item-fields"
+import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
 
 export type MaterialReviewStatus = "ready" | "check" | "missing"
 
@@ -73,6 +74,7 @@ function normalizedReviewReasons(item: ReviewableMaterialItem) {
 }
 
 export function materialReviewStatus(item: ReviewableMaterialItem): MaterialReviewStatus {
+  if (isRequestIntakePlaceholder(item)) return "check"
   const stored = text(item.metadata?.review_status) as MaterialReviewStatus
   const reasons = normalizedReviewReasons(item)
   if (KNOWN_STATUSES.has(stored)) return reasons.length || stored === "ready" ? stored : "ready"
@@ -80,6 +82,7 @@ export function materialReviewStatus(item: ReviewableMaterialItem): MaterialRevi
 }
 
 export function materialReviewReasons(item: ReviewableMaterialItem) {
+  if (isRequestIntakePlaceholder(item)) return ["Organize this request into products with AI first."]
   const stored = normalizedReviewReasons(item)
   if (stored.length) return stored.slice(0, 5)
   return materialReviewStatus(item) === "ready" ? [] : ["Confirm the product details before requesting supplier pricing."]

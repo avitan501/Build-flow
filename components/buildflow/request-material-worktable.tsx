@@ -11,6 +11,7 @@ import { moveRequestItemDepartmentAction, saveRequestItemSupplierRouteAction } f
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { MaterialOrganizationStatus } from "@/components/buildflow/material-organization-status"
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
+import { RequestMaterialIdentity } from "@/components/buildflow/request-material-identity"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
@@ -22,6 +23,7 @@ import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSuppl
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
 import { realPhotoForMaterialCategory } from "@/lib/material-photo-catalog"
 import { requestItemFieldSummary } from "@/lib/request-item-fields"
+import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
 import type { SupplierDiscoveryCandidate } from "@/lib/supplier-discovery"
 import { supplierIdentityKeys } from "@/lib/supplier-identity"
 import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
@@ -41,7 +43,7 @@ function itemDetails(item: ReviewableMaterialItem) {
 }
 
 function isRawFreeTextContainer(item: ReviewableMaterialItem) {
-  return item.name.trim().toLowerCase() === "free-text material list"
+  return isRequestIntakePlaceholder(item)
 }
 
 function copyText(items: ReviewableMaterialItem[]) {
@@ -332,7 +334,7 @@ export function RequestMaterialWorktable({
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 sm:px-4">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Step 1</p>
-          <h2 id="request-items-heading" className="truncate text-base font-bold">Request items</h2>
+          <h2 id="request-items-heading" tabIndex={-1} className="scroll-mt-24 truncate text-base font-bold">Request items</h2>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
         <RequestWorkflowStatusButton key={`${requestId}:${stepCompleted}`} requestId={requestId} step={1} completed={stepCompleted} />
@@ -411,7 +413,7 @@ export function RequestMaterialWorktable({
                     <label className="inline-flex h-10 w-10 cursor-pointer items-center justify-center"><input type="checkbox" disabled={routingBusy} aria-label={`Select ${item.name}`} checked={selectedRouteIds.includes(item.id)} onChange={(event) => setSelectedRouteIds((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /></label>
                     <span className="hidden text-[10px] font-bold tabular-nums text-slate-400 sm:block">#{index + 1}</span>
                     <span title={photo.description} className="relative inline-flex h-10 w-12 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={photo.imageUrl} alt={photo.description} fill sizes="48px" unoptimized={photo.label !== "REF"} className="object-cover" /><span className="absolute inset-x-0 bottom-0 bg-slate-950/80 py-px text-center text-[6px] font-black tracking-wide text-white">{photo.label}</span></span>
-                    <div className="min-w-0"><div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><p className="min-w-0 break-words text-sm font-extrabold leading-5 text-slate-950">{item.name}</p><span className="shrink-0 text-[10px] font-bold text-slate-500">{materialQuantity(item)} {materialSalesUnit(item)}</span></div><div className="mt-1 flex min-w-0 items-center gap-1 overflow-hidden"><OriginalRequestItemEditor requestId={requestId} item={item} itemKind={hasAi ? "organized" : "original"} buttonLabel="Details" /><span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-extrabold sm:hidden ${missing ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{missing ? `${reasons.length} missing` : "Ready"}</span>{routeLabel ? <span className="shrink-0 text-[9px] font-semibold text-sky-700 sm:hidden" title={routeSummary}>{routeLabel}</span> : null}{details.length ? details.map((detail) => <span key={detail} title={detail} className="max-w-32 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">{detail}</span>) : null}</div></div>
+                    <div className="min-w-0"><RequestMaterialIdentity name={item.name} quantity={`${materialQuantity(item)} ${materialSalesUnit(item)}`} metadata={item.metadata} /><div className="mt-1 flex min-w-0 flex-wrap items-center gap-1"><OriginalRequestItemEditor requestId={requestId} item={item} itemKind={hasAi ? "organized" : "original"} buttonLabel="Details" /><span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-extrabold sm:hidden ${missing ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{missing ? `${reasons.length} missing` : "Ready"}</span>{routeLabel ? <span className="text-[9px] font-semibold text-sky-700 sm:hidden" title={routeSummary}>{routeLabel}</span> : null}</div></div>
                     <div className="hidden min-w-0 gap-1 overflow-hidden sm:flex">{details.slice(0, 2).map((detail) => <span key={detail} title={detail} className="max-w-36 truncate rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600">{detail}</span>)}</div>
                     <span className={`hidden justify-self-start rounded-md px-2 py-1 text-[9px] font-extrabold sm:inline-flex ${missing ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>{missing ? `${reasons.length} missing` : "Ready"}</span>
                     <button type="button" onClick={() => toggleExpandedItem(item.id)} title={routeSummary || "Choose supplier route"} className="hidden min-w-0 items-center gap-1.5 rounded-md border border-slate-200 px-2 py-2 text-left text-[10px] font-bold text-slate-700 sm:flex"><Route className="h-3.5 w-3.5 shrink-0 text-[#0066cc]" /><span className="truncate">{routeLabel || "Choose supplier"}</span></button>

@@ -26,9 +26,11 @@ import {
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
-import { managerPipelineStage, managerPipelineStageWithOverride, type ManagerPipelineStage } from "@/lib/manager-dashboard";
+import { managerPipelineStage, managerPipelineStageWithOverride } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
-import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
+import { hasPersistedReceiptProof, requestWorkflowState } from "@/lib/request-workflow-state";
+import { requestWorkflowGuidance } from "@/lib/request-workflow-guidance";
+import { RequestWorkflowGuide } from "@/components/buildflow/request-workflow-guide";
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion";
 import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubstepLabel, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime } from "@/lib/site-date-time";
@@ -120,13 +122,6 @@ type CurrentClientDocumentView = {
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
 }
-
-const requestProgress: Array<{ stage: ManagerPipelineStage; label: string }> = [
-  { stage: "received", label: "Received" },
-  { stage: "pricing", label: "Pricing" },
-  { stage: "approval", label: "Client" },
-  { stage: "delivery", label: "Delivery" },
-];
 
 export default async function OwnerMaterialRequestPage({
   params,
@@ -684,17 +679,20 @@ export default async function OwnerMaterialRequestPage({
             <span className="text-slate-300">·</span>
             <div className="min-w-0 basis-full pt-1 text-base font-black leading-5 sm:flex-1 sm:basis-auto sm:truncate sm:pt-0 sm:text-sm sm:font-bold" title={request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
           </div>
-          <nav aria-label="Request progress" className="mt-1.5 hidden sm:block">
-            <ol className="grid grid-cols-4 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-              {requestProgress.map((step, index) => {
-                const currentIndex = requestProgress.findIndex((candidate) => candidate.stage === currentStage);
-                const active = step.stage === currentStage;
-                const complete = index < currentIndex;
-                return <li key={step.stage} aria-current={active ? "step" : undefined} className={`truncate border-r border-slate-200 px-1.5 py-1 text-center text-[9px] font-bold last:border-r-0 ${active ? "bg-slate-950 text-white" : complete ? "bg-emerald-50 text-emerald-700" : "text-slate-400"}`}>{index + 1}. {step.label}</li>;
-              })}
-            </ol>
-          </nav>
         </header>
+        <RequestWorkflowGuide guidance={requestWorkflowGuidance({
+          closed: request.status === "closed",
+          step1Blocker: requestStep1CompletionError(items ?? []),
+          organizationStatus,
+          workflow: requestWorkflowState({
+            routeSupplierCount: routeSelections.length,
+            supplierRequestCount: (packages ?? []).length,
+            supplierQuoteCount: (comparisonBidsResult.data ?? []).length,
+            winningSupplierSelected: selectedPricingReady,
+            step2CompletedOverride: selectedPricingReady ? workflowOverrides.get(2) ?? null : false,
+            ...initialPaymentDelivery,
+          }),
+        })} />
         <RequestMaterialWorktable
           requestId={request.id}
           stepCompleted={(workflowOverrides.get(1) ?? true) && !requestStep1CompletionError(items ?? [])}

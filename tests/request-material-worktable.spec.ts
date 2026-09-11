@@ -166,7 +166,8 @@ test("mobile request detail keeps one clear next action and collapses repeated p
 
   expect(page).toContain("sm:flex-nowrap")
   expect(page).toContain("basis-full")
-  expect(page).toContain('className="mt-1.5 hidden sm:block"')
+  expect(page).toContain("<RequestWorkflowGuide")
+  expect(page).not.toContain('aria-label="Request progress"')
   expect(page).toContain("env(safe-area-inset-bottom)+10rem")
   expect(funnel).toContain("Current status:")
   expect(funnel).toContain("sm:hidden")
@@ -520,7 +521,7 @@ test("partial AI organization keeps manually added request rows in pricing", asy
 
 test("organized requests do not render the free-text storage row as a material", async () => {
   const worktable = await source(path.join(root, "components/buildflow/request-material-worktable.tsx"))
-  expect(worktable).toContain('item.name.trim().toLowerCase() === "free-text material list"')
+  expect(worktable).toContain("isRequestIntakePlaceholder(item)")
   expect(worktable).toContain("!isRawFreeTextContainer(item)")
 })
 

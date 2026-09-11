@@ -1,4 +1,5 @@
 import { requestItemFieldSummary } from "@/lib/request-item-fields"
+import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
 
 type DirectorySupplier = { id: string; name: string }
 
@@ -19,11 +20,12 @@ type RequestMatchItem = {
 type RequestSourceItem = {
   id: string
   name?: string
+  unit?: string | null
   metadata: Record<string, unknown> | null
 }
 
 function isRawFreeTextContainer(item: RequestSourceItem) {
-  return clean(item.name, 300).toLowerCase() === "free-text material list"
+  return isRequestIntakePlaceholder(item)
 }
 
 type RequestComparisonSourceItem = RequestSourceItem & {
