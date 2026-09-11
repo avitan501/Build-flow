@@ -172,6 +172,7 @@ function ManagerNavigation({
   onCollapsedChange,
   onNavigate,
   showNotifications = false,
+  mobile = false,
 }: {
   pathname: string;
   access: ManagerAccess;
@@ -179,13 +180,14 @@ function ManagerNavigation({
   onCollapsedChange?: (collapsed: boolean) => void;
   onNavigate?: () => void;
   showNotifications?: boolean;
+  mobile?: boolean;
 }) {
   const router = useRouter();
   const links = navigationLinks(access);
 
   return (
-    <div className="flex h-full flex-col overflow-visible bg-white">
-      <div className={`relative flex h-16 shrink-0 items-center border-b border-slate-100 ${collapsed ? "justify-center px-2" : "justify-between gap-2 px-3"}`}>
+    <div className={`flex h-full min-h-0 flex-col bg-white ${mobile ? "overflow-hidden" : "overflow-visible"}`}>
+      <div className={`relative flex h-16 shrink-0 items-center border-b border-slate-100 ${mobile ? "box-content pt-[env(safe-area-inset-top)]" : ""} ${collapsed ? "justify-center px-2" : "justify-between gap-2 px-3"}`}>
         <Link href="/" prefetch={false} onClick={onNavigate} aria-label="Open the Avantia Build customer website" className="min-w-0 overflow-hidden">
           {collapsed ? (
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-[13px] font-black tracking-[-0.04em] text-white">AV</span>
@@ -206,7 +208,7 @@ function ManagerNavigation({
         ) : null}
       </div>
 
-      <nav className={`flex flex-1 flex-col gap-1 overflow-visible py-3 ${collapsed ? "px-2" : "px-3"}`} aria-label="Manager navigation">
+      <nav className={`flex min-h-0 flex-1 flex-col gap-1 py-3 ${mobile ? "overflow-y-auto overscroll-contain" : "overflow-visible"} ${collapsed ? "px-2" : "px-3"}`} aria-label="Manager navigation">
         <button
           type="button"
           onClick={() => { router.back(); onNavigate?.(); }}
@@ -241,7 +243,7 @@ function ManagerNavigation({
         {links.map((link) => <NavigationLink key={link.href} link={link} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />)}
       </nav>
 
-      <div className={`shrink-0 border-t border-slate-100 py-2.5 ${collapsed ? "px-2" : "px-3"}`}>
+      <div className={`shrink-0 border-t border-slate-100 pt-2.5 ${mobile ? "pb-[max(0.625rem,env(safe-area-inset-bottom))]" : "pb-2.5"} ${collapsed ? "px-2" : "px-3"}`}>
         {showNotifications ? <ManagerNotificationCenter compact={collapsed} /> : null}
         {access.communications ? (
           <NavigationLink
@@ -319,7 +321,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
         onClick={() => setMenuOpen(false)}
         aria-hidden="true"
       />
-      <aside className={`fixed inset-0 z-[81] bg-white transition-transform duration-300 lg:hidden ${menuOpen ? "translate-x-0" : "-translate-x-full"}`} aria-hidden={!menuOpen} inert={!menuOpen}>
+      <aside className={`fixed inset-0 z-[81] h-dvh overflow-hidden bg-white transition-transform duration-300 lg:hidden ${menuOpen ? "translate-x-0" : "-translate-x-full"}`} aria-hidden={!menuOpen} inert={!menuOpen}>
         <button
           type="button"
           onClick={() => setMenuOpen(false)}
@@ -328,7 +330,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
         >
           <X className="h-5 w-5" />
         </button>
-        <ManagerNavigation pathname={pathname} access={access} onNavigate={() => setMenuOpen(false)} />
+        <ManagerNavigation pathname={pathname} access={access} onNavigate={() => setMenuOpen(false)} mobile />
       </aside>
     </div>
   );

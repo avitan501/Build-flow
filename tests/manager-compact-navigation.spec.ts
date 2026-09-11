@@ -46,3 +46,14 @@ test("collapsed manager rail remembers preference and provides keyboard-readable
   expect(shell).toContain("lg:grid-cols-[4.5rem_minmax(0,1fr)]");
   expect(shell).toContain("lg:grid-cols-[13rem_minmax(0,1fr)]");
 });
+
+test("mobile manager navigation keeps its footer visible and scrolls only the middle links", async () => {
+  const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8");
+
+  expect(shell).toContain('h-dvh overflow-hidden bg-white');
+  expect(shell).toContain('mobile ? "overflow-hidden" : "overflow-visible"');
+  expect(shell).toContain('mobile ? "overflow-y-auto overscroll-contain" : "overflow-visible"');
+  expect(shell).toContain('mobile ? "pb-[max(0.625rem,env(safe-area-inset-bottom))]" : "pb-2.5"');
+  expect(shell).toContain('box-content pt-[env(safe-area-inset-top)]');
+  expect(shell).toContain('onNavigate={() => setMenuOpen(false)} mobile');
+});
