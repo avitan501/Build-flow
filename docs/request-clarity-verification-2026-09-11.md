@@ -1,5 +1,15 @@
 # Request clarity and screenshot fixes — 2026-09-11
 
+## Production release completed
+
+David explicitly approved publication. Canonical and mirror main fast-forwarded to `0906a5ce2918b82da03d7908041295fca03ca3e2`. Serialized owner release run `34561837353` completed **success**, including CI application tests, full lint/build/typecheck and live identity guard. Vercel deployment `dpl_8xGDanFZzUah4X7TWoiGqJ7MYFSy` READY, canonical domain alias confirmed. Live `/api/release` proves that exact SHA, environment production and Supabase `nprfhspwdflpqlopydmp`. No Edge redeploy or DDL was needed/performed.
+
+Authenticated existing Chrome LIVE checks at390/1440 passed: Dashboard heading/attendance do not overlap, no horizontal overflow; request638410 (`08786a04-da3d-491b-bda6-c2f007fa0549`) has visible Organize with AI, closed initial supplier stage, no visible duplicate status rows or Ready fake intake product; step navigation opens supplier stage. Zero page JavaScript errors. Screens visually reviewed: `/tmp/avantia-live-dashboard-0906-390.png`, `/tmp/avantia-live-request-0906-390.png`. Current Build account dashboard returned Requests only, so this session does NOT verify all live communications categories with real alert data; category behavior was covered locally.
+
+Important live finding:638410 already has failed AI organization state. New UI truthfully exposes failure/retry; its original RFQ/PDF remains. No retry/extraction/quantity changes were performed in this release, especially given HOLD/unverified roofing source notes. Full production intake→extraction→quote/save journey is NOT yet completed by these read-only release checks.
+
+New requested unpaid-day payroll request at $5/hour remains pending and was explicitly excluded from publication. No attendance, wages, payments, supplier communications, quote records or defect statuses were mutated during release verification.
+
 ## Latest screenshot follow-up (supersedes older pending notes below)
 
 - `dbe2ea15`: moved manual substep controls into existing tools, removed duplicate Open step CTA, compact three-step navigation; unresolved intake keeps Step 2 closed and marked Not started, with no premature completion control. Closed step headers hide detail/badges while remaining accessible. No-reply unread emails are retained under Automated emails, separate from personal unread messages; failures are not hidden.
