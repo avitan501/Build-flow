@@ -82,7 +82,7 @@ export function ManagerDashboardAiSearch({ initialHistory, enabled, compact = fa
     })
   }
 
-  return <details className={`group min-w-0 ${compact ? "[&[open]]:col-span-3" : "[&[open]]:col-span-2 sm:[&[open]]:col-span-4"}`}>
+  return <details className={`group min-w-0 ${compact ? "[&[open]]:col-span-2 sm:[&[open]]:col-span-3" : "[&[open]]:col-span-2 sm:[&[open]]:col-span-4"}`}>
     <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm hover:border-slate-400 ${compact ? "h-10 w-10 px-0" : "min-h-12 w-full px-3"}`} title="Orders & Requests AI">
       <Plus className={`h-4 w-4 text-[#0071e3] group-open:hidden ${compact ? "hidden" : ""}`} />
       <X className="hidden h-4 w-4 text-slate-500 group-open:block" />

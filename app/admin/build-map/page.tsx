@@ -535,8 +535,8 @@ export default async function AdminDashboardPage({
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
       <div className="mx-auto max-w-7xl">
-        <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-slate-200 pb-3">
-          <div>
+        <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-200 pb-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)_auto]" data-testid="dashboard-header">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
             {access.owner ? (
               <Link
@@ -547,28 +547,16 @@ export default async function AdminDashboardPage({
               </Link>
             ) : null}
           </div>
-          {access.owner ? (
-            <Link
-              href="/admin/carlos-activity"
-              title="Open Carlos activity history"
-            >
-              <EmployeeClockStatus
-                compact
-                checkInAt={todaySummary?.checkInAt ?? null}
-                checkOutAt={todaySummary?.checkOutAt ?? null}
-                pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
-                pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
-              />
-            </Link>
-          ) : (
+          <div className="order-last col-span-2 min-w-0 sm:order-none sm:col-span-1" data-testid="dashboard-attendance">
             <EmployeeClockStatus
               compact
+              activityHistory={access.owner}
               checkInAt={todaySummary?.checkInAt ?? null}
               checkOutAt={todaySummary?.checkOutAt ?? null}
               pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
               pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
             />
-          )}
+          </div>
           <ManagerDashboardAiSearch
             initialHistory={dashboardHistory}
             enabled

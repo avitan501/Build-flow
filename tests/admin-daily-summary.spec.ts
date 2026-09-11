@@ -104,8 +104,8 @@ test("dashboard clock opens Carlos time log instead of looking like a dead butto
     readFile(path.join(root, "app/admin/daily-summary/page.tsx"), "utf8"),
   ])
 
-  expect(clock).toContain('href="/admin/daily-summary"')
-  expect(clock).toContain('aria-label="Open Carlos time log and daily summary"')
+  expect(clock).toContain('href={activityHistory ? "/admin/carlos-activity" : "/admin/daily-summary"}')
+  expect(clock).toContain('"Open Carlos time log and daily summary"')
   expect(page).toContain('href="/admin/build-map"')
   expect(page).toContain("Time Log &amp; Daily Summary")
 })
