@@ -2,6 +2,16 @@
 
 David prioritizes a fast, light, usable request flow over further AI extraction tuning and authorized website publication. Active domain is only https://avantiabuild.com.
 
+## Final publication and live verification (supersedes pending notes below)
+
+- Both serialized releases completed successfully: `34596241237` deployed2750f9e3 (homepage resilience + comparison readability), then `34596891206` deployed **`01964b79c481fa17555ae6f22b61aaa6d81cd105`** (public intake continuity). Canonical and mirror main match01964b79. Latest Vercel deployment `dpl_7Vp7NjQbgPNvv3AvkUU8gVRLZLPG` READY; production alias avantiabuild.com and `/api/release` exact commit/environment/Supabase ref independently verified. Both CI runs passed bounded regression tests, full lint/build/typecheck and release guards.
+- Homepage live hero HTML arrived at1336ms (headers1286ms/status200), versus prior20s timeout/zero bytes. One measurement, not a general speed guarantee. Live390/1440 showed hero/actions, no horizontal overflow or page JS exceptions. Optional service loading could still keep document loading in background; page content is no longer withheld.
+- Final live forms390/1440 passed: request form displayed in334/739ms and empty-submit client validation responded; beat-a-quote correctly displays its upload-first gate, with client handlers attached. Every POST was intercepted/aborted in these checks; zero server-action attempts. No actual files, requests, emails or supplier/customer notifications were submitted. Initial cold validation wait timed out once; next run passed request validation but revealed an incorrect test expectation for the upload-first form. Corrected test then passed all four route/viewport combinations. Do not present this as a real successful save/upload test.
+- Final focused suite72/72 passed together;7release guards; full production builds/typechecks passed. Final added-code secret-pattern scan348 lines/zero matches. Comparison390 manual override stayed visible with lowest offer and focus preserved;1440 no overflow. These are Chrome responsive checks, not physical iPhone/Safari execution.
+- Screens: `/tmp/avantia-home-live-2750-390.png`, `/tmp/avantia-home-live-2750-1440.png`, `/tmp/avantia-live-intake-request-quote-390.png`, `/tmp/avantia-live-intake-beat-a-quote-390.png`, corresponding1440 form images, and local comparison card screenshots above.
+- **Unresolved service incident:** authenticated internal request638410 still timed out at12s; two production management read-only SQL probes each timed out after15s, including `select 1`. Project reports ACTIVE_HEALTHY, which is not proof of query availability. Supabase reports [Unresponsive Projects](https://status.supabase.com/incidents/4mkcsnlf6p5x); latest06:19UTC update says a fix was deployed, earlier03:44 update suggested restart for persistently affected projects. A connection to our specific project is plausible but unproven. No project restart, configuration mutation or support ticket sent. Any restart must target only verified production ref and be coordinated for its availability impact.
+- Root master context updated. Full request save→AI→supplier→customer flow is NOT complete/proven; underlying database/auth timeouts and the previously documented idempotency/autosave issues remain. UI publication is not closure of those tasks.
+
 ## Evidence and scope
 
 - Before fix, anonymous homepage request timed out after 20 seconds with zero response bytes. `/api/release` still returned production `0906a5ce2918b82da03d7908041295fca03ca3e2`, Supabase `nprfhspwdflpqlopydmp`.
@@ -19,8 +29,6 @@ David prioritizes a fast, light, usable request flow over further AI extraction 
 - Local production-build homepage HTML contained the hero at 76 ms; browser 390 px first contentful paint 600 ms, no overflow or JS errors. JavaScript-disabled 390 px page still shows hero/actions, FCP 148 ms. These are local measurements, not user-device performance promises.
 - Local comparison at390: no overflow/errors; opening other offers and selecting a non-cheapest supplier retained focus and moved selection into primary visible offers. Screens: `/tmp/avantia-home-candidate-390.png`, `/tmp/avantia-home-nojs-390.png`, `/tmp/avantia-comparison-candidate-card-390.png`.
 - Production project independently confirmed: `prj_9YPQLnJQT8ud6NHQOCkGYBYZQTjE`, team `team_ppEl8INgejzz6LoMr6UhXnfs`, latest prior deployment READY and canonical domain present. Preflight homepage timed out; release endpoint verified exact current identity. Isolated worktree `/tmp/avantia-request-clarity-20260911` preserves all approved0906 changes.
-
-## Remaining
 
 ## Follow-up verification and intake continuity
 
