@@ -10,7 +10,7 @@ import { completedMaterialListOutput, MaterialListFailure, materialListFailureCo
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false })
+const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false, connect_timeout: 5, idle_timeout: 5, max_lifetime: 60 })
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 const AI_MODEL = Deno.env.get("OPENAI_CLIENT_MATERIAL_LIST_MODEL") || "gpt-5.6-sol"
 
@@ -236,10 +236,21 @@ function encodeBase64(bytes: Uint8Array) {
 }
 
 async function openAiKey() {
-  const rows = await sql<{ decrypted_secret: string }[]>`
+  const query = sql<{ decrypted_secret: string }[]>`
     select decrypted_secret from vault.decrypted_secrets where name = 'openai_supplier_quote_api_key' limit 1
   `
-  return rows[0]?.decrypted_secret || null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const rows = await Promise.race([query, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        void query.cancel().catch(() => undefined)
+        reject(new MaterialListFailure("key_lookup_timeout"))
+      }, 8_000)
+    })])
+    return rows[0]?.decrypted_secret || null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function authorized(request: Request) {
@@ -265,7 +276,10 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
   if (!await authorized(request)) return json({ error: "Staff authorization required" }, 401)
 
-  const apiKey = await openAiKey()
+  let apiKey: string | null
+  try { apiKey = await openAiKey() } catch {
+    return json({ error: "AI configuration is temporarily unavailable.", failureCode: "key_lookup_timeout" }, 503)
+  }
   if (!apiKey) return json({ error: "AI is not configured" }, 503)
 
   let body: { requestId?: unknown; force?: unknown }
@@ -335,7 +349,7 @@ Deno.serve(async (request: Request) => {
     if (!typedSource && !includedAttachmentCount) throw new MaterialListFailure("source_empty")
 
     const controller = new AbortController()
-    const openAiTimeout = setTimeout(() => controller.abort(), 30_000)
+    const openAiTimeout = setTimeout(() => controller.abort(), 90_000)
     let result: AiResult
     try {
       const response = await fetch("https://api.openai.com/v1/responses", {

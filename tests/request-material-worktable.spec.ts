@@ -499,7 +499,7 @@ test("organizer has bounded OpenAI deadlines and the server action only enqueues
 
   expect(organizer).toContain("new AbortController()")
   expect(organizer).toContain("signal: controller.signal")
-  expect(organizer).toContain("controller.abort(), 30_000")
+  expect(organizer).toContain("controller.abort(), 90_000")
   expect(organizer).toContain("clearTimeout(openAiTimeout)")
   expect(actions).toContain("await scheduleClientMaterialListOrganization")
   expect(actions).not.toContain("Promise.race([invocation, deadline])")

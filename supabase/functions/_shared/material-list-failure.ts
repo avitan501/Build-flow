@@ -1,5 +1,6 @@
 // Codes only: never propagate arbitrary provider responses or customer text.
 const failureCodes = new Set([
+  "key_lookup_timeout",
   "organizer_failed", "organizer_timeout", "organizer_busy", "organizer_unavailable",
   "openai_timeout", "openai_unavailable", "openai_incomplete", "openai_refused",
   "openai_empty_output", "openai_invalid_json", "openai_invalid_shape",

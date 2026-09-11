@@ -68,7 +68,7 @@ test("worker processes one bounded job and always records a terminal or retry re
 
   expect(worker).toContain('admin.rpc("claim_client_material_list_jobs", { p_limit: 1 })')
   expect(worker).toContain('fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`')
-  expect(worker).toContain("controller.abort(), 45_000")
+  expect(worker).toContain("controller.abort(), 120_000")
   expect(worker).toContain('admin.rpc("finish_client_material_list_job"')
   expect(worker).toContain('payload.status === "processing"')
   expect(worker).toContain('? "organizer_timeout"')
@@ -126,10 +126,10 @@ test("the request screen shows queue, processing, and retry states while continu
 
   expect(worktable).toContain('["queued", "processing", "retrying"].includes(organizationStatus)')
   expect(worktable).toContain("<MaterialOrganizationStatus status={organizationStatus}")
-  expect(status).toContain('queued: "Queued for AI"')
-  expect(status).toContain('processing: "AI is reading files…"')
-  expect(status).toContain('retrying: "AI will retry automatically"')
-  expect(status).toContain('failed: "AI could not finish"')
+  expect(status).toContain('queued: "Waiting to split your list…"')
+  expect(status).toContain('processing: "Splitting your list…"')
+  expect(status).toContain('retrying: "Delayed · retrying automatically"')
+  expect(status).toContain('failed: "List not split · try again"')
   expect(status).toContain("router.refresh()")
   expect(status).toContain("retrying ? 15_000 : 4_000")
   expect(button).toContain("You can keep working while AI reads the files")

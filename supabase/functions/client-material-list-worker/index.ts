@@ -75,7 +75,7 @@ async function finishJob(job: MaterialListJob, result: {
 
 async function runJob(job: MaterialListJob) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 45_000)
+  const timeout = setTimeout(() => controller.abort(), 120_000)
   let result: {
     succeeded: boolean
     status?: string
