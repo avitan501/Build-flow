@@ -49,7 +49,10 @@ export type QuoteComparisonPriceRecord = {
   unit_price: number | null;
   is_available: boolean;
   notes: string;
+  quote_product_match_confirmations?: ProductMatchConfirmation[];
 };
+
+export type ProductMatchConfirmation = { id: string; actor_id: string; actor_label: string; created_at: string; revoked_at?:string|null; source_fingerprint: string; source_snapshot: unknown; selling_unit: string };
 
 export type QuoteComparisonBidRecord = {
   id: string;
@@ -166,7 +169,39 @@ export type QuoteBuyingOption = {
   selectable: boolean;
 };
 
-export type QuoteLineMatchStatus = "exact" | "possible" | "review" | "manual";
+export type QuoteLineMatchStatus = "exact" | "possible" | "review" | "manual" | "reviewed";
+
+export function productMatchSnapshot(item: QuoteComparisonItemRecord, bid: QuoteComparisonBidRecord, price: QuoteComparisonPriceRecord) {
+  return { item: { id:item.id, description:item.description, specification:item.specification, quantity:item.quantity, unit:item.unit }, bid: { id:bid.id, supplier_id:bid.supplier_id, trust_level_snapshot:bid.trust_level_snapshot }, price: { unit_price:price.unit_price, is_available:price.is_available, notes:price.notes } };
+}
+
+export function canonicalProductMatch(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalProductMatch).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,entry])=>`${JSON.stringify(key)}:${canonicalProductMatch(entry)}`).join(",")}}`;
+  return JSON.stringify(value ?? null);
+}
+
+export function productMatchConfirmationError(item: QuoteComparisonItemRecord, bid: QuoteComparisonBidRecord, price: QuoteComparisonPriceRecord | undefined, sellingUnit: string) {
+  if (!price?.notes.trim()) return "Record the actual supplier wording before reviewing this match.";
+  if (!price.is_available || price.unit_price === null || !Number.isFinite(price.unit_price) || price.unit_price < 0 || !Number.isFinite(item.quantity) || item.quantity <= 0) return "A current available price and valid quantity are required.";
+  if (bid.trust_level_snapshot === "do-not-use" || bid.status === "declined") return "This supplier is excluded.";
+  const unit = (value:string) => value.trim().toLowerCase().replace(/\s+/g," ");
+  if (!unit(item.unit) || unit(sellingUnit) !== unit(item.unit)) return "Confirm the exact requested selling unit; unit conversion is not supported here.";
+  if (/\b(not available|unavailable|out of stock|not included|exclud\w*)\b/i.test(price.notes)) return "The source says this product is unavailable or excluded. Resolve it with the supplier first.";
+  const basis = price.notes.match(/\bper\s+(box|pack|bundle|case|pallet|roll|sheet|piece|each|foot|feet|sq\.?\s*ft)\b|\/\s*(box|pack|bundle|case|pallet|roll|sheet|piece|each|ft|sf|lf)\b/i);
+  if (basis && unit(basis[1] || basis[2]) !== unit(item.unit)) return "The recorded supplier selling unit differs. Obtain a price in the requested unit first.";
+  return null;
+}
+
+export function confirmedProductMatch(item: QuoteComparisonItemRecord, bid: QuoteComparisonBidRecord, price: QuoteComparisonPriceRecord | undefined) {
+  if (!price) return null;
+  return price.quote_product_match_confirmations?.find(record => !record.revoked_at && record.actor_id && record.created_at && !productMatchConfirmationError(item,bid,price,record.selling_unit)
+    && canonicalProductMatch(record.source_snapshot) === canonicalProductMatch(productMatchSnapshot(item,bid,price))) ?? null;
+}
+
+export function savedProductMatchStatus(item: QuoteComparisonItemRecord, bid: QuoteComparisonBidRecord, price: QuoteComparisonPriceRecord | undefined): QuoteLineMatchStatus {
+  return confirmedProductMatch(item,bid,price) ? "reviewed" : quoteLineMatchStatus(item,price?.notes ?? "");
+}
 
 export type ClientQuoteLine = {
   itemId: string;
@@ -287,6 +322,7 @@ export function analyzeQuoteComparison(
     const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
     const missingFields = [
       ...(pricedItemCount === items.length ? [] : [`${Math.max(0, items.length - pricedItemCount)} material price${items.length - pricedItemCount === 1 ? "" : "s"}`]),
+      ...(items.some(item=>!["exact","reviewed"].includes(savedProductMatchStatus(item,bid,prices.get(item.id)))) ? ["supplier product match review"] : []),
       ...bidMetadataMissingFields(bid),
     ];
 
@@ -379,6 +415,7 @@ export function lowestSupplierPriceByItem(
     for (const bid of eligibleBids) {
       const price = (bid.quote_comparison_prices ?? []).find((entry) => entry.item_id === item.id);
       if (!price?.is_available || price.unit_price === null || !Number.isFinite(price.unit_price) || price.unit_price < 0) continue;
+      if (!Number.isFinite(item.quantity) || item.quantity <= 0 || !item.unit?.trim() || !["exact","reviewed"].includes(savedProductMatchStatus(item,bid,price))) continue;
       const unitPrice = positiveNumber(price.unit_price);
       const current = result.get(item.id);
       if (!current || unitPrice < current.unitPrice) {

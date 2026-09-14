@@ -4,6 +4,7 @@ import { requireStaffProfile } from "@/lib/auth";
 import { parseProductChoiceDraft, productChoiceFingerprint, productChoiceScopeError } from "@/lib/product-choice-draft";
 import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "@/lib/quote-comparison";
 import type { AutosaveResult } from "@/lib/autosave-queue";
+import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 
 export async function saveProductChoicesAction(input: { comparisonId: string; expectedRevision: number; sourceFingerprint: string; snapshot: unknown }): Promise<AutosaveResult> {
   const { supabase } = await requireStaffProfile("suppliers");
@@ -23,6 +24,7 @@ export async function saveProductChoicesAction(input: { comparisonId: string; ex
       supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id",input.comparisonId).returns<QuoteComparisonBidRecord[]>(),
     ]);
     if (items.error || bids.error) return {ok:false,error:"Supplier prices could not be checked. Retry before leaving."};
+    bids.data = await loadProductMatchConfirmations(supabase,bids.data??[]);
     if (await productChoiceFingerprint(items.data??[],bids.data??[]) !== input.sourceFingerprint) return {ok:false,conflict:true,error:"Prices changed. Reload and review before choosing."};
     const scopeError = productChoiceScopeError(draft,items.data??[],bids.data??[]);
     if (scopeError) return {ok:false,conflict:true,error:scopeError};

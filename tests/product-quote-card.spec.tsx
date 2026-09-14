@@ -5,16 +5,17 @@ import { readFile } from "node:fs/promises"
 import { readFileSync, readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import ts from "typescript"
-import { ProductQuoteCard, productQuoteCardSections } from "../components/buildflow/product-quote-card"
+import type { ProductQuoteCard as Card, productQuoteCardSections as Sections } from "../components/buildflow/product-quote-card"
 import { buildProductQuotePreview } from "../lib/product-quote-preview"
 import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "../lib/quote-comparison"
 import { formatComparisonMoney } from "../lib/quote-comparison"
 
 // Compile real React JSX for SSR, rather than Playwright's component-test JSX.
-const serverExports = {} as { ProductQuoteCard: typeof ProductQuoteCard }
+const serverExports = {} as { ProductQuoteCard: typeof Card; productQuoteCardSections: typeof Sections }
 const localRequire = createRequire(`${process.cwd()}/package.json`)
 const componentSource = ts.transpileModule(readFileSync("components/buildflow/product-quote-card.tsx", "utf8"), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText
-new Function("exports", "require", componentSource)(serverExports, (id: string) => id === "@/lib/quote-comparison" ? { formatComparisonMoney } : localRequire(id))
+new Function("exports", "require", componentSource)(serverExports, (id: string) => id === "@/lib/quote-comparison" ? { formatComparisonMoney } : id === "@/components/buildflow/product-match-review" ? {ProductMatchReview:()=>null} : localRequire(id))
+const {productQuoteCardSections}=serverExports
 
 const item: QuoteComparisonItemRecord = { id: "valve", comparison_id: "comparison", description: "Control valve with a very long manufacturer product name", specification: "4 in · threaded · exact requested specification", quantity: 2, unit: "each", markup_percent: 0, client_unit_price: null, sort_order: 0, created_at: "", updated_at: "" }
 function bid(id: string, price: number | null, available = true, notes = `${item.description} ${item.specification}`): QuoteComparisonBidRecord {

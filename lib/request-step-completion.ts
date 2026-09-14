@@ -1,5 +1,5 @@
 import { materialReviewStatus, type ReviewableMaterialItem } from "@/lib/client-material-review"
-import { analyzeQuoteComparison, quoteLineMatchStatus, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison"
+import { analyzeQuoteComparison, savedProductMatchStatus, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import { effectiveRequestComparisonItems, requestItemSpecification } from "@/lib/supplier-quote-routing"
 import { normalizeSupplierQuoteUnit } from "@/lib/supplier-quote-pricing"
 import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
@@ -71,8 +71,8 @@ export function requestStep2CompletionError(
   const analysis = analyzeQuoteComparison(comparisonItems, [selectedBid])[0]
   if (!analysis || analysis.blocked) return "Choose an eligible supplier route before completing."
   if (analysis.missingItemCount) return `Finish ${analysis.missingItemCount} missing or unavailable material price(s).`
-  if (!analysis.eligible) return "Complete the selected route's delivery and tax before completing."
   const byItem = new Map(prices.map((price) => [price.item_id, price]))
-  const unconfirmed = comparisonItems.filter((item) => ["possible", "review"].includes(quoteLineMatchStatus(item, byItem.get(item.id)?.notes ?? "")))
-  return unconfirmed.length ? `Confirm ${unconfirmed.length} supplier product match(es) in Compare products.` : null
+  const unconfirmed = comparisonItems.filter((item) => !["exact", "reviewed"].includes(savedProductMatchStatus(item, selectedBid, byItem.get(item.id))))
+  if (unconfirmed.length) return `Confirm ${unconfirmed.length} supplier product match(es) in Compare products.`
+  return !analysis.eligible ? "Complete the selected route's delivery and tax before completing." : null
 }

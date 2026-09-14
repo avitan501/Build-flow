@@ -35,6 +35,7 @@ function actionHarness(options:{status?:string;revision?:number;race?:boolean;de
   const exported={} as {saveProductChoicesAction:typeof saveProductChoicesAction};
   new Function("exports","require",compiled)(exported,(id:string)=>{
     if(id==="@/lib/product-choice-draft")return helpers;
+    if(id==="@/lib/product-match-server")return {loadProductMatchConfirmations:async(_client:unknown,rows:QuoteComparisonBidRecord[])=>rows};
     if(id==="@/lib/auth")return {requireStaffProfile:async(capability:string)=>{expect(capability).toBe("suppliers");if(options.deny)throw new Error("Unauthorized");return {supabase}}};
     throw new Error(`Unexpected runtime dependency ${id}`);
   });
@@ -76,6 +77,6 @@ test("missing or contradictory source cannot be persisted even with its current 
 test("legacy supplier award does not bypass source review for blank wording",()=>{
   const source=readFileSync("app/admin/quote-comparison/actions.ts","utf8");
   const guard=source.slice(source.indexOf("const weakMatch ="),source.indexOf("if (weakMatch)"));
-  expect(guard).toContain('return matchStatus !== "exact"');
+  expect(guard).toContain('return !["exact","reviewed"].includes(matchStatus)');
   expect(guard).not.toContain("return sourceDescription &&");
 });

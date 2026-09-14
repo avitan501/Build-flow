@@ -6,6 +6,7 @@ import type { ClientQuoteAttachmentRecord, QuoteComparisonBidRecord, QuoteCompar
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 import { productChoiceFingerprint, restoreProductChoices, type ProductChoiceDraftColumns } from "@/lib/product-choice-draft";
+import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -56,6 +57,7 @@ export default async function QuoteComparisonDetailPage({
 
   if (comparisonResult.error || !comparisonResult.data) notFound();
   if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
+  bidsResult.data = await loadProductMatchConfirmations(supabase,bidsResult.data ?? []);
   const choiceFingerprint = await productChoiceFingerprint(itemsResult.data ?? [], bidsResult.data ?? []);
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
 

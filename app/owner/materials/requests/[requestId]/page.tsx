@@ -12,6 +12,7 @@ import {
 } from "@/components/buildflow/request-management-panel";
 import { requireStaffProfile } from "@/lib/auth";
 import { requestItemRevision } from "@/lib/request-item-revision";
+import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 import { RequestProductSupplierRoutes } from "@/components/buildflow/request-product-supplier-routes";
 import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
@@ -364,6 +365,7 @@ export default async function OwnerMaterialRequestPage({
         { data: [] as QuoteComparisonBidRecord[], error: null },
         { data: [] as LinkedSupplierQuote[] },
       ];
+  comparisonBidsResult.data = await loadProductMatchConfirmations(supabase,comparisonBidsResult.data??[]);
   const supplierQuoteSources = await Promise.all(
     (supplierQuotesResult.data ?? []).map(async (quote) => ({
       ...quote,

@@ -45,7 +45,7 @@ function bid(
     status: "received",
     created_at: "",
     updated_at: "",
-    quote_comparison_prices: options.prices.map(([itemId, unitPrice]) => ({ bid_id: id, item_id: itemId, unit_price: unitPrice, is_available: true, notes: "" })),
+    quote_comparison_prices: options.prices.map(([itemId, unitPrice]) => ({ bid_id: id, item_id: itemId, unit_price: unitPrice, is_available: true, notes: items.filter(item=>item.id===itemId).map(item=>`${item.description} ${item.specification}`.trim()).join("") })),
   };
 }
 

@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react"
 import { formatComparisonMoney } from "@/lib/quote-comparison"
 import type { buildProductQuotePreview } from "@/lib/product-quote-preview"
+import { ProductMatchReview } from "@/components/buildflow/product-match-review"
 
 type ProductRow = ReturnType<typeof buildProductQuotePreview>["rows"][number]
 type ProductOffer = ProductRow["offers"][number]
@@ -15,11 +16,11 @@ export function productQuoteCardSections(row: ProductRow) {
   return { primary, other, reviewCount: row.offers.filter((offer) => offer.status === "review").length }
 }
 
-function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void; choiceDisabled?: boolean }) {
+function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeConfirm }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean> }) {
   const lowest = offer.eligible && offer.unitPrice === row.lowest?.unitPrice
   const selected = row.selected?.bid.id === offer.bid.id
   const source = offer.bid.quote_comparison_prices?.find(price => price.item_id === row.item.id)?.notes?.trim() || ""
-  return <label className={`flex min-h-16 items-start gap-2.5 px-3 py-3 ${offer.eligible ? "cursor-pointer" : "cursor-not-allowed"} ${selected ? "bg-sky-50" : ""}`}>
+  return <><label className={`flex min-h-16 items-start gap-2.5 px-3 py-3 ${offer.eligible ? "cursor-pointer" : "cursor-not-allowed"} ${selected ? "bg-sky-50" : ""}`}>
     <input type="radio" name={`draft-product-${row.item.id}`} value={offer.bid.id} checked={selected} disabled={!offer.eligible || choiceDisabled} onChange={(event) => {
       const card = event.currentTarget.closest("article")
       onSelect(offer.bid.id)
@@ -37,15 +38,16 @@ function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false }: { row
         {offer.status === "review" ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Match needs review · excluded</span> : null}
         {offer.blocked ? <span className="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">Supplier excluded</span> : null}
         {source && offer.matchStatus === "exact" ? <span className="text-slate-600">Source wording matches</span> : null}
+        {offer.confirmation ? <span className="text-sky-800">Match reviewed by {offer.confirmation.actor_label}</span> : null}
       </span>
     </span>
     <span className="max-w-[40%] break-words text-right text-sm font-bold tabular-nums">{offer.status === "unavailable" ? "Unavailable" : offer.status === "unknown" ? "No quote" : offer.unitPrice === null ? "—" : `${formatComparisonMoney(offer.unitPrice)} / ${row.item.unit}`}
       <span className="mt-1 block text-[10px] font-normal text-slate-500">{offer.status === "unknown" ? "Availability unknown" : offer.status === "unavailable" ? "Marked unavailable" : offer.lineTotal === null ? "Quantity needs review" : `${formatComparisonMoney(offer.lineTotal)} product total`}</span>
     </span>
-  </label>
+  </label>{beforeConfirm && offer.status === "review" && !offer.blocked ? <ProductMatchReview item={row.item} bid={offer.bid} disabled={choiceDisabled} beforeConfirm={beforeConfirm}/> : null}</>
 }
 
-export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisabled = false }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void; choiceDisabled?: boolean }) {
+export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisabled = false, beforeConfirm }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean> }) {
   const { primary, other, reviewCount } = productQuoteCardSections(row)
   return <article className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white" data-testid="product-quote-card">
     <details name="requested-product-offers" className="group/product">
@@ -56,7 +58,7 @@ export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisab
       {!row.validQuantity ? <p className="mt-1 text-xs font-semibold text-rose-700">Check requested quantity.</p> : !row.lowest ? <p className="mt-1 text-xs font-semibold text-amber-800">No confirmed price yet.</p> : null}
     </div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 group-open/product:rotate-180" aria-hidden="true"/></summary>
     <fieldset><legend className="sr-only">Draft supplier choice for {row.item.description}</legend>
-      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} choiceDisabled={choiceDisabled} />)}</div>
+      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} choiceDisabled={choiceDisabled} beforeConfirm={beforeConfirm} />)}</div>
       {!row.offers.length ? <p className="px-3 py-4 text-xs text-slate-500">No supplier quotes yet.</p> : null}
     </fieldset>
     {onReview ? <button type="button" onClick={onReview} className="min-h-11 w-full border-t border-slate-100 px-3 text-left text-xs font-semibold text-sky-800">Compare details / review matches</button> : null}

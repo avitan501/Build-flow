@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireStaffProfile } from "@/lib/auth";
+import { loadProductMatchConfirmations } from "@/lib/product-match-server";
+import { savedProductMatchStatus } from "@/lib/quote-comparison";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requestStep2CompletionError } from "@/lib/request-step-completion";
+import type { ReviewableMaterialItem } from "@/lib/client-material-review";
 import { matchRequestClientQuoteItems } from "@/lib/client-quote-import";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
 import { sendClientQuoteEmail } from "@/lib/cart-submission-email";
@@ -12,7 +17,6 @@ import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
 import {
   analyzeQuoteComparison,
   buildClientQuoteSummary,
-  quoteLineMatchStatus,
   type ClientQuoteAttachmentRecord,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
@@ -439,31 +443,16 @@ export async function confirmQuoteComparisonPriceMatchAction(input: {
   bidId: string;
   itemId: string;
 }): Promise<ActionResult> {
-  const { supabase } = await requireStaffProfile("suppliers");
-  const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
-  if (lockedError) return { ok: false, error: lockedError };
-  const { data: bid, error: bidError } = await supabase
-    .from("quote_comparison_bids")
-    .select("id")
-    .eq("id", input.bidId)
-    .eq("comparison_id", input.comparisonId)
-    .maybeSingle<{ id: string }>();
-  if (bidError || !bid) return { ok: false, error: "The supplier quote could not be found in this comparison." };
-  const { error } = await supabase
-    .from("quote_comparison_prices")
-    .update({ notes: "" })
-    .eq("bid_id", input.bidId)
-    .eq("item_id", input.itemId);
-  if (error) return { ok: false, error: "The supplier item match could not be confirmed." };
-  revalidatePath(comparisonPath(input.comparisonId));
-  return { ok: true };
+  await requireStaffProfile("suppliers");
+  void input;
+  return { ok: false, error: "Open Products, expand this product, and use Review this match. Original supplier wording is never erased." };
 }
 
 export async function awardQuoteComparisonBidAction(input: {
   comparisonId: string;
   bidId: string;
 }): Promise<ActionResult> {
-  const { supabase } = await requireStaffProfile("suppliers");
+  const { supabase, user } = await requireStaffProfile("suppliers");
   const [itemsResult, bidsResult] = await Promise.all([
     supabase.from("quote_comparison_items").select("*").eq("comparison_id", input.comparisonId).returns<QuoteComparisonItemRecord[]>(),
     supabase
@@ -473,6 +462,7 @@ export async function awardQuoteComparisonBidAction(input: {
       .returns<QuoteComparisonBidRecord[]>(),
   ]);
   if (itemsResult.error || bidsResult.error) return { ok: false, error: "Could not verify the comparison." };
+  bidsResult.data = await loadProductMatchConfirmations(supabase,bidsResult.data??[]);
   const analysis = analyzeQuoteComparison(itemsResult.data ?? [], bidsResult.data ?? []).find((entry) => entry.bidId === input.bidId);
   if (!analysis || analysis.blocked || !analysis.eligible || analysis.missingItemCount > 0) {
     return { ok: false, error: "This supplier cannot be selected until material prices, delivery, tax, and lead time are complete." };
@@ -480,15 +470,25 @@ export async function awardQuoteComparisonBidAction(input: {
   const selectedBid = (bidsResult.data ?? []).find((bid) => bid.id === input.bidId);
   const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
   const weakMatch = (itemsResult.data ?? []).find((item) => {
-    const sourceDescription = prices.get(item.id)?.notes ?? "";
-    const matchStatus = quoteLineMatchStatus(item, sourceDescription);
-    return matchStatus !== "exact";
+    const matchStatus = savedProductMatchStatus(item,selectedBid!,prices.get(item.id));
+    return !["exact","reviewed"].includes(matchStatus);
   });
   if (weakMatch) return { ok: false, error: `Review the supplier match for ${weakMatch.description} before selecting this supplier.` };
-
-  const { error } = await supabase.rpc("staff_award_quote_comparison_bid", {
+  const parent = await supabase.from("quote_comparisons").select("request_id").eq("id",input.comparisonId).maybeSingle<{request_id:string|null}>();
+  if(parent.error || !parent.data)return {ok:false,error:"Could not check the current request."};
+  let expectedRequest: ReviewableMaterialItem[]=[];
+  if(parent.data.request_id){
+    const requested=await supabase.from("quote_request_items").select("id,name,department,quantity,unit,metadata,qualification_status").eq("request_id",parent.data.request_id).order("id").returns<ReviewableMaterialItem[]>();
+    if(requested.error)return {ok:false,error:"Could not check the current request products."};
+    expectedRequest=requested.data??[];
+    const invalid=requestStep2CompletionError(expectedRequest,itemsResult.data??[],selectedBid);
+    if(invalid)return {ok:false,error:invalid};
+  }
+  const { error } = await createAdminClient().rpc("staff_award_reviewed_product_bid", {
     p_comparison_id: input.comparisonId,
     p_bid_id: input.bidId,
+    p_actor_id:user.id,
+    p_request_expected:expectedRequest,
   });
   if (error) return { ok: false, error: "Could not select this supplier. Reopen the comparison and try again." };
 

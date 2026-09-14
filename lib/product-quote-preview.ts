@@ -1,4 +1,4 @@
-import { quoteLineMatchStatus, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison";
+import { savedProductMatchStatus, confirmedProductMatch, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison";
 
 /** Read-only product comparison. Selections are browser-session draft inputs, never an order. */
 export function buildProductQuotePreview(items: QuoteComparisonItemRecord[], bids: QuoteComparisonBidRecord[], selections: Record<string, string> = {}) {
@@ -7,10 +7,11 @@ export function buildProductQuotePreview(items: QuoteComparisonItemRecord[], bid
     const offers = bids.map((bid) => {
       const price = bid.quote_comparison_prices?.find((entry) => entry.item_id === item.id);
       const unitPrice = price?.unit_price != null && Number.isFinite(price.unit_price) && price.unit_price >= 0 ? price.unit_price : null;
-      const matchStatus = quoteLineMatchStatus(item, price?.notes ?? "");
-      const status = price?.is_available === false ? "unavailable" : price?.is_available !== true || unitPrice === null ? "unknown" : matchStatus !== "exact" || !item.unit?.trim() ? "review" : "priced";
+      const matchStatus = savedProductMatchStatus(item,bid,price);
+      const confirmation = confirmedProductMatch(item,bid,price);
+      const status = price?.is_available === false ? "unavailable" : price?.is_available !== true || unitPrice === null ? "unknown" : !["exact","reviewed"].includes(matchStatus) || !item.unit?.trim() ? "review" : "priced";
       const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
-      return { bid, unitPrice, lineTotal: validQuantity && unitPrice !== null ? Math.round(unitPrice * item.quantity * 100) / 100 : null, status, matchStatus, eligible: status === "priced" && !blocked && validQuantity, blocked };
+      return { bid, unitPrice, lineTotal: validQuantity && unitPrice !== null ? Math.round(unitPrice * item.quantity * 100) / 100 : null, status, matchStatus, confirmation, eligible: status === "priced" && !blocked && validQuantity, blocked };
     });
     const eligible = offers.filter((offer) => offer.eligible).sort((a, b) => a.unitPrice! - b.unitPrice!);
     const lowest = eligible[0] ?? null;

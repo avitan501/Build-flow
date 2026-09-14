@@ -30,7 +30,7 @@ export async function productChoiceFingerprint(items: QuoteComparisonItemRecord[
   const source = {
     items: [...items].sort((a,b)=>a.id.localeCompare(b.id)).map(item=>[item.id,item.description,item.specification,item.quantity,item.unit]),
     bids: [...bids].sort((a,b)=>a.id.localeCompare(b.id)).map(bid=>[bid.id,bid.supplier_id,bid.trust_level_snapshot,bid.status,
-      [...(bid.quote_comparison_prices??[])].sort((a,b)=>a.item_id.localeCompare(b.item_id)).map(price=>[price.item_id,price.unit_price,price.is_available,price.notes])]),
+      [...(bid.quote_comparison_prices??[])].sort((a,b)=>a.item_id.localeCompare(b.item_id)).map(price=>[price.item_id,price.unit_price,price.is_available,price.notes,(price.quote_product_match_confirmations??[]).map(record=>[record.id,record.source_fingerprint,record.selling_unit,record.revoked_at??null])])]),
   };
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(source)));
   return Array.from(new Uint8Array(digest), byte=>byte.toString(16).padStart(2,"0")).join("");

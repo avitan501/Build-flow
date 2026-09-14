@@ -1,0 +1,64 @@
+\set ON_ERROR_STOP on
+-- Empty isolated PostgreSQL only. Never production.
+do $$begin if not exists(select 1 from pg_roles where rolname='anon') then create role anon;create role authenticated;create role service_role bypassrls;end if;end$$;
+create schema auth;
+create table auth.users(id uuid primary key,email text);
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
+grant usage on schema auth to authenticated,service_role;
+create table public.profiles(id uuid primary key,is_active boolean,approval_status text,role text);
+create table public.quote_requests(id uuid primary key);
+create table public.quote_request_items(id uuid primary key,request_id uuid,name text,department text,quantity numeric,unit text,metadata jsonb,qualification_status text);
+create table public.quote_comparisons(id uuid primary key,status text,request_id uuid,awarded_bid_id uuid,product_choice_draft_revision integer default 0);
+create table public.quote_comparison_items(id uuid primary key,comparison_id uuid references public.quote_comparisons(id),description text,specification text,quantity numeric,unit text);
+create table public.quote_comparison_bids(id uuid primary key,comparison_id uuid references public.quote_comparisons(id),supplier_id text,trust_level_snapshot text,status text,delivery_charge numeric default 0,tax_percent numeric default 0);
+create table public.quote_comparison_prices(bid_id uuid,item_id uuid,unit_price numeric,is_available boolean,notes text,primary key(bid_id,item_id));
+grant all on all tables in schema public to service_role;
+grant select on auth.users to service_role;
+\i /migration.sql
+insert into auth.users values ('00000000-0000-4000-8000-000000000001','avitanneto@gmail.com'),('00000000-0000-4000-8000-000000000002','other@example.test');
+insert into public.profiles values ('00000000-0000-4000-8000-000000000001',true,'approved','admin'),('00000000-0000-4000-8000-000000000002',true,'approved','staff');
+insert into public.quote_comparisons(id,status) values ('00000000-0000-4000-8000-000000000010','review');
+insert into public.quote_comparison_items values ('00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000010','Valve','4 in',2,'each');
+insert into public.quote_comparison_bids(id,comparison_id,supplier_id,trust_level_snapshot,status) values ('00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000010','supplier','verified','received'),('00000000-0000-4000-8000-000000000013','00000000-0000-4000-8000-000000000010','declined','verified','declined');
+insert into public.quote_comparison_prices values ('00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000011',12,true,'MFR V400 four inch valve');
+create function public.test_match_snapshot() returns jsonb language sql as $$select jsonb_build_object('item',jsonb_build_object('id',i.id,'description',i.description,'specification',i.specification,'quantity',i.quantity,'unit',i.unit),'bid',jsonb_build_object('id',b.id,'supplier_id',b.supplier_id,'trust_level_snapshot',b.trust_level_snapshot),'price',jsonb_build_object('unit_price',p.unit_price,'is_available',p.is_available,'notes',p.notes)) from public.quote_comparison_items i join public.quote_comparison_prices p on p.item_id=i.id join public.quote_comparison_bids b on b.id=p.bid_id$$;
+set test.actor='00000000-0000-4000-8000-000000000001';
+set role authenticated;
+do $$begin
+ begin perform public.staff_award_quote_comparison_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012');raise exception 'unsafe award passed';exception when insufficient_privilege then null;end;
+ begin perform public.staff_award_reviewed_product_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','[]');raise exception 'public service award passed';exception when insufficient_privilege then null;end;
+ begin insert into public.quote_product_match_confirmations(bid_id,item_id,actor_id,actor_label,source_fingerprint,source_snapshot,selling_unit) values('00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000001','Forged',repeat('a',64),'{}','each');raise exception 'forged review passed';exception when insufficient_privilege then null;end;
+end$$;
+reset role;set role service_role;
+do $$declare result jsonb;begin
+ result:=public.staff_confirm_product_match('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','{}',repeat('a',64),'each');assert not (result->>'ok')::boolean,'stale snapshot accepted';
+ result:=public.staff_confirm_product_match('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001',public.test_match_snapshot(),repeat('a',64),'box');assert not (result->>'ok')::boolean,'unit conversion accepted';
+ result:=public.staff_confirm_product_match('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001',public.test_match_snapshot(),repeat('a',64),'each');assert (result->>'ok')::boolean,'review failed';
+ assert (select notes='MFR V400 four inch valve' from public.quote_comparison_prices),'source changed';
+end$$;
+reset role;set role service_role;
+select public.staff_award_reviewed_product_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','[]');
+reset role;
+do $$begin assert (select status='declined' from public.quote_comparison_bids where supplier_id='declined'),'declined supplier revived';end$$;
+update public.quote_comparisons set status='review';
+update public.quote_comparison_prices set unit_price=13;
+set role service_role;
+do $$begin begin perform public.staff_award_reviewed_product_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','[]');raise exception 'stale confirmation passed';exception when raise_exception then if sqlerrm='stale confirmation passed' then raise; end if;end;end$$;
+reset role;set role authenticated;
+set test.actor='00000000-0000-4000-8000-000000000002';
+do $$begin assert (select count(*)=0 from public.quote_product_match_confirmations),'nonstaff read evidence';end$$;
+reset role;
+update public.quote_comparison_prices set unit_price=12;
+do $$begin assert not public.quote_product_match_is_eligible('00000000-0000-4000-8000-000000000011','00000000-0000-4000-8000-000000000012'),'reverting price revived old review';end$$;
+update public.quote_comparison_prices set notes='Valve 4 in';
+insert into public.quote_comparison_items values('00000000-0000-4000-8000-000000000014','00000000-0000-4000-8000-000000000010','Pipe','1 in',1,'each');
+set role service_role;
+do $$begin begin perform public.staff_award_reviewed_product_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','[]');raise exception 'partial coverage passed';exception when raise_exception then if sqlerrm<>'price_or_source_missing' then raise;end if;end;end$$;
+reset role;
+insert into public.quote_requests values('00000000-0000-4000-8000-000000000020');
+insert into public.quote_request_items values('00000000-0000-4000-8000-000000000021','00000000-0000-4000-8000-000000000020','Valve','Plumbing',3,'each','{}','not_required');
+update public.quote_comparisons set request_id='00000000-0000-4000-8000-000000000020';
+set role service_role;
+do $$begin begin perform public.staff_award_reviewed_product_bid('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000001','[]');raise exception 'stale request passed';exception when raise_exception then if sqlerrm<>'request_source_changed' then raise;end if;end;end$$;
+reset role;
+select 'trusted match / source / RLS / stale award tests passed';

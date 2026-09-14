@@ -18,6 +18,7 @@ import { requestItemFieldsMetadata, type RequestItemField } from "@/lib/request-
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion"
+import { loadProductMatchConfirmations } from "@/lib/product-match-server"
 import type { RequestStepPatch, RequestStepRecord } from "@/lib/request-step-state"
 import type { ReviewableMaterialItem } from "@/lib/client-material-review"
 import { materialReviewChoiceUpdate } from "@/lib/material-review-recommendations"
@@ -984,7 +985,8 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
         supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", comparison.id).eq("id", comparison.awarded_bid_id!).maybeSingle<QuoteComparisonBidRecord>(),
       ])
       if (items.error || bid.error) return { ok: false as const, error: "Could not verify the saved prices. Try again." }
-      const reason = requestStep2CompletionError(requested.data ?? [], items.data ?? [], bid.data ?? undefined)
+      const confirmedBids = await loadProductMatchConfirmations(supabase,bid.data ? [bid.data] : [])
+      const reason = requestStep2CompletionError(requested.data ?? [], items.data ?? [], confirmedBids[0])
       if (reason) return { ok: false as const, error: reason }
     }
   }
