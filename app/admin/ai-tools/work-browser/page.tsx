@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { CarlosWorkBrowserAcknowledgement } from "@/components/buildflow/carlos-work-browser-acknowledgement"
+import { CompanyScreenLauncher } from "@/components/buildflow/company-screen-launcher"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import {
   CARLOS_WORK_BROWSER_ACK_PREFIX,
@@ -36,6 +37,9 @@ export default async function CarlosWorkBrowserPage() {
   const ready = Boolean(acknowledgement)
   const browserUrl = carlosWorkBrowserUrl(access.owner)
   const directBrowserUrl = carlosWorkBrowserDirectUrl(access.owner)
+  if (isCarlos && !access.owner && ready) {
+    return <CompanyScreenLauncher href={directBrowserUrl} />
+  }
   return <main className="min-h-screen bg-[#0a1020] px-3 py-4 text-white sm:px-5 lg:px-7">
     <div className="mx-auto max-w-[96rem]">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">

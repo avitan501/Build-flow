@@ -50,6 +50,15 @@ test("work-browser offers a Tailnet IP fallback when MagicDNS is unavailable", (
   expect(employee.searchParams.get("view_only")).toBe("0")
 })
 
+test("Carlos launcher has one same-tab screen link without a blank viewer", async () => {
+  const source = await readFile(path.join(process.cwd(), "components/buildflow/company-screen-launcher.tsx"), "utf8")
+  expect(source.match(/<a\s/g)).toHaveLength(1)
+  expect(source).toContain("Open company screen")
+  expect(source).not.toContain('target="_blank"')
+  expect(source).not.toContain("<iframe")
+  expect(source).toContain("Management may view")
+})
+
 test("daily smart review has a safe deterministic fallback and saved format", () => {
   const events = [{ id: "1", user_id: "u1", event_type: "communication_sent" as const, page_path: "/admin/communications", page_label: "Communications", metadata: { outcome: "failed", channel: "email" }, occurred_at: "2026-09-04T15:00:00.000Z" }]
   const answer = fallbackCarlosActivityReview(events, "Quote upload button failed")
