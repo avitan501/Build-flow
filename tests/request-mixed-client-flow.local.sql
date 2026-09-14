@@ -35,12 +35,18 @@ do $$declare raw jsonb;route uuid;result jsonb;before_client jsonb;after_client 
  assert (select client_send_snapshot=after_client from quote_comparison_routes where id=route),'claimed content differs';
  begin perform staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002',after_client,'00000000-0000-4000-8000-000000000052',after_client,manifest);raise exception 'duplicate send accepted';exception when raise_exception then assert sqlerrm='Delivery already started. Check delivery history; do not send twice.';end;
  begin perform staff_reopen_finalized_route('00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000002');raise exception 'claimed route reopened';exception when raise_exception then assert sqlerrm='Client delivery already started. Check delivery history before reopening.';end;
+ update profiles set is_active=false where id='00000000-0000-4000-8000-000000000002';
+ begin perform staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');raise exception 'revoked actor dispatched';exception when raise_exception then assert sqlerrm='Not authorized';end;
+ begin perform staff_finish_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002','forged-receipt');raise exception 'revoked actor recorded receipt';exception when raise_exception then assert sqlerrm='Not authorized';end;
+ assert (select client_send_dispatch_started_at is null and client_send_provider_id is null from quote_comparison_routes where id=route),'rejected actor mutated delivery';
+ update profiles set is_active=true where id='00000000-0000-4000-8000-000000000002';
  result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
  assert result->>'status'='claimed','first dispatch not claimed';
  result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
  assert result->>'status'='ambiguous','ambiguous dispatch retried blindly';
  -- Synthetic receipt only: no provider/network call is made by this test.
- perform staff_finish_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002','synthetic-provider-receipt');
+ result:=staff_finish_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002','synthetic-provider-receipt');
+ assert result->>'ok'='true','finish did not acknowledge persisted receipt';
  result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
  assert result->>'status'='sent' and result->>'providerId'='synthetic-provider-receipt','completed dispatch not idempotent';
  begin update quote_comparison_routes set client_send_token=null where id=route;raise exception 'claim reset bypass';exception when raise_exception then assert sqlerrm='Delivery claim is immutable';end;

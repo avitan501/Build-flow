@@ -65,3 +65,11 @@ Three existing live legacy function definitions were captured by read-only catal
 Final local schema: **129 constraints and 28 triggers**. The run initially exposed a real candidate regression: the new immutable-history trigger blocked finalization's placeholder-total update. Reported it to the owning reviewer; their `sealed_at` initialization fix passes this combined regression. Earlier WIP hashes and the obsolete six-argument claim signature are not the tested release contract. A fixture-only duplicate sort index was corrected by assigning the second row `sort_order=1`, preserving the real unique index.
 
 This rehearsal proves database behavior only. The synthetic manifest/hash/receipt do not prove PDF byte correctness or external email delivery. Final frozen SQL changes require rerunning this exact gate; Edge/browser integration is owned by the release coordinator.
+
+### Final contract rerun
+
+Rehearsed the updated mixed SQL at **`d9521be0ca183572c1f43d50ecb6a5384df52216f35543dcca81cef8a10071ee`** after the intermediate `4d0430935ca7f4346b14f1c75535c4034c83aae8e4f711f0815bf612958c31a9` correction. All six migrations and interactions pass again (129 constraints, 28 triggers). The finish RPC now must acknowledge persisted receipt with JSON `{ok:true}`; the test asserts this exact contract. Revoking the saved actor blocks both dispatch start and receipt completion, with dispatch/receipt fields unchanged; re-enabling the actor allows the normal local flow.
+
+Independent cached Deno execution of `supabase/functions/_shared/claimed-client-quote.test.ts` in the coordinated release tree passed **22/22**: snapshot-derived client amounts, actor/token/route/recipient injection, malformed or mismatched PDF/hash/filename/size, supplemental attachment order, duplicate calls and ambiguous outcomes. These are dependency-isolated tests with no actual email delivery.
+
+Independent boundary review found no additional blocker in the reviewed final SQL/Edge combination. Publishing still requires the matching reviewer web actions (seven-argument manifest claim, displayed-client CAS, safe filename generation) and Edge functions to be integrated together; an older five-argument/direct-provider web action must not be deployed against the new contract. This audit is not a live website completion claim.
