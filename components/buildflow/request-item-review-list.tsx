@@ -82,7 +82,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
 
   const shown = reviewed && reviewed.item.id === selectedId ? reviewed : current
   const recommendation = shown ? materialReviewRecommendation(shown.item) : null
-  const choices = recommendation?.choices || []
+  const choices = shown?.item.metadata?.ai_organized === true ? recommendation?.choices || [] : []
   const activeChoice = choices.find((choice) => choice.field === field) || choices[0]
 
   return <div className="@container w-full p-3 sm:p-4" data-testid="request-item-review-list">
