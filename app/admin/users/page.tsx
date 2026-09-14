@@ -208,15 +208,16 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
 
   function requestCard(request: RequestRecord, archived = false) {
     const customer = customerMap.get(request.owner_id)
-    const isOpen = deletableRequestStatuses.has(request.status)
+    const projectName = request.projects?.name === "Material Requests" ? "" : request.projects?.name || ""
+    const projectSummary = [projectName, request.projects?.address].filter(Boolean).join(" · ")
     return <article key={request.id} className={`grid gap-3 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-4 ${archived ? "border-slate-200 opacity-90" : "border-slate-200"}`}>
       <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]">
-        <div className="flex min-w-0 items-center gap-2"><span className="shrink-0 text-xs font-bold text-[#0066cc]">#{request.public_number}</span><h2 className="truncate text-sm font-bold sm:text-base">{request.title}</h2><span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${archived ? "border-slate-200 bg-slate-100 text-slate-600" : badgeTone(request.status)}`}>{archived ? "Archived" : request.status.replaceAll("_", " ")}</span></div>
-        <p className="mt-1 truncate text-xs text-slate-600 sm:text-sm">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p>
+        <div className="flex min-w-0 items-center gap-2"><span className="shrink-0 text-xs font-bold text-[#0066cc]">#{request.public_number}</span><h2 className="truncate text-sm font-bold sm:text-base">{request.title}</h2>{archived || request.status !== "submitted" ? <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${archived ? "border-slate-200 bg-slate-100 text-slate-600" : badgeTone(request.status)}`}>{archived ? "Archived" : request.status.replaceAll("_", " ")}</span> : null}</div>
+        {projectSummary ? <p className="mt-1 truncate text-xs text-slate-600 sm:text-sm">{projectSummary}</p> : null}
         <p className="mt-1 text-[11px] text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p>
-        {!archived ? <div className="mt-2 flex flex-wrap gap-1.5">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-2 py-1 text-[10px] font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-[10px] font-semibold text-slate-400">Manual material list</span>}</div> : null}
+        {!archived && request.material_questionnaire_responses.length > 0 ? <div className="mt-2 flex flex-wrap gap-1.5">{request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-2 py-1 text-[10px] font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>)}</div> : null}
       </Link>
-      {archived ? <ArchivedRequestRestoreButton requestId={request.id} /> : isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : null}
+      {archived ? <ArchivedRequestRestoreButton requestId={request.id} /> : null}
     </article>
   }
 

@@ -12,6 +12,7 @@ type DeleteManagerRecordButtonProps = {
   label: string
   projectCount?: number
   requestCount?: number
+  returnToRequests?: boolean
 }
 
 export function DeleteManagerRecordButton({
@@ -20,6 +21,7 @@ export function DeleteManagerRecordButton({
   label,
   projectCount = 0,
   requestCount = 0,
+  returnToRequests = false,
 }: DeleteManagerRecordButtonProps) {
   const router = useRouter()
   const [message, setMessage] = useState("")
@@ -56,6 +58,9 @@ export function DeleteManagerRecordButton({
       }
 
       if (result.warning) setMessage(result.warning)
+      if (kind === "request" && returnToRequests) {
+        router.replace("/admin/users?view=requests")
+      }
       router.refresh()
     })
   }

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
+import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button";
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
 import { RequestActivityLog } from "@/components/buildflow/request-activity-log";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
@@ -679,6 +680,17 @@ export default async function OwnerMaterialRequestPage({
             <span className="text-slate-300">·</span>
             <div className="min-w-0 basis-full pt-1 text-base font-black leading-5 sm:flex-1 sm:basis-auto sm:truncate sm:pt-0 sm:text-sm sm:font-bold" title={request.title}><RequestInlineNameEditor requestId={request.id} value={request.title} kind="request" /></div>
           </div>
+          <details className="mt-1.5 border-t border-slate-100 pt-1" data-testid="request-actions">
+            <summary className="flex min-h-11 cursor-pointer items-center justify-end rounded-md px-2 text-xs font-semibold text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]">Request actions ···</summary>
+            <div className="grid gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+              <dl className="grid gap-1">
+                <div><dt className="inline font-semibold">Status: </dt><dd className="inline">{request.status.replaceAll("_", " ")}</dd></div>
+                <div><dt className="inline font-semibold">Project: </dt><dd className="inline">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}</dd></div>
+                {request.projects?.address ? <div><dt className="inline font-semibold">Address: </dt><dd className="inline">{request.projects.address}</dd></div> : null}
+              </dl>
+              {["draft", "submitted", "in_review", "quoted"].includes(request.status) ? <DeleteManagerRecordButton id={request.id} kind="request" label={`#${request.public_number} · ${request.title}`} returnToRequests /> : null}
+            </div>
+          </details>
         </header>
         <RequestWorkflowGuide guidance={requestWorkflowGuidance({
           closed: request.status === "closed",
