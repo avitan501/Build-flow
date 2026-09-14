@@ -145,13 +145,18 @@ export function QuoteComparisonWorkspace({
   const [showDetails, setShowDetails] = useState(false);
   const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
   const [productSelections, setProductSelections] = useState<Record<string, string>>(initialProductSelections);
+  const [choiceSourceReviewed, setChoiceSourceReviewed] = useState(!productChoiceWarning);
   const [initialChoiceSnapshot] = useState({ version: 1, selections: initialProductSelections });
   const choiceAutosave = useQuoteAutosave({
     scopeKey: `${choiceActorId}:${comparison.id}:${productChoiceFingerprint}`,
     snapshot: { version: 1, selections: productSelections }, initialSnapshot: initialChoiceSnapshot,
     initialRevision: productChoiceRevision,
-    persist: async (snapshot, expectedRevision) => previewMode ? {ok:true as const, revision:expectedRevision+1}
-      : saveProductChoicesAction({comparisonId:comparison.id,expectedRevision,sourceFingerprint:productChoiceFingerprint,snapshot}),
+    persist: async (snapshot, expectedRevision) => {
+      const result = previewMode ? {ok:true as const, revision:expectedRevision+1}
+        : await saveProductChoicesAction({comparisonId:comparison.id,expectedRevision,sourceFingerprint:productChoiceFingerprint,snapshot});
+      if (result.ok) setChoiceSourceReviewed(true);
+      return result;
+    },
   });
   const [showItemForm, setShowItemForm] = useState(items.length === 0);
   const [showSupplierForm, setShowSupplierForm] = useState(bids.length === 0);
@@ -491,8 +496,8 @@ export function QuoteComparisonWorkspace({
 
         {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="space-y-4">
           {!previewMode ? <div className="text-xs" role="status" aria-live="polite">
-            {productChoiceWarning ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
-            <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
+            {!choiceSourceReviewed ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
+            <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (!choiceSourceReviewed && choiceAutosave.status === "saved" ? "Product choices need review" : choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
             {choiceAutosave.error ? choiceAutosave.conflict ? <button type="button" onClick={()=>window.location.reload()} className="min-h-11 font-semibold underline">Reload and review</button> : <button type="button" onClick={()=>void choiceAutosave.retry()} className="min-h-11 font-semibold underline">Retry saving choices</button> : null}
           </div> : null}
           <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-2">

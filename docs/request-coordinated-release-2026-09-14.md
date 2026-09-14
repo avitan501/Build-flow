@@ -8,7 +8,7 @@ Owner: root/release reviewer. Worktree `/tmp/avantia-request-coordinated-release
 - REQ03/04 + delivery coverage + navigation isolation: integrated as `9bf8b71f`, `7900ee78`, `668e7291` (equivalent to prior reviewed `154efb31`).
 - Product-first Step2 and truthful quote-entry count: `b903694b`, `753cf9d3` from `edf37e98`, `12dc59d3`.
 - Step1 source/clarity and routing placement: another agent owns it, not yet integrated.
-- Step3 compact UI + both review fixes: `f1a35eb7`, `9a41cc92` received; not yet integrated at this report checkpoint.
+- Step3 compact UI + both review fixes: `f1a35eb7`, `9a41cc92` integrated as `08efd51a`, `9420c3ce`; active phase and saved subtotal/delivery/tax/total now align.
 
 ## Narrow product-choice autosave
 
@@ -34,11 +34,12 @@ Step1 may add its own approved migration. Root must review the final manifest an
 ## Evidence at checkpoint
 
 - Independent Step2 review: 15 focused/render/browser tests passed with existing local sample at 390/1440, POST blocked; candidate screenshots inspected.
-- New choice/controller tests: 18 passed (behavioral/helper + source contracts).
+- Combined focused tests: 55 passed including 390/1440 product workflow, fulfillment, private step proof, controller, source helpers and executable mocked server-action tests. Action cases cover correct save, read/write-time conflict, locked/foreign/mismatched evidence and unauthorized denial.
 - Disposable network-none PostgreSQL 16: migration applied successfully, bounded-schema check, successful draft update, stale CAS zero rows, parent/child invalidation, locked-state CAS zero rows, nonstaff RLS denied and anon direct-write denied. Authorized definer supplier write still invalidates draft.
 - Two concurrent transactions with the same expected revision returned UPDATE 1 then UPDATE 0; no lost overwrite.
 - SQL fixture uses simplified local RLS predicates, not a production database/auth validation. Actual endpoint/browser persistence after reload remains a final gate.
-- Scoped ESLint passed; combined build in progress. No claim final combined build/browser/end-to-end success yet.
+- Interim combined webpack build passed153 routes; standalone TypeScript passed; full ESLint0 errors/31 existing warnings; 7 deployment guards +23 release regressions passed. Local app server stopped after checks. A test-only widened literal initially failed TypeScript and was corrected before the successful run.
+- These checks precede Step1 integration and do not replace final frozen-candidate build/browser/end-to-end gates. No authenticated browser-to-database persistence claim yet.
 
 ## Explicit exclusions and remaining work
 
