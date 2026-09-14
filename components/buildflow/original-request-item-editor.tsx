@@ -33,7 +33,7 @@ function nextCustomId(fields: RequestItemField[]) {
   return `custom-${number}`
 }
 
-export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children, revision, onReviewedSave }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode; revision?: string; onReviewedSave?: (result: Extract<Awaited<ReturnType<typeof saveReviewedRequestItemAction>>, { ok: true }>) => void }) {
+export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children, revision, onReviewedSave, onOriginalSaved }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode; revision?: string; onReviewedSave?: (result: Extract<Awaited<ReturnType<typeof saveReviewedRequestItemAction>>, { ok: true }>) => void; onOriginalSaved?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ItemDraft>(() => draftFromItem(item))
@@ -61,7 +61,9 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
       return result
     }
     if (mode === "add" || itemKind === "original") {
-      return saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields })
+      const result = await saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields })
+      if (result.ok) onOriginalSaved?.()
+      return result
     }
     const formData = new FormData()
     formData.set("requestId", requestId)

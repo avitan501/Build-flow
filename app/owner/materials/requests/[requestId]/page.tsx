@@ -724,7 +724,7 @@ export default async function OwnerMaterialRequestPage({
         </header>
         <RequestMaterialWorktable
           actorId={user.id}
-          reviewProducts={organizedItems.length ? reviewDisplayItems.map((item) => {
+          reviewProducts={reviewDisplayItems.length ? reviewDisplayItems.map((item) => {
             const source = originalItems.find((entry) => entry.id === item.metadata?.source_item_id) ?? null;
             return { item, source, revision: requestItemRevision(item, source) };
           }) : undefined}
@@ -805,7 +805,7 @@ export default async function OwnerMaterialRequestPage({
         ) : null}
         <div className="mt-2">
           <RequestManagementPanel
-            supplierRouting={organizedItems.length ? <RequestProductSupplierRoutes requestId={request.id} items={reviewDisplayItems} defaultZipCode={zipCodeFromAddress(request.projects?.address)} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))} /> : undefined}
+            supplierRouting={reviewDisplayItems.length ? <RequestProductSupplierRoutes requestId={request.id} items={reviewDisplayItems} defaultZipCode={zipCodeFromAddress(request.projects?.address)} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))} /> : undefined}
             itemsReadyForPricing={!requestStep1CompletionError(items ?? [])}
             key={[
               ...routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`),
