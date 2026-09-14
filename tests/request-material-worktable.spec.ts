@@ -93,9 +93,11 @@ test("request changes synchronize between staff screens", async () => {
   ])
 
   expect(page).toContain("<RequestLiveSync />")
-  expect(liveSync).toContain("router.refresh()")
+  expect(liveSync).toContain("useRequestRefresh(REQUEST_REFRESH_INTERVAL_MS)")
+  const refreshHook = await source(path.join(root, "lib/use-request-refresh.ts"))
+  expect(refreshHook).toContain("router.refresh()")
   expect(liveSync).toContain("REQUEST_REFRESH_INTERVAL_MS = 10_000")
-  expect(liveSync).toContain('window.addEventListener("focus", refresh)')
+  expect(refreshHook).toContain('window.addEventListener("focus", callback)')
   expect(page).toContain("(supplierRecommendations ?? []).map")
   expect(page).toContain("entry.contact_status")
   expect(page).toContain("entry.notes")

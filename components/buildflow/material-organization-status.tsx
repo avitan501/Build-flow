@@ -1,8 +1,7 @@
 "use client"
 
 import { Clock3, RefreshCw, Sparkles } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useRequestRefresh } from "@/lib/use-request-refresh"
 
 const labels: Record<string, string> = {
   queued: "Waiting to split your list…",
@@ -13,19 +12,10 @@ const labels: Record<string, string> = {
 }
 
 export function MaterialOrganizationStatus({ status }: { status: string }) {
-  const router = useRouter()
   const retrying = status === "retrying"
   const active = ["queued", "processing", "retrying"].includes(status)
 
-  useEffect(() => {
-    if (!active) return
-    // A refresh with unchanged status preserves this component. Keep polling
-    // until the durable job changes, instead of stopping after one refresh.
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh()
-    }, retrying ? 15_000 : 4_000)
-    return () => window.clearInterval(timer)
-  }, [active, retrying, router, status])
+  useRequestRefresh(active ? (retrying ? 15_000 : 4_000) : null)
 
   const draftChanged = status === "draft_changed"
   const Icon = status === "queued" ? Clock3 : status === "retrying" ? RefreshCw : Sparkles
