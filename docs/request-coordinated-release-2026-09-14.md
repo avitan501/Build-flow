@@ -7,7 +7,7 @@ Owner: root/release reviewer. Worktree `/tmp/avantia-request-coordinated-release
 - Live preserved: `8c79820c767fbf49f0e239678bd4fa82886df983` (request-list cleanup, communications, Company screen).
 - REQ03/04 + delivery coverage + navigation isolation: integrated as `9bf8b71f`, `7900ee78`, `668e7291` (equivalent to prior reviewed `154efb31`).
 - Product-first Step2 and truthful quote-entry count: `b903694b`, `753cf9d3` from `edf37e98`, `12dc59d3`.
-- Step1 source/clarity and routing placement: another agent owns it, not yet integrated.
+- Step1 source/clarity and routing placement: frozen `6fcb15a6` + `5c9f91b6` independently reviewed and integrated as `fc54ddf1` + `2fad0f32`, without conflicts. Original-only products keep their supported editor; AI-only controls are not offered for those rows.
 - Step3 compact UI + both review fixes: `f1a35eb7`, `9a41cc92` integrated as `08efd51a`, `9420c3ce`; active phase and saved subtotal/delivery/tax/total now align.
 
 ## Narrow product-choice autosave
@@ -27,9 +27,22 @@ Old `137ffe5a` is NOT cherry-picked wholesale. Its complete client autosave and 
 | Migration | SHA256 | Purpose |
 | --- | --- | --- |
 | `20260914175308_request_workflow_steps.sql` | `7d8b6e4a8303c85f3aba538b59fceeed479514552e5b3a9c9cfbd421639cadfd` | Private per-step assignee/note/state/CAS; exact approved actor RLS |
+| `20260914191309_request_item_edit_receipts.sql` | `53a7a3da5a77cd6779393324a8e6753cc5718be503f40ee1b2017b752e5ed0d5` | Service-only revision-checked organized-item edits and private same-actor Undo receipts |
 | `20260914191336_product_choice_autosave.sql` | `75a356c0ad59fe238dc51631552bacd9c570ec09c10a11539ef12980bbdf831e` | Bounded choice JSON, revision/fingerprint, source invalidation triggers; preserves existing supplier-staff RLS |
 
-Step1 may add its own approved migration. Root must review the final manifest and independently confirm active production ref `nprfhspwdflpqlopydmp` before any production DDL. No migration, push, hook, deployment or customer mutation has occurred here.
+The three migration hashes above were rechecked on integrated `2fad0f32`. Root must approve this exact manifest and independently confirm active production ref `nprfhspwdflpqlopydmp` before any production DDL. No migration, push, hook, deployment or customer mutation has occurred here.
+
+## Step1 independent integration review
+
+- Existing actor/request-keyed provider, private step state, partial-delivery coverage guard, Step3 phase/totals fixes and product-choice autosave remain intact.
+- Organized edit RPC is service-only with an independent active/approved signed-email role check; it locks source/item rows and checks both snapshots before writing. Undo is same actor, unchanged source and exact after-snapshot only. Receipts are not exposed through customer-visible event metadata.
+- Original editor resets its draft from the currently selected product on each open. Source changes return a conflict rather than overwriting another worker's edit.
+- Position persistence stores only selected item/question IDs, scoped to actor and request. No original descriptions or notes are written to browser position storage.
+- Supplier routing now renders primarily inside Step2; existing route writer and supplier discovery actions are reused. No automatic supplier contact was added.
+- Original-only edits and grouping remain outside the new organized-product Undo contract. This is not universal autosave, source re-extraction, or the unfinished partial financial ledger.
+- Final integrated checks on code `2fad0f32`: webpack build153 routes PASS; standalone `tsc --noEmit --incremental false` PASS; full lint0 errors/31 baseline warnings; 7 release guards PASS; 51 focused action/controller/helper/render tests PASS; 22 Step1/Step2 fixture/browser tests across Chromium and WebKit at390/1440 PASS; 23 release regressions PASS. Total103 checks across these suites, not103 distinct end-to-end customer flows.
+- Fresh built-code sample screenshots visually reviewed: `/tmp/step1-review-chromium-desktop-390.png`, `/tmp/step1-review-wide-chromium-desktop.png` and corresponding mobile-safari screenshots. These are62-product fixtures, not live customer records. Browser POSTs are blocked in the fixture tests.
+- Bounded secret-pattern scan of added code reported0 matches; `git diff --check` clean. Production fixture gate checked independently by restarting without `AVANTIA_LOCAL_UI_TEST` and confirming404. Owned local server stopped after checks.
 
 ## Evidence at checkpoint
 
@@ -45,4 +58,4 @@ Step1 may add its own approved migration. Root must review the final manifest an
 
 Payroll `508c8213`, AI `4be39d00`, incomplete partial financial ledger/PDF prototype, and client quote autosave/send claim are not included. Original client save/send race remains tracked in `docs/autosave-inventory-2026-09-14.md` in the separate foundation worktree.
 
-Final gates: integrate frozen Step1/Step3 without logical overwrite, final exact migration audit, full regressions/lint/build/standalone TypeScript, phone+desktop complete request flow and autosave failure/reload checks, secrets/diff scan, then root exact migration/publication approval and one serialized release with live verification. No reliable wall-clock deadline while component candidates remain unfrozen.
+Remaining release gates: root approval of exact three-migration manifest; independently confirm active production binding; controlled authenticated browser-to-database verification of step state, organized edit/Undo, product-choice reload and conflict behavior on safe test records; one serialized publication and exact-SHA live verification. Local tests and SQL fixtures do not establish live Google login, complete authenticated customer-to-payment workflow, provider delivery or production persistence. No production changes have been made by this integration task.
