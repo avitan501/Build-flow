@@ -69,9 +69,11 @@ begin
  if v_label is null then raise exception 'Not authorized'; end if;
  select status into v_status from public.quote_comparisons where id=p_comparison_id for update;
  if v_status is null or v_status not in ('draft','review') then return jsonb_build_object('ok',false); end if;
- select * into v_item from public.quote_comparison_items where id=p_item_id and comparison_id=p_comparison_id for update;
- select * into v_bid from public.quote_comparison_bids where id=p_bid_id and comparison_id=p_comparison_id for update;
- select * into v_price from public.quote_comparison_prices where bid_id=p_bid_id and item_id=p_item_id for update;
+ -- Child edits can already hold their tuple while their AFTER trigger waits
+ -- for this parent. Never wait back on that child: abort safely for retry.
+ select * into v_item from public.quote_comparison_items where id=p_item_id and comparison_id=p_comparison_id for update nowait;
+ select * into v_bid from public.quote_comparison_bids where id=p_bid_id and comparison_id=p_comparison_id for update nowait;
+ select * into v_price from public.quote_comparison_prices where bid_id=p_bid_id and item_id=p_item_id for update nowait;
  if v_item.id is null or v_bid.id is null or v_price.item_id is null then return jsonb_build_object('ok',false); end if;
  v_snapshot:=jsonb_build_object('item',jsonb_build_object('id',v_item.id,'description',v_item.description,'specification',v_item.specification,'quantity',v_item.quantity,'unit',v_item.unit),
  'bid',jsonb_build_object('id',v_bid.id,'supplier_id',v_bid.supplier_id,'trust_level_snapshot',v_bid.trust_level_snapshot),
@@ -88,6 +90,8 @@ begin
  insert into public.quote_product_match_confirmations(bid_id,item_id,actor_id,actor_label,source_fingerprint,source_snapshot,selling_unit)
  values(p_bid_id,p_item_id,p_actor_id,v_label,p_source_fingerprint,v_snapshot,p_selling_unit) on conflict(bid_id,item_id,source_fingerprint) where revoked_at is null do nothing;
  return jsonb_build_object('ok',true);
+exception when lock_not_available then
+ raise exception using errcode='55P03',message='Another update is in progress. Nothing was saved; retry after it finishes.';
 end $$;
 revoke all on function public.staff_confirm_product_match(uuid,uuid,uuid,uuid,jsonb,text,text) from public,anon,authenticated;
 grant execute on function public.staff_confirm_product_match(uuid,uuid,uuid,uuid,jsonb,text,text) to service_role;
@@ -128,16 +132,16 @@ begin
  select status,request_id into v_status,v_request_id from public.quote_comparisons where id=p_comparison_id for update;
  if v_status is null or v_status not in ('draft','review') then raise exception 'comparison_locked'; end if;
  if v_request_id is not null then
-   perform 1 from public.quote_requests where id=v_request_id for update;
-   perform 1 from public.quote_request_items where request_id=v_request_id order by id for update;
+   perform 1 from public.quote_requests where id=v_request_id for update nowait;
+   perform 1 from public.quote_request_items where request_id=v_request_id order by id for update nowait;
    select coalesce(jsonb_agg(jsonb_build_object('id',r.id,'name',r.name,'department',r.department,'quantity',r.quantity,'unit',r.unit,'metadata',r.metadata,'qualification_status',r.qualification_status) order by r.id),'[]'::jsonb) into v_request_snapshot from public.quote_request_items r where r.request_id=v_request_id;
    if v_request_snapshot is distinct from p_request_expected or v_request_snapshot='[]'::jsonb then raise exception 'request_source_changed'; end if;
  elsif p_request_expected is distinct from '[]'::jsonb then raise exception 'request_source_changed'; end if;
- perform 1 from public.quote_comparison_bids where comparison_id=p_comparison_id order by id for update;
+ perform 1 from public.quote_comparison_bids where comparison_id=p_comparison_id order by id for update nowait;
  select * into v_bid from public.quote_comparison_bids where id=p_bid_id and comparison_id=p_comparison_id;
  if not found or v_bid.status='declined' or v_bid.trust_level_snapshot='do-not-use' or v_bid.delivery_charge is null or v_bid.delivery_charge<0 or v_bid.tax_percent is null or v_bid.tax_percent<0 or v_bid.tax_percent>100 then raise exception 'bid_not_eligible'; end if;
- perform 1 from public.quote_comparison_items where comparison_id=p_comparison_id order by id for update;
- perform 1 from public.quote_comparison_prices where bid_id=p_bid_id order by item_id for update;
+ perform 1 from public.quote_comparison_items where comparison_id=p_comparison_id order by id for update nowait;
+ perform 1 from public.quote_comparison_prices where bid_id=p_bid_id order by item_id for update nowait;
  if not exists(select 1 from public.quote_comparison_items where comparison_id=p_comparison_id) then raise exception 'no_requested_items'; end if;
  for v_row in select i.id,i.description,i.specification,i.quantity,i.unit,p.unit_price,p.is_available,p.notes
  from public.quote_comparison_items i left join public.quote_comparison_prices p on p.item_id=i.id and p.bid_id=p_bid_id where i.comparison_id=p_comparison_id loop
@@ -146,6 +150,8 @@ begin
  end loop;
  update public.quote_comparison_bids set status=case when id=p_bid_id then 'awarded' when status='awarded' then 'received' else status end where comparison_id=p_comparison_id;
  update public.quote_comparisons set awarded_bid_id=p_bid_id,status='awarded' where id=p_comparison_id;
+exception when lock_not_available then
+ raise exception using errcode='55P03',message='Another update is in progress. Nothing was saved; retry after it finishes.';
 end $$;
 revoke all on function public.staff_award_reviewed_product_bid(uuid,uuid,uuid,jsonb) from public,anon,authenticated;
 grant execute on function public.staff_award_reviewed_product_bid(uuid,uuid,uuid,jsonb) to service_role;
