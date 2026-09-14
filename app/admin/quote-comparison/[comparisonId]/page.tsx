@@ -5,6 +5,7 @@ import { requireStaffProfile } from "@/lib/auth";
 import type { ClientQuoteAttachmentRecord, QuoteComparisonBidRecord, QuoteComparisonItemRecord, QuoteComparisonRecord } from "@/lib/quote-comparison";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
+import { productChoiceFingerprint, restoreProductChoices, type ProductChoiceDraftColumns } from "@/lib/product-choice-draft";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -30,9 +31,9 @@ export default async function QuoteComparisonDetailPage({
   params: Promise<{ comparisonId: string }>;
 }) {
   const { comparisonId } = await params;
-  const { supabase } = await requireStaffProfile("suppliers");
+  const { supabase, user } = await requireStaffProfile("suppliers");
   const [comparisonResult, itemsResult, bidsResult, projectsResult, directoryResult, clientsResult, attachmentsResult] = await Promise.all([
-    supabase.from("quote_comparisons").select("*").eq("id", comparisonId).maybeSingle<QuoteComparisonRecord>(),
+    supabase.from("quote_comparisons").select("*").eq("id", comparisonId).maybeSingle<QuoteComparisonRecord & ProductChoiceDraftColumns>(),
     supabase.from("quote_comparison_items").select("*").eq("comparison_id", comparisonId).order("sort_order").order("created_at").returns<QuoteComparisonItemRecord[]>(),
     supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", comparisonId).order("created_at").returns<QuoteComparisonBidRecord[]>(),
     supabase.from("projects").select("id,name,address").order("updated_at", { ascending: false }).limit(150).returns<ProjectOption[]>(),
@@ -55,6 +56,8 @@ export default async function QuoteComparisonDetailPage({
 
   if (comparisonResult.error || !comparisonResult.data) notFound();
   if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
+  const choiceFingerprint = await productChoiceFingerprint(itemsResult.data ?? [], bidsResult.data ?? []);
+  const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
 
   const requestClientQuoteSourcesResult = comparisonResult.data.request_id
     ? await supabase
@@ -82,6 +85,12 @@ export default async function QuoteComparisonDetailPage({
 
   return (
     <QuoteComparisonWorkspace
+      key={`${user.id}:${comparisonId}:${choiceFingerprint}:${comparisonResult.data.status}`}
+      choiceActorId={user.id}
+      initialProductSelections={choiceState.selections}
+      productChoiceRevision={comparisonResult.data.product_choice_draft_revision ?? 0}
+      productChoiceFingerprint={choiceFingerprint}
+      productChoiceWarning={choiceState.warning}
       comparison={comparisonResult.data}
       items={itemsResult.data ?? []}
       bids={bidsResult.data ?? []}

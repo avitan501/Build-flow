@@ -17,6 +17,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { useQuoteAutosave } from "@/hooks/use-quote-autosave";
+import { saveProductChoicesAction } from "@/app/admin/quote-comparison/product-choice-actions";
 
 import {
   addQuoteComparisonItemAction,
@@ -114,6 +116,11 @@ export function QuoteComparisonWorkspace({
   clientQuoteAttachments,
   requestClientQuoteSources = [],
   previewMode = false,
+  choiceActorId = "sample",
+  initialProductSelections = {},
+  productChoiceRevision = 0,
+  productChoiceFingerprint = "",
+  productChoiceWarning = "",
 }: {
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
@@ -125,6 +132,11 @@ export function QuoteComparisonWorkspace({
   clientQuoteAttachments: ClientQuoteAttachmentRecord[];
   requestClientQuoteSources?: RequestClientQuoteSource[];
   previewMode?: boolean;
+  choiceActorId?: string;
+  initialProductSelections?: Record<string, string>;
+  productChoiceRevision?: number;
+  productChoiceFingerprint?: string;
+  productChoiceWarning?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -132,7 +144,15 @@ export function QuoteComparisonWorkspace({
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
-  const [productSelections, setProductSelections] = useState<Record<string, string>>({});
+  const [productSelections, setProductSelections] = useState<Record<string, string>>(initialProductSelections);
+  const [initialChoiceSnapshot] = useState({ version: 1, selections: initialProductSelections });
+  const choiceAutosave = useQuoteAutosave({
+    scopeKey: `${choiceActorId}:${comparison.id}:${productChoiceFingerprint}`,
+    snapshot: { version: 1, selections: productSelections }, initialSnapshot: initialChoiceSnapshot,
+    initialRevision: productChoiceRevision,
+    persist: async (snapshot, expectedRevision) => previewMode ? {ok:true as const, revision:expectedRevision+1}
+      : saveProductChoicesAction({comparisonId:comparison.id,expectedRevision,sourceFingerprint:productChoiceFingerprint,snapshot}),
+  });
   const [showItemForm, setShowItemForm] = useState(items.length === 0);
   const [showSupplierForm, setShowSupplierForm] = useState(bids.length === 0);
   const [selectedBidId, setSelectedBidId] = useState(comparison.awarded_bid_id || "");
@@ -166,6 +186,8 @@ export function QuoteComparisonWorkspace({
     return values;
   });
   const [clientTargetDrafts, setClientTargetDrafts] = useState<Record<string, string>>(() => Object.fromEntries(items.map((item) => [item.id, item.client_unit_price === null || item.client_unit_price === undefined ? "" : String(item.client_unit_price)])));
+  const [initialPriceDraftJson] = useState(() => JSON.stringify(priceDrafts));
+  const pricesNeedSaving = !previewMode && JSON.stringify(priceDrafts) !== initialPriceDraftJson;
   const [clientDeliveryDraft, setClientDeliveryDraft] = useState(String(comparison.client_delivery_charge));
   const [clientTaxDraft, setClientTaxDraft] = useState(String(comparison.client_tax_percent));
   const [selectedClientQuoteSourceId, setSelectedClientQuoteSourceId] = useState(requestClientQuoteSources[0]?.id ?? "");
@@ -245,6 +267,7 @@ export function QuoteComparisonWorkspace({
     setError("");
     setMessage("");
     startTransition(async () => {
+      if (!await choiceAutosave.flush()) return;
       const result = await action();
       if (!result.ok) {
         setError(result.error || "The change could not be saved.");
@@ -293,6 +316,7 @@ export function QuoteComparisonWorkspace({
       return;
     }
     startTransition(async () => {
+      if (!await choiceAutosave.flush()) return;
       const results = await Promise.all([saveQuoteComparisonClientTargetsAction({
         comparisonId: comparison.id,
         clientDeliveryCharge: clientReady.deliveryCharge,
@@ -322,6 +346,7 @@ export function QuoteComparisonWorkspace({
     setError("");
     setMessage("");
     startTransition(async () => {
+      if (!await choiceAutosave.flush()) return;
       const result = await importRequestClientQuotePricesAction({
         comparisonId: comparison.id,
         attachmentId: selectedClientQuoteSourceId,
@@ -365,6 +390,7 @@ export function QuoteComparisonWorkspace({
     setError("");
     setMessage("");
     startTransition(async () => {
+      if (!await choiceAutosave.flush()) return;
       const targetResult = await saveQuoteComparisonClientTargetsAction({
         comparisonId: comparison.id,
         clientDeliveryCharge: clientReady.deliveryCharge,
@@ -464,23 +490,28 @@ export function QuoteComparisonWorkspace({
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 
         {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="space-y-4">
+          {!previewMode ? <div className="text-xs" role="status" aria-live="polite">
+            {productChoiceWarning ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
+            <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
+            {choiceAutosave.error ? choiceAutosave.conflict ? <button type="button" onClick={()=>window.location.reload()} className="min-h-11 font-semibold underline">Reload and review</button> : <button type="button" onClick={()=>void choiceAutosave.retry()} className="min-h-11 font-semibold underline">Retry saving choices</button> : null}
+          </div> : null}
           <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-2">
             <div><h2 id="product-comparison-heading" className="text-lg font-bold sm:text-xl">Supplier quotes</h2>
             <p className="mt-1 text-xs text-slate-600">{items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")).length} to review</p></div>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={()=>setActiveStep(2)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-800"><Plus className="h-4 w-4"/>Add / edit quote</button>
               <details className="relative"><summary className="min-h-11 cursor-pointer rounded-lg px-3 py-3 text-xs font-semibold">More</summary><div className="absolute right-0 z-30 grid w-64 gap-2 rounded-xl border bg-white p-2 shadow-lg">
-              <button type="button" onClick={() => setProductSelections(productPreview.cheapestSelections)} disabled={!productPreview.comparableCount} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Draft lowest prices</button>
+              <button type="button" onClick={() => setProductSelections(productPreview.cheapestSelections)} disabled={!productPreview.comparableCount || locked || pricesNeedSaving || choiceAutosave.conflict} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Draft lowest prices</button>
               <button type="button" onClick={() => setActiveStep(2)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">Edit prices / review matches</button>
               </div></details>
             </div>
           </header>
-          <details aria-label="Draft selection summary" className="rounded-lg border border-slate-200 bg-white px-3 py-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-600">Temporary choices · not saved · no orders sent</summary><div className="pb-3">
-            <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-sky-950">Temporary preview · Not saved</h3><p className="mt-1 text-xs leading-5 text-sky-900">Materials only. Excludes delivery and tax.</p></div><button type="button" onClick={() => setProductSelections({})} disabled={!productPreview.selectedCount} className="min-h-11 shrink-0 rounded-lg border border-sky-200 bg-white px-3 text-xs font-bold text-sky-950 disabled:opacity-40">Clear draft</button></div>
-            <details className="mt-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Preview details and ordering checks</summary><p className="text-xs leading-5 text-sky-900">Resets on reload. Does not place an order, select a final route, or contact suppliers. Splitting products can add delivery fees, minimum-order requirements, or change quoted prices. Prices use the current request-row units; no unit conversion is performed here. Confirm units, availability and final charges before ordering. This is not a lowest delivered-order total.</p></details>
+          <details aria-label="Draft selection summary" className="rounded-lg border border-slate-200 bg-white px-3 py-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-600">{previewMode ? "Temporary choices · not saved · no orders sent" : "Draft product choices · no orders sent"}</summary><div className="pb-3">
+            <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-sky-950">{previewMode ? "Temporary preview · Not saved" : "Draft product choices"}</h3><p className="mt-1 text-xs leading-5 text-sky-900">Materials only. Excludes delivery and tax.</p></div><button type="button" onClick={() => setProductSelections({})} disabled={!productPreview.selectedCount || locked || pricesNeedSaving || choiceAutosave.conflict} className="min-h-11 shrink-0 rounded-lg border border-sky-200 bg-white px-3 text-xs font-bold text-sky-950 disabled:opacity-40">Clear draft</button></div>
+            <details className="mt-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Preview details and ordering checks</summary><p className="text-xs leading-5 text-sky-900">{previewMode ? "Resets on reload." : "Product choices save automatically; supplier price edits use Save prices."} Does not place an order, select a final route, or contact suppliers. Splitting products can add delivery fees, minimum-order requirements, or change quoted prices. Prices use the current request-row units; no unit conversion is performed here. Confirm units, availability and final charges before ordering. This is not a lowest delivered-order total.</p></details>
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>
-          <div className="grid gap-2">{productPreview.rows.map((row) => <ProductQuoteCard key={row.item.id} row={row} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} />)}</div>
+          <div className="grid gap-2">{productPreview.rows.map((row) => <ProductQuoteCard key={row.item.id} row={row} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} />)}</div>
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
           <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setActiveStep(3)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Whole-order routes and client pricing</button><p className="self-center text-xs text-slate-500">Draft product selections do not change the final route.</p></div>
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_20px_rgba(15,23,42,.08)] backdrop-blur"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="mx-auto grid max-w-[92rem] grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>

@@ -15,12 +15,12 @@ export function productQuoteCardSections(row: ProductRow) {
   return { primary, other, reviewCount: row.offers.filter((offer) => offer.status === "review").length }
 }
 
-function ProductOfferRow({ row, offer, onSelect }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void }) {
+function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void; choiceDisabled?: boolean }) {
   const lowest = offer.eligible && offer.unitPrice === row.lowest?.unitPrice
   const selected = row.selected?.bid.id === offer.bid.id
   const source = offer.bid.quote_comparison_prices?.find(price => price.item_id === row.item.id)?.notes?.trim() || ""
   return <label className={`flex min-h-16 items-start gap-2.5 px-3 py-3 ${offer.eligible ? "cursor-pointer" : "cursor-not-allowed"} ${selected ? "bg-sky-50" : ""}`}>
-    <input type="radio" name={`draft-product-${row.item.id}`} value={offer.bid.id} checked={selected} disabled={!offer.eligible} onChange={(event) => {
+    <input type="radio" name={`draft-product-${row.item.id}`} value={offer.bid.id} checked={selected} disabled={!offer.eligible || choiceDisabled} onChange={(event) => {
       const card = event.currentTarget.closest("article")
       onSelect(offer.bid.id)
       // An override moves into the visible summary; keep keyboard focus on it.
@@ -45,7 +45,7 @@ function ProductOfferRow({ row, offer, onSelect }: { row: ProductRow; offer: Pro
   </label>
 }
 
-export function ProductQuoteCard({ row, onSelect, onClear, onReview }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void }) {
+export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisabled = false }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void; choiceDisabled?: boolean }) {
   const { primary, other, reviewCount } = productQuoteCardSections(row)
   return <article className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white" data-testid="product-quote-card">
     <details name="requested-product-offers" className="group/product">
@@ -56,11 +56,11 @@ export function ProductQuoteCard({ row, onSelect, onClear, onReview }: { row: Pr
       {!row.validQuantity ? <p className="mt-1 text-xs font-semibold text-rose-700">Check requested quantity.</p> : !row.lowest ? <p className="mt-1 text-xs font-semibold text-amber-800">No confirmed price yet.</p> : null}
     </div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 group-open/product:rotate-180" aria-hidden="true"/></summary>
     <fieldset><legend className="sr-only">Draft supplier choice for {row.item.description}</legend>
-      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} />)}</div>
+      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} choiceDisabled={choiceDisabled} />)}</div>
       {!row.offers.length ? <p className="px-3 py-4 text-xs text-slate-500">No supplier quotes yet.</p> : null}
     </fieldset>
     {onReview ? <button type="button" onClick={onReview} className="min-h-11 w-full border-t border-slate-100 px-3 text-left text-xs font-semibold text-sky-800">Compare details / review matches</button> : null}
-    {row.selected ? <button type="button" onClick={onClear} aria-label={`Clear draft selection for ${row.item.description}`} className="min-h-11 w-full border-t border-slate-100 px-3 text-left text-xs font-semibold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">Clear selection</button> : null}
+    {row.selected ? <button type="button" onClick={onClear} disabled={choiceDisabled} aria-label={`Clear draft selection for ${row.item.description}`} className="min-h-11 w-full border-t border-slate-100 px-3 text-left text-xs font-semibold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">Clear selection</button> : null}
     </details>
   </article>
 }
