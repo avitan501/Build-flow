@@ -10,6 +10,7 @@ export type ReviewableMaterialItem = {
   quantity: number
   unit: string | null
   metadata: Record<string, unknown> | null
+  qualification_status?: string
 }
 
 const KNOWN_STATUSES = new Set<MaterialReviewStatus>(["ready", "check", "missing"])

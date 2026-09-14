@@ -12,6 +12,7 @@ import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { MaterialOrganizationStatus } from "@/components/buildflow/material-organization-status"
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { RequestMaterialIdentity } from "@/components/buildflow/request-material-identity"
+import { RequestItemReviewList } from "@/components/buildflow/request-item-review-list"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
@@ -54,7 +55,7 @@ function copyText(items: ReviewableMaterialItem[]) {
   ].filter(Boolean).join(" | ")).join("\n")
 }
 
-function similarItemGroupLabel(item: ReviewableMaterialItem) {
+export function similarItemGroupLabel(item: ReviewableMaterialItem) {
   const department = item.department?.trim()
   if (department) return department.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
 
@@ -133,6 +134,8 @@ export function RequestMaterialWorktable({
   suppliers,
   attachments,
   stepCompleted = false,
+  actorId,
+  reviewProducts,
 }: {
   requestId: string
   originalItems: ReviewableMaterialItem[]
@@ -145,6 +148,8 @@ export function RequestMaterialWorktable({
   suppliers: RequestRouteSupplier[]
   attachments: RequestWorktableAttachment[]
   stepCompleted?: boolean
+  actorId?: string
+  reviewProducts?: Array<{ item: ReviewableMaterialItem; source: ReviewableMaterialItem | null; revision: string }>
 }) {
   const router = useRouter()
   const [savedItems, setSavedItems] = useState<Record<string, ReviewableMaterialItem>>({})
@@ -373,6 +378,7 @@ export function RequestMaterialWorktable({
         <div className="grid gap-1 border-t border-slate-200 px-3 py-2 sm:px-4">{sourceItems.map((sourceItem, index) => <OriginalRequestItemEditor key={sourceItem.id} requestId={requestId} item={sourceItem} trigger="content"><div className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1"><span className="w-5 shrink-0 text-[9px] font-bold text-slate-400">#{index + 1}</span><span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{sourceItem.name}</span><span className="shrink-0 text-[10px] font-semibold text-slate-500">{materialQuantity(sourceItem)} {materialSalesUnit(sourceItem)}</span></div></OriginalRequestItemEditor>)}</div>
       </details> : null}
 
+      {reviewProducts && actorId ? <RequestItemReviewList key={`${actorId}:${requestId}`} actorId={actorId} requestId={requestId} products={reviewProducts} defaultZipCode={defaultZipCode} /> : <>
       {organizationCompletedLabel && aiItems.length > 0 && !organizationInProgress ? <p className="border-b border-slate-100 px-4 py-1.5 text-[10px] font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}
       {aiItems.length ? <div className="flex flex-col gap-2 border-b border-sky-100 bg-sky-50/55 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div className="flex min-w-0 items-center gap-2.5"><Sparkles className="h-4 w-4 shrink-0 text-[#b8860b]" /><div className="min-w-0"><p className="text-xs font-extrabold text-slate-900">AI split {aiItems.length} items{missingItemCount ? <span className="text-amber-700"> · {missingItemCount} missing details</span> : <span className="text-emerald-700"> · ready to route</span>}</p><p className="truncate text-[10px] text-slate-500">Review, edit, then send each group to the right supplier.</p></div></div>
@@ -437,6 +443,7 @@ export function RequestMaterialWorktable({
       )}
 
       {supplierComparisons.length ? <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <button key={comparison.id} type="button" onClick={() => openSynchronizedComparison(comparison.id)} disabled={comparisonPending} title={comparison.title} className="inline-flex min-h-10 items-center rounded-lg border border-sky-200 bg-white px-3 text-left text-xs font-bold text-[#0066cc] disabled:opacity-50">{comparisonPending ? "Syncing comparison…" : `Open comparison · ${comparison.id.slice(0, 8).toUpperCase()}`}</button>)}{comparisonFeedback ? <span className="text-xs font-bold text-rose-700">{comparisonFeedback}</span> : null}</div> : null}
+      </>}
     </section>
   )
 }

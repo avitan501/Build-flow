@@ -11,6 +11,9 @@ import {
   type RequestClientDocumentSnapshot,
 } from "@/components/buildflow/request-management-panel";
 import { requireStaffProfile } from "@/lib/auth";
+import { requestItemRevision } from "@/lib/request-item-revision";
+import { RequestProductSupplierRoutes } from "@/components/buildflow/request-product-supplier-routes";
+import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog";
 import type {
@@ -166,7 +169,7 @@ export default async function OwnerMaterialRequestPage({
       .returns<Attachment[]>(),
     supabase
       .from("quote_request_items")
-      .select("id,name,department,item_type,quantity,unit,answers,metadata")
+      .select("id,name,department,item_type,quantity,unit,answers,metadata,qualification_status")
       .eq("request_id", requestId)
       .order("created_at")
       .returns<RequestItem[]>(),
@@ -401,6 +404,8 @@ export default async function OwnerMaterialRequestPage({
   const originalItems = (items ?? []).filter(
     (item) => item.metadata?.ai_organized !== true,
   );
+  const representedOriginalIds = new Set(organizedItems.map((item) => item.metadata?.source_item_id));
+  const reviewDisplayItems = [...organizedItems, ...originalItems.filter((item) => !representedOriginalIds.has(item.id) && !isRequestIntakePlaceholder(item))];
   const organizationStatus =
     typeof originalItems[0]?.metadata?.ai_organization_status === "string"
       ? originalItems[0].metadata.ai_organization_status
@@ -718,6 +723,11 @@ export default async function OwnerMaterialRequestPage({
           </details>
         </header>
         <RequestMaterialWorktable
+          actorId={user.id}
+          reviewProducts={organizedItems.length ? reviewDisplayItems.map((item) => {
+            const source = originalItems.find((entry) => entry.id === item.metadata?.source_item_id) ?? null;
+            return { item, source, revision: requestItemRevision(item, source) };
+          }) : undefined}
           requestId={request.id}
           stepCompleted={stepState[0].completed}
           originalItems={originalItems}
@@ -795,6 +805,7 @@ export default async function OwnerMaterialRequestPage({
         ) : null}
         <div className="mt-2">
           <RequestManagementPanel
+            supplierRouting={organizedItems.length ? <RequestProductSupplierRoutes requestId={request.id} items={reviewDisplayItems} defaultZipCode={zipCodeFromAddress(request.projects?.address)} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))} /> : undefined}
             itemsReadyForPricing={!requestStep1CompletionError(items ?? [])}
             key={[
               ...routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`),

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom"
 import { useState, useTransition, type ReactNode } from "react"
 
 import { organizeClientMaterialRequestAction, saveOriginalMaterialItemAction, updateOrganizedMaterialItemAction } from "@/app/owner/materials/requests/actions"
+import { saveReviewedRequestItemAction } from "@/app/owner/materials/requests/item-edit-actions"
 import { cleanMaterialRequestDetails, materialQuantity, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
 import { COMMON_REQUEST_ITEM_FIELDS, requestItemFieldDefinition, requestItemFieldsFromMetadata, type RequestItemField } from "@/lib/request-item-fields"
 
@@ -32,7 +33,7 @@ function nextCustomId(fields: RequestItemField[]) {
   return `custom-${number}`
 }
 
-export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode }) {
+export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children, revision, onReviewedSave }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode; revision?: string; onReviewedSave?: (result: Extract<Awaited<ReturnType<typeof saveReviewedRequestItemAction>>, { ok: true }>) => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ItemDraft>(() => draftFromItem(item))
@@ -54,6 +55,11 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
   }
 
   async function persist(value: ItemDraft) {
+    if (item && itemKind === "organized" && revision) {
+      const result = await saveReviewedRequestItemAction({ requestId, itemId: item.id, revision, edit: { name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields } })
+      if (result.ok) onReviewedSave?.(result)
+      return result
+    }
     if (mode === "add" || itemKind === "original") {
       return saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields })
     }

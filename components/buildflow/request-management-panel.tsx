@@ -2,7 +2,7 @@
 
 import { Award, CalendarClock, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Pencil, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
@@ -222,7 +222,9 @@ export function RequestManagementPanel({
   requestAttachments,
   supplierRequestFiles,
   supplierRequestItemLinks,
+  supplierRouting,
 }: {
+  supplierRouting?: ReactNode
   requestId: string
   requestTitle: string
   client: { name: string; email: string; phone: string }
@@ -967,7 +969,7 @@ export function RequestManagementPanel({
       return <button type="button" onClick={continueToClientDelivery} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Step 3</button>
     }
     if (workflow.step2Action === "choose-suppliers") {
-      return <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={primaryWorkflowClass}><Route className="h-4 w-4" />Choose suppliers for this request</button>
+      return <button type="button" onClick={() => { const target = document.getElementById(supplierRouting ? "request-supplier-routing" : "request-items-heading"); if (target instanceof HTMLDetailsElement) target.open = true; target?.scrollIntoView({ behavior: "smooth", block: "start" }) }} className={primaryWorkflowClass}><Route className="h-4 w-4" />Choose suppliers for this request</button>
     }
     if (workflow.step2Action === "contact-suppliers") {
       return <button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={compactWorkflowClass}><Route className="h-4 w-4" />Contact {selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</button>
@@ -1032,6 +1034,7 @@ export function RequestManagementPanel({
         </>} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
           <div className="mb-3">{renderStep2PrimaryAction()}</div>
+          {supplierRouting}
           {supplierRequestFiles.length ? <details className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-black text-[#12263f] [&::-webkit-details-marker]:hidden">
               <span className="inline-flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5 text-amber-700" />Supplier files <span className="rounded-full bg-white px-1.5 py-0.5 text-[9px]">{supplierRequestFiles.length}</span></span>
@@ -1064,7 +1067,7 @@ export function RequestManagementPanel({
               </div>
               <div role="cell">{row.bid ? <p className={`rounded-lg border px-3 py-2 text-xs font-bold ${row.bid.pricedItemCount === row.bid.itemCount && row.bid.itemCount > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{row.bid.pricedItemCount === row.bid.itemCount && row.bid.itemCount > 0 ? "All quote lines priced" : row.bid.pricedItemCount > 0 ? "Partial quote received" : "No priced lines received"}</p> : <><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={displayContactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(displayContactStatus)}`}>{displayContactStatus === "no_response" ? <option value="no_response" disabled>No response</option> : null}{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></>}</div>
             </article>
-          })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
+          })}</div></div> : supplierRouting ? null : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers to begin pricing.</p>}
 
 
           {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
