@@ -34,3 +34,13 @@ test("closed request does not invent delivery proof", () => {
   expect(result.text).toContain("closed")
   expect(result.text).not.toContain("delivered")
 })
+test("explicitly reopened Items wins over valid products and later pricing", () => {
+  const result = requestWorkflowGuidance({ workflow: requestWorkflowState({ ...base, winningSupplierSelected: true }), step1Blocker: null, step1Completed: false, organizationStatus: "organized", closed: false })
+  expect(result.step).toBe(1)
+  expect(result.text).toContain("reopened Items")
+})
+test("reopened fulfillment keeps its proof and asks for review instead of claiming done", () => {
+  const result = guide({ winningSupplierSelected: true, paymentReceived: true, receiptSent: true, deliveryScheduled: true, step3CompletedOverride: false })
+  expect(result.step).toBe(3)
+  expect(result.text).toContain("records are unchanged")
+})

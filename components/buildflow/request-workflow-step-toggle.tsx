@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation"
 import { type ReactNode, useState, useTransition } from "react"
 
 import { updateRequestWorkflowStepAction } from "@/app/owner/materials/requests/actions"
+import { RequestStepStatusPopover, useRequestStepWorkspace } from "@/components/buildflow/request-step-workspace"
 
 export function RequestWorkflowStatusButton({ requestId, step, completed }: { requestId: string; step: 1 | 2 | 3 | 4; completed: boolean }) {
+  const workspace = useRequestStepWorkspace()
+  return workspace && step !== 4 ? <RequestStepStatusPopover step={step} /> : <LegacyRequestWorkflowStatusButton requestId={requestId} step={step} completed={completed} />
+}
+
+function LegacyRequestWorkflowStatusButton({ requestId, step, completed }: { requestId: string; step: 1 | 2 | 3 | 4; completed: boolean }) {
   const router = useRouter()
   const [isComplete, setIsComplete] = useState(completed)
   const [error, setError] = useState("")
@@ -37,9 +43,10 @@ export function RequestWorkflowStatusButton({ requestId, step, completed }: { re
 }
 
 export function RequestWorkflowStepToggle({ requestId, step, completed, className, allowManualCompletion = true, statusLabel, children }: { requestId: string; step: 1 | 2 | 3 | 4; completed: boolean; className: string; allowManualCompletion?: boolean; statusLabel?: string; children?: ReactNode }) {
+  const workspace = useRequestStepWorkspace()
   const [menuOpen, setMenuOpen] = useState(false)
   return <div className="relative z-30 flex items-center gap-1" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-    {allowManualCompletion ? <RequestWorkflowStatusButton key={`${requestId}:${step}:${completed}`} requestId={requestId} step={step} completed={completed} /> : <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${className}`}>{statusLabel || (completed ? "Done" : "In progress")}</span>}
+    {allowManualCompletion || workspace ? <RequestWorkflowStatusButton requestId={requestId} step={step} completed={completed} /> : <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${className}`}>{statusLabel || (completed ? "Done" : "In progress")}</span>}
     {children ? <button type="button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={`Step ${step} tools`} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"><MoreHorizontal className="h-4 w-4" /></button> : null}
     {menuOpen ? <><button type="button" aria-label="Close tools" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-40 bg-slate-950/35 sm:hidden" /><div role="dialog" aria-label={`Step ${step} tools`} className="fixed inset-x-0 bottom-0 z-50 grid gap-1 rounded-t-2xl border border-slate-200 bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-11 sm:z-auto sm:w-52 sm:rounded-lg sm:p-1.5">
       <div className="mb-1 flex items-center justify-between px-2 sm:hidden"><p className="text-sm font-black text-[#12263f]">Step {step} tools</p><button type="button" onClick={() => setMenuOpen(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200" aria-label="Close tools"><X className="h-4 w-4" /></button></div>

@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button";
-import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
-import { RequestActivityLog } from "@/components/buildflow/request-activity-log";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestLiveSync } from "@/components/buildflow/request-live-sync";
 import { RequestInlineNameEditor } from "@/components/buildflow/request-inline-name-editor";
@@ -31,7 +29,8 @@ import { managerPipelineStage, managerPipelineStageWithOverride } from "@/lib/ma
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof, requestWorkflowState } from "@/lib/request-workflow-state";
 import { requestWorkflowGuidance } from "@/lib/request-workflow-guidance";
-import { RequestWorkflowGuide } from "@/components/buildflow/request-workflow-guide";
+import { RequestStepWorkspace, RequestAttentionIndicator } from "@/components/buildflow/request-step-workspace";
+import { deriveRequestSteps, type RequestStepRecord } from "@/lib/request-step-state";
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion";
 import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubstepLabel, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime } from "@/lib/site-date-time";
@@ -130,7 +129,7 @@ export default async function OwnerMaterialRequestPage({
   params: Promise<{ requestId: string }>;
 }) {
   const { requestId } = await params;
-  const { supabase } = await requireStaffProfile("customers");
+  const { supabase, user } = await requireStaffProfile("customers");
   const [
     { data: request, error: requestError },
     { data: responses },
@@ -663,15 +662,38 @@ export default async function OwnerMaterialRequestPage({
     return Boolean(normalizedClientEmail && communication.counterparty_email?.trim().toLowerCase() === normalizedClientEmail);
   });
 
+  const stepRecords = await supabase.from("request_workflow_steps").select("request_id,step,assignee,note,completed_override,revision").eq("request_id", request.id).returns<RequestStepRecord[]>();
+  const proofWorkflow = requestWorkflowState({
+    routeSupplierCount: routeSelections.length,
+    supplierRequestCount: (packages ?? []).length,
+    supplierQuoteCount: (comparisonBidsResult.data ?? []).length,
+    winningSupplierSelected: selectedPricingReady,
+    ...initialPaymentDelivery,
+  });
+  const stepState = deriveRequestSteps({
+    requestId: request.id,
+    assignee: request.manager_assignee,
+    records: stepRecords.data ?? [],
+    eligible: [!requestStep1CompletionError(items ?? []), selectedPricingReady, proofWorkflow.step3Complete],
+    legacyCompleted: [workflowOverrides.get(1) ?? true, workflowOverrides.get(2) ?? selectedPricingReady, workflowOverrides.get(3) ?? proofWorkflow.step3Complete],
+  });
+  const guidance = requestWorkflowGuidance({
+    closed: request.status === "closed",
+    step1Blocker: requestStep1CompletionError(items ?? []),
+    step1Completed: stepState[0].completed,
+    organizationStatus,
+    workflow: { ...proofWorkflow, step2Complete: stepState[1].completed, step3Complete: stepState[2].completed },
+  });
+
   return (
+    <RequestStepWorkspace initial={stepState} available={!stepRecords.error} actorId={user.id}>
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-[calc(env(safe-area-inset-bottom)+10rem)] pt-4 text-slate-950 sm:px-6 sm:pb-28">
       <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
         <header className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
           <div className="flex min-w-0 items-center gap-1.5" data-testid="request-header-internal-row">
             <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700" title={profile?.company_name || projectLabel || "Company not added"}>{profile?.company_name || projectLabel || "Company not added"}</span>
-            <div className="w-28 shrink-0"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact hideLabel /></div>
-            <div className="w-36 shrink-0"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} currentLabel={request.status === "closed" ? "Completed" : requestWorkflowSubstepLabel(currentSubstep) || undefined} hideLabel /></div>
+            <RequestAttentionIndicator guidance={guidance} events={activityEvents.map((event) => ({ id: event.id, title: event.title, description: event.description, createdAt: event.created_at }))} />
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 border-t border-slate-100 pt-1.5 sm:flex-nowrap" data-testid="request-header-owner-row">
             <span className="shrink-0 text-[11px] font-semibold text-slate-400">#{request.public_number}</span>
@@ -688,26 +710,14 @@ export default async function OwnerMaterialRequestPage({
                 <div><dt className="inline font-semibold">Project: </dt><dd className="inline">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}</dd></div>
                 {request.projects?.address ? <div><dt className="inline font-semibold">Address: </dt><dd className="inline">{request.projects.address}</dd></div> : null}
               </dl>
+              <div className="max-w-48"><CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} currentLabel={request.status === "closed" ? "Completed" : requestWorkflowSubstepLabel(currentSubstep) || undefined} /></div>
               {["draft", "submitted", "in_review", "quoted"].includes(request.status) ? <DeleteManagerRecordButton id={request.id} kind="request" label={`#${request.public_number} · ${request.title}`} returnToRequests /> : null}
             </div>
           </details>
         </header>
-        <RequestWorkflowGuide guidance={requestWorkflowGuidance({
-          closed: request.status === "closed",
-          step1Blocker: requestStep1CompletionError(items ?? []),
-          organizationStatus,
-          workflow: requestWorkflowState({
-            routeSupplierCount: routeSelections.length,
-            supplierRequestCount: (packages ?? []).length,
-            supplierQuoteCount: (comparisonBidsResult.data ?? []).length,
-            winningSupplierSelected: selectedPricingReady,
-            step2CompletedOverride: selectedPricingReady ? workflowOverrides.get(2) ?? null : false,
-            ...initialPaymentDelivery,
-          }),
-        })} />
         <RequestMaterialWorktable
           requestId={request.id}
-          stepCompleted={(workflowOverrides.get(1) ?? true) && !requestStep1CompletionError(items ?? [])}
+          stepCompleted={stepState[0].completed}
           originalItems={originalItems}
           organizedItems={organizedItems}
           defaultZipCode={zipCodeFromAddress(request.projects?.address)}
@@ -829,8 +839,8 @@ export default async function OwnerMaterialRequestPage({
             currentSubstep={currentSubstep}
             comparisons={comparisonSummaries}
             clientReplyCompleted={clientReplyCompleted}
-            step2CompletedOverride={selectedPricingReady ? workflowOverrides.get(2) ?? null : false}
-            step3CompletedOverride={workflowOverrides.get(3) ?? null}
+            step2CompletedOverride={stepState[1].completed}
+            step3CompletedOverride={stepState[2].completed}
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, managerPreviewToken: entry.manager_preview_token, version: entry.version, updatedAt: entry.updated_at, lastOpenedAt: currentClientDocumentViewByVersion.get(`${entry.id}:${entry.version}`)?.last_opened_at ?? null }))}
             requestAttachments={clientRequestFiles.flatMap((entry) => entry.file_type && Number.isSafeInteger(Number(entry.file_size)) && Number(entry.file_size) > 0 ? [{ id: entry.id, fileName: entry.file_name, fileType: entry.file_type, fileSize: Number(entry.file_size) }] : [])}
@@ -845,13 +855,8 @@ export default async function OwnerMaterialRequestPage({
             supplierEmails={supplierEmails}
           />
         </div>
-        <RequestActivityLog events={activityEvents.map((event) => ({
-          id: event.id,
-          title: event.title,
-          description: event.description,
-          createdAt: event.created_at,
-        }))} />
       </div>
     </main>
+    </RequestStepWorkspace>
   );
 }

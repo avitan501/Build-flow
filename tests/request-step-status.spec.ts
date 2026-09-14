@@ -34,5 +34,7 @@ test("both headers expose status and page derives completion from current eviden
   expect(worktable).toContain("RequestWorkflowStatusButton")
   expect(header).toContain("RequestWorkflowStepToggle")
   expect(page).toContain("requestStep1CompletionError(items ?? [])")
-  expect(page).toContain("selectedPricingReady ? workflowOverrides.get(2) ?? null : false")
+  expect(page).toContain("deriveRequestSteps")
+  expect(page).toContain("selectedPricingReady, proofWorkflow.step3Complete")
+  expect(page).toContain("step2CompletedOverride={stepState[1].completed}")
 })

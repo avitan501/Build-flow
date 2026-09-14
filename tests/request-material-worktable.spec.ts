@@ -166,7 +166,8 @@ test("mobile request detail keeps one clear next action and collapses repeated p
 
   expect(page).toContain("sm:flex-nowrap")
   expect(page).toContain("basis-full")
-  expect(page).toContain("<RequestWorkflowGuide")
+  expect(page).toContain("<RequestAttentionIndicator")
+  expect(page).not.toContain("<RequestWorkflowGuide")
   expect(page).not.toContain('aria-label="Request progress"')
   expect(page).toContain("env(safe-area-inset-bottom)+10rem")
   expect(funnel).toContain("Current status:")
@@ -434,9 +435,11 @@ test("request header is compact and request text edits directly on click", async
   ])
 
   expect(page).not.toContain("Back to Customer Requests")
-  expect(page).toContain("MaterialRequestAssigneeControl")
+  expect(page).toContain("RequestAttentionIndicator")
+  expect(page).not.toContain("MaterialRequestAssigneeControl")
   expect(page).toContain("CustomerRequestStatus")
-  expect(page).toContain("RequestActivityLog")
+  expect(page).toContain("events={activityEvents.map")
+  expect(page).not.toContain("<RequestActivityLog")
   expect(page).not.toContain("Next:")
   expect(worktable).toContain("<FileText")
   expect(worktable).toContain("Client request files <span")

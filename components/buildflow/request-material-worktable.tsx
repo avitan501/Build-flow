@@ -337,7 +337,7 @@ export function RequestMaterialWorktable({
           <h2 id="request-items-heading" tabIndex={-1} className="scroll-mt-24 truncate text-base font-bold">Request items</h2>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
-        <RequestWorkflowStatusButton key={`${requestId}:${stepCompleted}`} requestId={requestId} step={1} completed={stepCompleted} />
+        <RequestWorkflowStatusButton requestId={requestId} step={1} completed={stepCompleted} />
         <details className="group relative shrink-0">
           <summary className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Request tools"><MoreHorizontal className="h-4 w-4" /></summary>
           <div className="absolute right-0 top-[calc(100%+.4rem)] z-40 grid w-[min(24rem,calc(100vw-2rem))] gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">

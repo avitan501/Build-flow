@@ -66,10 +66,10 @@ test("Step 3 cannot be completed without payment, receipt, and delivery proof", 
   }
 })
 
-test("reopening Step 3 cannot permanently hide later complete proof", () => {
+test("explicit reopening keeps Step 3 in progress without deleting its proof", () => {
   const state = requestWorkflowState({ ...base, paymentReceived: true, receiptSent: true, deliveryScheduled: true, step3CompletedOverride: false })
-  expect(state.step3Complete).toBe(true)
-  expect(state.step3Status).toBe("complete")
+  expect(state.step3Complete).toBe(false)
+  expect(state.step3Status).toBe("upcoming")
   expect(state.step3Action).toBe("complete")
 })
 

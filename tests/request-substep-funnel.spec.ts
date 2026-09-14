@@ -107,7 +107,8 @@ test("the compact header has one internal row and one owner-request row", async 
   expect(internalRow).toBeGreaterThan(-1)
   expect(ownerRow).toBeGreaterThan(internalRow)
   expect(header).toContain("profile?.company_name || projectLabel")
-  expect(header).toContain("MaterialRequestAssigneeControl")
+  expect(header).toContain("RequestAttentionIndicator")
+  expect(header).not.toContain("MaterialRequestAssigneeControl")
   expect(header).toContain("CustomerRequestStatus")
   expect(header).toContain('request.status === "closed" ? "Completed"')
   expect(header).toContain("requestWorkflowSubstepLabel(currentSubstep)")
@@ -148,13 +149,13 @@ test("each workflow step has one compact Tools menu and its own sub-funnel", asy
 
   expect(stepHeader).toContain("tools?: ReactNode")
   expect(stepHeader).toContain("min-w-0 w-full overflow-visible")
-  expect(stepHeader).toContain("allowManualCompletion || tools")
+  expect(stepHeader).toContain("<RequestWorkflowStepToggle")
   const stepSummary = stepHeader.slice(stepHeader.indexOf("<summary"), stepHeader.indexOf("</summary>"))
   expect(stepSummary).toContain("RequestWorkflowStepToggle")
   expect(stepToggle).toContain('aria-label={`Step ${step} tools`}')
   expect(stepToggle).toContain("event.stopPropagation()")
   expect(stepToggle).toContain("{children}")
-  expect(stepToggle).toContain("allowManualCompletion ?")
+  expect(stepToggle).toContain("allowManualCompletion || workspace ?")
 })
 
 test("saved substeps update the top status while verified workflow evidence can advance it", async () => {

@@ -75,7 +75,7 @@ export function hasPersistedReceiptProof(
 export function requestWorkflowState(input: RequestWorkflowStateInput): RequestWorkflowState {
   const step2Complete = input.step2CompletedOverride ?? input.winningSupplierSelected
   const step3ProofComplete = input.paymentReceived && input.receiptSent && input.deliveryScheduled
-  const step3Complete = step3ProofComplete
+  const step3Complete = step3ProofComplete && input.step3CompletedOverride !== false
 
   let step2Action: RequestWorkflowAction
   if (step2Complete) step2Action = "send-estimate"

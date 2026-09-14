@@ -18,6 +18,7 @@ import { requestItemFieldsMetadata, type RequestItemField } from "@/lib/request-
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion"
+import type { RequestStepPatch, RequestStepRecord } from "@/lib/request-step-state"
 import type { ReviewableMaterialItem } from "@/lib/client-material-review"
 import { materialReviewChoiceUpdate } from "@/lib/material-review-recommendations"
 import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "@/lib/quote-comparison"
@@ -958,7 +959,7 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
   return { ok: true }
 }
 
-export async function updateRequestWorkflowStepAction(input: { requestId: string; step: number; completed: boolean }) {
+export async function updateRequestWorkflowStepAction(input: { requestId: string; step: number; completed: boolean; validateOnly?: boolean }) {
   const requestId = String(input.requestId || "").trim()
   const step = Number(input.step)
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !Number.isInteger(step) || step < 1 || step > 4 || typeof input.completed !== "boolean") {
@@ -1011,6 +1012,8 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
     }
   }
 
+  if (input.validateOnly) return { ok: true as const }
+
   const { error } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
@@ -1028,6 +1031,34 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
   if (error) return { ok: false as const, error: "The workflow step could not be updated." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
+}
+
+export async function updateRequestWorkflowStepDetailsAction(input: { requestId: string; step: number; revision: number; patch: RequestStepPatch }) {
+  if (!input || typeof input !== "object") return { ok: false as const, error: "This step could not be identified." }
+  const { requestId, step, revision, patch } = input
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || ![1, 2, 3].includes(step) || !Number.isSafeInteger(revision) || revision < 0 || !patch || !Object.keys(patch).length || Object.keys(patch).some(key => !["assignee", "note", "completed_override"].includes(key))) return { ok: false as const, error: "This step could not be identified." }
+  if ((patch.assignee !== undefined && !["carlos", "david"].includes(patch.assignee)) || (patch.note !== undefined && (typeof patch.note !== "string" || patch.note.length > 2000)) || (patch.completed_override !== undefined && typeof patch.completed_override !== "boolean")) return { ok: false as const, error: "Check the step details and try again." }
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,manager_assignee").eq("id", requestId).maybeSingle<{ id: string; manager_assignee: string }>()
+  if (requestError || !request) return { ok: false as const, error: "Request not found." }
+  if (patch.completed_override === true) {
+    const validation = await updateRequestWorkflowStepAction({ requestId, step, completed: true, validateOnly: true })
+    if (!validation.ok) return validation
+  }
+  const fields = "request_id,step,assignee,note,completed_override,revision"
+  const values = { ...patch, revision: revision + 1, updated_by: user.id, updated_at: new Date().toISOString() }
+  const result = revision === 0
+    ? await supabase.from("request_workflow_steps").insert({ request_id: requestId, step, assignee: request.manager_assignee === "david" ? "david" : "carlos", ...values }).select(fields).maybeSingle<RequestStepRecord>()
+    : await supabase.from("request_workflow_steps").update(values).eq("request_id", requestId).eq("step", step).eq("revision", revision).select(fields).maybeSingle<RequestStepRecord>()
+  if (!result.data) {
+    if (!result.error || result.error.code === "23505") {
+      const { data: current } = await supabase.from("request_workflow_steps").select(fields).eq("request_id", requestId).eq("step", step).maybeSingle<RequestStepRecord>()
+      return { ok: false as const, error: "Another person updated this step. Your changes are kept; review and retry.", current }
+    }
+    return { ok: false as const, error: "Not saved. Your changes are kept. Please retry." }
+  }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const, record: result.data }
 }
 
 export async function updateRequestSubstepAction(input: { requestId: string; substep: RequestWorkflowSubstepId; reopen?: boolean }) {

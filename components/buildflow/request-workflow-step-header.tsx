@@ -74,7 +74,7 @@ export function RequestWorkflowStepHeader({
           {badges ? <span className="mt-1 hidden flex-wrap gap-1 group-open/step:flex">{badges}</span> : null}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open/step:rotate-180" aria-hidden="true" />
-        {allowManualCompletion || tools ? <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} statusLabel={styles.label} allowManualCompletion={allowManualCompletion}>{tools}</RequestWorkflowStepToggle> : null}
+        <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} statusLabel={styles.label} allowManualCompletion={allowManualCompletion}>{tools}</RequestWorkflowStepToggle>
       </summary>
   )
 }

@@ -27,6 +27,7 @@ export function requestWorkflowGuidance(input: {
   organizationStatus: string
   workflow: RequestWorkflowState
   closed: boolean
+  step1Completed?: boolean
 }) {
   if (input.closed) return { step: 3, text: "Request closed · open a step to review its records.", waiting: false } as const
   if (input.step1Blocker) {
@@ -37,7 +38,9 @@ export function requestWorkflowGuidance(input: {
       : input.step1Blocker
     return { step: 1, text, waiting } as const
   }
+  if (input.step1Completed === false) return { step: 1, text: "Review the reopened Items step, then mark it Done.", waiting: false } as const
   const step = input.workflow.step2Complete ? 3 : 2
   const action = step === 2 ? input.workflow.step2Action : input.workflow.step3Action
+  if (step === 3 && !input.workflow.step3Complete && action === "complete") return { step: 3, text: "Review this reopened step, then mark it Done. Payment and delivery records are unchanged.", waiting: false } as const
   return { step, text: actionCopy[action], waiting: ["add-supplier-quote", "wait-for-approval", "mark-paid"].includes(action) } as const
 }
