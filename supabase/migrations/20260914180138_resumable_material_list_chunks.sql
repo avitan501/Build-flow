@@ -154,7 +154,7 @@ begin
   -- not slip between the protection check and deletion of an old AI copy.
   select array_agg(id) into v_existing from (select id from public.quote_request_items where request_id=v_job.request_id and metadata->>'ai_organized'='true' for update) locked_items;
   if v_existing is not null and (
-    exists(select 1 from public.quote_request_items i where i.id=any(v_existing) and (i.unit_price>0 or i.metadata ? 'manually_edited_at'
+    exists(select 1 from public.quote_request_items i where i.id=any(v_existing) and (i.unit_price>0 or i.metadata ? 'manually_edited_at' or i.metadata ? 'manually_reviewed_at'
       or coalesce(i.metadata->'supplier_route_entries','[]'::jsonb)<>'[]'::jsonb or coalesce(i.metadata->'supplier_route_names','[]'::jsonb)<>'[]'::jsonb))
     or exists(select 1 from public.quote_comparison_items where source_request_item_id=any(v_existing))
     or exists(select 1 from public.quote_request_attachments where item_id=any(v_existing))
@@ -187,7 +187,12 @@ declare v_status text; v_request uuid; v_job public.client_material_list_jobs%ro
 begin
   if coalesce(auth.jwt()->>'role','') <> 'service_role' then raise exception 'service_only' using errcode='42501'; end if;
   select * into v_job from public.client_material_list_jobs where id=p_job_id for update;
-  if v_job.id is null or v_job.status<>'processing' or v_job.ai_chunk_lease is distinct from p_lease or p_lease is null then return 'stale'; end if;
+  if v_job.id is null or p_generation is null or v_job.generation is distinct from p_generation or v_job.status<>'processing' or v_job.ai_chunk_lease is distinct from p_lease or p_lease is null then return 'stale'; end if;
+  if p_succeeded is null then raise exception 'invalid_result'; end if;
+  if p_succeeded and not exists (
+    select 1 from private.client_material_list_checkpoints c where c.job_id=p_job_id and c.generation=p_generation
+      and c.published_at is not null and c.source_revision is not distinct from private.material_list_source_revision(v_job.request_id)
+  ) then raise exception 'checkpoint_not_published'; end if;
   if not p_succeeded and p_error in ('ai_not_configured','document_unreadable','document_page_limit','material_row_limit','attachment_limit','openai_refused','openai_http_400','openai_http_401','openai_http_403','source_changed','organized_work_in_use') then
     update public.client_material_list_jobs set attempts=max_attempts where id=p_job_id and generation=p_generation;
   end if;

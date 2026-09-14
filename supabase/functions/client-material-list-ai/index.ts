@@ -39,6 +39,7 @@ type Attachment = {
 
 type AiItem = {
   sourceChunk?: string
+  sourceOccurrence?: string
   name: string
   department: string
   quantity: number | null
@@ -411,7 +412,7 @@ Deno.serve(async (request: Request) => {
     }
     if(nextMissingMaterialChunk(results,chunks.length)!==null) return json({ok:true,status:"chunk_completed",chunksDone:Object.keys(results).length,chunksTotal:chunks.length})
     const completed=Array.from({length:chunks.length},(_,index)=>results[String(index)])
-    const allItems=completed.flatMap(chunk=>chunk.result.items.map(item=>({...item,sourceChunk:chunk.label})))
+    const allItems=completed.flatMap((chunk,chunkIndex)=>chunk.result.items.map((item,rowIndex)=>({...item,sourceChunk:chunk.label,sourceOccurrence:`${chunkIndex}:${rowIndex}`})))
     if(allItems.length>300) throw new MaterialListFailure("material_row_limit")
     const result:AiResult={documentType:allItems.length?"material_list":completed.some(chunk=>chunk.result.documentType==="plan")?"plan":"other",summary:completed.map(chunk=>chunk.result.summary).join("\n"),items:allItems}
     const items = result.documentType === "material_list"
@@ -513,6 +514,7 @@ Deno.serve(async (request: Request) => {
           request_details: details,
           source_text: groundedSourceText,
           source_chunk: item.sourceChunk,
+          source_occurrence: item.sourceOccurrence,
           quantity_defaulted: quantityWasDefaulted,
           unit_defaulted: unitWasDefaulted,
           review_status: reviewStatus,
