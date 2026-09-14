@@ -20,6 +20,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
   const current = useRef(steps)
   const timers = useRef(new Map<RequestStep, ReturnType<typeof setTimeout>>())
   const saving = useRef(new Set<RequestStep>())
+  const active = useRef(true)
   const draftKey = `avantia-step-drafts:${actorId}:${initial[0]?.request_id}`
   function publish(next: StepDraft[]) { current.current = next; setSteps(next) }
   useEffect(() => {
@@ -51,6 +52,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
   }, [steps, draftKey])
 
   const flush = useCallback(async function flushStep(step: RequestStep, retry = false) {
+    if (!active.current) return
     clearTimeout(timers.current.get(step))
     if (saving.current.has(step) || !available) return
     const draft = current.current.find(row => row.state.step === step)!
@@ -61,6 +63,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     publish(current.current.map(row => row.state.step === step ? { ...row, pending: true, error: "" } : row))
     try {
       const result = await saveAction({ requestId: draft.state.request_id, step, revision: draft.state.revision, patch })
+      if (!active.current) return
       if (!result.ok) {
         publish(current.current.map(row => row.state.step === step ? { ...row, pending: false, error: result.error, state: "current" in result && result.current ? { ...row.state, ...result.current, completed: row.state.eligible && (result.current.completed_override ?? row.state.completed) } : row.state } : row))
         return
@@ -86,6 +89,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     else void flush(step)
   }
   useEffect(() => {
+    active.current = true
     const dirty = () => current.current.some(row => row.pending || Object.keys(row.patch).length)
     const unload = (event: BeforeUnloadEvent) => { if (dirty()) { event.preventDefault(); event.returnValue = "" } }
     const navigate = (event: MouseEvent) => {
@@ -95,7 +99,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     window.addEventListener("beforeunload", unload)
     document.addEventListener("click", navigate, true)
     const scheduled = timers.current
-    return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); scheduled.forEach(clearTimeout) }
+    return () => { active.current = false; window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); scheduled.forEach(clearTimeout) }
   }, [])
   return <Context.Provider value={{ steps, available, change, flush }}>{children}</Context.Provider>
 }

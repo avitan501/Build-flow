@@ -688,7 +688,7 @@ export default async function OwnerMaterialRequestPage({
   });
 
   return (
-    <RequestStepWorkspace initial={stepState} available={!stepRecords.error} actorId={user.id}>
+    <RequestStepWorkspace key={`${user.id}:${request.id}`} initial={stepState} available={!stepRecords.error} actorId={user.id}>
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-[calc(env(safe-area-inset-bottom)+10rem)] pt-4 text-slate-950 sm:px-6 sm:pb-28">
       <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
