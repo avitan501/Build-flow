@@ -1,0 +1,1673 @@
+{
+  "columns": [
+    {
+      "table_name": "profiles",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "email",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "full_name",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "phone",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "company_name",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "role",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'client'::text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "approval_status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'pending'::text"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "is_active",
+      "type": "boolean",
+      "not_null": true,
+      "default_expression": "true"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "approved_at",
+      "type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "approved_by",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "preferred_language",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'en'::text"
+    },
+    {
+      "table_name": "projects",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "projects",
+      "column_name": "owner_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "projects",
+      "column_name": "name",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "projects",
+      "column_name": "address",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "projects",
+      "column_name": "status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'draft'::text"
+    },
+    {
+      "table_name": "projects",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "projects",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "comparison_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "supplier_id",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "supplier_name_snapshot",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "trust_level_snapshot",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'not-reviewed'::text"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "delivery_charge",
+      "type": "numeric(14,2)",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "tax_amount",
+      "type": "numeric(14,2)",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "lead_time_days",
+      "type": "integer",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "notes",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'received'::text"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "tax_percent",
+      "type": "numeric(7,4)",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "source_supplier_quote_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "source_vendor_name",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "source_contact_name",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "column_name": "source_delivery_charge",
+      "type": "numeric(14,2)",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "comparison_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "description",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "specification",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "quantity",
+      "type": "numeric(14,3)",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "unit",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'each'::text"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "sort_order",
+      "type": "integer",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "markup_percent",
+      "type": "numeric(8,3)",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "client_unit_price",
+      "type": "numeric(14,4)",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "column_name": "source_request_item_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "bid_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "item_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "unit_price",
+      "type": "numeric(14,4)",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "is_available",
+      "type": "boolean",
+      "not_null": true,
+      "default_expression": "true"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "notes",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "project_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "request_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "created_by",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "title",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "department",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "job_address",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'draft'::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "currency",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'USD'::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "awarded_bid_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_name_snapshot",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_email_snapshot",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "quote_number",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "('ABQ-'::text || upper(substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 8)))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_quote_status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'draft'::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "expires_on",
+      "type": "date",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_message",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_delivery_charge",
+      "type": "numeric(14,2)",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "quote_sent_at",
+      "type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "column_name": "client_tax_percent",
+      "type": "numeric(7,4)",
+      "not_null": true,
+      "default_expression": "8.875"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "request_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "project_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "owner_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "item_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "file_name",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "file_path",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "file_type",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "file_size",
+      "type": "bigint",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "material_response_id",
+      "type": "uuid",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "column_name": "source_party",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'client'::text"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "request_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "project_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "owner_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "catalog_item_id",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "name",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "department",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "item_type",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "quantity",
+      "type": "numeric",
+      "not_null": true,
+      "default_expression": "1"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "unit",
+      "type": "text",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "unit_price",
+      "type": "numeric",
+      "not_null": true,
+      "default_expression": "0"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "qualification_status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'not_required'::text"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "answers",
+      "type": "jsonb",
+      "not_null": true,
+      "default_expression": "'[]'::jsonb"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "metadata",
+      "type": "jsonb",
+      "not_null": true,
+      "default_expression": "'{}'::jsonb"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_request_items",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": "gen_random_uuid()"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "project_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "owner_id",
+      "type": "uuid",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "title",
+      "type": "text",
+      "not_null": true,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "status",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'draft'::text"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "submitted_at",
+      "type": "timestamp with time zone",
+      "not_null": false,
+      "default_expression": null
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "not_null": true,
+      "default_expression": "now()"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "manager_assignee",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "'carlos'::text"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "manager_notes",
+      "type": "text",
+      "not_null": true,
+      "default_expression": "''::text"
+    },
+    {
+      "table_name": "quote_requests",
+      "column_name": "public_number",
+      "type": "integer",
+      "not_null": true,
+      "default_expression": "nextval('quote_request_public_number_seq'::regclass)"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "profiles",
+      "name": "profiles_approval_status_check",
+      "kind": "c",
+      "definition": "CHECK ((approval_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'suspended'::text])))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_preferred_language_check",
+      "kind": "c",
+      "definition": "CHECK ((preferred_language = ANY (ARRAY['en'::text, 'es'::text])))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_role_check",
+      "kind": "c",
+      "definition": "CHECK ((role = ANY (ARRAY['admin'::text, 'staff'::text, 'client'::text])))"
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_status_check",
+      "kind": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'archived'::text])))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_delivery_charge_check",
+      "kind": "c",
+      "definition": "CHECK ((delivery_charge >= (0)::numeric))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_lead_time_days_check",
+      "kind": "c",
+      "definition": "CHECK (((lead_time_days IS NULL) OR ((lead_time_days >= 0) AND (lead_time_days <= 3650))))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_notes_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(notes) <= 4000))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_source_contact_name_check",
+      "kind": "c",
+      "definition": "CHECK (((source_contact_name IS NULL) OR ((char_length(TRIM(BOTH FROM source_contact_name)) >= 1) AND (char_length(TRIM(BOTH FROM source_contact_name)) <= 200))))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_source_delivery_charge_check",
+      "kind": "c",
+      "definition": "CHECK (((source_delivery_charge IS NULL) OR ((source_delivery_charge >= (0)::numeric) AND (source_delivery_charge <= (100000000)::numeric))))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_source_vendor_name_check",
+      "kind": "c",
+      "definition": "CHECK (((source_vendor_name IS NULL) OR ((char_length(TRIM(BOTH FROM source_vendor_name)) >= 1) AND (char_length(TRIM(BOTH FROM source_vendor_name)) <= 200))))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_status_check",
+      "kind": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['received'::text, 'declined'::text, 'awarded'::text])))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_supplier_id_check",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM supplier_id)) >= 1) AND (char_length(TRIM(BOTH FROM supplier_id)) <= 160)))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_supplier_name_snapshot_check",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM supplier_name_snapshot)) >= 1) AND (char_length(TRIM(BOTH FROM supplier_name_snapshot)) <= 200)))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_tax_amount_check",
+      "kind": "c",
+      "definition": "CHECK ((tax_amount >= (0)::numeric))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_tax_percent_range",
+      "kind": "c",
+      "definition": "CHECK (((tax_percent >= (0)::numeric) AND (tax_percent <= (100)::numeric)))"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_trust_level_snapshot_check",
+      "kind": "c",
+      "definition": "CHECK ((trust_level_snapshot = ANY (ARRAY['not-reviewed'::text, 'first-time'::text, 'verified'::text, 'trusted'::text, 'preferred'::text, 'do-not-use'::text])))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_client_unit_price_check",
+      "kind": "c",
+      "definition": "CHECK (((client_unit_price IS NULL) OR ((client_unit_price >= (0)::numeric) AND (client_unit_price <= (100000000)::numeric))))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_description_check",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM description)) >= 1) AND (char_length(TRIM(BOTH FROM description)) <= 500)))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_markup_percent_check",
+      "kind": "c",
+      "definition": "CHECK (((markup_percent >= (0)::numeric) AND (markup_percent <= (10000)::numeric)))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_quantity_check",
+      "kind": "c",
+      "definition": "CHECK (((quantity > (0)::numeric) AND (quantity <= (100000000)::numeric)))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_sort_order_check",
+      "kind": "c",
+      "definition": "CHECK ((sort_order >= 0))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_specification_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(specification) <= 1000))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_unit_check",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM unit)) >= 1) AND (char_length(TRIM(BOTH FROM unit)) <= 40)))"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_notes_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(notes) <= 1000))"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_unit_price_check",
+      "kind": "c",
+      "definition": "CHECK (((unit_price IS NULL) OR ((unit_price >= (0)::numeric) AND (unit_price <= (100000000)::numeric))))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_delivery_charge_check",
+      "kind": "c",
+      "definition": "CHECK (((client_delivery_charge >= (0)::numeric) AND (client_delivery_charge <= (100000000)::numeric)))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_email_snapshot_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(client_email_snapshot) <= 320))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_message_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(client_message) <= 4000))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_name_snapshot_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(client_name_snapshot) <= 200))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_quote_status_check",
+      "kind": "c",
+      "definition": "CHECK ((client_quote_status = ANY (ARRAY['draft'::text, 'ready'::text, 'sent'::text, 'accepted'::text, 'declined'::text])))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_tax_percent_check",
+      "kind": "c",
+      "definition": "CHECK (((client_tax_percent >= (0)::numeric) AND (client_tax_percent <= (100)::numeric)))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_currency_check",
+      "kind": "c",
+      "definition": "CHECK ((currency = 'USD'::text))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_department_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(department) <= 120))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_job_address_check",
+      "kind": "c",
+      "definition": "CHECK ((char_length(job_address) <= 500))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_quote_number_length",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM quote_number)) >= 3) AND (char_length(TRIM(BOTH FROM quote_number)) <= 40)))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_status_check",
+      "kind": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'review'::text, 'awarded'::text, 'archived'::text])))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_title_check",
+      "kind": "c",
+      "definition": "CHECK (((char_length(TRIM(BOTH FROM title)) >= 1) AND (char_length(TRIM(BOTH FROM title)) <= 160)))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_file_size_check",
+      "kind": "c",
+      "definition": "CHECK (((file_size IS NULL) OR (file_size >= 0)))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_source_party_check",
+      "kind": "c",
+      "definition": "CHECK ((source_party = ANY (ARRAY['client'::text, 'supplier'::text, 'internal'::text])))"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_item_type_check",
+      "kind": "c",
+      "definition": "CHECK ((item_type = ANY (ARRAY['material'::text, 'service'::text, 'file_upload'::text, 'custom_priced'::text])))"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_qualification_status_check",
+      "kind": "c",
+      "definition": "CHECK ((qualification_status = ANY (ARRAY['not_required'::text, 'pending'::text, 'answered'::text, 'skipped'::text])))"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_quantity_check",
+      "kind": "c",
+      "definition": "CHECK ((quantity > (0)::numeric))"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_unit_price_check",
+      "kind": "c",
+      "definition": "CHECK ((unit_price >= (0)::numeric))"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_manager_assignee_check",
+      "kind": "c",
+      "definition": "CHECK ((manager_assignee = ANY (ARRAY['carlos'::text, 'david'::text])))"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_public_number_range",
+      "kind": "c",
+      "definition": "CHECK (((public_number >= 100000) AND (public_number <= 999999)))"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_status_check",
+      "kind": "c",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'submitted'::text, 'in_review'::text, 'quoted'::text, 'closed'::text])))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_approved_by_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (approved_by) REFERENCES profiles(id)"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_owner_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_comparison_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (comparison_id) REFERENCES quote_comparisons(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_source_supplier_quote_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (source_supplier_quote_id) REFERENCES supplier_quotes(id) ON DELETE RESTRICT"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_comparison_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (comparison_id) REFERENCES quote_comparisons(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_source_request_item_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (source_request_item_id) REFERENCES quote_request_items(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_bid_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (bid_id) REFERENCES quote_comparison_bids(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_item_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (item_id) REFERENCES quote_comparison_items(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_awarded_bid_fk",
+      "kind": "f",
+      "definition": "FOREIGN KEY (awarded_bid_id) REFERENCES quote_comparison_bids(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_client_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (client_id) REFERENCES profiles(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_created_by_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id) ON DELETE RESTRICT"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_project_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_request_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (request_id) REFERENCES quote_requests(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_item_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (item_id) REFERENCES quote_request_items(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_material_response_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (material_response_id) REFERENCES material_questionnaire_responses(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_owner_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_project_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_request_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (request_id) REFERENCES quote_requests(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_owner_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_project_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_request_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (request_id) REFERENCES quote_requests(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_owner_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_project_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (bid_id, item_id)"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_comparison_id_supplier_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (comparison_id, supplier_id)"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_id_comparison_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (id, comparison_id)"
+    }
+  ],
+  "triggers": [
+    {
+      "table_name": "projects",
+      "name": "set_projects_updated_at",
+      "definition": "CREATE TRIGGER set_projects_updated_at BEFORE UPDATE ON public.projects FOR EACH ROW EXECUTE FUNCTION set_projects_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_projects_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "protect_quote_comparison_bid_source_trigger",
+      "definition": "CREATE TRIGGER protect_quote_comparison_bid_source_trigger BEFORE UPDATE ON public.quote_comparison_bids FOR EACH ROW EXECUTE FUNCTION private.protect_quote_comparison_bid_source()",
+      "function_definition": "CREATE OR REPLACE FUNCTION private.protect_quote_comparison_bid_source()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  if old.source_supplier_quote_id is not null\n     and row(\n       new.source_supplier_quote_id,\n       new.source_vendor_name,\n       new.source_contact_name,\n       new.source_delivery_charge\n     ) is distinct from row(\n       old.source_supplier_quote_id,\n       old.source_vendor_name,\n       old.source_contact_name,\n       old.source_delivery_charge\n     ) then\n    raise exception 'quote_comparison_bid_source_provenance_is_immutable';\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "set_quote_comparison_bids_updated_at",
+      "definition": "CREATE TRIGGER set_quote_comparison_bids_updated_at BEFORE UPDATE ON public.quote_comparison_bids FOR EACH ROW EXECUTE FUNCTION set_projects_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_projects_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_source_request_guard",
+      "definition": "CREATE TRIGGER quote_comparison_items_source_request_guard BEFORE INSERT OR UPDATE OF comparison_id, source_request_item_id ON public.quote_comparison_items FOR EACH ROW EXECUTE FUNCTION enforce_quote_comparison_item_source_request()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.enforce_quote_comparison_item_source_request()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\ndeclare\n  comparison_request_id uuid;\n  source_request_id uuid;\nbegin\n  if tg_op = 'UPDATE'\n    and old.source_request_item_id is not null\n    and new.source_request_item_id is distinct from old.source_request_item_id\n  then\n    if not (\n      new.source_request_item_id is null\n      and pg_trigger_depth() > 1\n    ) then\n      raise exception 'source_request_item_id cannot be changed once linked';\n    end if;\n  end if;\n\n  if new.source_request_item_id is null then\n    return new;\n  end if;\n\n  select request_id\n  into comparison_request_id\n  from public.quote_comparisons\n  where id = new.comparison_id;\n\n  select request_id\n  into source_request_id\n  from public.quote_request_items\n  where id = new.source_request_item_id;\n\n  if comparison_request_id is null\n    or source_request_id is null\n    or comparison_request_id is distinct from source_request_id\n  then\n    raise exception 'comparison item source must belong to the same request';\n  end if;\n\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "set_quote_comparison_items_updated_at",
+      "definition": "CREATE TRIGGER set_quote_comparison_items_updated_at BEFORE UPDATE ON public.quote_comparison_items FOR EACH ROW EXECUTE FUNCTION set_projects_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_projects_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "set_quote_comparison_prices_updated_at",
+      "definition": "CREATE TRIGGER set_quote_comparison_prices_updated_at BEFORE UPDATE ON public.quote_comparison_prices FOR EACH ROW EXECUTE FUNCTION set_projects_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_projects_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "manager_staff_activity_change",
+      "definition": "CREATE TRIGGER manager_staff_activity_change AFTER INSERT OR DELETE OR UPDATE ON public.quote_comparisons FOR EACH ROW EXECUTE FUNCTION log_manager_staff_record_change()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.log_manager_staff_record_change()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  actor_id uuid := auth.uid();\n  source_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;\n  destination text;\n  label text;\nbegin\n  if actor_id is null or not exists (\n    select 1 from public.profiles\n    where id = actor_id\n      and role in ('admin', 'staff')\n      and approval_status = 'approved'\n      and is_active = true\n  ) then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n  if tg_table_name = 'manager_goals' and source_row ->> 'title' = 'Employee activity' then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n\n  destination := case tg_table_name\n    when 'manager_goals' then '/admin/goals-progress'\n    when 'manager_outreach_leads' then '/admin/users'\n    when 'quote_requests' then '/owner/materials/requests/' || coalesce(source_row ->> 'id', '')\n    when 'quote_comparisons' then '/admin/quote-comparison/' || coalesce(source_row ->> 'id', '')\n    when 'supplier_quotes' then '/admin/supplier-quotes/' || coalesce(source_row ->> 'id', '')\n    when 'workflow_manager_settings' then '/admin/vendors'\n    else '/admin/build-map'\n  end;\n  label := left(coalesce(\n    nullif(source_row ->> 'title', ''),\n    nullif(source_row ->> 'full_name', ''),\n    nullif(source_row ->> 'supplier_name', ''),\n    replace(initcap(tg_table_name), '_', ' ')\n  ), 160);\n\n  insert into public.manager_staff_activity_events (\n    user_id, event_type, page_path, page_label, entity_type, entity_id, metadata\n  ) values (\n    actor_id,\n    case tg_op when 'INSERT' then 'record_created' when 'DELETE' then 'record_deleted' else 'record_updated' end,\n    destination,\n    replace(initcap(tg_table_name), '_', ' '),\n    tg_table_name,\n    source_row ->> 'id',\n    jsonb_build_object('label', label)\n  );\n  if tg_op = 'DELETE' then return old; end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_manager_push",
+      "definition": "CREATE TRIGGER quote_comparisons_manager_push AFTER UPDATE OF client_quote_status ON public.quote_comparisons FOR EACH ROW EXECUTE FUNCTION queue_client_approval_push()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.queue_client_approval_push()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  if new.client_quote_status in ('accepted', 'approved')\n    and new.client_quote_status is distinct from old.client_quote_status then\n    perform public.queue_manager_push_event(\n      'quote_approval',\n      'Client approved a quote',\n      coalesce(nullif(new.title, ''), nullif(new.quote_number, ''), 'Open the request for details.'),\n      '/admin/quote-comparison/' || new.id::text,\n      'quote_approval:' || new.id::text || ':' || new.client_quote_status,\n      'avantia-quote-approval-' || new.id::text\n    );\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "set_quote_comparisons_updated_at",
+      "definition": "CREATE TRIGGER set_quote_comparisons_updated_at BEFORE UPDATE ON public.quote_comparisons FOR EACH ROW EXECUTE FUNCTION set_projects_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_projects_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "set_quote_request_items_updated_at",
+      "definition": "CREATE TRIGGER set_quote_request_items_updated_at BEFORE UPDATE ON public.quote_request_items FOR EACH ROW EXECUTE FUNCTION set_quote_workflow_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_quote_workflow_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "keep_quote_request_public_number",
+      "definition": "CREATE TRIGGER keep_quote_request_public_number BEFORE UPDATE OF public_number ON public.quote_requests FOR EACH ROW EXECUTE FUNCTION private.keep_quote_request_public_number()",
+      "function_definition": "CREATE OR REPLACE FUNCTION private.keep_quote_request_public_number()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  if new.public_number is distinct from old.public_number then\n    raise exception 'request_public_number_is_immutable';\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "manager_staff_activity_change",
+      "definition": "CREATE TRIGGER manager_staff_activity_change AFTER INSERT OR DELETE OR UPDATE ON public.quote_requests FOR EACH ROW EXECUTE FUNCTION log_manager_staff_record_change()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.log_manager_staff_record_change()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  actor_id uuid := auth.uid();\n  source_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;\n  destination text;\n  label text;\nbegin\n  if actor_id is null or not exists (\n    select 1 from public.profiles\n    where id = actor_id\n      and role in ('admin', 'staff')\n      and approval_status = 'approved'\n      and is_active = true\n  ) then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n  if tg_table_name = 'manager_goals' and source_row ->> 'title' = 'Employee activity' then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n\n  destination := case tg_table_name\n    when 'manager_goals' then '/admin/goals-progress'\n    when 'manager_outreach_leads' then '/admin/users'\n    when 'quote_requests' then '/owner/materials/requests/' || coalesce(source_row ->> 'id', '')\n    when 'quote_comparisons' then '/admin/quote-comparison/' || coalesce(source_row ->> 'id', '')\n    when 'supplier_quotes' then '/admin/supplier-quotes/' || coalesce(source_row ->> 'id', '')\n    when 'workflow_manager_settings' then '/admin/vendors'\n    else '/admin/build-map'\n  end;\n  label := left(coalesce(\n    nullif(source_row ->> 'title', ''),\n    nullif(source_row ->> 'full_name', ''),\n    nullif(source_row ->> 'supplier_name', ''),\n    replace(initcap(tg_table_name), '_', ' ')\n  ), 160);\n\n  insert into public.manager_staff_activity_events (\n    user_id, event_type, page_path, page_label, entity_type, entity_id, metadata\n  ) values (\n    actor_id,\n    case tg_op when 'INSERT' then 'record_created' when 'DELETE' then 'record_deleted' else 'record_updated' end,\n    destination,\n    replace(initcap(tg_table_name), '_', ' '),\n    tg_table_name,\n    source_row ->> 'id',\n    jsonb_build_object('label', label)\n  );\n  if tg_op = 'DELETE' then return old; end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_manager_push",
+      "definition": "CREATE TRIGGER quote_requests_manager_push AFTER INSERT OR UPDATE OF status ON public.quote_requests FOR EACH ROW EXECUTE FUNCTION queue_new_request_push()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.queue_new_request_push()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nbegin\n  if new.status <> 'draft' and (tg_op = 'INSERT' or old.status = 'draft') then\n    perform public.queue_manager_push_event(\n      'new_order',\n      'New material request',\n      coalesce(new.title, 'A customer submitted a material request.'),\n      '/owner/materials/requests/' || new.id::text,\n      'new_order:' || new.id::text,\n      'avantia-new-order-' || new.id::text\n    );\n  end if;\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "set_quote_requests_updated_at",
+      "definition": "CREATE TRIGGER set_quote_requests_updated_at BEFORE UPDATE ON public.quote_requests FOR EACH ROW EXECUTE FUNCTION set_quote_workflow_updated_at()",
+      "function_definition": "CREATE OR REPLACE FUNCTION public.set_quote_workflow_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n"
+    }
+  ],
+  "policies": [
+    {
+      "table_name": "profiles",
+      "name": "profiles_admin_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "( SELECT private.is_admin() AS is_admin)",
+      "with_check": "( SELECT private.is_admin() AS is_admin)"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(( SELECT auth.uid() AS uid) = id)",
+      "with_check": null
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_staff_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "( SELECT private.is_admin_or_staff() AS is_admin_or_staff)",
+      "with_check": null
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_admin_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "( SELECT private.is_admin_or_staff() AS is_admin_or_staff)",
+      "with_check": null
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_admin_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "( SELECT private.is_admin_or_staff() AS is_admin_or_staff)",
+      "with_check": "( SELECT private.is_admin_or_staff() AS is_admin_or_staff)"
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_insert_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(auth.uid() = owner_id)"
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_select_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "SELECT",
+      "qual": "(auth.uid() = owner_id)",
+      "with_check": null
+    },
+    {
+      "table_name": "projects",
+      "name": "projects_update_own",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "cmd": "UPDATE",
+      "qual": "(auth.uid() = owner_id)",
+      "with_check": "(auth.uid() = owner_id)"
+    },
+    {
+      "table_name": "quote_comparison_bids",
+      "name": "quote_comparison_bids_supplier_staff_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_comparisons comparison\n  WHERE (comparison.id = quote_comparison_bids.comparison_id))))",
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_comparisons comparison\n  WHERE (comparison.id = quote_comparison_bids.comparison_id))))"
+    },
+    {
+      "table_name": "quote_comparison_items",
+      "name": "quote_comparison_items_supplier_staff_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_comparisons comparison\n  WHERE (comparison.id = quote_comparison_items.comparison_id))))",
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_comparisons comparison\n  WHERE (comparison.id = quote_comparison_items.comparison_id))))"
+    },
+    {
+      "table_name": "quote_comparison_prices",
+      "name": "quote_comparison_prices_supplier_staff_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM (quote_comparison_bids bid\n     JOIN quote_comparison_items item ON ((item.comparison_id = bid.comparison_id)))\n  WHERE ((bid.id = quote_comparison_prices.bid_id) AND (item.id = quote_comparison_prices.item_id)))))",
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM (quote_comparison_bids bid\n     JOIN quote_comparison_items item ON ((item.comparison_id = bid.comparison_id)))\n  WHERE ((bid.id = quote_comparison_prices.bid_id) AND (item.id = quote_comparison_prices.item_id)))))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_supplier_staff_delete",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_supplier_staff_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability)) AND (created_by = ( SELECT auth.uid() AS uid)))"
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_supplier_staff_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_comparisons",
+      "name": "quote_comparisons_supplier_staff_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability))",
+      "with_check": "(( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('suppliers'::text) AS has_staff_capability))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_customer_staff_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('customers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_attachments.request_id) AND (request.project_id = quote_request_attachments.project_id) AND (request.owner_id = quote_request_attachments.owner_id)))))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_customer_staff_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('customers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_attachments.request_id) AND (request.project_id = quote_request_attachments.project_id) AND (request.owner_id = quote_request_attachments.owner_id)))))",
+      "with_check": "((( SELECT private.is_admin() AS is_admin) OR ( SELECT private.has_staff_capability('customers'::text) AS has_staff_capability)) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_attachments.request_id) AND (request.project_id = quote_request_attachments.project_id) AND (request.owner_id = quote_request_attachments.owner_id)))))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_owner_delete",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(((( SELECT auth.uid() AS uid) = owner_id) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_attachments.request_id) AND (request.owner_id = ( SELECT auth.uid() AS uid)) AND (request.status = 'draft'::text))))) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_owner_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((( SELECT auth.uid() AS uid) = owner_id) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_attachments.request_id) AND (request.owner_id = ( SELECT auth.uid() AS uid)) AND (request.status = 'draft'::text)))))"
+    },
+    {
+      "table_name": "quote_request_attachments",
+      "name": "quote_request_attachments_owner_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(((( SELECT auth.uid() AS uid) = owner_id) AND (source_party = ANY (ARRAY['client'::text, 'internal'::text]))) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_owner_delete",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "(((( SELECT auth.uid() AS uid) = owner_id) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_items.request_id) AND (request.owner_id = ( SELECT auth.uid() AS uid)) AND (request.status = 'draft'::text))))) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_owner_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(((( SELECT auth.uid() AS uid) = owner_id) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_items.request_id) AND (request.owner_id = ( SELECT auth.uid() AS uid)) AND (request.status = 'draft'::text))))) OR private.is_admin_or_staff())"
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_owner_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "((( SELECT auth.uid() AS uid) = owner_id) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_request_items",
+      "name": "quote_request_items_owner_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(((( SELECT auth.uid() AS uid) = owner_id) AND (EXISTS ( SELECT 1\n   FROM quote_requests request\n  WHERE ((request.id = quote_request_items.request_id) AND (request.owner_id = ( SELECT auth.uid() AS uid)) AND (request.status = 'draft'::text))))) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": "((( SELECT auth.uid() AS uid) = owner_id) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_owner_delete_empty_draft",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "((( SELECT auth.uid() AS uid) = owner_id) AND (status = 'draft'::text))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_owner_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(( SELECT auth.uid() AS uid) = owner_id)"
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_owner_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "((( SELECT auth.uid() AS uid) = owner_id) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": null
+    },
+    {
+      "table_name": "quote_requests",
+      "name": "quote_requests_owner_update_draft",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(((( SELECT auth.uid() AS uid) = owner_id) AND (status = 'draft'::text)) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))",
+      "with_check": "((( SELECT auth.uid() AS uid) = owner_id) OR ( SELECT private.is_admin_or_staff() AS is_admin_or_staff))"
+    }
+  ],
+  "helpers": [
+    {
+      "schema": "private",
+      "name": "has_staff_capability",
+      "definition": "CREATE OR REPLACE FUNCTION private.has_staff_capability(capability text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.profiles profile\n    join public.staff_access_grants access\n      on access.email = lower(trim(profile.email))\n    where profile.id = (select auth.uid())\n      and profile.role = 'staff'\n      and profile.approval_status = 'approved'\n      and profile.is_active = true\n      and access.active = true\n      and case capability\n        when 'customers' then access.can_manage_customers\n        when 'suppliers' then access.can_manage_suppliers\n        else false\n      end\n  );\n$function$\n"
+    },
+    {
+      "schema": "private",
+      "name": "is_admin",
+      "definition": "CREATE OR REPLACE FUNCTION private.is_admin()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.profiles\n    where id = (select auth.uid())\n      and role = 'admin'\n      and approval_status = 'approved'\n      and is_active = true\n  );\n$function$\n"
+    },
+    {
+      "schema": "private",
+      "name": "is_admin_or_staff",
+      "definition": "CREATE OR REPLACE FUNCTION private.is_admin_or_staff()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select private.is_admin() or private.is_staff();\n$function$\n"
+    },
+    {
+      "schema": "private",
+      "name": "is_staff",
+      "definition": "CREATE OR REPLACE FUNCTION private.is_staff()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.profiles\n    where id = (select auth.uid())\n      and role = 'staff'\n      and approval_status = 'approved'\n      and is_active = true\n  );\n$function$\n"
+    }
+  ]
+}

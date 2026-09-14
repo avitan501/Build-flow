@@ -1,0 +1,147 @@
+[
+  {
+    "table_name": "profiles",
+    "name": "profiles_approved_by_idx",
+    "definition": "CREATE INDEX profiles_approved_by_idx ON public.profiles USING btree (approved_by)"
+  },
+  {
+    "table_name": "projects",
+    "name": "projects_owner_id_idx",
+    "definition": "CREATE INDEX projects_owner_id_idx ON public.projects USING btree (owner_id)"
+  },
+  {
+    "table_name": "quote_comparison_bids",
+    "name": "quote_comparison_bids_comparison_idx",
+    "definition": "CREATE INDEX quote_comparison_bids_comparison_idx ON public.quote_comparison_bids USING btree (comparison_id, created_at)"
+  },
+  {
+    "table_name": "quote_comparison_bids",
+    "name": "quote_comparison_bids_source_quote_uidx",
+    "definition": "CREATE UNIQUE INDEX quote_comparison_bids_source_quote_uidx ON public.quote_comparison_bids USING btree (comparison_id, source_supplier_quote_id) WHERE (source_supplier_quote_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparison_items",
+    "name": "quote_comparison_items_comparison_idx",
+    "definition": "CREATE INDEX quote_comparison_items_comparison_idx ON public.quote_comparison_items USING btree (comparison_id, sort_order, created_at)"
+  },
+  {
+    "table_name": "quote_comparison_items",
+    "name": "quote_comparison_items_sort_order_uidx",
+    "definition": "CREATE UNIQUE INDEX quote_comparison_items_sort_order_uidx ON public.quote_comparison_items USING btree (comparison_id, sort_order)"
+  },
+  {
+    "table_name": "quote_comparison_items",
+    "name": "quote_comparison_items_source_request_uidx",
+    "definition": "CREATE UNIQUE INDEX quote_comparison_items_source_request_uidx ON public.quote_comparison_items USING btree (comparison_id, source_request_item_id) WHERE (source_request_item_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparison_items",
+    "name": "quote_comparison_items_source_request_idx",
+    "definition": "CREATE INDEX quote_comparison_items_source_request_idx ON public.quote_comparison_items USING btree (source_request_item_id) WHERE (source_request_item_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparison_prices",
+    "name": "quote_comparison_prices_item_idx",
+    "definition": "CREATE INDEX quote_comparison_prices_item_idx ON public.quote_comparison_prices USING btree (item_id)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_updated_idx",
+    "definition": "CREATE INDEX quote_comparisons_updated_idx ON public.quote_comparisons USING btree (updated_at DESC)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_project_idx",
+    "definition": "CREATE INDEX quote_comparisons_project_idx ON public.quote_comparisons USING btree (project_id, updated_at DESC) WHERE (project_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_quote_number_unique_idx",
+    "definition": "CREATE UNIQUE INDEX quote_comparisons_quote_number_unique_idx ON public.quote_comparisons USING btree (lower(quote_number))"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_client_idx",
+    "definition": "CREATE INDEX quote_comparisons_client_idx ON public.quote_comparisons USING btree (client_id, updated_at DESC) WHERE (client_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_request_idx",
+    "definition": "CREATE INDEX quote_comparisons_request_idx ON public.quote_comparisons USING btree (request_id) WHERE (request_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_created_by_idx",
+    "definition": "CREATE INDEX quote_comparisons_created_by_idx ON public.quote_comparisons USING btree (created_by)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_awarded_bid_idx",
+    "definition": "CREATE INDEX quote_comparisons_awarded_bid_idx ON public.quote_comparisons USING btree (awarded_bid_id) WHERE (awarded_bid_id IS NOT NULL)"
+  },
+  {
+    "table_name": "quote_comparisons",
+    "name": "quote_comparisons_one_active_per_request_idx",
+    "definition": "CREATE UNIQUE INDEX quote_comparisons_one_active_per_request_idx ON public.quote_comparisons USING btree (request_id) WHERE ((request_id IS NOT NULL) AND (status = ANY (ARRAY['draft'::text, 'review'::text])))"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_request_idx",
+    "definition": "CREATE INDEX quote_request_attachments_request_idx ON public.quote_request_attachments USING btree (request_id, created_at)"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_owner_idx",
+    "definition": "CREATE INDEX quote_request_attachments_owner_idx ON public.quote_request_attachments USING btree (owner_id)"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_project_idx",
+    "definition": "CREATE INDEX quote_request_attachments_project_idx ON public.quote_request_attachments USING btree (project_id)"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_item_idx",
+    "definition": "CREATE INDEX quote_request_attachments_item_idx ON public.quote_request_attachments USING btree (item_id)"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_material_response_idx",
+    "definition": "CREATE INDEX quote_request_attachments_material_response_idx ON public.quote_request_attachments USING btree (material_response_id)"
+  },
+  {
+    "table_name": "quote_request_attachments",
+    "name": "quote_request_attachments_request_source_created_idx",
+    "definition": "CREATE INDEX quote_request_attachments_request_source_created_idx ON public.quote_request_attachments USING btree (request_id, source_party, created_at DESC)"
+  },
+  {
+    "table_name": "quote_request_items",
+    "name": "quote_request_items_request_idx",
+    "definition": "CREATE INDEX quote_request_items_request_idx ON public.quote_request_items USING btree (request_id, created_at)"
+  },
+  {
+    "table_name": "quote_request_items",
+    "name": "quote_request_items_owner_idx",
+    "definition": "CREATE INDEX quote_request_items_owner_idx ON public.quote_request_items USING btree (owner_id)"
+  },
+  {
+    "table_name": "quote_request_items",
+    "name": "quote_request_items_project_idx",
+    "definition": "CREATE INDEX quote_request_items_project_idx ON public.quote_request_items USING btree (project_id)"
+  },
+  {
+    "table_name": "quote_requests",
+    "name": "quote_requests_project_idx",
+    "definition": "CREATE INDEX quote_requests_project_idx ON public.quote_requests USING btree (project_id, created_at DESC)"
+  },
+  {
+    "table_name": "quote_requests",
+    "name": "quote_requests_owner_idx",
+    "definition": "CREATE INDEX quote_requests_owner_idx ON public.quote_requests USING btree (owner_id, created_at DESC)"
+  },
+  {
+    "table_name": "quote_requests",
+    "name": "quote_requests_public_number_uidx",
+    "definition": "CREATE UNIQUE INDEX quote_requests_public_number_uidx ON public.quote_requests USING btree (public_number)"
+  }
+]
