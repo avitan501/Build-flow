@@ -119,7 +119,7 @@ Deno.serve(async (request) => {
 
     const { data: comparison } = await admin
       .from("quote_comparisons")
-      .select("id,quote_number,client_name_snapshot,client_email_snapshot,job_address,client_message,client_delivery_charge,client_tax_percent,awarded_bid_id")
+      .select("id,quote_number,client_name_snapshot,client_email_snapshot,job_address,client_message,client_delivery_charge,client_tax_percent,awarded_bid_id,active_route_id")
       .eq("id", requestId)
       .maybeSingle<{
         id: string
@@ -131,7 +131,11 @@ Deno.serve(async (request) => {
         client_delivery_charge: number
         client_tax_percent: number
         awarded_bid_id: string | null
+        active_route_id: string | null
       }>()
+    // An older awarded bid can remain as history after mixed-route finalization.
+    // Omitting routeId must never fall back around the immutable dispatch claim.
+    if (comparison?.active_route_id) return json({ error: "mixed_quote_requires_route_claim" }, 409)
     if (!comparison?.awarded_bid_id) return json({ error: "quote_not_ready" }, 400)
     const recipientEmail = comparison.client_email_snapshot.trim().toLowerCase()
     if (!/^\S+@\S+\.\S+$/.test(recipientEmail)) return json({ error: "client_email_required" }, 400)
