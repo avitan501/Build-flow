@@ -482,7 +482,7 @@ export async function awardQuoteComparisonBidAction(input: {
   const weakMatch = (itemsResult.data ?? []).find((item) => {
     const sourceDescription = prices.get(item.id)?.notes ?? "";
     const matchStatus = quoteLineMatchStatus(item, sourceDescription);
-    return sourceDescription && matchStatus !== "exact" && matchStatus !== "manual";
+    return matchStatus !== "exact";
   });
   if (weakMatch) return { ok: false, error: `Review the supplier match for ${weakMatch.description} before selecting this supplier.` };
 

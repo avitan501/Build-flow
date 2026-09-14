@@ -540,11 +540,21 @@ function normalizedMatchText(value: string) {
 }
 
 export function quoteLineMatchStatus(item: Pick<QuoteComparisonItemRecord, "description" | "specification">, supplierDescription: string): QuoteLineMatchStatus {
+  // Free-text containment is not product verification. Preserve dimension punctuation:
+  // 1/2, 1-2 and 12 must never collapse into an automatically equivalent product.
+  const literal = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
+  const suppliedLiteral = literal(supplierDescription);
+  const requestedLiteral = literal(`${item.description} ${item.specification}`);
+  if (!suppliedLiteral || !requestedLiteral) return "review";
+  // Negation, alternatives and an explicit selling basis need a human price/unit review,
+  // even when the requested product wording also appears in the supplier's line.
+  if (/\b(not available|unavailable|substitut\w*|alternative|instead|equivalent|replacement|out of stock|back\s?order\w*|not included|exclud\w*)\b/i.test(supplierDescription)
+    || /\b(?:per|by the|sold as|priced as)\s+\w+|\/\s*(?:ea(?:ch)?|pc|piece|box|pack|bundle|case|pallet|roll|sheet|ft|sf|lf|sq\.?\s*ft)\b/i.test(supplierDescription)) return "review";
+  if (suppliedLiteral === requestedLiteral) return "exact";
   const source = normalizedMatchText(supplierDescription);
-  if (!source) return "manual";
+  if (!source) return "review";
   const requestedDescription = normalizedMatchText(item.description);
   const requestedFull = normalizedMatchText(`${item.description} ${item.specification}`);
-  if (source === requestedFull || source.includes(requestedFull) || (!item.specification.trim() && source === requestedDescription)) return "exact";
   if (source === requestedDescription || requestedFull.includes(source)) return "possible";
 
   const requestedWords = new Set(requestedFull.split(" ").filter((word) => word.length > 1));

@@ -216,10 +216,11 @@ test("mixed option is omitted when it duplicates a single supplier order", () =>
 });
 
 test("supplier line matching distinguishes exact, possible, review, and manual prices", () => {
-  expect(quoteLineMatchStatus(items[0], "2 x 4 studs 10 ft")).toBe("exact");
+  expect(quoteLineMatchStatus(items[0], `${items[0].description} ${items[0].specification}`)).toBe("exact");
+  expect(quoteLineMatchStatus(items[0], "2 x 4 studs 10 ft")).not.toBe("exact");
   expect(quoteLineMatchStatus(items[0], "2 x 4 studs")).toBe("possible");
   expect(quoteLineMatchStatus(items[0], "SPF framing lumber")).toBe("review");
-  expect(quoteLineMatchStatus(items[0], "")).toBe("manual");
+  expect(quoteLineMatchStatus(items[0], "")).toBe("review");
 });
 
 test("manager navigation and migration enforce supplier-scoped access", async () => {

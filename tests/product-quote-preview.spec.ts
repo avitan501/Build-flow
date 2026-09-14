@@ -6,7 +6,7 @@ function item(id: string, quantity = 2): QuoteComparisonItemRecord {
   return { id, comparison_id: "comparison", description: id, specification: "", quantity, unit: "each", markup_percent: 0, client_unit_price: null, sort_order: 0, created_at: "", updated_at: "" };
 }
 function bid(id: string, prices: Array<[string, number | null, boolean?, string?]>): QuoteComparisonBidRecord {
-  return { id, comparison_id: "comparison", supplier_id: id, supplier_name_snapshot: id, trust_level_snapshot: "verified", delivery_charge: 500, tax_amount: 0, tax_percent: 10, lead_time_days: null, notes: "", status: "received", created_at: "", updated_at: "", quote_comparison_prices: prices.map(([item_id, unit_price, is_available = true, notes = ""]) => ({ bid_id: id, item_id, unit_price, is_available, notes })) };
+  return { id, comparison_id: "comparison", supplier_id: id, supplier_name_snapshot: id, trust_level_snapshot: "verified", delivery_charge: 500, tax_amount: 0, tax_percent: 10, lead_time_days: null, notes: "", status: "received", created_at: "", updated_at: "", quote_comparison_prices: prices.map(([item_id, unit_price, is_available = true, notes = item_id]) => ({ bid_id: id, item_id, unit_price, is_available, notes })) };
 }
 
 test("lowest selections are per product and exclude delivery and tax from draft materials subtotal", () => {
@@ -66,4 +66,19 @@ test("draft choices become unselected if a later edit makes their price unsafe",
   expect(buildProductQuotePreview(items, [bid("A", [["Valve", 2]])], { Valve: "A" }).selectedCount).toBe(1);
   expect(buildProductQuotePreview(items, [bid("A", [["Valve", null]])], { Valve: "A" }).selectedCount).toBe(0);
   expect(buildProductQuotePreview(items, [], { Valve: "A" }).materialSubtotal).toBe(0);
+});
+
+test("missing source, negation, package basis and differing dimension punctuation never auto-match", () => {
+  const requested = { ...item("Copper pipe"), specification: "1 inch", quantity: 10 };
+  for (const wording of ["", "Copper pipe 1 inch NOT AVAILABLE; substitute 3/4 inch", "Copper pipe 1 inch; price per bundle of 10", "Copper pipe 1 inch / box", "Copper pipe 1 inch alternative"] ) {
+    const result = buildProductQuotePreview([requested], [bid("supplier", [[requested.id, 20, true, wording]])], { [requested.id]: "supplier" });
+    expect(result.rows[0].offers[0].matchStatus).not.toBe("exact");
+    expect(result.rows[0].offers[0].eligible).toBe(false);
+    expect(result.cheapestSelections).toEqual({});
+    expect(result.selectedCount).toBe(0);
+  }
+  const fractional = { ...requested, specification: "1/2 inch" };
+  expect(buildProductQuotePreview([fractional], [bid("supplier", [[fractional.id, 20, true, "Copper pipe 1-2 inch"]])]).comparableCount).toBe(0);
+  expect(buildProductQuotePreview([requested], [bid("supplier", [[requested.id, 20, true, " Copper pipe  1 inch "]])]).comparableCount).toBe(1);
+  expect(buildProductQuotePreview([{ ...requested, unit: "" }], [bid("supplier", [[requested.id, 20, true, "Copper pipe 1 inch"]])]).comparableCount).toBe(0);
 });

@@ -5,7 +5,7 @@ import type { QuoteComparisonItemRecord, QuoteComparisonBidRecord } from "../lib
 
 const item = {id:"item",description:"Valve",specification:"",quantity:2,unit:"each"} as QuoteComparisonItemRecord;
 const bid = {id:"bid",supplier_id:"supplier",supplier_name_snapshot:"Supplier",trust_level_snapshot:"verified",status:"received",
-  quote_comparison_prices:[{bid_id:"bid",item_id:"item",unit_price:12,is_available:true,notes:""}]} as QuoteComparisonBidRecord;
+  quote_comparison_prices:[{bid_id:"bid",item_id:"item",unit_price:12,is_available:true,notes:"Valve"}]} as QuoteComparisonBidRecord;
 test("raw choices accept intentional clear but reject malformed and oversized maps",()=>{
   expect(parseProductChoiceDraft({version:1,selections:{item:""}})).toEqual({version:1,selections:{item:""}});
   expect(parseProductChoiceDraft({version:1,selections:[]})).toBeNull();

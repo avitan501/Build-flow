@@ -8,7 +8,7 @@ export function buildProductQuotePreview(items: QuoteComparisonItemRecord[], bid
       const price = bid.quote_comparison_prices?.find((entry) => entry.item_id === item.id);
       const unitPrice = price?.unit_price != null && Number.isFinite(price.unit_price) && price.unit_price >= 0 ? price.unit_price : null;
       const matchStatus = quoteLineMatchStatus(item, price?.notes ?? "");
-      const status = price?.is_available === false ? "unavailable" : unitPrice === null ? "unknown" : ["possible", "review"].includes(matchStatus) ? "review" : "priced";
+      const status = price?.is_available === false ? "unavailable" : price?.is_available !== true || unitPrice === null ? "unknown" : matchStatus !== "exact" || !item.unit?.trim() ? "review" : "priced";
       const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
       return { bid, unitPrice, lineTotal: validQuantity && unitPrice !== null ? Math.round(unitPrice * item.quantity * 100) / 100 : null, status, matchStatus, eligible: status === "priced" && !blocked && validQuantity, blocked };
     });

@@ -17,7 +17,7 @@ const componentSource = ts.transpileModule(readFileSync("components/buildflow/pr
 new Function("exports", "require", componentSource)(serverExports, (id: string) => id === "@/lib/quote-comparison" ? { formatComparisonMoney } : localRequire(id))
 
 const item: QuoteComparisonItemRecord = { id: "valve", comparison_id: "comparison", description: "Control valve with a very long manufacturer product name", specification: "4 in · threaded · exact requested specification", quantity: 2, unit: "each", markup_percent: 0, client_unit_price: null, sort_order: 0, created_at: "", updated_at: "" }
-function bid(id: string, price: number | null, available = true, notes = ""): QuoteComparisonBidRecord {
+function bid(id: string, price: number | null, available = true, notes = `${item.description} ${item.specification}`): QuoteComparisonBidRecord {
   return { id, comparison_id: "comparison", supplier_id: id, supplier_name_snapshot: id, trust_level_snapshot: "verified", delivery_charge: 0, tax_amount: 0, tax_percent: 0, lead_time_days: null, notes: "", status: "received", created_at: "", updated_at: "", quote_comparison_prices: [{ bid_id: id, item_id: item.id, unit_price: price, is_available: available, notes }] }
 }
 const bids = [bid("higher", 20), bid("unknown", null), bid("lowest", 10), bid("review", 1, true, "Unrelated product"), bid("unavailable", null, false)]
@@ -79,7 +79,8 @@ test("workspace keeps draft warning and existing cheapest computation, not award
 })
 
 for (const width of [390,1440]) test(`product accordion opens only one product and preserves review evidence at ${width}px`, async ({page})=>{
-  const css=readdirSync(".next/static/css").filter(name=>name.endsWith(".css")).map(name=>readFileSync(`.next/static/css/${name}`,"utf8")).join("\n")
+  const cssRoot=process.env.PLAYWRIGHT_FIXTURE_CSS_ROOT || ".next/static/css"
+  const css=readdirSync(cssRoot).filter(name=>name.endsWith(".css")).map(name=>readFileSync(`${cssRoot}/${name}`,"utf8")).join("\n")
   const first=renderToStaticMarkup(createElement(serverExports.ProductQuoteCard,{row:row(),onSelect:()=>{},onClear:()=>{}}))
   const second=renderToStaticMarkup(createElement(serverExports.ProductQuoteCard,{row:{...row(),item:{...item,id:"second",description:"Second requested product"}},onSelect:()=>{},onClear:()=>{}}))
   await page.setViewportSize({width,height:900})
@@ -96,4 +97,20 @@ for (const width of [390,1440]) test(`product accordion opens only one product a
   await expect(cards.nth(0).getByText("Unrelated product",{exact:true})).not.toBeVisible()
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:`/tmp/step2-product-accordion-${width}.png`,fullPage:true})
+})
+
+for (const width of [390,1440]) test(`missing source never gets lowest badge or selectable price at ${width}px`, async ({page})=>{
+  const cssRoot=process.env.PLAYWRIGHT_FIXTURE_CSS_ROOT || ".next/static/css"
+  const css=readdirSync(cssRoot).filter(name=>name.endsWith(".css")).map(name=>readFileSync(`${cssRoot}/${name}`,"utf8")).join("\n")
+  const missingRow=buildProductQuotePreview([item],[bid("Supplier quote",12,true,"")]).rows[0]
+  const html=renderToStaticMarkup(createElement(serverExports.ProductQuoteCard,{row:missingRow,onSelect:()=>{},onClear:()=>{}}))
+  await page.setViewportSize({width,height:900})
+  await page.setContent(`<style>${css}</style><main style="max-width:1000px;margin:auto;padding:16px">${html}</main>`)
+  await page.locator("summary").click()
+  await expect(page.getByText("Source wording not recorded")).toBeVisible()
+  await expect(page.getByText("Match needs review · excluded")).toBeVisible()
+  await expect(page.getByText("Lowest eligible price")).toHaveCount(0)
+  await expect(page.getByRole("radio")).toBeDisabled()
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await page.screenshot({path:`/tmp/step2-safe-missing-source-${width}.png`,fullPage:true})
 })

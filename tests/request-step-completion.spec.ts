@@ -9,7 +9,7 @@ function comparisonItem(source = request): QuoteComparisonItemRecord {
   return { id: `comparison-${source.id}`, comparison_id: "comparison", source_request_item_id: source.id, description: source.name, specification: requestItemSpecification(source.metadata, source.department), quantity: source.quantity, unit: source.unit!, markup_percent: 0, client_unit_price: null, sort_order: 0, created_at: "", updated_at: "" }
 }
 function bid(items = [comparisonItem()]): QuoteComparisonBidRecord {
-  return { id: "bid", comparison_id: "comparison", supplier_id: "supplier", supplier_name_snapshot: "Supply A", trust_level_snapshot: "verified", delivery_charge: 0, tax_amount: 0, tax_percent: 0, lead_time_days: 0, notes: "", status: "awarded", created_at: "", updated_at: "", quote_comparison_prices: items.map((item) => ({ bid_id: "bid", item_id: item.id, unit_price: 0, is_available: true, notes: "" })) }
+  return { id: "bid", comparison_id: "comparison", supplier_id: "supplier", supplier_name_snapshot: "Supply A", trust_level_snapshot: "verified", delivery_charge: 0, tax_amount: 0, tax_percent: 0, lead_time_days: 0, notes: "", status: "awarded", created_at: "", updated_at: "", quote_comparison_prices: items.map((item) => ({ bid_id: "bid", item_id: item.id, unit_price: 0, is_available: true, notes: `${item.description} ${item.specification}`.trim() })) }
 }
 
 test("step1 accepts ready discrete originals without requiring AI", () => {
@@ -70,6 +70,6 @@ test("step2 requires existing award eligibility without adding an optional lead-
   expect(requestStep2CompletionError([request], [comparisonItem()], { ...bid(), lead_time_days: null })).toBeNull()
 })
 test("step2 rejects unresolved product matches but accepts exact saved matching", () => {
-  for (const notes of ["Valve", "Unrelated item"]) expect(requestStep2CompletionError([request], [comparisonItem()], { ...bid(), quote_comparison_prices: [{ ...bid().quote_comparison_prices![0], notes }] })).toContain("Confirm 1")
+  for (const notes of ["", "Valve", "Unrelated item"]) expect(requestStep2CompletionError([request], [comparisonItem()], { ...bid(), quote_comparison_prices: [{ ...bid().quote_comparison_prices![0], notes }] })).toContain("Confirm 1")
   expect(requestStep2CompletionError([request], [comparisonItem()], { ...bid(), quote_comparison_prices: [{ ...bid().quote_comparison_prices![0], notes: "Valve Plumbing" }] })).toBeNull()
 })
