@@ -18,7 +18,7 @@
 - Optional AI training/model details collapsed; safety decision/review indicators remain visible.
 - Message body drafts persist in the current browser tab, scoped by signed-in account, channel and recipient address. Address keys survive directory name/link remapping. A new-message composer has one reusable buffer per channel until sent; it does not create a separate draft for every edit of its recipient field.
 - A successful send clears only the submitted text, not newer text typed during the request. Failed sends retain text. AI generation and request invitations explicitly write to their destination channel/address when changing composer channel in the same render batch.
-- Files are not persisted and are cleared when switching conversation/channel, avoiding accidental cross-recipient attachments. Subject edits are not persisted; the UI deliberately says **Text draft**.
+- Files are not persisted and are cleared when switching conversation/channel, choosing/editing a new recipient, or generating a reply/invitation that sets its destination. File selection/removal and recipient edits are disabled while an action is pending, avoiding an async send clearing a newly selected attachment. Subject edits are not persisted; the UI deliberately says **Text draft**.
 - Directory cache is scoped to the signed-in account; blocked browser storage has an in-memory draft fallback.
 
 ## Files
@@ -33,7 +33,7 @@
 
 ## Evidence
 
-- 31 focused communications tests passed (history, image preview, next action, control system, mobile new-conversation target and simplification).
+- 32 focused communications tests passed (history, image preview, next action, control system, mobile new-conversation target and simplification), including the final attachment-boundary source regression.
 - 15 affected tests rerun after final explicit AI draft destination fix: passed.
 - 23 standard release regression tests: passed.
 - 7 deployment guard tests: passed.

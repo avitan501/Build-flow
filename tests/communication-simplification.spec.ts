@@ -69,3 +69,13 @@ test("drafts and directory cache are scoped to the signed-in account", async () 
   expect(hook).toContain("sessionStorage.setItem")
   expect(hook).not.toContain("localStorage")
 })
+
+test("attachment selection cannot race a send or cross an AI destination switch", async () => {
+  const inbox = await readFile("components/buildflow/unified-communication-inbox.tsx", "utf8")
+  expect(inbox).toMatch(/ref=\{attachmentInputRef\}\s+type="file"\s+disabled=\{pending\}/)
+  for (const [start, end] of [["function prepareAiReply()", "function reviewMessageForRequest"], ["function createRequestFromReview()", "function quickTag"], ["function selectNewRecipient(", "function changeChannel("]]) {
+    const handler = inbox.slice(inbox.indexOf(start), inbox.indexOf(end))
+    expect(handler).toContain("setAttachments([])")
+    expect(handler).toContain('attachmentInputRef.current.value = ""')
+  }
+})

@@ -972,6 +972,8 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       }
       const replyChannel = incoming.channel === "whatsapp" ? "whatsapp" : "sms"
       const replyPhone = activeConversation?.phone || ""
+      setAttachments([])
+      if (attachmentInputRef.current) attachmentInputRef.current.value = ""
       setChannel(replyChannel)
       setRecipient(replyPhone)
       setMessage(result.reply, `${replyChannel}:${normalizeAuraPhone(replyPhone) || replyPhone}`)
@@ -1010,6 +1012,8 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       }
       setRequestReview(null)
       setConfirmationCommunicationId("")
+      setAttachments([])
+      if (attachmentInputRef.current) attachmentInputRef.current.value = ""
       setChannel("sms")
       setRecipient(requestReview.phone)
       setMessage(result.invitation, `sms:${normalizeAuraPhone(requestReview.phone) || requestReview.phone}`)
@@ -1083,11 +1087,15 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function newWhatsAppConversation() {
+    if (pending) return
     newConversation()
     setChannel("whatsapp")
   }
 
   function selectNewRecipient(id: string) {
+    if (pending) return
+    setAttachments([])
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setSelectedRecipientId(id)
     const entry = recipientOptions.find((item) => item.id === id)
     setRecipient(channel === "email" ? entry?.email || "" : channel === "whatsapp" ? entry?.whatsapp || entry?.phone || "" : entry?.phone || entry?.whatsapp || "")
@@ -1618,7 +1626,10 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                 </label>
                 <select
                   value={recipientType}
+                  disabled={pending}
                   onChange={(event) => {
+                    setAttachments([])
+                    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
                     setRecipientType(event.target.value as Exclude<ContactKind, "contact">)
                     setSelectedRecipientId("")
                     setRecipient("")
@@ -1629,7 +1640,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                   <option value="lead">Leads</option>
                   <option value="supplier">Suppliers / Vendors</option>
                 </select>
-                <select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm">
+                <select disabled={pending} value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm">
                   <option value="">Choose a contact</option>
                   {recipientOptions.map((item) => (
                     <option key={item.key} value={item.id}>
@@ -1643,7 +1654,10 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                 <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">{selectedRecipientId ? "Selected recipient" : channel === "email" ? "Email address" : "Phone number"}</span>
                 <input
                   value={recipient}
+                  disabled={pending}
                   onChange={(event) => {
+                    setAttachments([])
+                    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
                     setRecipient(event.target.value)
                     setSelectedRecipientId("")
                     setFeedback(null)
@@ -2127,6 +2141,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                     <input
                       ref={attachmentInputRef}
                       type="file"
+                      disabled={pending}
                       multiple={channel !== "sms"}
                       accept={channel === "sms" ? ".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" : ".pdf,.jpg,.jpeg,.png,.webp"}
                       className="sr-only"
@@ -2160,6 +2175,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                     </span>
                     <button
                       type="button"
+                      disabled={pending}
                       onClick={() => {
                         setAttachments([])
                         if (attachmentInputRef.current) attachmentInputRef.current.value = ""
