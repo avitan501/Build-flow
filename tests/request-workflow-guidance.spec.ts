@@ -8,6 +8,11 @@ const guide = (changes: Partial<RequestWorkflowStateInput> = {}, blocker: string
 test("all requests share exactly three reachable stages", () => {
   expect(REQUEST_GUIDE_STEPS.map(step => step.id)).toEqual(["request-items-heading", "request-supplier-quotes", "request-client-delivery"])
 })
+test("a reviewed list advances to supplier selection in step2", () => {
+  expect(REQUEST_GUIDE_STEPS[0].description).not.toContain("supplier")
+  expect(REQUEST_GUIDE_STEPS[1].description).toContain("Choose suppliers")
+  expect(guide()).toMatchObject({ step: 2, text: "Choose suppliers for the items.", waiting: false })
+})
 test("unresolved list takes priority over later pricing evidence", () => {
   expect(guide({ winningSupplierSelected: true }, "Review 2 materials.")).toMatchObject({ step: 1, text: "Review 2 materials." })
   for (const status of ["queued", "processing", "retrying"]) expect(guide({}, "Pending", status)).toMatchObject({ step: 1, waiting: true })

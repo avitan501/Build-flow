@@ -30,10 +30,9 @@ function currentItemsError(requestItems: ReviewableMaterialItem[]) {
 }
 
 export function requestStep1CompletionError(requestItems: ReviewableMaterialItem[]): string | null {
-  const error = currentItemsError(requestItems)
-  if (error) return error
-  const unrouted = effectiveRequestComparisonItems(requestItems).filter((item) => !Array.isArray(item.metadata?.supplier_route_names) || !item.metadata.supplier_route_names.some((name) => typeof name === "string" && Boolean(name.trim())))
-  return unrouted.length ? `Choose a supplier for ${unrouted.length} material(s).` : null
+  // Supplier selection belongs to Step 2, so a reviewed list can finish Step 1
+  // before any supplier has been chosen. Source/specification guards stay intact.
+  return currentItemsError(requestItems)
 }
 
 export function requestStep2CompletionError(

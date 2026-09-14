@@ -1,8 +1,8 @@
 import type { RequestWorkflowState } from "./request-workflow-state"
 
 export const REQUEST_GUIDE_STEPS = [
-  { id: "request-items-heading", label: "Items", description: "Review the list, then choose suppliers by group or item." },
-  { id: "request-supplier-quotes", label: "Supplier quotes", description: "Request prices, add replies, then compare and select." },
+  { id: "request-items-heading", label: "Items", description: "Review the products, quantities and missing details." },
+  { id: "request-supplier-quotes", label: "Supplier quotes", description: "Choose suppliers by group or item, then compare their prices." },
   { id: "request-client-delivery", label: "Client & delivery", description: "Estimate → approval → payment → receipt → schedule delivery." },
 ] as const
 

@@ -30,10 +30,10 @@ test("step1 validates actual quantity/unit rather than UI fallback defaults", ()
   for (const unit of [null, "", "unknown", "unspecified", "n/a"]) expect(requestStep1CompletionError([{ ...request, unit }])).toContain("unit")
   expect(requestStep1CompletionError([{ ...request, name: " " }])).toContain("name")
 })
-test("step1 requires review and an actual nonempty named supplier route for each row", () => {
+test("step1 requires review but leaves supplier routing to step2", () => {
   expect(requestStep1CompletionError([{ ...request, metadata: { ...request.metadata, review_status: "check" } }])).toContain("Review 1")
   expect(requestStep1CompletionError([{ ...request, metadata: { ...request.metadata, needs_review: true } }])).toContain("Review 1")
-  for (const routes of [undefined, [], [" "], [123]]) expect(requestStep1CompletionError([{ ...request, metadata: { supplier_route_names: routes } }])).toContain("Choose a supplier for 1")
+  for (const routes of [undefined, [], [" "], [123]]) expect(requestStep1CompletionError([{ ...request, metadata: { supplier_route_names: routes } }])).toBeNull()
 })
 test("step2 accepts exact current saved coverage with valid zero prices and metadata", () => {
   expect(requestStep2CompletionError([request], [comparisonItem()], bid())).toBeNull()
