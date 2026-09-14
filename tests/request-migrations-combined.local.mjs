@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 const meta = JSON.parse(read('tests/fixtures/request-schema-metadata-20260914.json'));
@@ -9,6 +10,11 @@ const indexes = JSON.parse(read('tests/fixtures/request-schema-indexes-20260914.
 const grants = JSON.parse(read('tests/fixtures/request-schema-grants-20260914.json'));
 const database = `noam_combined_${Date.now()}`;
 const container = 'avantia-noam-match-20260914';
+// Capture the optional candidate once; reject a mismatched frozen hash rather
+// than accidentally test a moving worktree under a previous version label.
+const mixed = process.argv[2] ? readFileSync(process.argv[2],'utf8') : null;
+const mixedHash = mixed === null ? null : createHash('sha256').update(mixed).digest('hex');
+if(process.argv[3]) assert.equal(mixedHash,process.argv[3],'Mixed candidate changed before rehearsal');
 function sql(text, db = database) {
  const result = spawnSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1','-At'], {input:text,encoding:'utf8'});
  assert.equal(result.status,0,result.stderr); return result.stdout.trim();
@@ -43,13 +49,18 @@ try {
  }
  for(const definition of new Set(meta.triggers.map(t=>t.function_definition))) sql(definition);
  for(const t of meta.triggers) sql(t.definition+';');
+ for(const fn of JSON.parse(read('tests/fixtures/request-legacy-functions-20260914.json'))) sql(fn.definition);
+ sql('grant execute on function public.staff_reopen_quote_comparison(uuid) to authenticated;');
  // Replay captured table grants, then apply pending migration grants/revokes.
  sql(grants.map(g=>`grant ${g.privilege_type} on public.${quote(g.table_name)} to ${quote(g.grantee)};`).join('\n'));
  sql(`grant usage,select on all sequences in schema public to service_role,authenticated;`);
  for(const migration of migrations) { sql('begin;\n'+read('supabase/migrations/'+migration)+'\ncommit;'); console.log('Installed '+migration); }
  // Optional future frozen mixed migration can be rehearsed on this same baseline.
- if(process.argv[2]) { sql(readFileSync(process.argv[2],'utf8')); console.log('Installed optional mixed migration'); }
+ if(mixed !== null) {
+  sql(mixed); console.log('Installed mixed migration SHA256 '+mixedHash);
+ }
  sql(read('tests/request-migrations-combined.local.sql'));
+ if(process.argv[2]) { sql(read('tests/request-mixed-client-flow.local.sql')); console.log('PASS: mixed A/B allocation, displayed client CAS, claim and bypass guards'); }
  console.log('PASS: combined schema, roles, receipt/source fence, choices and trusted match interactions');
  console.log(sql(`select 'constraints='||count(*) from pg_constraint where connamespace='public'::regnamespace; select 'triggers='||count(*) from pg_trigger where not tgisinternal and tgrelid in(select oid from pg_class where relnamespace='public'::regnamespace);`));
 } finally { sql(`drop database ${database} with (force);`,'postgres'); }

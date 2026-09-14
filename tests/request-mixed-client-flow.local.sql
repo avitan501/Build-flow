@@ -1,0 +1,64 @@
+-- Extends the first-five synthetic fixtures, retaining live constraints/triggers.
+set test.actor='';
+insert into auth.users values('00000000-0000-4000-8000-000000000004','client@example.invalid');
+insert into profiles(id,email,role,approval_status,full_name) values('00000000-0000-4000-8000-000000000004','client@example.invalid','client','approved','Synthetic client');
+insert into quote_request_items(id,request_id,project_id,owner_id,name,department,item_type,quantity,unit) values('00000000-0000-4000-8000-000000000035','00000000-0000-4000-8000-000000000020','00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001','Pipe','Plumbing','material',1,'each');
+insert into quote_comparison_items(id,comparison_id,source_request_item_id,description,quantity,sort_order) values('00000000-0000-4000-8000-000000000036','00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000035','Pipe',1,1);
+update quote_comparison_items set description='Reviewed valve' where id='00000000-0000-4000-8000-000000000031';
+update quote_comparison_bids set delivery_charge=10,tax_percent=10,supplier_id='supplier-a:quote-1' where id='00000000-0000-4000-8000-000000000032';
+update quote_comparison_prices set unit_price=20,notes='Reviewed valve';
+insert into quote_comparison_bids(id,comparison_id,supplier_id,supplier_name_snapshot,trust_level_snapshot,delivery_charge,tax_percent,lead_time_days) values('00000000-0000-4000-8000-000000000037','00000000-0000-4000-8000-000000000030','supplier-b:quote-2','Synthetic B','verified',20,5,3);
+insert into quote_comparison_prices(bid_id,item_id,unit_price,notes) values('00000000-0000-4000-8000-000000000037','00000000-0000-4000-8000-000000000036',30,'Pipe');
+update quote_comparisons set product_choice_draft='{"version":1,"selections":{"00000000-0000-4000-8000-000000000031":"00000000-0000-4000-8000-000000000032","00000000-0000-4000-8000-000000000036":"00000000-0000-4000-8000-000000000037"}}',product_choice_draft_source_fingerprint=repeat('b',64);
+set role service_role;
+do $$declare raw jsonb;route uuid;result jsonb;before_client jsonb;after_client jsonb;items jsonb;manifest jsonb;begin
+ manifest:=jsonb_build_array(jsonb_build_object('filename','synthetic.pdf','sha256',repeat('d',64),'bytes',100));
+ select jsonb_agg(jsonb_build_object('id',id,'name',name,'department',department,'quantity',quantity,'unit',unit,'metadata',metadata,'qualification_status',qualification_status) order by id) into raw from quote_request_items;
+ result:=staff_finalize_quote_comparison_route('00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000002',(select product_choice_draft_revision from quote_comparisons),repeat('b',64),'00000000-0000-4000-8000-000000000050',raw);
+ route:=(result->>'routeId')::uuid;
+ assert route is not null,'missing finalized route';
+ assert (select count(*)=2 from quote_comparison_route_suppliers),'supplier allocations collapsed';
+ assert (select count(*)=2 from quote_comparison_route_items),'material allocation missing';
+ assert (select material_subtotal=70 and delivery_total=30 and supplier_tax_total=7.50 and landed_total=107.50 from quote_comparison_routes where id=route),'incorrect A/B supplier landed totals';
+ assert (select lead_time_days is null from quote_comparison_route_suppliers where supplier_id='supplier-a'),'unknown lead time inferred';
+ assert quote_finalized_route_is_current('00000000-0000-4000-8000-000000000030',route),'fresh route falsely stale';
+ before_client:=finalized_route_client_snapshot('00000000-0000-4000-8000-000000000030');
+ items:='[{"item_id":"00000000-0000-4000-8000-000000000031","markup_percent":25,"client_unit_price":25},{"item_id":"00000000-0000-4000-8000-000000000036","markup_percent":20,"client_unit_price":36}]';
+ after_client:=staff_save_finalized_route_client_quote('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004','TEST-AB-QUOTE',null,'Synthetic message',30,8.875,items,before_client);
+ assert after_client is distinct from before_client,'client save did not return new CAS';
+ assert (select client_quote_status='ready' from quote_comparisons),'client quote not ready';
+ assert quote_finalized_route_is_current('00000000-0000-4000-8000-000000000030',route),'client pricing invalidated unchanged procurement';
+ begin perform staff_save_finalized_route_client_quote('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000004','STALE-QUOTE',null,'Stale message',30,8.875,items,before_client);raise exception 'stale displayed CAS accepted';exception when raise_exception then assert sqlerrm='Client quote changed. Reload before saving.';end;
+ assert finalized_route_client_snapshot('00000000-0000-4000-8000-000000000030')=after_client,'stale save partly mutated client data';
+ begin perform staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002',before_client,'00000000-0000-4000-8000-000000000051',before_client,manifest);raise exception 'stale send accepted';exception when raise_exception then assert sqlerrm='Client quote changed. Reload before sending.';end;
+ perform staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002',after_client,'00000000-0000-4000-8000-000000000051',after_client,manifest);
+ assert (select client_send_snapshot=after_client from quote_comparison_routes where id=route),'claimed content differs';
+ begin perform staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000002',after_client,'00000000-0000-4000-8000-000000000052',after_client,manifest);raise exception 'duplicate send accepted';exception when raise_exception then assert sqlerrm='Delivery already started. Check delivery history; do not send twice.';end;
+ begin perform staff_reopen_finalized_route('00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000002');raise exception 'claimed route reopened';exception when raise_exception then assert sqlerrm='Client delivery already started. Check delivery history before reopening.';end;
+ result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
+ assert result->>'status'='claimed','first dispatch not claimed';
+ result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
+ assert result->>'status'='ambiguous','ambiguous dispatch retried blindly';
+ -- Synthetic receipt only: no provider/network call is made by this test.
+ perform staff_finish_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002','synthetic-provider-receipt');
+ result:=staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000030',route,'00000000-0000-4000-8000-000000000051','00000000-0000-4000-8000-000000000002');
+ assert result->>'status'='sent' and result->>'providerId'='synthetic-provider-receipt','completed dispatch not idempotent';
+ begin update quote_comparison_routes set client_send_token=null where id=route;raise exception 'claim reset bypass';exception when raise_exception then assert sqlerrm='Delivery claim is immutable';end;
+ begin update quote_comparison_route_items set quantity=quantity+1 where route_id=route;raise exception 'allocation overwrite bypass';exception when raise_exception then assert sqlerrm='Finalized supplier allocations are immutable';end;
+end$$;
+reset role;set test.actor='00000000-0000-4000-8000-000000000002';set role authenticated;
+do $$begin
+ begin perform staff_reopen_quote_comparison('00000000-0000-4000-8000-000000000030');raise exception 'legacy reopen bypass';exception when raise_exception then assert sqlerrm='Use the reviewed product-route reopen action.';end;
+ begin perform staff_save_quote_comparison_client_quote('00000000-0000-4000-8000-000000000030','00000000-0000-4000-8000-000000000004','LEGACY',null,'Legacy bypass',0,0,'[]');raise exception 'legacy client save bypass';exception when raise_exception then assert sqlerrm='supplier_selection_required';end;
+ begin update quote_comparisons set client_message='forged overwrite';raise exception 'parent direct DML bypass';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+ begin update quote_comparisons set active_route_id=null,status='review';raise exception 'direct route reset bypass';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+ begin update quote_comparison_items set client_unit_price=1;raise exception 'item direct DML bypass';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+ begin delete from quote_comparison_items;raise exception 'item deletion bypass';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+end$$;
+reset role;
+do $$begin
+ assert (select client_message='Synthetic message' and status='awarded' and client_quote_status='ready' from quote_comparisons),'failed bypass mutated quote';
+ assert (select sum(quantity*client_unit_price)=86 from quote_comparison_items),'failed bypass mutated client prices';
+ assert (select count(*)=2 from quote_comparison_route_items),'failed bypass mutated allocations';
+ assert (select count(*)=0 from test_push_events),'local claim sent a notification';
+end$$;
