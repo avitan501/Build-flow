@@ -411,9 +411,15 @@ export function buildMixedSupplierAnalysis(
   let deliveryCharge = 0;
   let taxAmount = 0;
   let leadTimeDays: number | null = null;
+  const missingFields = lines.length === items.length ? [] : [`${Math.max(0, items.length - lines.length)} material price${items.length - lines.length === 1 ? "" : "s"}`];
+  let missingLeadTime = false;
   for (const [bidId, subtotal] of subtotals) {
     const bid = bids.find((entry) => entry.id === bidId);
     if (!bid) continue;
+    missingFields.push(...bidMetadataMissingFields(bid).map((field) => `${bid.supplier_name_snapshot}: ${field}`));
+    if (bid.lead_time_days === null || !Number.isFinite(bid.lead_time_days) || bid.lead_time_days < 0) {
+      missingLeadTime = true;
+    }
     const delivery = positiveNumber(bid.delivery_charge);
     deliveryCharge += delivery;
     taxAmount += calculateQuoteTax(subtotal + delivery, bid.tax_percent);
@@ -421,7 +427,6 @@ export function buildMixedSupplierAnalysis(
   }
 
   const supplierNames = [...new Set(lines.map((line) => line.supplierName))];
-  const missingFields = lines.length === items.length ? [] : [`${Math.max(0, items.length - lines.length)} material price${items.length - lines.length === 1 ? "" : "s"}`];
   const materialSubtotal = lines.reduce((total, line) => total + line.lineTotal, 0);
   return {
     complete: items.length > 0 && missingFields.length === 0,
@@ -434,7 +439,7 @@ export function buildMixedSupplierAnalysis(
     deliveryCharge,
     taxAmount,
     landedTotal: materialSubtotal + deliveryCharge + taxAmount,
-    leadTimeDays,
+    leadTimeDays: missingLeadTime ? null : leadTimeDays,
     missingFields,
     lines,
   };
