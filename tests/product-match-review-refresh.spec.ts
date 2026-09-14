@@ -54,7 +54,7 @@ test("source removal does not crash or leave an approval button", async ({ page 
   const errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
   await fixture(page);
   await page.evaluate(() => { const w = window as unknown as {props: {bid: {quote_comparison_prices: {notes: string | null}[]}}, redraw: () => void}; w.props = {...w.props, bid: {...w.props.bid, quote_comparison_prices: w.props.bid.quote_comparison_prices.map(p => ({...p, notes: null}))}}; w.redraw(); });
-  await expect(page.getByText("Upload the supplier quote with its original wording before reviewing.")).toBeVisible();
+  await expect(page.getByText("Original supplier wording is missing. Add it from the saved quote in Edit prices, or upload the quote.")).toBeVisible();
   await expect(page.getByRole("button")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
