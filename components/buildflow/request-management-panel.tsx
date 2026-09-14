@@ -1,6 +1,6 @@
 "use client"
 
-import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Pencil, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
+import { Award, CalendarClock, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Pencil, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -13,6 +13,7 @@ import { LocationAutocomplete } from "@/components/buildflow/location-autocomple
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
+import { RequestFulfillmentOverview } from "@/components/buildflow/request-fulfillment-overview"
 import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import { buildClientLinkMessage, splitClientLinkMessage } from "@/lib/client-link-message"
@@ -929,6 +930,15 @@ export function RequestManagementPanel({
       ? "Payment complete · Delivery scheduled"
       : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
   const latestClientDocument = clientDocuments[0] ?? null
+  const fulfillmentDone = [estimateSent, clientApproved, paymentReceived, receiptSent, deliveryScheduled]
+  const fulfillmentPhase = fulfillmentDone.every(Boolean) ? 4 : fulfillmentDone.findIndex((done) => !done)
+  const fulfillmentDocument = latestClientDocument ? {
+    label: latestClientDocument.documentType === "invoice" ? "Invoice" : latestClientDocument.documentType === "receipt" ? "Receipt" : "Estimate",
+    number: latestClientDocument.documentNumber,
+    total: savedDocumentTotal(latestClientDocument.documentData),
+    updated: new Date(latestClientDocument.updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET",
+    href: `${PRODUCTION_SITE_ORIGIN}/client-document/${latestClientDocument.publicToken}?preview=${latestClientDocument.managerPreviewToken}`,
+  } : null
   const supplierProgressRows = selectedSupplierNames.map((name) => {
     const supplier = findCanonicalSupplier(availableSuppliers, { supplierId: null, name }) ?? null
     const bid = comparisons.flatMap((comparison) => comparison.bids).find((candidate) => supplierNameCollator.compare(candidate.supplierName, name) === 0) ?? null
@@ -1077,18 +1087,8 @@ export function RequestManagementPanel({
           <button type="button" onClick={openDeliverySchedule} className={stepToolClass}><CalendarClock className="h-4 w-4" />Delivery schedule</button>
         </>} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
-          <ol className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            {[
-              { key: "estimate", label: "Estimate & approval", done: estimateSent && clientApproved, active: !waitingForSupplierPricing && ["send-estimate", "wait-for-approval"].includes(workflow.step3Action), detail: !estimateSent ? "Not sent" : clientApproved ? "Client approved" : "Waiting for approval", icon: FileCheck2 },
-              { key: "invoice", label: "Invoice & payment link", done: invoiceSent && paymentLinkSent, active: ["create-invoice", "send-payment-link"].includes(workflow.step3Action), detail: !invoiceSent ? "Invoice not sent" : paymentLinkSent ? "Payment link sent" : "Send payment link", icon: FileText },
-              { key: "receipt", label: "Payment & receipt", done: paymentReceived && receiptSent, active: ["mark-paid", "create-receipt"].includes(workflow.step3Action), detail: !paymentReceived ? "Payment pending" : receiptSent ? "Receipt sent" : "Create receipt", icon: ReceiptText },
-              { key: "delivery", label: "Delivery", done: deliveryScheduled, active: workflow.step3Action === "schedule-delivery", detail: deliveryScheduled ? "Scheduled" : "Not scheduled", icon: CalendarClock },
-            ].map((item, index) => <li key={item.key} data-fulfillment-action={item.key} className={`flex min-h-14 items-center gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0 ${item.active ? "bg-sky-50" : ""}`}>
-              <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${item.done ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.active ? "border-sky-200 bg-white text-sky-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>{item.done ? <Check className="h-4 w-4" /> : <item.icon className="h-4 w-4" />}</span>
-              <span className="min-w-0 flex-1"><span className="block text-xs font-black text-[#12263f]">{index + 1}. {item.label}</span><span className={`mt-0.5 block text-[10px] font-semibold ${item.done ? "text-emerald-700" : item.active ? "text-sky-700" : "text-slate-500"}`}>{item.detail}</span></span>
-            </li>)}
-          </ol>
-
+          <RequestFulfillmentOverview phase={fulfillmentPhase} done={fulfillmentDone} status={fulfillmentDetail} document={fulfillmentDocument} primaryAction={renderStep3PrimaryAction()} deliveryLabel={deliveryScheduled ? "Scheduled" : scheduledItemIds.size ? "Partly scheduled" : "Not scheduled"} priceBreakdown={<>
+          {latestClientDocument?.documentData.lines?.length ? <ul className="divide-y divide-slate-100" aria-label="Saved document prices">{latestClientDocument.documentData.lines.map((line, index) => <li key={index} className="flex items-start justify-between gap-3 py-2 text-xs"><span className="min-w-0 break-words">{line.description}<span className="mt-1 block text-slate-500">{line.quantity} {line.unit} × {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.unitPrice)}</span></span><span className="shrink-0 font-semibold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</span></li>)}</ul> : <p className="text-xs text-slate-500">No saved client prices yet.</p>}
           {clientDocuments.length ? <div className="mt-2 grid gap-2" aria-label="Saved client documents">{clientDocuments.map((saved) => {
             const label = saved.documentType === "invoice" ? "Invoice" : saved.documentType === "receipt" ? "Receipt" : "Estimate"
             const deletionKey = `${saved.documentType}:${saved.version}`
@@ -1112,7 +1112,14 @@ export function RequestManagementPanel({
             </article>
           })}</div> : null}
 
-          <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mt-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep3PrimaryAction()}</div>
+          </>} paymentDetails={<div className="grid gap-2 text-xs">
+            <p>{invoiceSent ? "Invoice sent" : "Invoice not sent"} · {paymentLinkSent ? "Payment link sent" : "Payment link not sent"}</p>
+            <p>{paymentReceived ? "Payment recorded" : "Payment pending"} · {receiptSent ? "Receipt sent" : "Receipt not sent"}</p>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => openDocument("invoice")} className={secondaryWorkflowClass}>Invoice</button><button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className={secondaryWorkflowClass}>Payment link</button><button type="button" onClick={() => openDocument("receipt")} className={secondaryWorkflowClass}>Receipt</button></div>
+          </div>} deliveryDetails={<div className="grid gap-2 text-xs">
+            <p>{deliveryScheduled ? "All current material lines are scheduled." : `${scheduledItemIds.size} of ${requestItems.length} material lines scheduled.`} Scheduling does not confirm delivery.</p>
+            <button type="button" onClick={openDeliverySchedule} className={secondaryWorkflowClass}><CalendarClock className="h-4 w-4" />Delivery schedule</button>
+          </div>} />
 
           {feedback ? <p className={`mt-2 rounded-lg border px-3 py-2 text-xs font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status" aria-live="polite">{feedback}</p> : null}
         </div>
