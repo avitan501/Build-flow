@@ -2,6 +2,15 @@
 export const MATERIAL_PAGES_PER_CHUNK = 3
 export const MAX_MATERIAL_CHUNKS = 64
 
+// Deduplicate complete evidence bytes, never individual material rows. Two
+// identical rows in one document may represent separate floors or deliveries.
+export function claimMaterialEvidence(seen: Set<string>, mimeType: string, sha256: string) {
+  const key = `${mimeType}:${sha256}`
+  if (seen.has(key)) return false
+  seen.add(key)
+  return true
+}
+
 export function materialPageRanges(pageCount: number) {
   if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > MATERIAL_PAGES_PER_CHUNK * MAX_MATERIAL_CHUNKS) throw new Error("document_page_limit")
   return Array.from({ length: Math.ceil(pageCount / MATERIAL_PAGES_PER_CHUNK) }, (_, index) => ({

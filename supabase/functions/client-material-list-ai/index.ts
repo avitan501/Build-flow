@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 import { PDFDocument } from "npm:pdf-lib@1.17.1"
-import { materialPageRanges, materialChunkInstruction, nextMissingMaterialChunk, MAX_MATERIAL_CHUNKS } from "./chunk-plan.ts"
+import { materialPageRanges, materialChunkInstruction, nextMissingMaterialChunk, MAX_MATERIAL_CHUNKS, claimMaterialEvidence } from "./chunk-plan.ts"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
 import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedMeasurementReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
@@ -319,6 +319,7 @@ Deno.serve(async (request: Request) => {
     }).filter(Boolean).join("\n\n")
     const chunks: Array<{ label: string; content: Record<string, unknown> }> = []
     const evidenceHashes: string[] = []
+    const seenEvidence = new Set<string>()
     const sha256 = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer))).map(byte => byte.toString(16).padStart(2,"0")).join("")
 
     let includedAttachmentCount = 0
@@ -336,7 +337,13 @@ Deno.serve(async (request: Request) => {
       const mimeType = attachmentMimeType(attachment)
       if (!mimeType) continue
       const fileName = clean(attachment.file_name, 180) || `request-attachment-${includedAttachmentCount + 1}`
-      evidenceHashes.push(`${attachment.file_path}:${await sha256(bytes)}`)
+      const evidenceHash = await sha256(bytes)
+      // Every saved file remains in the generation fingerprint and download
+      // limits, even if its bytes are already represented by another upload.
+      evidenceHashes.push(`${attachment.file_path}:${evidenceHash}`)
+      includedAttachmentCount += 1
+      includedAttachmentBytes += bytes.byteLength
+      if (!claimMaterialEvidence(seenEvidence, mimeType, evidenceHash)) continue
       if (mimeType === "application/pdf") {
         let pdf: PDFDocument
         try { pdf = await PDFDocument.load(bytes) } catch { throw new MaterialListFailure("document_unreadable") }
@@ -348,14 +355,12 @@ Deno.serve(async (request: Request) => {
           chunks.push({label,content:{type:"input_file",filename:fileName,file_data:`data:application/pdf;base64,${encodeBase64(await part.save())}`}})
         }
       } else chunks.push({label:fileName,content:{type:"input_image",image_url:`data:${mimeType};base64,${encodeBase64(bytes)}`,detail:"high"}})
-      includedAttachmentCount += 1
-      includedAttachmentBytes += bytes.byteLength
     }
 
     if (!typedSource && !includedAttachmentCount) throw new MaterialListFailure("source_empty")
     if (!chunks.length) chunks.push({label:"Typed material list",content:{type:"input_text",text:typedSource}})
     if (chunks.length>MAX_MATERIAL_CHUNKS) throw new MaterialListFailure("document_page_limit")
-    const fingerprint = await sha256(new TextEncoder().encode(JSON.stringify({typedSource,evidenceHashes,model:AI_MODEL,version:1})))
+    const fingerprint = await sha256(new TextEncoder().encode(JSON.stringify({typedSource,evidenceHashes,model:AI_MODEL,version:2})))
     const checkpointInput = {p_job_id:jobId,p_generation:generation,p_lease:lease,p_fingerprint:fingerprint,p_count:chunks.length}
     const {data:checkpoint,error:checkpointError} = await admin.rpc("material_list_checkpoint",checkpointInput)
     if (checkpointError) throw new MaterialListFailure(materialListDatabaseFailure(checkpointError,"checkpoint_unavailable"))
