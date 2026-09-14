@@ -31,6 +31,8 @@ export function parseCarlosWorkBrowserAcknowledgement(value: string | null | und
 
 const DEFAULT_CARLOS_BROWSER_ORIGIN = "https://ubuntu-16gb-hil-3.tailc90016.ts.net:8443"
 const DEFAULT_CARLOS_BROWSER_DIRECT_ORIGIN = "http://100.66.91.3:6081"
+// Shared devices have a recipient-specific IP in Carlos's tailnet.
+const DEFAULT_CARLOS_SHARED_BROWSER_ORIGIN = "http://100.66.91.2:6081"
 
 function buildCarlosWorkBrowserUrl(origin: string, viewOnly: boolean) {
   const normalizedOrigin = origin.replace(/\/+$/, "")
@@ -49,6 +51,8 @@ export function carlosWorkBrowserUrl(viewOnly: boolean) {
 }
 
 export function carlosWorkBrowserDirectUrl(viewOnly: boolean) {
-  const origin = String(process.env.CARLOS_WORK_BROWSER_DIRECT_URL || DEFAULT_CARLOS_BROWSER_DIRECT_ORIGIN)
+  const origin = viewOnly
+    ? String(process.env.CARLOS_WORK_BROWSER_DIRECT_URL || DEFAULT_CARLOS_BROWSER_DIRECT_ORIGIN)
+    : String(process.env.CARLOS_WORK_BROWSER_SHARED_URL || DEFAULT_CARLOS_SHARED_BROWSER_ORIGIN)
   return buildCarlosWorkBrowserUrl(origin, viewOnly)
 }

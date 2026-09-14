@@ -51,10 +51,10 @@ export default async function CarlosWorkBrowserPage() {
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"><MonitorUp className="h-4 w-4 text-violet-300" /><span>{access.owner ? "Control stays with Carlos" : "You control this screen"}</span></div>
         </section>
         <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-300/25 bg-sky-300/10 p-3">
-          <p className="text-xs leading-5 text-sky-50">If the screen below is blank, use the direct Tailnet connection. It stays private and bypasses the Tailnet DNS problem.</p>
+          <p className="text-xs leading-5 text-sky-50">{access.owner ? "If the screen below is blank, open the direct connection." : "Keep Tailscale connected. Open your company screen in a new tab."}</p>
           <a href={directBrowserUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg bg-white px-3 text-xs font-bold text-[#071126]"><ExternalLink className="h-4 w-4" />Open direct connection</a>
         </section>
-        <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"><iframe title={access.owner ? "Carlos live work browser — view only" : "Carlos managed work browser"} src={browserUrl} className="h-[calc(100vh-13rem)] min-h-[34rem] w-full" allow="clipboard-read; clipboard-write; fullscreen" /></div>
+        {access.owner ? <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl"><iframe title="Carlos live work browser — view only" src={browserUrl} className="h-[calc(100vh-13rem)] min-h-[34rem] w-full" allow="clipboard-read; clipboard-write; fullscreen" /></div> : null}
         <p className="mt-2 text-[11px] text-slate-500">Acknowledged {formatSiteDateTime(acknowledgement!.acknowledgedAt, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}. Activity outside this company browser is not visible.</p>
       </> : <section className="mt-6 rounded-xl border border-amber-300/30 bg-amber-300/10 p-5"><h2 className="font-semibold">Waiting for Carlos</h2><p className="mt-2 text-sm leading-6 text-amber-100">Carlos must open this tool once and accept the work-browser monitoring notice before live viewing is enabled.</p></section>}
     </div>

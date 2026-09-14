@@ -45,6 +45,7 @@ test("work-browser offers a Tailnet IP fallback when MagicDNS is unavailable", (
   const owner = new URL(carlosWorkBrowserDirectUrl(true))
   const employee = new URL(carlosWorkBrowserDirectUrl(false))
   expect(owner.origin).toBe("http://100.66.91.3:6081")
+  expect(employee.origin).toBe("http://100.66.91.2:6081")
   expect(owner.searchParams.get("view_only")).toBe("1")
   expect(employee.searchParams.get("view_only")).toBe("0")
 })
