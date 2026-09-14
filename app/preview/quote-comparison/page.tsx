@@ -55,7 +55,11 @@ function sampleBid(
     status: "received",
     created_at: comparison.created_at,
     updated_at: comparison.updated_at,
-    quote_comparison_prices: prices.map(([itemId, unitPrice, isAvailable = true]) => ({ bid_id: id, item_id: itemId, unit_price: unitPrice, is_available: isAvailable, notes: "" })),
+    // Synthetic example wording only. Never infer or backfill real supplier evidence.
+    quote_comparison_prices: prices.map(([itemId, unitPrice, isAvailable = true]) => {
+      const item = items.find(row => row.id === itemId)!;
+      return { bid_id: id, item_id: itemId, unit_price: unitPrice, is_available: isAvailable, notes: `${item.description} ${item.specification}` };
+    }),
   };
 }
 
@@ -67,6 +71,8 @@ const bids = [
 
 export default function PublicQuoteComparisonPreviewPage() {
   return (
+    <>
+    <p className="bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">Demo only · sample products and supplier wording · no real quote or order</p>
     <QuoteComparisonWorkspace
       comparison={comparison}
       items={items}
@@ -81,5 +87,6 @@ export default function PublicQuoteComparisonPreviewPage() {
       clientQuoteAttachments={[]}
       previewMode
     />
+    </>
   );
 }

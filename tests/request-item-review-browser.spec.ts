@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test"
 for (const width of [390, 1440]) test(`62 products and focused question resume at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 })
   await page.route("**/*", (route) => route.request().method() === "POST" ? route.abort() : route.continue())
-  await page.goto("http://127.0.0.1:3101/preview/request-items")
+  await page.goto("/preview/request-items")
   await expect(page.getByRole("button", { name: /Dimensional lumber|CDX plywood/ })).toHaveCount(62)
   await expect(page.getByLabel("Current product review")).toContainText("product 8")
   await expect(page.getByRole("combobox", { name: "Sheet size" })).toHaveValue("")
@@ -26,7 +26,7 @@ for (const width of [390, 1440]) test(`62 products and focused question resume a
 test("wide work area places the focused question beside the readable list", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.route("**/*", (route) => route.request().method() === "POST" ? route.abort() : route.continue())
-  await page.goto("http://127.0.0.1:3101/preview/request-items")
+  await page.goto("/preview/request-items")
   // The public preview shell is intentionally phone-width. Exercise the actual admin
   // content width without changing site-wide layout or touching authenticated records.
   await page.getByTestId("request-item-review-list").evaluate((element) => {
