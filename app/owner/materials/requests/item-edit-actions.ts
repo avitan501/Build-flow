@@ -9,6 +9,7 @@ import { materialReviewChoiceUpdate } from "@/lib/material-review-recommendation
 import { requestItemRevision } from "@/lib/request-item-revision"
 import { itemEditSnapshot } from "@/lib/request-item-continuity"
 import { requestItemFieldsMetadata, type RequestItemField } from "@/lib/request-item-fields"
+import { sourceFileChangeNotice } from "@/lib/request-source-file-change"
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const columns = "id,name,department,quantity,unit,metadata,qualification_status"
@@ -43,5 +44,12 @@ export async function saveReviewedRequestItemAction(input: EditInput) {
   const { data: saved } = await supabase.from("quote_request_items").select(columns).eq("request_id", input.requestId).eq("id", input.itemId).maybeSingle<ReviewableMaterialItem>()
   revalidatePath(`/owner/materials/requests/${input.requestId}`)
   if (!saved) return { ok: false as const, error: "Saved, but this product could not be reloaded. Refresh before continuing." }
+  // Upload may commit after our edit but before readback. Never silently acknowledge
+  // the newer source as if the employee reviewed it when submitting the old answer.
+  const fileChange = sourceFileChangeNotice(item, saved)
+  if (fileChange) {
+    const { data: latestSource } = sourceId ? await supabase.from("quote_request_items").select(columns).eq("request_id", input.requestId).eq("id", sourceId).maybeSingle<ReviewableMaterialItem>() : { data: null }
+    return { ok: false as const, conflict: true as const, item: saved, source: latestSource, revision: requestItemRevision(saved, latestSource), error: `Your edit was saved before a source-file update. ${fileChange}` }
+  }
   return { ok: true as const, item: saved, source, revision: requestItemRevision(saved, source), receiptId: input.undoReceiptId ? null : receiptId }
 }

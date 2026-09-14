@@ -7,6 +7,7 @@ import { materialReviewReasons, materialReviewStatus, materialSearchQuery, type 
 import { materialReviewRecommendation } from "@/lib/material-review-recommendations"
 import { hasIncomingItemRevision, nextUnresolvedItem, readItemResume } from "@/lib/request-item-continuity"
 import { requestItemFieldSummary } from "@/lib/request-item-fields"
+import { sourceFileChangeNotice } from "@/lib/request-source-file-change"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { moveRequestItemDepartmentAction } from "@/app/owner/materials/requests/actions"
@@ -102,7 +103,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
           <h4 className="text-sm font-bold">{shown.item.name}</h4>
           <p className="mt-1 text-xs text-slate-600">{requestItemFieldSummary(shown.item.metadata).join(" · ")}</p>
           {latest ? <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3" role="alert">
-            <p className="text-xs font-bold text-amber-950">This product or its original source changed.</p>
+            <p className="text-xs font-bold text-amber-950">{sourceFileChangeNotice(shown.item, latest.item) || "This product or its original source changed."}</p>
             <div className="mt-2 grid gap-2 text-xs"><div><span className="font-bold">You were reviewing</span><p>{shown.item.name} · {shown.item.quantity} {shown.item.unit}</p><p>{requestItemFieldSummary(shown.item.metadata).join(" · ")}</p></div><div><span className="font-bold">Latest saved version</span><p>{latest.item.name} · {latest.item.quantity} {latest.item.unit}</p><p>{requestItemFieldSummary(latest.item.metadata).join(" · ")}</p>{latest.source ? <details className="mt-1"><summary className="cursor-pointer font-bold">Latest original source</summary><p className="max-h-40 overflow-auto whitespace-pre-wrap">{String(latest.source.metadata?.request_details || latest.source.name)}</p></details> : null}</div></div>
             <button type="button" onClick={() => { setReviewed(latest); setBaselineRevision(current?.revision || latest.revision); setLatest(null); setReceipt(null); setFeedback(""); setField(null); router.refresh() }} className="mt-2 min-h-11 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white">Review latest version</button>
           </div> : <>
