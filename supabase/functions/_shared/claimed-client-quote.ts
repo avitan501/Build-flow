@@ -74,7 +74,7 @@ async function verifiedAttachments(payload: Record<string, unknown>, manifest: u
   for (let index=0;index<manifest.length;index++) {
     const expected = object(manifest[index]), attachment = object(incoming[index]);
     const filename = string(expected.filename,180,true);
-    if (/[\\/\u0000-\u001f\u007f]/.test(filename) || attachment.filename !== filename || !Number.isSafeInteger(expected.bytes) || number(expected.bytes,MAX_BYTES)<5 || !/^[a-f0-9]{64}$/.test(String(expected.sha256))) throw Error("invalid_attachment_manifest");
+    if (/[\\/\u0000-\u001f\u007f]/.test(filename) || attachment.filename !== filename || !Number.isSafeInteger(expected.bytes) || number(expected.bytes,MAX_BYTES)<1 || !/^[a-f0-9]{64}$/.test(String(expected.sha256))) throw Error("invalid_attachment_manifest");
     const content = string(attachment.content, Math.ceil(MAX_BYTES/3)*4, true);
     // Avoid a repeated-group regexp over multi-megabyte PDFs; atob additionally
     // rejects malformed padding without recursive regexp stack growth.
