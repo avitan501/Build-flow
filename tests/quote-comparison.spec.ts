@@ -328,7 +328,8 @@ test("comparison room opens with products and retains the compact editing and ro
   expect(workspace).toContain("Choose the route");
   expect(workspace).toContain("Lowest landed cost");
   expect(workspace).toContain("No stock");
-  expect(workspace).toContain("activeStep === 4 && selectedBid");
+  expect(workspace).toContain("activeStep === 4 && (selectedBid || procurementRoute)");
+  expect(workspace).toContain("procurementRoute={procurementRoute}");
   expect(workspace).toContain('className="divide-y divide-slate-200 md:hidden"');
   expect(workspace).toContain("Finish supplier prices");
   expect(workspace).not.toContain("hasMissingValues");
@@ -361,7 +362,8 @@ test("supplier costs and client pricing are separated into focused steps", async
   expect(workspace).toContain("Finish supplier prices");
   expect(workspace).toContain('className="hidden overflow-x-auto md:block"');
   expect(workspace).toContain('className="divide-y divide-slate-200 md:hidden"');
-  expect(workspace).toContain("activeStep === 4 && selectedBid");
+  expect(workspace).toContain("activeStep === 4 && (selectedBid || procurementRoute)");
+  expect(workspace).toContain("routeError={routeError}");
   expect(workspace).toContain("saveQuoteComparisonClientTargetsAction");
   expect(actions).toContain("client_unit_price: value");
   expect(actions).toContain("client_delivery_charge: cleanMoney(input.clientDeliveryCharge)");
