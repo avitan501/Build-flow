@@ -36,6 +36,7 @@ import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubst
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing";
+import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
@@ -276,7 +277,8 @@ export default async function OwnerMaterialRequestPage({
     receiptSent,
     paymentLinkSent: clientActions.some((event) => event.metadata.client_action === "payment_link_sent"),
     paymentReceived,
-    deliveryScheduled: clientActions.some((event) => event.metadata.client_action === "delivery_scheduled"),
+    deliveryScheduled: requestDeliveryCoverage(clientActions.map((event) => event.metadata), effectiveRequestComparisonItems(items ?? []).map(item => item.id)).complete,
+    deliveryItemIds: requestDeliveryCoverage(clientActions.map((event) => event.metadata), effectiveRequestComparisonItems(items ?? []).map(item => item.id)).scheduledItemIds,
   };
   const activityEvents = [
     ...(clientActionEvents ?? []),

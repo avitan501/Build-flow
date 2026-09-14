@@ -243,7 +243,7 @@ export function RequestManagementPanel({
   clientReplyCompleted: boolean
   step2CompletedOverride: boolean | null
   step3CompletedOverride: boolean | null
-  initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; estimateSent: boolean; clientApproved: boolean; invoiceSent: boolean; receiptSent: boolean; paymentLinkSent: boolean; paymentReceived: boolean; deliveryScheduled: boolean }
+  initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; estimateSent: boolean; clientApproved: boolean; invoiceSent: boolean; receiptSent: boolean; paymentLinkSent: boolean; paymentReceived: boolean; deliveryScheduled: boolean; deliveryItemIds?: string[] }
   initialClientDocuments: RequestClientDocumentSnapshot[]
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean; contactStatus: RequestSupplierContactStatus; note: string }>
   clientEmails: RelatedEmailItem[]
@@ -277,7 +277,9 @@ export function RequestManagementPanel({
   const [receiptSent, setReceiptSent] = useState(initialPaymentDelivery.receiptSent)
   const [paymentLinkSent, setPaymentLinkSent] = useState(initialPaymentDelivery.paymentLinkSent)
   const [paymentReceived, setPaymentReceived] = useState(initialPaymentDelivery.paymentReceived)
-  const [deliveryScheduled, setDeliveryScheduled] = useState(initialPaymentDelivery.deliveryScheduled)
+  const [locallyScheduledItemIds, setLocallyScheduledItemIds] = useState<string[]>([])
+  const scheduledItemIds = new Set([...(initialPaymentDelivery.deliveryItemIds ?? []), ...locallyScheduledItemIds])
+  const deliveryScheduled = initialPaymentDelivery.deliveryScheduled || (requestItems.length > 0 && requestItems.every(item => scheduledItemIds.has(item.id)))
   const [quoteEntryOpen, setQuoteEntryOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
@@ -570,7 +572,8 @@ export function RequestManagementPanel({
       setFeedback(result.ok ? "Delivery schedule saved. The client message is ready to send." : result.error)
       if (result.ok) {
         setReplyBlock("delivery")
-        setDeliveryScheduled(true)
+        setLocallyScheduledItemIds(current => [...new Set([...current, ...deliveryItemIds])])
+        router.refresh()
       }
     })
   }

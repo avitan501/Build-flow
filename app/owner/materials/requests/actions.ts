@@ -30,6 +30,7 @@ import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqu
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requestSupplierRouteGroupKey, supplierRouteRevision, type SupplierRouteMode } from "@/lib/request-supplier-group-route"
 import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing"
+import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 export type QuoteResult =
@@ -996,6 +997,8 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
   }
 
   if (step === 3 && input.completed) {
+    const requestedItems = await supabase.from("quote_request_items").select("id,name,metadata").eq("request_id", requestId).returns<Array<{ id: string; name: string; metadata: Record<string, unknown> | null }>>()
+    if (requestedItems.error) return { ok: false as const, error: "The delivery items could not be checked." }
     const [{ data: clientEvents, error: clientEventsError }, { data: receiptDocument, error: receiptDocumentError }] = await Promise.all([
       supabase.from("project_events").select("metadata").contains("metadata", { quote_request_id: requestId }),
       supabase.from("request_client_documents").select("document_number,public_token,version").eq("request_id", requestId).eq("document_type", "receipt").maybeSingle<{ document_number: string; public_token: string; version: number }>(),
@@ -1007,7 +1010,8 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
       (clientEvents ?? []).map((event) => event.metadata as Record<string, unknown> | null),
       receiptDocument ? { documentNumber: receiptDocument.document_number, publicToken: receiptDocument.public_token, version: receiptDocument.version } : null,
     )
-    if (!paymentReceived || !receiptSent || !actions.has("delivery_scheduled")) {
+    const deliveryCoverage = requestDeliveryCoverage((clientEvents ?? []).map(event => event.metadata as Record<string, unknown> | null), effectiveRequestComparisonItems(requestedItems.data ?? []).map(item => item.id))
+    if (!paymentReceived || !receiptSent || !deliveryCoverage.complete) {
       return { ok: false as const, error: "Finish payment, send the receipt, and schedule delivery before completing Step 3." }
     }
   }
