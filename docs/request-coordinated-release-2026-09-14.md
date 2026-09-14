@@ -1,4 +1,29 @@
-# Coordinated request release — HOLD until final verification and migration approval
+# Coordinated request release — final publication gate
+
+## Current frozen release (supersedes historical checkpoints below)
+
+User explicitly reauthorized publication of today's approved work. Root candidate `ca908e3d` plus test-only `e730deb2` preserves live base `8c79820c`. Root is the only production publisher. Primary dirty workspace remains untouched.
+
+Integrated: compact Step1/2/3 and progress/activity; private per-step assignee/note/completion; existing-item autosave, retained conflicts, resume/Undo/source-change review; persistent per-product supplier choices; source-backed human product matching; immutable real multi-supplier allocations; mixed client/PDF totals and displayed-snapshot save/send protection; guarded existing Edge transport. Request-list cleanup and communications already on base are preserved.
+
+Final migration order and SHA256:
+
+1. `20260914175308_request_workflow_steps.sql` — `7d8b6e4a8303c85f3aba538b59fceeed479514552e5b3a9c9cfbd421639cadfd`
+2. `20260914191309_request_item_edit_receipts.sql` — `53a7a3da5a77cd6779393324a8e6753cc5718be503f40ee1b2017b752e5ed0d5`
+3. `20260914191336_product_choice_autosave.sql` — `75a356c0ad59fe238dc51631552bacd9c570ec09c10a11539ef12980bbdf831e`
+4. `20260914225145_request_source_attachment_fence.sql` — `10f241b372b0a644bda4a03bf89c9fb807f2496aff930e9a8116a496d17da6ca`
+5. `20260914225701_trusted_product_match.sql` — `5e09c55167a5ed60386271cd55a51d9d6e11221809b39d71ca65a0108334edb6`
+6. `20260914230638_quote_comparison_finalized_routes.sql` — `d9521be0ca183572c1f43d50ecb6a5384df52216f35543dcca81cef8a10071ee`
+
+Root independently rehearsed all six against captured live schema metadata with synthetic records: PASS, 129 constraints/28 triggers. Includes displayed client CAS, legacy/direct-DML bypass guards, ordered attachment claim, once-only/ambiguous/confirmed dispatch, revoked actors. No real provider send.
+
+Root final application build (webpack, isolated dependency symlink) passed153 routes and TypeScript; lint0 errors/31 existing warnings. Independent Edge22 tests and full cached Deno check passed. Broad104-check run exposed two obsolete single-bid-only source assertions; corrected to require legacy OR persisted route, then21 comparison checks passed. Final combined styled/browser and release regressions recorded in subsequent publication checkpoint.
+
+Required rollout: six SQL in order on confirmed `nprfhspwdflpqlopydmp` → verify schema/grants → deploy only `send-supplier-quote` with `_shared/claimed-client-quote.ts` and existing JWT verification → serialized canonical/mirror app publication → exact-SHA authenticated live check. SQL5 safely disables the old award RPC during the transition; SQL6 must precede Edge because its legacy guard reads `active_route_id`. Do not restore an unsafe RPC or ship app before dependencies.
+
+Live before cutover independently verified through Vercel deployment `dpl_CLLCppHC9nQapf8bxeFbdNKo6BiM`, canonical domain and `/api/release`: `8c79820c`, production Supabase `nprfhspwdflpqlopydmp`. No production mutation yet at this checkpoint. Payroll and AI safeguards are separately queued; full sitewide autosave, partial financial ledger, full PDF extraction/provider success are NOT represented as complete.
+
+## Historical checkpoint (superseded by current release above)
 
 Owner: root/release reviewer. Worktree `/tmp/avantia-request-coordinated-release-20260914`, branch `codex/request-coordinated-release-20260914`.
 
