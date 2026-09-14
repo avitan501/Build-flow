@@ -13,6 +13,7 @@ import {
 import { requireStaffProfile } from "@/lib/auth";
 import { requestItemRevision } from "@/lib/request-item-revision";
 import { loadProductMatchConfirmations } from "@/lib/product-match-server";
+import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
 import { RequestProductSupplierRoutes } from "@/components/buildflow/request-product-supplier-routes";
 import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
@@ -101,6 +102,7 @@ type ComparisonRecord = Pick<
   | "client_quote_status"
   | "quote_number"
   | "awarded_bid_id"
+  | "active_route_id"
   | "client_delivery_charge"
   | "client_tax_percent"
   | "updated_at"
@@ -206,7 +208,7 @@ export default async function OwnerMaterialRequestPage({
     supabase
       .from("quote_comparisons")
       .select(
-        "id,request_id,title,status,client_quote_status,quote_number,awarded_bid_id,client_delivery_charge,client_tax_percent,updated_at",
+        "id,request_id,title,status,client_quote_status,quote_number,awarded_bid_id,active_route_id,client_delivery_charge,client_tax_percent,updated_at",
       )
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
@@ -389,7 +391,8 @@ export default async function OwnerMaterialRequestPage({
   );
   const clientRequestFiles = signedFiles.filter((file) => file.source_party !== "supplier");
   const latestSelectedComparison = (comparisons ?? []).find((comparison) => comparison.status === "awarded");
-  const selectedPricingReady = Boolean(latestSelectedComparison?.awarded_bid_id
+  const finalized = latestSelectedComparison ? await loadFinalizedProcurementRoute(supabase, latestSelectedComparison.id, latestSelectedComparison.active_route_id) : { route: null, error: null };
+  const selectedPricingReady = latestSelectedComparison?.active_route_id ? Boolean(finalized.route && !finalized.error) : Boolean(latestSelectedComparison?.awarded_bid_id
     && !comparisonItemsResult.error && !comparisonBidsResult.error
     && !requestStep2CompletionError(
       items ?? [],
@@ -474,6 +477,9 @@ export default async function OwnerMaterialRequestPage({
       title: comparison.title,
       status: comparison.status,
       awardedBidId: comparison.awarded_bid_id,
+      activeRouteId: comparison.active_route_id ?? null,
+      routeReady: comparison.id === latestSelectedComparison?.id && selectedPricingReady,
+      routeSupplierNames: comparison.id === latestSelectedComparison?.id ? finalized.route?.suppliers.map((supplier) => supplier.supplier_name) ?? [] : [],
       clientQuoteStatus: comparison.client_quote_status,
       quoteNumber: comparison.quote_number,
       updatedAt: comparison.updated_at,

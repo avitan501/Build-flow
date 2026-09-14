@@ -34,6 +34,7 @@ export class AutosaveQueue<T> {
   }
 
   getState = () => this.state;
+  getRevision = () => this.revision;
 
   setPersist(persist: (snapshot: T, expectedRevision: number) => Promise<AutosaveResult>) {
     this.persist = persist;

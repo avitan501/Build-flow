@@ -13,6 +13,9 @@ create table public.quote_comparisons(id uuid primary key,request_id uuid,status
 create table public.quote_comparison_items(id uuid primary key,comparison_id uuid references public.quote_comparisons(id),source_request_item_id uuid,description text,specification text,quantity numeric,unit text);
 create table public.quote_comparison_bids(id uuid primary key,comparison_id uuid references public.quote_comparisons(id),supplier_id text,supplier_name_snapshot text,trust_level_snapshot text,status text,delivery_charge numeric,tax_percent numeric,lead_time_days integer);
 create table public.quote_comparison_prices(bid_id uuid,item_id uuid,unit_price numeric,is_available boolean,notes text,primary key(bid_id,item_id));
+alter table public.profiles add column full_name text, add column email text;
+alter table public.quote_comparisons add column client_id uuid, add column client_name_snapshot text, add column client_email_snapshot text, add column quote_number text, add column expires_on date, add column client_message text, add column job_address text, add column client_delivery_charge numeric default 0, add column client_tax_percent numeric default 0, add column client_quote_status text default 'draft', add column quote_sent_at timestamptz;
+alter table public.quote_comparison_items add column markup_percent numeric default 0, add column client_unit_price numeric;
 \i /match/supabase/migrations/20260914225701_trusted_product_match.sql
 \i /work/supabase/migrations/20260914230638_quote_comparison_finalized_routes.sql
 grant usage on schema auth to service_role,authenticated;

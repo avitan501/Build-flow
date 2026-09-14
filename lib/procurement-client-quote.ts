@@ -1,5 +1,13 @@
 import { buildClientQuoteSummary, calculateQuoteTax, type ClientQuoteSummary, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import type { FinalizedProcurementRoute } from "@/lib/finalized-procurement-route"
+import type { QuoteComparisonRecord } from "@/lib/quote-comparison"
+
+export function finalizedClientSnapshot(comparison: QuoteComparisonRecord, items: QuoteComparisonItemRecord[]) {
+  return {
+    comparison: Object.fromEntries(["active_route_id", "client_id", "client_name_snapshot", "client_email_snapshot", "quote_number", "expires_on", "client_message", "job_address", "client_delivery_charge", "client_tax_percent", "client_quote_status"].map((key) => [key, comparison[key as keyof QuoteComparisonRecord] ?? null])),
+    items: [...items].sort((a,b) => a.id.localeCompare(b.id)).map((item) => ({ id:item.id, description:item.description, specification:item.specification, quantity:item.quantity, unit:item.unit, markup_percent:item.markup_percent, client_unit_price:item.client_unit_price })),
+  }
+}
 
 /** A cost map, not a synthetic supplier/bid. Supplier identity stays on route lines. */
 export function procurementItemCosts(route: FinalizedProcurementRoute | null, legacyBid: QuoteComparisonBidRecord | null) {

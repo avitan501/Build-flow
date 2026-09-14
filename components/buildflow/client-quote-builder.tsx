@@ -23,7 +23,6 @@ import {
 } from "@/app/admin/quote-comparison/actions";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import {
-  buildClientQuoteSummary,
   formatComparisonMoney,
   type ClientQuoteAttachmentRecord,
   type QuoteComparisonBidRecord,
@@ -32,6 +31,7 @@ import {
 } from "@/lib/quote-comparison";
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms";
 import { createClient } from "@/lib/supabase/client";
+import { procurementItemCosts, buildProcurementClientQuoteSummary } from "@/lib/procurement-client-quote";
 
 const MAX_ATTACHMENT_FILES = 10;
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
@@ -118,6 +118,8 @@ export function ClientQuoteBuilder({
   comparison,
   items,
   selectedBid,
+  procurementRoute = null,
+  routeError = null,
   clients,
   initialAttachments,
   previewMode,
@@ -125,6 +127,8 @@ export function ClientQuoteBuilder({
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
   selectedBid: QuoteComparisonBidRecord | null;
+  procurementRoute?: import("@/lib/finalized-procurement-route").FinalizedProcurementRoute | null;
+  routeError?: string | null;
   clients: QuoteClientOption[];
   initialAttachments: ClientQuoteAttachmentRecord[];
   previewMode: boolean;
@@ -144,12 +148,12 @@ export function ClientQuoteBuilder({
   const [attachments, setAttachments] = useState(initialAttachments);
 
   const supplierPrices = useMemo(
-    () => new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price])),
-    [selectedBid],
+    () => procurementItemCosts(procurementRoute, selectedBid),
+    [selectedBid, procurementRoute],
   );
   const [priceDrafts, setPriceDrafts] = useState<Record<string, PriceDraft>>(() => {
     const values: Record<string, PriceDraft> = {};
-    const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
+    const prices = procurementItemCosts(procurementRoute, selectedBid);
     for (const item of items) {
       const supplierPrice = prices.get(item.id);
       const supplierCost = supplierPrice?.is_available && supplierPrice.unit_price !== null
@@ -172,11 +176,12 @@ export function ClientQuoteBuilder({
       : nonNegativeNumber(priceDrafts[item.id].clientUnitPrice),
   })), [items, priceDrafts]);
   const summary = useMemo(
-    () => buildClientQuoteSummary(draftItems, selectedBid, nonNegativeNumber(clientDeliveryCharge), nonNegativeNumber(clientTaxPercent)),
-    [clientDeliveryCharge, clientTaxPercent, draftItems, selectedBid],
+    () => buildProcurementClientQuoteSummary(draftItems, procurementRoute, selectedBid, nonNegativeNumber(clientDeliveryCharge), nonNegativeNumber(clientTaxPercent)),
+    [clientDeliveryCharge, clientTaxPercent, draftItems, selectedBid, procurementRoute],
   );
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-  const canPrepare = Boolean(selectedClient && selectedBid && summary.complete && quoteNumber.trim());
+  const canPrepare = Boolean(selectedClient && (selectedBid || procurementRoute) && !routeError && summary.complete && quoteNumber.trim()
+    && !(procurementRoute && ["sent", "accepted"].includes(clientQuoteStatus)));
 
   function updateMarkup(itemId: string, rawValue: string) {
     const supplierPrice = supplierPrices.get(itemId);
@@ -229,6 +234,7 @@ export function ClientQuoteBuilder({
   function quotePayload() {
     return {
       comparisonId: comparison.id,
+      expectedRouteId: procurementRoute?.id ?? null,
       clientId: selectedClientId,
       quoteNumber,
       expiresOn: null,
@@ -422,7 +428,7 @@ export function ClientQuoteBuilder({
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">Sales tax %<input type="number" min="0" max="100" step="0.001" value={clientTaxPercent} onChange={(event) => setClientTaxPercent(event.target.value)} className="min-h-12 rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold tabular-nums" /></label>
       </div>
 
-      {!selectedBid ? (
+      {!selectedBid && !procurementRoute ? (
         <div className="p-5 sm:px-6">
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <CircleDollarSign className="mt-0.5 h-5 w-5 shrink-0" />
@@ -432,7 +438,7 @@ export function ClientQuoteBuilder({
       ) : (
         <>
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-6">
-            <div><p className="text-sm font-bold">Pricing from {selectedBid.supplier_name_snapshot}</p><p className="mt-1 text-xs text-slate-500">Set a markup or type the final client unit price. Both fields stay synchronized.</p></div>
+            <div><p className="text-sm font-bold">Pricing from {procurementRoute ? procurementRoute.suppliers.map((supplier) => supplier.supplier_name).join(" + ") : selectedBid?.supplier_name_snapshot}</p><p className="mt-1 text-xs text-slate-500">{routeError || "Set a markup or type the final client unit price. Both fields stay synchronized."}</p></div>
             <div className="flex items-end gap-2">
               <label className="grid gap-1 text-xs font-bold text-slate-600">Markup for all<div className="relative"><input type="number" min="0" step="0.1" value={bulkMarkup} onChange={(event) => setBulkMarkup(event.target.value)} placeholder="15" className="min-h-10 w-28 rounded-lg border border-slate-300 pr-8 pl-3 text-right text-sm font-bold" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span></div></label>
               <button type="button" onClick={applyMarkupToAll} disabled={!bulkMarkup} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold disabled:opacity-40">Apply</button>

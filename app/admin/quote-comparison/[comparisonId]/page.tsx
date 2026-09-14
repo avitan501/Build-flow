@@ -7,6 +7,7 @@ import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 import { productChoiceFingerprint, restoreProductChoices, type ProductChoiceDraftColumns } from "@/lib/product-choice-draft";
 import { loadProductMatchConfirmations } from "@/lib/product-match-server";
+import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -60,6 +61,7 @@ export default async function QuoteComparisonDetailPage({
   bidsResult.data = await loadProductMatchConfirmations(supabase,bidsResult.data ?? []);
   const choiceFingerprint = await productChoiceFingerprint(itemsResult.data ?? [], bidsResult.data ?? []);
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
+  const finalized = await loadFinalizedProcurementRoute(supabase, comparisonId, comparisonResult.data.active_route_id);
 
   const requestClientQuoteSourcesResult = comparisonResult.data.request_id
     ? await supabase
@@ -94,6 +96,8 @@ export default async function QuoteComparisonDetailPage({
       productChoiceFingerprint={choiceFingerprint}
       productChoiceWarning={choiceState.warning}
       comparison={comparisonResult.data}
+      procurementRoute={finalized.route}
+      routeError={finalized.error}
       items={itemsResult.data ?? []}
       bids={bidsResult.data ?? []}
       suppliers={suppliers}

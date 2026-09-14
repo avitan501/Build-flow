@@ -59,5 +59,5 @@ export function useQuoteAutosave<T>({ scopeKey, snapshot, initialSnapshot, initi
       document.removeEventListener("click", navigate, true);
     };
   }, [queue]);
-  return { ...state, flush: queue.flush, retry: queue.retry };
+  return { ...state, flush: queue.flush, retry: queue.retry, getRevision: queue.getRevision };
 }

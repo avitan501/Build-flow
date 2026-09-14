@@ -19,6 +19,7 @@ import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sani
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/request-step-completion"
 import { loadProductMatchConfirmations } from "@/lib/product-match-server"
+import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server"
 import type { RequestStepPatch, RequestStepRecord } from "@/lib/request-step-state"
 import type { ReviewableMaterialItem } from "@/lib/client-material-review"
 import { materialReviewChoiceUpdate } from "@/lib/material-review-recommendations"
@@ -979,10 +980,14 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
       const reason = requestStep1CompletionError(requested.data ?? [])
       if (reason) return { ok: false as const, error: reason }
     } else {
-      const selected = await supabase.from("quote_comparisons").select("id,awarded_bid_id").eq("request_id", requestId).eq("status", "awarded").order("updated_at", { ascending: false }).limit(1).maybeSingle<{ id: string; awarded_bid_id: string | null }>()
+      const selected = await supabase.from("quote_comparisons").select("id,awarded_bid_id,active_route_id").eq("request_id", requestId).eq("status", "awarded").order("updated_at", { ascending: false }).limit(1).maybeSingle<{ id: string; awarded_bid_id: string | null; active_route_id: string | null }>()
       if (selected.error) return { ok: false as const, error: "Could not check the selected prices. Try again." }
-      if (!selected.data?.awarded_bid_id) return { ok: false as const, error: "Select and save a supplier route in Compare supplier quotes first." }
+      if (!selected.data?.awarded_bid_id && !selected.data?.active_route_id) return { ok: false as const, error: "Select and save a supplier route in Compare supplier quotes first." }
       const comparison = selected.data
+      if (comparison.active_route_id) {
+        const finalized = await loadFinalizedProcurementRoute(supabase, comparison.id, comparison.active_route_id)
+        if (!finalized.route || finalized.error) return { ok: false as const, error: finalized.error || "Review the finalized supplier route." }
+      } else {
       const [items, bid] = await Promise.all([
         supabase.from("quote_comparison_items").select("*").eq("comparison_id", comparison.id).returns<QuoteComparisonItemRecord[]>(),
         supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", comparison.id).eq("id", comparison.awarded_bid_id!).maybeSingle<QuoteComparisonBidRecord>(),
@@ -991,6 +996,7 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
       const confirmedBids = await loadProductMatchConfirmations(supabase,bid.data ? [bid.data] : [])
       const reason = requestStep2CompletionError(requested.data ?? [], items.data ?? [], confirmedBids[0])
       if (reason) return { ok: false as const, error: reason }
+      }
     }
   }
 

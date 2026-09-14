@@ -19,6 +19,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { useQuoteAutosave } from "@/hooks/use-quote-autosave";
 import { saveProductChoicesAction } from "@/app/admin/quote-comparison/product-choice-actions";
+import { finalizeProductChoicesAction } from "@/app/admin/quote-comparison/route-actions";
+import type { FinalizedProcurementRoute } from "@/lib/finalized-procurement-route";
 
 import {
   addQuoteComparisonItemAction,
@@ -119,6 +121,8 @@ export function QuoteComparisonWorkspace({
   productChoiceRevision = 0,
   productChoiceFingerprint = "",
   productChoiceWarning = "",
+  procurementRoute = null,
+  routeError = null,
 }: {
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
@@ -135,13 +139,16 @@ export function QuoteComparisonWorkspace({
   productChoiceRevision?: number;
   productChoiceFingerprint?: string;
   productChoiceWarning?: string;
+  procurementRoute?: FinalizedProcurementRoute | null;
+  routeError?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
-  const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
+  const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => procurementRoute && !routeError ? 4 : items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
+  const [finalizeKey] = useState(() => crypto.randomUUID());
   const [productSelections, setProductSelections] = useState<Record<string, string>>(initialProductSelections);
   const [choiceSourceReviewed, setChoiceSourceReviewed] = useState(!productChoiceWarning);
   const [initialChoiceSnapshot] = useState({ version: 1, selections: initialProductSelections });
@@ -159,6 +166,17 @@ export function QuoteComparisonWorkspace({
   const [showItemForm, setShowItemForm] = useState(items.length === 0);
   const [showSupplierForm, setShowSupplierForm] = useState(bids.length === 0);
   const [selectedBidId, setSelectedBidId] = useState(comparison.awarded_bid_id || "");
+  const hasFinalRoute = Boolean((procurementRoute && !routeError) || selectedBidId);
+  function finalizeChoices() {
+    if (previewMode) return;
+    startTransition(async () => {
+      setError("");
+      if (!await choiceAutosave.flush()) return;
+      const result = await finalizeProductChoicesAction({ comparisonId: comparison.id, expectedDraftRevision: choiceAutosave.getRevision(), expectedSourceFingerprint: productChoiceFingerprint, idempotencyKey: finalizeKey });
+      if (!result.ok) { setError(result.error); return; }
+      router.refresh();
+    });
+  }
   const [details, setDetails] = useState({
     title: comparison.title,
     department: comparison.department,
@@ -471,9 +489,9 @@ export function QuoteComparisonWorkspace({
             { step: 0 as const, label: "Products", meta: `${productPreview.comparableCount}/${items.length}` },
             { step: 1 as const, label: "Materials", meta: `${items.length}` },
             { step: 2 as const, label: "Edit prices", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
-            { step: 3 as const, label: "Route", meta: selectedBidId ? "✓" : "" },
-            { step: 4 as const, label: "Client", meta: selectedBidId ? "Ready" : "Locked" },
-          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !selectedBidId} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
+            { step: 3 as const, label: "Route", meta: hasFinalRoute ? "✓" : "" },
+            { step: 4 as const, label: "Client", meta: hasFinalRoute ? "Ready" : "Locked" },
+          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !hasFinalRoute} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
         </nav>
         {showDetails ? (
           <section className="mb-5 border border-slate-200 bg-white p-5 shadow-sm">
@@ -493,6 +511,8 @@ export function QuoteComparisonWorkspace({
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 
         {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="space-y-4">
+          {routeError ? <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{routeError}</p> : null}
+          {!locked && !previewMode ? <button type="button" onClick={finalizeChoices} disabled={pending || pricesNeedSaving || choiceAutosave.conflict || !choiceSourceReviewed || productPreview.selectedCount !== items.length || items.length === 0} className="min-h-11 w-full rounded-lg bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-40">Finalize product choices · Continue to client</button> : null}
           {!previewMode ? <div className="text-xs" role="status" aria-live="polite">
             {!choiceSourceReviewed ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
             <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (!choiceSourceReviewed && choiceAutosave.status === "saved" ? "Product choices need review" : choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
@@ -642,11 +662,13 @@ export function QuoteComparisonWorkspace({
           </> : <div className="mt-4 border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><p className="text-sm font-bold">Enter supplier prices to compare them.</p></div>}
         </section> : null}
 
-        {activeStep === 4 && selectedBid ? <div className="mt-4 overflow-hidden rounded-xl"><ClientQuoteBuilder
-          key={selectedBidId || "no-supplier"}
+        {activeStep === 4 && (selectedBid || procurementRoute) ? <div className="mt-4 overflow-hidden rounded-xl"><ClientQuoteBuilder
+          key={procurementRoute?.id || selectedBidId || "no-supplier"}
           comparison={{ ...comparison, client_delivery_charge: clientReady.deliveryCharge, client_tax_percent: clientReady.taxPercent }}
           items={liveItems}
           selectedBid={selectedBid}
+          procurementRoute={procurementRoute}
+          routeError={routeError}
           clients={clients}
           initialAttachments={clientQuoteAttachments}
           previewMode={previewMode}

@@ -4,6 +4,7 @@ export type QuoteComparisonStatus = "draft" | "review" | "awarded" | "archived";
 export type ClientQuoteStatus = "draft" | "ready" | "sent" | "accepted" | "declined";
 
 export type QuoteComparisonRecord = {
+  active_route_id?: string | null;
   id: string;
   project_id: string | null;
   request_id: string | null;

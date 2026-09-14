@@ -30,6 +30,7 @@ create table public.quote_comparison_route_items (
  foreign key(route_id,supplier_id) references public.quote_comparison_route_suppliers(route_id,supplier_id)
 );
 alter table public.quote_comparisons add column active_route_id uuid;
+alter table public.quote_comparison_routes add column client_send_token uuid, add column client_send_snapshot jsonb, add column client_send_started_at timestamptz;
 alter table public.quote_comparisons add constraint quote_comparison_active_route_scope foreign key(id,active_route_id) references public.quote_comparison_routes(comparison_id,id);
 create index quote_routes_request_idx on public.quote_comparison_routes(request_id);
 create index quote_routes_actor_idx on public.quote_comparison_routes(created_by);
@@ -63,19 +64,22 @@ begin
  select * into v_parent from public.quote_comparisons where id=p_comparison_id for update;
  if not found then raise exception 'Comparison not found'; end if;
  select id into v_route from public.quote_comparison_routes where comparison_id=p_comparison_id and idempotency_key=p_idempotency_key;
- if found then return jsonb_build_object('ok',true,'routeId',v_route,'alreadyFinalized',true); end if;
+ if found then
+  if v_parent.active_route_id is distinct from v_route or v_parent.status<>'awarded' then raise exception 'Finalized route is no longer active'; end if;
+  return jsonb_build_object('ok',true,'routeId',v_route,'alreadyFinalized',true);
+ end if;
  if v_parent.status not in ('draft','review') or v_parent.active_route_id is not null or v_parent.product_choice_draft_revision is distinct from p_expected_revision
  or v_parent.product_choice_draft_source_fingerprint is distinct from p_source_fingerprint then raise exception 'Source or draft changed'; end if;
  if v_parent.request_id is not null then
-  perform 1 from public.quote_requests where id=v_parent.request_id for update;
-  perform 1 from public.quote_request_items where request_id=v_parent.request_id order by id for update;
+  perform 1 from public.quote_requests where id=v_parent.request_id for update nowait;
+  perform 1 from public.quote_request_items where request_id=v_parent.request_id order by id for update nowait;
   select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'department',department,'quantity',quantity,'unit',unit,'metadata',metadata,'qualification_status',qualification_status) order by id),'[]'::jsonb) into v_raw from public.quote_request_items where request_id=v_parent.request_id;
   if v_raw is distinct from p_expected_request_items then raise exception 'Request changed'; end if;
  elsif p_expected_request_items is distinct from '[]'::jsonb then raise exception 'Unexpected request source'; end if;
- perform 1 from public.quote_comparison_items where comparison_id=p_comparison_id order by id for update;
- perform 1 from public.quote_comparison_bids where comparison_id=p_comparison_id order by id for update;
- perform 1 from public.quote_comparison_prices p join public.quote_comparison_items i on i.id=p.item_id where i.comparison_id=p_comparison_id order by p.bid_id,p.item_id for update of p;
- perform 1 from public.quote_product_match_confirmations c join public.quote_comparison_items i on i.id=c.item_id where i.comparison_id=p_comparison_id order by c.id for update of c;
+ perform 1 from public.quote_comparison_items where comparison_id=p_comparison_id order by id for update nowait;
+ perform 1 from public.quote_comparison_bids where comparison_id=p_comparison_id order by id for update nowait;
+ perform 1 from public.quote_comparison_prices p join public.quote_comparison_items i on i.id=p.item_id where i.comparison_id=p_comparison_id order by p.bid_id,p.item_id for update of p nowait;
+ perform 1 from public.quote_product_match_confirmations c join public.quote_comparison_items i on i.id=c.item_id where i.comparison_id=p_comparison_id order by c.id for update of c nowait;
  select count(*) into v_count from public.quote_comparison_items where comparison_id=p_comparison_id;
  if v_count=0 or v_count>1000 or coalesce(jsonb_typeof(v_parent.product_choice_draft->'selections'),'')<>'object'
  or (select count(*) from jsonb_object_keys(v_parent.product_choice_draft->'selections'))<>v_count then raise exception 'Full product coverage required'; end if;
@@ -114,3 +118,128 @@ begin
 end $$;
 revoke all on function public.staff_finalize_quote_comparison_route(uuid,uuid,integer,text,uuid,jsonb) from public,anon,authenticated;
 grant execute on function public.staff_finalize_quote_comparison_route(uuid,uuid,integer,text,uuid,jsonb) to service_role;
+
+create function public.quote_finalized_route_is_current(p_comparison_id uuid,p_route_id uuid)
+returns boolean language plpgsql stable security invoker set search_path='' as $$
+declare v_route public.quote_comparison_routes%rowtype; v_line public.quote_comparison_route_items%rowtype;
+ v_item public.quote_comparison_items%rowtype; v_bid public.quote_comparison_bids%rowtype; v_price public.quote_comparison_prices%rowtype; v_raw jsonb;
+begin
+ if not exists(select 1 from public.quote_comparisons where id=p_comparison_id and active_route_id=p_route_id and status='awarded') then return false; end if;
+ select * into v_route from public.quote_comparison_routes where id=p_route_id and comparison_id=p_comparison_id;
+ if not found then return false; end if;
+ if (select request_id from public.quote_comparisons where id=p_comparison_id) is distinct from v_route.request_id then return false; end if;
+ if v_route.request_id is not null then
+  select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'department',department,'quantity',quantity,'unit',unit,'metadata',metadata,'qualification_status',qualification_status) order by id),'[]'::jsonb) into v_raw from public.quote_request_items where request_id=v_route.request_id;
+  if v_raw is distinct from v_route.source_snapshot->'request_items' then return false; end if;
+ end if;
+ if (select count(*) from public.quote_comparison_items where comparison_id=p_comparison_id)<>(select count(*) from public.quote_comparison_route_items where route_id=p_route_id) then return false; end if;
+ for v_line in select * from public.quote_comparison_route_items where route_id=p_route_id loop
+  select * into v_item from public.quote_comparison_items where id=v_line.item_id and comparison_id=p_comparison_id;
+  if not found then return false; end if;
+  select * into v_bid from public.quote_comparison_bids where id=v_line.bid_id and comparison_id=p_comparison_id;
+  if not found then return false; end if;
+  select * into v_price from public.quote_comparison_prices where item_id=v_line.item_id and bid_id=v_line.bid_id;
+  if not found or not public.quote_product_match_is_eligible(v_line.item_id,v_line.bid_id) then return false; end if;
+  if jsonb_build_array(v_item.id,v_item.source_request_item_id,v_item.description,v_item.specification,v_item.quantity,v_item.unit)
+   is distinct from jsonb_build_array(v_line.source_snapshot->'item'->'id',v_line.source_snapshot->'item'->'source_request_item_id',v_line.source_snapshot->'item'->'description',v_line.source_snapshot->'item'->'specification',v_line.source_snapshot->'item'->'quantity',v_line.source_snapshot->'item'->'unit') then return false; end if;
+  if jsonb_build_array(v_bid.id,v_bid.supplier_id,v_bid.delivery_charge,v_bid.tax_percent,v_bid.trust_level_snapshot,v_bid.lead_time_days)
+   is distinct from jsonb_build_array(v_line.source_snapshot->'bid'->'id',v_line.source_snapshot->'bid'->'supplier_id',v_line.source_snapshot->'bid'->'delivery_charge',v_line.source_snapshot->'bid'->'tax_percent',v_line.source_snapshot->'bid'->'trust_level_snapshot',v_line.source_snapshot->'bid'->'lead_time_days') then return false; end if;
+  if jsonb_build_array(v_price.unit_price,v_price.is_available,v_price.notes)
+   is distinct from jsonb_build_array(v_line.source_snapshot->'price'->'unit_price',v_line.source_snapshot->'price'->'is_available',v_line.source_snapshot->'price'->'notes') then return false; end if;
+ end loop;
+ return true;
+end $$;
+revoke all on function public.quote_finalized_route_is_current(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.quote_finalized_route_is_current(uuid,uuid) to service_role;
+
+-- Lock the exact supplier/request evidence before client writes. NOWAIT avoids
+-- deadlocking legacy child-first writers; no lock conflict becomes a partial save.
+create function public.lock_finalized_route_evidence(p_comparison_id uuid,p_route_id uuid)
+returns void language plpgsql security invoker set search_path='' as $$
+declare v_request uuid;
+begin
+ select request_id into v_request from public.quote_comparisons where id=p_comparison_id for update;
+ if v_request is not null then
+  perform 1 from public.quote_requests where id=v_request for update nowait;
+  perform 1 from public.quote_request_items where request_id=v_request order by id for update nowait;
+ end if;
+ perform 1 from public.quote_comparison_items where comparison_id=p_comparison_id order by id for update nowait;
+ perform 1 from public.quote_comparison_bids where comparison_id=p_comparison_id order by id for update nowait;
+ perform 1 from public.quote_comparison_prices p join public.quote_comparison_items i on i.id=p.item_id where i.comparison_id=p_comparison_id order by p.bid_id,p.item_id for update of p nowait;
+ perform 1 from public.quote_product_match_confirmations c join public.quote_comparison_items i on i.id=c.item_id where i.comparison_id=p_comparison_id order by c.id for update of c nowait;
+ if public.quote_finalized_route_is_current(p_comparison_id,p_route_id) is not true then raise exception 'Supplier route changed. Reopen and review.'; end if;
+end $$;
+revoke all on function public.lock_finalized_route_evidence(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.lock_finalized_route_evidence(uuid,uuid) to service_role;
+
+create function public.staff_save_finalized_route_client_quote(
+ p_comparison_id uuid,p_route_id uuid,p_actor_id uuid,p_client_id uuid,p_quote_number text,p_expires_on date,
+ p_client_message text,p_client_delivery_charge numeric,p_client_tax_percent numeric,p_items jsonb
+) returns void language plpgsql security invoker set search_path='' as $$
+declare v_client public.profiles%rowtype; v_count integer;
+begin
+ if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
+ and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
+ perform public.lock_finalized_route_evidence(p_comparison_id,p_route_id);
+ if exists(select 1 from public.quote_comparison_routes where id=p_route_id and client_send_token is not null) then raise exception 'Client delivery already started. Check delivery history before changing this quote.'; end if;
+ if exists(select 1 from public.quote_comparisons where id=p_comparison_id and client_quote_status in ('sent','accepted')) then raise exception 'Sent quote is immutable'; end if;
+ select * into v_client from public.profiles where id=p_client_id and role='client' and is_active and nullif(btrim(email),'') is not null;
+ if not found then raise exception 'client_not_found'; end if;
+ if p_quote_number is null or length(btrim(p_quote_number))<3 or p_client_delivery_charge is null or p_client_delivery_charge<0
+ or p_client_delivery_charge::text in ('NaN','Infinity','-Infinity') or p_client_tax_percent is null or p_client_tax_percent<0 or p_client_tax_percent>100
+ or p_client_tax_percent::text in ('NaN','Infinity','-Infinity') or jsonb_typeof(p_items) is distinct from 'array' then raise exception 'Invalid client quote'; end if;
+ select count(*) into v_count from public.quote_comparison_items where comparison_id=p_comparison_id;
+ if v_count=0 or jsonb_array_length(p_items)<>v_count or (select count(distinct q.item_id) from jsonb_to_recordset(p_items) q(item_id uuid,markup_percent numeric,client_unit_price numeric)
+ join public.quote_comparison_items i on i.id=q.item_id and i.comparison_id=p_comparison_id where q.markup_percent>=0 and q.markup_percent::text not in ('NaN','Infinity','-Infinity')
+ and q.client_unit_price>=0 and q.client_unit_price::text not in ('NaN','Infinity','-Infinity'))<>v_count then raise exception 'client_prices_incomplete'; end if;
+ update public.quote_comparisons set client_id=p_client_id,client_name_snapshot=left(coalesce(nullif(btrim(v_client.full_name),''),v_client.email),200),
+ client_email_snapshot=left(v_client.email,320),quote_number=left(btrim(p_quote_number),40),expires_on=p_expires_on,client_message=left(coalesce(p_client_message,''),4000),
+ client_delivery_charge=p_client_delivery_charge,client_tax_percent=p_client_tax_percent,client_quote_status='ready',quote_sent_at=null where id=p_comparison_id;
+ update public.quote_comparison_items i set markup_percent=q.markup_percent,client_unit_price=q.client_unit_price
+ from jsonb_to_recordset(p_items) q(item_id uuid,markup_percent numeric,client_unit_price numeric) where i.id=q.item_id and i.comparison_id=p_comparison_id;
+end $$;
+revoke all on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb) from public,anon,authenticated;
+grant execute on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb) to service_role;
+
+create function public.staff_reopen_finalized_route(p_comparison_id uuid,p_actor_id uuid)
+returns void language plpgsql security invoker set search_path='' as $$
+declare v_parent public.quote_comparisons%rowtype;
+begin
+ if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
+ and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
+ select * into v_parent from public.quote_comparisons where id=p_comparison_id for update;
+ if not found or v_parent.active_route_id is null then raise exception 'No finalized route'; end if;
+ if exists(select 1 from public.quote_comparison_routes where id=v_parent.active_route_id and client_send_token is not null) then raise exception 'Client delivery already started. Check delivery history before reopening.'; end if;
+ if v_parent.client_quote_status in ('sent','accepted') then raise exception 'Sent quote is immutable'; end if;
+ update public.quote_comparisons set active_route_id=null,status='review',client_quote_status='draft' where id=p_comparison_id;
+ -- Immutable allocation history and original declined supplier statuses survive reopening.
+end $$;
+revoke all on function public.staff_reopen_finalized_route(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.staff_reopen_finalized_route(uuid,uuid) to service_role;
+
+create function public.finalized_route_client_snapshot(p_comparison_id uuid) returns jsonb
+language sql stable security invoker set search_path='' as $$
+ select jsonb_build_object('comparison',jsonb_build_object('active_route_id',c.active_route_id,'client_id',c.client_id,'client_name_snapshot',c.client_name_snapshot,
+ 'client_email_snapshot',c.client_email_snapshot,'quote_number',c.quote_number,'expires_on',c.expires_on,'client_message',c.client_message,'job_address',c.job_address,
+ 'client_delivery_charge',c.client_delivery_charge,'client_tax_percent',c.client_tax_percent,'client_quote_status',c.client_quote_status),
+ 'items',(select coalesce(jsonb_agg(jsonb_build_object('id',i.id,'description',i.description,'specification',i.specification,'quantity',i.quantity,'unit',i.unit,'markup_percent',i.markup_percent,'client_unit_price',i.client_unit_price) order by i.id),'[]') from public.quote_comparison_items i where i.comparison_id=c.id))
+ from public.quote_comparisons c where c.id=p_comparison_id
+$$;
+revoke all on function public.finalized_route_client_snapshot(uuid) from public,anon,authenticated;
+grant execute on function public.finalized_route_client_snapshot(uuid) to service_role;
+
+create function public.staff_claim_finalized_route_send(p_comparison_id uuid,p_route_id uuid,p_actor_id uuid,p_expected jsonb,p_token uuid)
+returns void language plpgsql security invoker set search_path='' as $$
+begin
+ if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
+ and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
+ perform public.lock_finalized_route_evidence(p_comparison_id,p_route_id);
+ if p_token is null or p_expected is null or public.finalized_route_client_snapshot(p_comparison_id) is distinct from p_expected then raise exception 'Client quote changed. Reload before sending.'; end if;
+ if not exists(select 1 from public.quote_comparisons where id=p_comparison_id and client_quote_status='ready' and client_id is not null and nullif(btrim(client_email_snapshot),'') is not null) then raise exception 'Save the client quote first'; end if;
+ update public.quote_comparison_routes set client_send_token=p_token,client_send_snapshot=p_expected,client_send_started_at=now()
+ where id=p_route_id and comparison_id=p_comparison_id and client_send_token is null;
+ if not found then raise exception 'Delivery already started. Check delivery history; do not send twice.'; end if;
+ -- Retain this claim even on an ambiguous provider timeout. No blind duplicate send.
+end $$;
+revoke all on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid) from public,anon,authenticated;
+grant execute on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid) to service_role;

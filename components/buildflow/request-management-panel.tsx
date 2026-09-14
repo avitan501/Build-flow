@@ -40,6 +40,9 @@ export type RequestComparisonSummary = {
   title: string
   status: string
   awardedBidId: string | null
+  activeRouteId?: string | null
+  routeReady?: boolean
+  routeSupplierNames?: string[]
   clientQuoteStatus: string
   quoteNumber: string
   updatedAt: string
@@ -892,7 +895,7 @@ export function RequestManagementPanel({
   }
 
   const supplierQuoteCount = comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)
-  const winningComparison = comparisons.find((comparison) => comparison.status === "awarded" && Boolean(comparison.awardedBidId)) ?? null
+  const winningComparison = comparisons.find((comparison) => comparison.status === "awarded" && (comparison.routeReady ?? Boolean(comparison.awardedBidId))) ?? null
   const primaryComparison = winningComparison ?? comparisons[0] ?? null
   const winningBid = winningComparison?.bids.find((bid) => bid.id === winningComparison.awardedBidId) ?? null
   const selectedSupplierNames = [...new Set([
@@ -918,7 +921,7 @@ export function RequestManagementPanel({
   const paymentDeliveryStatus = workflow.step3Status
   const replyComplete = clientReplyDone
   const pricingDetail = workflow.step2Complete
-    ? winningBid ? `Selected: ${winningBid.supplierName}` : "Supplier pricing complete"
+    ? winningBid ? `Selected: ${winningBid.supplierName}` : winningComparison?.routeSupplierNames?.length ? `Selected: ${winningComparison.routeSupplierNames.join(" + ")}` : "Supplier pricing complete"
     : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step2Action]}`
   const clientDocuments = initialClientDocuments.filter((document) => !deletedDocumentTokens.includes(document.publicToken))
   const hasClientProgress = Boolean(clientDocuments.length || estimateSent || clientApproved || invoiceSent || paymentLinkSent || paymentReceived || receiptSent || deliveryScheduled)
