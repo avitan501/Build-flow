@@ -66,10 +66,10 @@ test("queue and worker stay private and scheduled credentials remain in Vault", 
 test("worker processes one bounded job and always records a terminal or retry result", async () => {
   const worker = await source("supabase/functions/client-material-list-worker/index.ts")
 
-  expect(worker).toContain('admin.rpc("claim_client_material_list_jobs", { p_limit: 1 })')
+  expect(worker).toContain('admin.rpc("claim_material_list_checkpoint_jobs", { p_limit: 1 })')
   expect(worker).toContain('fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`')
   expect(worker).toContain("controller.abort(), 120_000")
-  expect(worker).toContain('admin.rpc("finish_client_material_list_job"')
+  expect(worker).toContain('admin.rpc("finish_material_list_checkpoint_job"')
   expect(worker).toContain('payload.status === "processing"')
   expect(worker).toContain('? "organizer_timeout"')
 })

@@ -1,6 +1,10 @@
 // Codes only: never propagate arbitrary provider responses or customer text.
 const failureCodes = new Set([
   "key_lookup_timeout",
+  "ai_not_configured", "source_read_unavailable", "job_context_required", "stale_job",
+  "checkpoint_unavailable", "checkpoint_publish_failed", "attachment_limit",
+  "document_unreadable", "document_page_limit", "material_row_limit",
+  "database_capacity", "database_retry", "source_changed", "organized_work_in_use",
   "organizer_failed", "organizer_timeout", "organizer_busy", "organizer_unavailable",
   "openai_timeout", "openai_unavailable", "openai_incomplete", "openai_refused",
   "openai_empty_output", "openai_invalid_json", "openai_invalid_shape",
@@ -21,6 +25,16 @@ export function materialListFailureCode(cause: unknown): string {
   if (cause instanceof MaterialListFailure) return safeMaterialListFailure(cause.message)
   if (cause instanceof Error && cause.name === "AbortError") return "openai_timeout"
   return "organizer_failed"
+}
+
+export function materialListDatabaseFailure(cause: unknown, fallback: string): string {
+  if (cause && typeof cause === "object") {
+    const error = cause as {code?:unknown;message?:unknown}
+    if(error.code==="53300") return "database_capacity"
+    if(error.code==="40P01" || error.code==="40001") return "database_retry"
+    if(["stale_job","source_changed","organized_work_in_use"].includes(String(error.message))) return String(error.message)
+  }
+  return safeMaterialListFailure(fallback)
 }
 
 function object(value: unknown): value is Record<string, unknown> {

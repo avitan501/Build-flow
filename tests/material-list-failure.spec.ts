@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
-import { completedMaterialListOutput, MaterialListFailure, materialListFailureCode, safeMaterialListFailure, validMaterialListOutput } from "../supabase/functions/_shared/material-list-failure"
+import { completedMaterialListOutput, MaterialListFailure, materialListFailureCode, materialListDatabaseFailure, safeMaterialListFailure, validMaterialListOutput } from "../supabase/functions/_shared/material-list-failure"
 
 const item = {
   name: "2x4 lumber", department: "Lumber", quantity: 3, unit: "each", dimensions: "2x4",
@@ -9,6 +9,13 @@ const item = {
 }
 const output = { documentType: "material_list", summary: "Lumber", items: [item] }
 const response = (value: unknown = output) => ({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] })
+
+test("database capacity and concurrency failures stay distinct without leaking details", () => {
+  expect(materialListDatabaseFailure({code:"53300",message:"private"},"checkpoint_unavailable")).toBe("database_capacity")
+  for (const code of ["40P01","40001"]) expect(materialListDatabaseFailure({code,message:"private"},"checkpoint_unavailable")).toBe("database_retry")
+  expect(materialListDatabaseFailure({message:"source_changed"},"checkpoint_unavailable")).toBe("source_changed")
+  expect(materialListDatabaseFailure({message:"private"},"checkpoint_unavailable")).toBe("checkpoint_unavailable")
+})
 
 test("completed validated material list can continue; plan review remains valid", () => {
   expect(completedMaterialListOutput(response())).toEqual(output)
@@ -48,18 +55,20 @@ test("unknown exception text and payload fields cannot leak through failure code
   expect(materialListFailureCode(new DOMException("private text", "AbortError"))).toBe("openai_timeout")
 })
 
-test("error survives worker finalization without requiring database DDL", async () => {
+test("error survives lease-fenced worker finalization without stale source writes", async () => {
   const organizer = await readFile("supabase/functions/client-material-list-ai/index.ts", "utf8")
   const worker = await readFile("supabase/functions/client-material-list-worker/index.ts", "utf8")
   const migration = await readFile("supabase/migrations/20260902140536_add_durable_client_material_processing.sql", "utf8")
-  expect(organizer).toContain("ai_organization_failure_code: code")
+  const checkpoint = await readFile("supabase/migrations/20260914180138_resumable_material_list_chunks.sql", "utf8")
+  expect(checkpoint).toContain("'ai_organization_failure_code',left(coalesce(p_error")
   expect(organizer).toContain("failureCode: code")
   expect(worker).toContain("safeMaterialListFailure(payload.failureCode)")
   expect(migration).toContain("set metadata = coalesce(metadata, '{}'::jsonb) ||")
   expect(migration).toContain("last_error = left(coalesce(nullif(p_error, ''), 'organizer_failed'), 240)")
   expect(migration).toContain("v_status := 'failed'")
-  expect(organizer.indexOf("completedMaterialListOutput(payload)")).toBeLessThan(organizer.indexOf('.insert(rows)'))
-  expect(organizer.indexOf("completedMaterialListOutput(payload)")).toBeLessThan(organizer.indexOf('.delete().in("id", existing'))
+  expect(organizer.indexOf("completedMaterialListOutput(payload)")).toBeLessThan(organizer.indexOf('admin.rpc("publish_material_list_checkpoint"'))
+  expect(organizer).not.toContain('.insert(rows)')
+  expect(organizer).not.toContain('.delete().in("id", existing')
 })
 
 test("provider budget covers body read and remains below worker and cron budgets", async () => {

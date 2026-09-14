@@ -14,6 +14,7 @@ type MaterialListJob = {
   generation: number
   force_requested: boolean
   attempt: number
+  lease_token: string
 }
 
 type OrganizerResult = {
@@ -61,9 +62,10 @@ async function finishJob(job: MaterialListJob, result: {
   reviewCount?: number
   error?: string
 }) {
-  const { data, error } = await admin.rpc("finish_client_material_list_job", {
+  const { data, error } = await admin.rpc("finish_material_list_checkpoint_job", {
     p_job_id: job.job_id,
     p_generation: job.generation,
+    p_lease: job.lease_token,
     p_succeeded: result.succeeded,
     p_result_status: result.status || null,
     p_item_count: Number.isFinite(result.itemCount) ? result.itemCount : null,
@@ -92,9 +94,14 @@ async function runJob(job: MaterialListJob) {
         authorization: `Bearer ${serviceKey}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ requestId: job.request_id, force: job.force_requested }),
+      body: JSON.stringify({ requestId: job.request_id, force: job.force_requested, jobId:job.job_id, generation:job.generation, lease:job.lease_token }),
     })
     const payload = await response.json().catch(() => null) as OrganizerResult | null
+    if(response.ok && payload?.ok && payload.status === "chunk_completed") {
+      const {data,error}=await admin.rpc("continue_material_list_job",{p_job_id:job.job_id,p_generation:job.generation,p_lease:job.lease_token})
+      if(error) throw new Error("checkpoint_continue_unavailable")
+      return typeof data === "string" ? data : "queued"
+    }
     if (!response.ok || !payload?.ok || payload.status === "processing") {
       result = {
         succeeded: false,
@@ -133,7 +140,7 @@ Deno.serve(async (request: Request) => {
   }
   if (body.action !== "drain") return json({ error: "Unsupported action" }, 400)
 
-  const { data, error } = await admin.rpc("claim_client_material_list_jobs", { p_limit: 1 })
+  const { data, error } = await admin.rpc("claim_material_list_checkpoint_jobs", { p_limit: 1 })
   if (error) return json({ error: "The document queue is unavailable." }, 503)
   const jobs = (data ?? []) as MaterialListJob[]
   if (!jobs.length) return json({ ok: true, claimed: 0, completed: 0 })
