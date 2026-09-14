@@ -2,6 +2,21 @@ import { test, expect } from "@playwright/test";
 import { AutosaveQueue, type AutosaveResult } from "../lib/autosave-queue";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 15));
+
+test("incomplete raw drafts remain dirty without saving and resume after valid typing", async () => {
+  const writes: string[] = [];
+  const queue = new AutosaveQueue("1", 0, async (value, revision) => { writes.push(value); return { ok: true, revision: revision + 1 }; }, 5, (value) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) > 0);
+  queue.update(""); await tick(); expect(writes).toEqual([]); expect(await queue.flush()).toBe(false); expect(queue.getState().dirty).toBe(true);
+  queue.update("2"); await tick(); expect(writes).toEqual(["2"]); expect(queue.getState().dirty).toBe(false);
+});
+
+test("invalid typing during an in-flight save never queues blank as zero", async () => {
+  const pending = deferred(); const writes: string[] = [];
+  const queue = new AutosaveQueue("1", 0, async (value, revision) => { writes.push(value); return writes.length === 1 ? pending.promise : { ok: true, revision: revision + 1 }; }, 5, (value) => value !== "" && Number(value) > 0);
+  queue.update("2"); const flush = queue.flush(); await Promise.resolve(); queue.update(""); pending.resolve({ ok: true, revision: 1 });
+  expect(await flush).toBe(false); expect(writes).toEqual(["2"]); expect(queue.getState().dirty).toBe(true);
+  queue.update("3"); await tick(); expect(writes).toEqual(["2", "3"]);
+});
 function deferred() {
   let resolve!: (result: AutosaveResult) => void;
   const promise = new Promise<AutosaveResult>((done) => { resolve = done; });

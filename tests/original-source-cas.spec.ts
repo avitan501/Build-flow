@@ -65,6 +65,6 @@ test("database or linked-row read failure returns not-saved without writes", asy
 test("editor captures expected snapshot on open and retains draft on failed result", () => {
   const editor = readFileSync("components/buildflow/original-request-item-editor.tsx", "utf8")
   expect(editor).toContain("setExpectedItemSnapshot(item ? itemEditSnapshot(item) : undefined)")
-  expect(editor).toContain("fields: value.fields, expectedItemSnapshot")
+  expect(editor).toContain("fields: value.fields, expectedItemSnapshot: expectedRef.current")
   expect(editor).toContain("if (!result.ok) { setFeedback(result.error); return }")
 })

@@ -616,14 +616,17 @@ export async function saveOriginalMaterialItemAction(input: {
     const details = isRawRequest ? multilineDetails : compactDetails
     // The RPC locks the original and compares the full displayed snapshot again.
     // Never mirror source edits into a reviewed/priced organized product.
+    const patch = { name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, ...(organizedRows?.length ? { ai_organization_status: "draft_changed", ai_organization_summary: "Original request changed. Review the organized products before using them." } : {}), manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }
     const { data: saved, error } = await createAdminClient().rpc("staff_apply_request_item_edit", {
       p_request_id: requestId, p_item_id: itemId, p_actor_id: user.id, p_receipt_id: randomUUID(),
       p_expected: itemEditSnapshot(current), p_source_id: null, p_source_expected: null,
-      p_patch: { name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, ...(organizedRows?.length ? { ai_organization_status: "draft_changed", ai_organization_summary: "Original request changed. Review the organized products before using them." } : {}), manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } },
+      p_patch: patch,
       p_undo: false,
     })
     if (error) return { ok: false as const, error: "The original item could not be saved.", version }
     if (!saved?.ok) return { ok: false as const, conflict: true as const, error: "A newer edit arrived before saving. Your draft is still here; review the latest original first.", version }
+    revalidatePath(`/owner/materials/requests/${requestId}`)
+    return { ok: true as const, version, expectedItemSnapshot: { ...itemEditSnapshot(current), ...patch } }
   } else {
     const { data: departmentSource } = await supabase
       .from("quote_request_items")

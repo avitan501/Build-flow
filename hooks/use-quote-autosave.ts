@@ -8,17 +8,18 @@ import { AutosaveQueue, type AutosaveResult } from "@/lib/autosave-queue";
 const mountedQueues = new Set<Pick<AutosaveQueue<unknown>, "getState" | "flush">>();
 
 /** scopeKey must include authenticated actor and record; never reuse one across accounts. */
-export function useQuoteAutosave<T>({ scopeKey, snapshot, initialSnapshot, initialRevision, persist, debounceMs = 650 }: {
+export function useQuoteAutosave<T>({ scopeKey, snapshot, initialSnapshot, initialRevision, persist, debounceMs = 650, isValid }: {
   scopeKey: string;
   snapshot: T;
   initialSnapshot: T;
   initialRevision: number;
   persist: (snapshot: T, expectedRevision: number) => Promise<AutosaveResult>;
   debounceMs?: number;
+  isValid?: (snapshot: T) => boolean;
 }) {
   // Server refreshes must not replace an actively edited baseline. A record/account change must.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const queue = useMemo(() => new AutosaveQueue(initialSnapshot, initialRevision, persist, debounceMs), [scopeKey]);
+  const queue = useMemo(() => new AutosaveQueue(initialSnapshot, initialRevision, persist, debounceMs, isValid), [scopeKey]);
   useEffect(() => { queue.resume(); return () => queue.pause(); }, [queue]);
   useEffect(() => { queue.setPersist(persist); }, [queue, persist]);
   const state = useSyncExternalStore(queue.subscribe, queue.getState, queue.getState);

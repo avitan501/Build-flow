@@ -3,13 +3,14 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
-import { useState, useTransition, type ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, useTransition, type ReactNode } from "react"
 
 import { organizeClientMaterialRequestAction, saveOriginalMaterialItemAction, updateOrganizedMaterialItemAction } from "@/app/owner/materials/requests/actions"
 import { saveReviewedRequestItemAction } from "@/app/owner/materials/requests/item-edit-actions"
-import { cleanMaterialRequestDetails, materialQuantity, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { cleanMaterialRequestDetails, type ReviewableMaterialItem } from "@/lib/client-material-review"
 import { COMMON_REQUEST_ITEM_FIELDS, requestItemFieldDefinition, requestItemFieldsFromMetadata, type RequestItemField } from "@/lib/request-item-fields"
 import { itemEditSnapshot } from "@/lib/request-item-continuity"
+import { useQuoteAutosave } from "@/hooks/use-quote-autosave"
 
 type ItemDraft = { name: string; quantity: string; unit: string; details: string; fields: RequestItemField[] }
 const COMMON_UNITS = ["each", "box", "bundle", "sheet", "piece", "roll", "bag", "pallet", "linear ft.", "sq. ft.", "cu. yd."]
@@ -18,8 +19,8 @@ function draftFromItem(item?: ReviewableMaterialItem): ItemDraft {
   const rawRequest = item?.name.trim().toLowerCase() === "free-text material list"
   return {
     name: item?.name ?? "",
-    quantity: String(item ? materialQuantity(item) : 1),
-    unit: item ? materialSalesUnit(item) : "each",
+    quantity: item ? String(item.quantity ?? "") : "1",
+    unit: item ? item.unit ?? "" : "each",
     details: item ? rawRequest
       ? String(item.metadata?.request_details ?? "").replace(/\\n/g, "\n").replace(/\r\n?/g, "\n").trim()
       : cleanMaterialRequestDetails(item.metadata?.request_details) : "",
@@ -34,38 +35,111 @@ function nextCustomId(fields: RequestItemField[]) {
   return `custom-${number}`
 }
 
-export function OriginalRequestItemEditor({ requestId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children, revision, onReviewedSave, onOriginalSaved }: { requestId: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode; revision?: string; onReviewedSave?: (result: Extract<Awaited<ReturnType<typeof saveReviewedRequestItemAction>>, { ok: true }>) => void; onOriginalSaved?: () => void }) {
+function valid(value: ItemDraft) {
+  return Boolean(value.name.trim() && value.unit.trim() && value.quantity.trim() && Number.isFinite(Number(value.quantity)) && Number(value.quantity) > 0 && value.fields.every((field) => field.label.trim() && field.value.trim()))
+}
+
+export function OriginalRequestItemEditor(props: Parameters<typeof OriginalRequestItemEditorSession>[0]) {
+  return <OriginalRequestItemEditorSession key={`${props.actorId || "unscoped"}:${props.requestId}:${props.item?.id || "add"}:${props.itemKind || "original"}`} {...props} />
+}
+
+function OriginalRequestItemEditorSession({ requestId, actorId, item, mode = "edit", itemKind = "original", trigger = "button", buttonLabel, children, revision, onReviewedSave, onOriginalSaved }: { requestId: string; actorId?: string; item?: ReviewableMaterialItem; mode?: "edit" | "add"; itemKind?: "original" | "organized"; trigger?: "button" | "content"; buttonLabel?: string; children?: ReactNode; revision?: string; onReviewedSave?: (result: Extract<Awaited<ReturnType<typeof saveReviewedRequestItemAction>>, { ok: true }>) => void; onOriginalSaved?: () => void }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ItemDraft>(() => draftFromItem(item))
   const [expectedItemSnapshot, setExpectedItemSnapshot] = useState(() => item ? itemEditSnapshot(item) : undefined)
+  const expectedRef = useRef(expectedItemSnapshot)
+  const revisionRef = useRef(revision)
+  const [initialSnapshot, setInitialSnapshot] = useState(() => draftFromItem(item))
+  const [openCount, setOpenCount] = useState(0)
+  const historyToken = useRef(`item-editor-${requestId}-${item?.id || "new"}`)
+  const closeCallback = useRef<() => void>(() => {})
   const [fieldToAdd, setFieldToAdd] = useState("")
   const [feedback, setFeedback] = useState("")
   const [organizeAfterSave, setOrganizeAfterSave] = useState(false)
   const [pending, startTransition] = useTransition()
   const rawRequest = item?.name.trim().toLowerCase() === "free-text material list"
+  const canAutosave = mode === "edit" && Boolean(actorId && item && (itemKind === "original" || revision))
+  const autosave = useQuoteAutosave({
+    scopeKey: `${actorId || "unscoped"}:${requestId}:${item?.id || "add"}:${openCount}`,
+    snapshot: canAutosave ? draft : initialSnapshot, initialSnapshot, initialRevision: 0, isValid: valid,
+    persist: async (value, serial) => {
+      if (!canAutosave) return { ok: false, error: "Open the current item before editing.", conflict: true }
+      const result = await persist(value)
+      if (!result.ok) return { ok: false, error: result.error, conflict: "conflict" in result && result.conflict === true }
+      return { ok: true, revision: serial + 1 }
+    },
+  })
 
   function openEditor() {
     setDraft(draftFromItem(item))
     setExpectedItemSnapshot(item ? itemEditSnapshot(item) : undefined)
+    expectedRef.current = item ? itemEditSnapshot(item) : undefined
+    revisionRef.current = revision
+    setInitialSnapshot(draftFromItem(item))
+    setOpenCount((value) => value + 1)
     setFeedback("")
     setFieldToAdd("")
+    // Back first closes this dialog, not the entire request with an unsaved draft.
+    if (canAutosave) window.history.pushState({ ...window.history.state, avantiaItemEditor: historyToken.current }, "", window.location.href)
     setOpen(true)
   }
 
+  function finishClose() {
+    if (canAutosave && window.history.state?.avantiaItemEditor === historyToken.current) window.history.back()
+    setOpen(false); router.refresh()
+  }
+
   function closeEditor() {
-    if (!pending) setOpen(false)
+    if (pending) return
+    if (!canAutosave) { setOpen(false); return }
+    startTransition(async () => {
+      if (!valid(draft)) { setFeedback("Complete the empty fields before leaving. Your draft is still here."); return }
+      if (!await autosave.flush()) { setFeedback("Some changes are not saved. Keep this window open and review the message below."); return }
+      finishClose()
+    })
+  }
+
+  useLayoutEffect(() => { closeCallback.current = closeEditor })
+  useLayoutEffect(() => {
+    if (!open || !canAutosave) return
+    const onBack = (event: PopStateEvent) => {
+      if (window.history.state?.avantiaItemEditor === historyToken.current) return
+      event.stopImmediatePropagation()
+      // Restore the same-URL dialog entry while its newest draft is checked/flushed.
+      window.history.pushState({ ...window.history.state, avantiaItemEditor: historyToken.current }, "", window.location.href)
+      closeCallback.current()
+    }
+    window.addEventListener("popstate", onBack, true)
+    return () => window.removeEventListener("popstate", onBack, true)
+  }, [open, canAutosave])
+
+  function discardDraft() {
+    if (pending || autosave.status === "saving") return
+    if (!window.confirm("Discard changes that have not been saved? Saved edits will stay.")) return
+    const latest = draftFromItem(item)
+    setDraft(latest); setInitialSnapshot(latest); setOpenCount((value) => value + 1)
+    setFeedback(""); finishClose()
+  }
+
+  function changeDraft(update: (value: ItemDraft) => ItemDraft) {
+    setFeedback("")
+    setDraft(update)
   }
 
   async function persist(value: ItemDraft) {
-    if (item && itemKind === "organized" && revision) {
-      const result = await saveReviewedRequestItemAction({ requestId, itemId: item.id, revision, edit: { name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields } })
-      if (result.ok) onReviewedSave?.(result)
+    if (item && itemKind === "organized" && revisionRef.current) {
+      const result = await saveReviewedRequestItemAction({ requestId, itemId: item.id, revision: revisionRef.current, edit: { name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields } })
+      if (result.ok) { revisionRef.current = result.revision; onReviewedSave?.(result) }
       return result
     }
     if (mode === "add" || itemKind === "original") {
-      const result = await saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields, expectedItemSnapshot })
-      if (result.ok) onOriginalSaved?.()
+      const result = await saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields, expectedItemSnapshot: expectedRef.current })
+      if (result.ok) {
+        if (item && !("expectedItemSnapshot" in result)) return { ok: false as const, conflict: true as const, error: "The save was not acknowledged. Review the latest item before continuing." }
+        if ("expectedItemSnapshot" in result) expectedRef.current = result.expectedItemSnapshot
+        onOriginalSaved?.()
+      }
       return result
     }
     const formData = new FormData()
@@ -78,10 +152,6 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
     formData.set("requestItemFields", JSON.stringify(value.fields))
     formData.set("markReady", String(item?.metadata?.review_status === "ready"))
     return updateOrganizedMaterialItemAction(formData)
-  }
-
-  function valid(value: ItemDraft) {
-    return Boolean(value.name.trim() && value.unit.trim() && Number(value.quantity) > 0 && value.fields.every((field) => field.label.trim() && field.value.trim()))
   }
 
   function addField() {
@@ -109,8 +179,12 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
     setOrganizeAfterSave(shouldOrganize)
     startTransition(async () => {
       try {
-        const result = await persist(draft)
-        if (!result.ok) { setFeedback(result.error); return }
+        if (canAutosave) {
+          if (!await autosave.flush()) { setFeedback("Your changes are not saved yet. Review them before organizing."); return }
+        } else {
+          const result = await persist(draft)
+          if (!result.ok) { setFeedback(result.error); return }
+        }
         if (shouldOrganize) {
           const formData = new FormData()
           formData.set("requestId", requestId)
@@ -122,8 +196,7 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
           }
         }
         if (mode === "add") setDraft(draftFromItem())
-        setOpen(false)
-        router.refresh()
+        finishClose()
       } catch {
         setFeedback("The item was not saved. Check the connection and try again.")
       } finally {
@@ -143,10 +216,10 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {rawRequest ? <label className="grid gap-1.5 text-xs font-bold">Request text<textarea autoFocus rows={9} maxLength={20_000} value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Type or paste the complete material request. Add quantities, sizes, colors, brands, delivery, or price requirements you already know." className="min-h-52 resize-y rounded-xl border border-slate-300 p-3 text-sm font-normal leading-6" /><span className="text-[10px] font-normal text-slate-500">The AI reads this saved version and the fields below. It does not overwrite your original.</span></label> : <div className="grid gap-3 sm:grid-cols-[6rem_8rem_minmax(0,1fr)]">
-            <label className="grid gap-1 text-xs font-bold">Quantity<input type="number" inputMode="decimal" min="0.01" step="0.01" value={draft.quantity} onChange={(event) => setDraft((current) => ({ ...current, quantity: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
-            <label className="grid gap-1 text-xs font-bold">Unit<input list="request-item-units" value={draft.unit} onChange={(event) => setDraft((current) => ({ ...current, unit: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /><datalist id="request-item-units">{COMMON_UNITS.map((unit) => <option key={unit} value={unit} />)}</datalist></label>
-            <label className="grid gap-1 text-xs font-bold">Item<input autoFocus value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
+          {rawRequest ? <label className="grid gap-1.5 text-xs font-bold">Request text<textarea autoFocus rows={9} maxLength={20_000} value={draft.details} onChange={(event) => changeDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Type or paste the complete material request. Add quantities, sizes, colors, brands, delivery, or price requirements you already know." className="min-h-52 resize-y rounded-xl border border-slate-300 p-3 text-sm font-normal leading-6" /><span className="text-[10px] font-normal text-slate-500">The AI reads this saved version and the fields below. It does not overwrite your original.</span></label> : <div className="grid gap-3 sm:grid-cols-[6rem_8rem_minmax(0,1fr)]">
+            <label className="grid gap-1 text-xs font-bold">Quantity<input type="number" inputMode="decimal" min="0.01" step="0.01" value={draft.quantity} onChange={(event) => changeDraft((current) => ({ ...current, quantity: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
+            <label className="grid gap-1 text-xs font-bold">Unit<input list="request-item-units" value={draft.unit} onChange={(event) => changeDraft((current) => ({ ...current, unit: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /><datalist id="request-item-units">{COMMON_UNITS.map((unit) => <option key={unit} value={unit} />)}</datalist></label>
+            <label className="grid gap-1 text-xs font-bold">Item<input autoFocus value={draft.name} onChange={(event) => changeDraft((current) => ({ ...current, name: event.target.value }))} className="h-11 rounded-lg border border-slate-300 px-3 font-normal" /></label>
           </div>}
 
           <div className="mt-5 border-t border-slate-100 pt-4">
@@ -164,13 +237,13 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
             {draft.fields.length < 16 ? <div className="mt-3 flex gap-2"><select aria-label="Add item detail" value={fieldToAdd} onChange={(event) => setFieldToAdd(event.target.value)} className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold"><option value="">Add detail…</option>{availableFields.map((field) => <option key={field.id} value={field.id}>{field.label}</option>)}<option value="custom">New custom field</option></select><button type="button" onClick={addField} disabled={!fieldToAdd} className="inline-flex h-11 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-[#0066cc] disabled:opacity-40"><Plus className="h-4 w-4" />Add</button></div> : null}
           </div>
 
-          {!rawRequest ? <label className="mt-5 grid gap-1 border-t border-slate-100 pt-4 text-xs font-bold">General notes<textarea rows={3} value={draft.details} onChange={(event) => setDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Anything else the supplier should know" className="resize-y rounded-lg border border-slate-300 p-3 font-normal" /></label> : null}
+          {!rawRequest ? <label className="mt-5 grid gap-1 border-t border-slate-100 pt-4 text-xs font-bold">General notes<textarea rows={3} value={draft.details} onChange={(event) => changeDraft((current) => ({ ...current, details: event.target.value }))} placeholder="Anything else the supplier should know" className="resize-y rounded-lg border border-slate-300 p-3 font-normal" /></label> : null}
           {feedback ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{feedback}</p> : null}
+          {canAutosave && autosave.error ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{autosave.error}</p> : null}
         </div>
 
         <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={closeEditor} disabled={pending} className="h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Cancel</button>
-          {rawRequest ? <><button type="button" onClick={() => save(false)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 disabled:opacity-40"><Check className="h-4 w-4" />{pending && !organizeAfterSave ? "Saving…" : "Save draft"}</button><button type="button" onClick={() => save(true)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">{pending && organizeAfterSave ? "Starting AI…" : "Save & organize"}</button></> : <button type="button" onClick={() => save(false)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />{pending ? "Saving…" : mode === "add" ? "Add item" : "Save changes"}</button>}
+          {canAutosave ? <>{autosave.dirty && (autosave.status === "error" || !valid(draft)) ? <button type="button" onClick={discardDraft} disabled={pending || autosave.status === "saving"} className="h-11 px-2 text-xs font-bold text-rose-700">Discard unsaved changes</button> : null}<span role="status" className="mr-auto text-xs text-slate-600">{!valid(draft) ? "Incomplete · not saved" : autosave.status === "saved" ? "Saved automatically" : autosave.status === "error" ? "Not saved" : "Saving…"}</span>{autosave.status === "error" && !autosave.conflict ? <button type="button" onClick={() => void autosave.retry()} className="h-11 px-3 text-xs font-bold">Retry</button> : null}<button type="button" onClick={closeEditor} disabled={pending} className="h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Done</button>{rawRequest ? <button type="button" onClick={() => save(true)} disabled={pending || !valid(draft) || autosave.conflict} className="h-11 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">{pending && organizeAfterSave ? "Starting AI…" : "Organize with AI"}</button> : null}</> : <><button type="button" onClick={closeEditor} disabled={pending} className="h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Cancel</button><button type="button" onClick={() => save(false)} disabled={pending || !valid(draft)} className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />{pending ? "Saving…" : mode === "add" ? "Add item" : "Save changes"}</button></>}
         </footer>
       </section>
     </div>, document.body) : null

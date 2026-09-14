@@ -27,6 +27,7 @@ export class AutosaveQueue<T> {
     initialRevision: number,
     private persist: (snapshot: T, expectedRevision: number) => Promise<AutosaveResult>,
     private debounceMs = 650,
+    private isValid: (snapshot: T) => boolean = () => true,
   ) {
     this.saved = this.latest = JSON.stringify(initialSnapshot);
     this.revision = initialRevision;
@@ -68,7 +69,7 @@ export class AutosaveQueue<T> {
   /** Supports React Strict Mode effect replay without discarding the draft. */
   resume = () => {
     this.paused = false;
-    if (!this.running && !this.failure && (this.latest !== this.saved || this.uncertain)) {
+    if (!this.running && !this.failure && this.isValid(JSON.parse(this.latest) as T) && (this.latest !== this.saved || this.uncertain)) {
       this.timer = setTimeout(() => { void this.flush(); }, this.debounceMs);
     }
   };
@@ -78,7 +79,7 @@ export class AutosaveQueue<T> {
     this.latest = serialized;
     this.cancelScheduled();
     this.publish();
-    if (!this.paused && !this.failure && !this.running && this.latest !== this.saved) {
+    if (!this.paused && !this.failure && !this.running && this.isValid(snapshot) && this.latest !== this.saved) {
       this.timer = setTimeout(() => { void this.flush(); }, this.debounceMs);
     }
   }
@@ -89,11 +90,13 @@ export class AutosaveQueue<T> {
     if (this.paused) return Promise.resolve(false);
     if (this.running) return this.running;
     if (this.failure) return Promise.resolve(false);
+    if (!this.isValid(JSON.parse(this.latest) as T)) return Promise.resolve(false);
     if (this.latest === this.saved && !this.uncertain) return Promise.resolve(true);
     // Start in a microtask so running is assigned even if persist throws synchronously.
     this.running = Promise.resolve().then(async () => {
       while (this.latest !== this.saved || this.uncertain) {
         if (this.paused) return false;
+        if (!this.isValid(JSON.parse(this.latest) as T)) return false;
         const submitted = this.latest;
         let result: AutosaveResult;
         try {
