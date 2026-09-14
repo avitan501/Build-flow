@@ -511,7 +511,7 @@ export default async function AdminDashboardPage({
                     },
                     {
                       href: "/admin/ai-tools/work-browser",
-                      label: "Live Employee Screen",
+                      label: "Company screen",
                     },
                     { href: "/admin/payments", label: "Payment Center" },
                   ]

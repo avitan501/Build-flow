@@ -73,9 +73,9 @@ test("manager UI uses reusable employee naming and exposes owner live screen", a
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/carlos-activity/page.tsx"), "utf8"),
   ])
-  expect(browserPage).toContain("Employee Work Browser")
+  expect(browserPage).toContain("Company screen")
   expect(browserPage).toContain("Current employee: Carlos")
   expect(browserPage).toContain("Open direct connection")
-  expect(toolsPage).toContain("Live employee screen")
+  expect(toolsPage).toContain("Company screen")
   expect(activityPage).toContain("CarlosActivityAiReviewCard")
 })

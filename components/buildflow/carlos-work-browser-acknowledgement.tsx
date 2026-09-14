@@ -23,7 +23,7 @@ export function CarlosWorkBrowserAcknowledgement({ statement }: { statement: str
   }
 
   return <section className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-sky-200 bg-white shadow-sm">
-    <header className="flex items-center gap-3 bg-[#071126] px-5 py-4 text-white"><span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10"><ShieldCheck className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-sky-300">One-time acknowledgement</p><h1 className="text-xl font-semibold">Employee Work Browser</h1></div></header>
+    <header className="flex items-center gap-3 bg-[#071126] px-5 py-4 text-white"><span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10"><ShieldCheck className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-sky-300">One-time acknowledgement</p><h1 className="text-xl font-semibold">Company screen</h1></div></header>
     <div className="grid gap-4 p-5">
       <p className="text-sm leading-6 text-slate-700">This is a company-owned browser for Avantia Build work. It is separate from David&apos;s private browser.</p>
       <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800"><input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="mt-1 h-4 w-4" /><span>{statement}</span></label>

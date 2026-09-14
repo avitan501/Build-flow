@@ -11,7 +11,7 @@ export default async function AdminAiToolsPage() {
   const email = String(user.email || profile?.email || "").trim().toLowerCase()
 
   const tools = [
-    ...(access.owner || email === "buildavantiap@gmail.com" ? [{ href: "/admin/ai-tools/work-browser", title: "Employee Work Browser", description: "Carlos works in a separate company browser; David can open the live view after the one-time acknowledgement.", icon: MonitorUp, badge: access.owner ? "Live employee screen" : "Work browser" }] : []),
+    ...(access.owner || email === "buildavantiap@gmail.com" ? [{ href: "/admin/ai-tools/work-browser", title: "Company screen", description: "Carlos works in a separate company browser; David can open the live view after the one-time acknowledgement.", icon: MonitorUp, badge: access.owner ? "Company screen" : "Work browser" }] : []),
     ...(access.owner ? [{ href: "/admin/share-ads", title: "Share Ads", description: "Choose an approved flyer and message, then share safely from your phone without automatic sending.", icon: Megaphone, badge: "Owner" }] : []),
     { href: "/admin/ai-tools/media-messages", title: "Media & Messages", description: "Preview approved videos and pages, copy exact wording, and open a safe editable communication draft.", icon: Clapperboard },
     { href: "/admin/ai-tools/website-defects", title: "Website Defects", description: "Upload a screen recording or screenshot, describe the problem, and track it from review through verification.", icon: Bug, badge: "Issue inbox" },
