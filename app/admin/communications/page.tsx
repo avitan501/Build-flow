@@ -49,7 +49,7 @@ export default async function CommunicationsPage({
   const requestedDraft = Array.isArray(query.draft) ? query.draft[0] : query.draft
   const requestedThread = Array.isArray(query.thread) ? query.thread[0] : query.thread
   const initialChannelFilter = requestedChannel === "email-list" ? "email" : ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
-  const { supabase, access } = await requireManagerPortalProfile()
+  const { supabase, access, user } = await requireManagerPortalProfile()
   if (access.customers) after(() => syncRecentTwilioWhatsAppMessages().catch(() => null))
   const exactThread = String(requestedThread || "")
     .trim()
@@ -100,7 +100,7 @@ export default async function CommunicationsPage({
 
   return (
     <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6">
-      <div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox key={inboxNavigationKey} communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={[]} smsReplyDrafts={[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={exactCommunicationId} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div>
+      <div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox draftScope={user.id} key={inboxNavigationKey} communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={[]} smsReplyDrafts={[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={exactCommunicationId} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div>
     </main>
   )
 }

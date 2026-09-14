@@ -1,6 +1,9 @@
 "use client"
 
-import { ArrowLeft, Bot, CheckCheck, ChevronDown, CircleAlert, ClipboardList, Clock3, ExternalLink, Mail, MapPin, MessageCircle, Paperclip, Pencil, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
+import { CommunicationMessageText } from "@/components/buildflow/communication-message-text"
+import { useCommunicationDraft } from "@/components/buildflow/use-communication-draft"
+
+import { ArrowLeft, Bot, CheckCheck, CircleAlert, ClipboardList, Clock3, ExternalLink, Mail, MapPin, MessageCircle, Paperclip, Pencil, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
@@ -59,7 +62,7 @@ const COMMUNICATION_DIRECTORY_CACHE_MS = 5 * 60 * 1000
 type Channel = "call" | "sms" | "whatsapp" | "email"
 type ContactKind = "customer" | "lead" | "supplier" | "contact"
 type ContactFilter = "all" | ContactKind
-type WorkFilter = "all" | "needs_reply" | "unread" | "ai_review" | "failed" | "duplicate"
+type WorkFilter = "all" | "needs_reply" | "unread" | "ai_review" | "failed" | "duplicate" | "system"
 type LiveSyncState = "connecting" | "live" | "fallback"
 
 const WHATSAPP_UTILITY_TEMPLATES: Record<
@@ -273,21 +276,6 @@ function messageCanStartMaterialRequest(message: AuraCommunicationRow) {
   return looksLikeMaterialRequestMessage(message.channel, message.direction, messageText(message))
 }
 
-function ExpandableMessage({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false)
-  const long = text.length > 520 || text.split("\n").length > 8
-  return (
-    <div>
-      <p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>
-      {long ? (
-        <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">
-          {expanded ? "Show less" : "Show more"}
-          <ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} />
-        </button>
-      ) : null}
-    </div>
-  )
-}
 
 function initialCommunicationForQuery(communications: AuraCommunicationRow[], query: string, channelFilter: string) {
   const available = channelFilter === "all" ? communications : communications.filter((communication) => communication.channel === channelFilter)
@@ -346,12 +334,15 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts: initialContacts, customers: initialCustomers, leads: initialLeads = [], suppliers: initialSuppliers = [], materialRequests: initialMaterialRequests = [], smsReplyDrafts: initialSmsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "", initialThread = "", initialHistoryCursor = null, initialHistoryHasMore = false }: { communications: AuraCommunicationRow[]; contacts: AuraContactRow[]; customers: AuraCustomerIdentity[]; leads?: AuraLeadRecipient[]; suppliers?: SupplierRoutingOption[]; materialRequests?: MaterialRequestRecipient[]; smsReplyDrafts?: SmsReplyDraft[]; connections: Connections; initialChannelFilter?: string; initialCommunicationId?: string; initialQuery?: string; initialDraft?: string; initialThread?: string; initialHistoryCursor?: string | null; initialHistoryHasMore?: boolean }) {
+export function UnifiedCommunicationInbox({ draftScope = "preview", communications, contacts: initialContacts, customers: initialCustomers, leads: initialLeads = [], suppliers: initialSuppliers = [], materialRequests: initialMaterialRequests = [], smsReplyDrafts: initialSmsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "", initialThread = "", initialHistoryCursor = null, initialHistoryHasMore = false }: { draftScope?: string; communications: AuraCommunicationRow[]; contacts: AuraContactRow[]; customers: AuraCustomerIdentity[]; leads?: AuraLeadRecipient[]; suppliers?: SupplierRoutingOption[]; materialRequests?: MaterialRequestRecipient[]; smsReplyDrafts?: SmsReplyDraft[]; connections: Connections; initialChannelFilter?: string; initialCommunicationId?: string; initialQuery?: string; initialDraft?: string; initialThread?: string; initialHistoryCursor?: string | null; initialHistoryHasMore?: boolean }) {
   const router = useRouter()
   const initialCommunication = communications.find((communication) => communication.id === initialCommunicationId) || initialCommunicationForThread(communications, initialThread, initialChannelFilter) || initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
   const initialStoredDraft = initialSmsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const exactCommunicationRef = useRef<HTMLElement>(null)
+  const messageScrollRef = useRef<HTMLDivElement>(null)
+  const positionedThreadRef = useRef("")
+  const [threadView, setThreadView] = useState<"chat" | "files">("chat")
   const initialCursor = communications.reduce((latest, item) => {
     const value = item.last_event_at || item.occurred_at
     return value > latest ? value : latest
@@ -386,7 +377,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
   const [recipient, setRecipient] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || ""))
   const [subject, setSubject] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : ""))
-  const [message, setMessage] = useState(initialDraft || initialStoredDraft?.reply_text || "")
+  const [message, setMessage, draftStorageFailed] = useCommunicationDraft(draftScope, activeKey, activeKey === "__new__" ? initialDraft : smsReplyDrafts.find(draft => draft.communication_id === liveCommunications.find(item => initialConversationKey(item, contacts) === activeKey)?.id)?.reply_text || "")
   const [attachments, setAttachments] = useState<File[]>([])
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error"
@@ -761,7 +752,9 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
     return conversations.filter((conversation) => {
       if (contactFilter !== "all" && conversation.kind !== contactFilter) return false
       const hasAiDraft = smsReplyDrafts.some((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
-      if (workFilter === "needs_reply" && conversation.latest.direction !== "incoming") return false
+      const systemEmail = /^(?:no[-_.]?reply|do[-_.]?not[-_.]?reply)@/i.test(conversation.email)
+      if (workFilter === "system" && !systemEmail) return false
+      if (workFilter === "needs_reply" && (conversation.latest.direction !== "incoming" || systemEmail)) return false
       if (workFilter === "unread" && conversation.unread < 1) return false
       if (workFilter === "ai_review" && !hasAiDraft) return false
       if (workFilter === "failed" && !conversation.messages.some((item) => ["failed", "undelivered", "bounced"].includes(item.status || ""))) return false
@@ -776,6 +769,18 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
   const selectedChannelReady = channel === "call" || (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
   const activeThreadHasMore = Boolean(activeConversation && (activeThreadHistory?.hasMore ?? true))
+
+  useEffect(() => {
+    if (threadView !== "chat" || !activeConversation || initialCommunicationId) return
+    if (positionedThreadRef.current === activeConversation.key) return
+    const container = messageScrollRef.current
+    if (!container) return
+    const firstUnread = activeConversation.messages.find(item => item.direction === "incoming" && !item.read_at)
+    const element = firstUnread ? Array.from(container.querySelectorAll<HTMLElement>("[data-message-id]")).find(item => item.dataset.messageId === firstUnread.id) : undefined
+    if (element) container.scrollTop += element.getBoundingClientRect().top - container.getBoundingClientRect().top
+    else container.scrollTop = container.scrollHeight
+    positionedThreadRef.current = activeConversation.key
+  }, [activeConversation, initialCommunicationId, threadView])
 
   useEffect(() => {
     if (!initialCommunicationId || !activeConversation?.messages.some((item) => item.id === initialCommunicationId)) return
@@ -847,6 +852,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
   }
 
   function openConversation(conversation: Conversation) {
+    setThreadView("chat")
     setActiveKey(conversation.key)
     setMobileThreadOpen(true)
     const latestChannel = [...conversation.messages].reverse().find((item) => ["sms", "whatsapp", "email"].includes(item.channel))?.channel
@@ -857,7 +863,6 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
     setSubject(latestEmail ? replySubject(latestEmail.subject) : "")
     setSelectedRecipientId("")
     const storedDraft = smsReplyDrafts.find((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
-    setMessage(storedDraft?.reply_text || "")
     setActiveDraftId(storedDraft?.id || null)
     setTeachAi(false)
     setCorrectionReasons([])
@@ -907,7 +912,6 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
     setSubject(nextChannel === "email" ? replySubject(nextCommunication.subject) : "")
     setSelectedRecipientId("")
     const nextStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === nextCommunication.id)
-    setMessage(nextStoredDraft?.reply_text || "")
     setActiveDraftId(nextStoredDraft?.id || null)
     setTeachAi(false)
     setCorrectionReasons([])
@@ -1049,7 +1053,6 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
     setSelectedRecipientId("")
     setRecipient("")
     setSubject("")
-    setMessage("")
     setAttachments([])
     if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setActiveDraftId(null)
@@ -1462,6 +1465,11 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
               <span className="sr-only">Search conversations</span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0071e3]" />
             </label>
+            <div className="mt-2 flex gap-1" aria-label="Inbox views">
+              {([ ["all", "Inbox"], ["needs_reply", "Needs reply"], ["system", "System"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={workFilter === value} onClick={() => setWorkFilter(value)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold focus-visible:ring-2 ${workFilter === value ? "bg-slate-950 text-white" : "text-slate-500"}`}>{label}</button>)}
+            </div>
+            <details className="mt-2 rounded-lg border border-slate-200 px-3">
+              <summary className="flex min-h-11 cursor-pointer items-center justify-between text-xs font-semibold">Filters <span className="text-slate-500">{contactFilter !== "all" || channelFilter !== "all" || workFilter !== "all" ? "Active" : "All conversations"}</span></summary>
             <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
               {(
                 [
@@ -1496,6 +1504,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   <option value="ai_review">AI review</option>
                   <option value="failed">Failed</option>
                   <option value="duplicate">Duplicates</option>
+                  <option value="system">System emails</option>
                 </select>
               </label>
             </div>
@@ -1524,6 +1533,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   </span>
                 ))}
               </div>
+            </details>
             </details>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -1651,6 +1661,9 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   </button>
                 ) : null}
               </div>
+              <div className="mt-2 flex gap-1" aria-label="Conversation view">
+                {(["chat", "files"] as const).map(view => <button key={view} type="button" aria-pressed={threadView === view} onClick={() => setThreadView(view)} className={`min-h-11 rounded-lg px-4 text-xs font-semibold focus-visible:ring-2 ${threadView === view ? "bg-slate-100 text-slate-950" : "text-slate-500"}`}>{view === "chat" ? "Chat" : "Files"}</button>)}
+              </div>
               {contactPanelOpen ? (
                 <section id="communication-contact-panel" className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2" aria-label="Contact details and links">
                   <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -1772,7 +1785,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
               <p className="truncate text-[10px] font-semibold text-slate-600">Verified exact phone match · {activeConversation.company}</p>
             </section>
           ) : null}
-          {activeHasEmail && activeConversation ? (
+          {activeHasEmail && activeConversation && contactPanelOpen ? (
             <section className="shrink-0 border-b border-slate-200 bg-sky-50/70 px-3 py-2" aria-label="Email links">
               <div className="flex flex-wrap items-center gap-1.5">
                 {activeEmailLinks.map((link) => (
@@ -1827,7 +1840,16 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
           ) : null}
 
           {activeConversation?.phone ? <span className="sr-only">Add or change contact type</span> : null}
-          <div className="min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5">
+          <div ref={messageScrollRef} className="min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5">
+            {threadView === "files" && activeConversation ? <div className="mx-auto max-w-3xl space-y-2">
+              {activeConversation.messages.flatMap(item => (item.media ?? []).map((attachment, index) => <div key={`${item.id}:${index}`} className="rounded-xl border border-slate-200 bg-white p-3">
+                {attachment.url ? <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-3 break-all text-sm font-semibold text-sky-700"><Paperclip className="h-4 w-4 shrink-0" />{attachmentLabel(attachment, index)}</a> : <p className="text-sm text-slate-500">{pendingAttachmentLabel(attachment)}</p>}
+                <p className="mt-1 text-xs text-slate-500">{formatMessageTime(item.occurred_at)}</p>
+              </div>))}
+              {!activeConversation.messages.some(item => item.media?.length) ? <p className="p-6 text-center text-sm text-slate-500">No files in the loaded messages.</p> : null}
+              {activeThreadHasMore ? <button type="button" onClick={() => void loadOlderHistory("thread")} disabled={historyLoading} className="min-h-11 w-full rounded-lg border bg-white px-3 text-sm">{historyLoading ? "Loading…" : "Find files in earlier messages"}</button> : null}
+              {historyError ? <p role="status" className="text-sm text-rose-700">{historyError}</p> : null}
+            </div> : <>
             {activeConversation ? (
               <div className="mx-auto grid min-w-0 max-w-3xl gap-2">
                 {historyError ? <p className="mb-1 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
@@ -1846,9 +1868,9 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   const text = messageText(item)
                   const media = Array.isArray(item.media) ? item.media : []
                   return (
-                    <article key={item.id} ref={exact ? exactCommunicationRef : undefined} className={`flex min-w-0 scroll-m-6 ${outgoing ? "justify-end" : "justify-start"}`}>
+                    <article key={item.id} data-message-id={item.id} ref={exact ? exactCommunicationRef : undefined} className={`flex min-w-0 scroll-m-6 ${outgoing ? "justify-end" : "justify-start"}`}>
                       <div className={`min-w-0 max-w-[88%] overflow-hidden rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${exact ? "ring-2 ring-[#0071e3] ring-offset-2" : ""} ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                        <ExpandableMessage text={text} />
+                        <CommunicationMessageText text={text} email={item.channel === "email"} />
                         {item.channel === "call" && item.summary && item.summary !== text ? (
                           <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600">
                             <strong>Summary:</strong> {item.summary}
@@ -1933,6 +1955,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                 </div>
               </div>
             )}
+            </>}
           </div>
 
           <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
@@ -1972,6 +1995,8 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   </div>
                 </section>
               ) : null}
+              <details className="mb-2 rounded-lg border border-slate-200 px-3">
+                <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-slate-600">Reply tools <span className="ml-auto text-slate-400">Suggestions & quick replies</span></summary>
               {nextAction ? (
                 <section className="mb-2 rounded-lg border border-slate-200 bg-slate-950 px-3 py-2 text-white" aria-label="Recommended next action">
                   <div className="flex min-w-0 items-start gap-2">
@@ -2001,7 +2026,7 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                       </button>
                     ) : nextAction.suggestedMessage ? (
                       <button type="button" onClick={() => setMessage(nextAction.suggestedMessage)} className="h-7 shrink-0 rounded-md bg-white px-2.5 text-[10px] font-bold text-slate-950">
-                        Draft
+                        Draft reply
                       </button>
                     ) : null}
                   </div>
@@ -2063,15 +2088,16 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   </button>
                 ))}
               </div>
+              </details>
               <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
                 {activeKey !== "__new__" ? (
-                  <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2">
+                  <select aria-label="Send via" value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-11 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-xs font-bold sm:w-[6.6rem] sm:px-2">
                     <option value="whatsapp">WhatsApp</option>
                     <option value="sms">Text</option>
                     <option value="email">Email</option>
                   </select>
                 ) : null}
-                <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
+                <textarea aria-label="Message" value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-y rounded border-0 bg-transparent px-1 py-3 text-sm leading-5 focus-visible:outline-sky-500" />
                 {channel !== "call" ? (
                   <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment">
                     <Paperclip className="h-4 w-4" />
@@ -2101,7 +2127,8 @@ export function UnifiedCommunicationInbox({ communications, contacts: initialCon
                   <Send className="h-4 w-4" />
                 </button>
               </div>
-              {channel === "email" ? <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-2 h-9 w-full rounded-md border border-slate-300 px-3 text-xs" /> : null}
+              {channel === "email" ? <details className="mt-1"><summary className="flex min-h-8 cursor-pointer items-center text-xs text-slate-500"><span className="truncate">Subject: {subject || "Add subject"}</span></summary><input aria-label="Email subject" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 text-sm" /></details> : null}
+              {message ? <p role="status" className={`mt-1 text-[11px] ${draftStorageFailed ? "text-amber-700" : "text-slate-400"}`}>{draftStorageFailed ? "Draft kept here; browser storage unavailable." : "Text draft saved in this tab"}</p> : null}
               {attachments.length ? (
                 <div className="mt-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold">
                   <div className="flex items-center justify-between gap-2">
