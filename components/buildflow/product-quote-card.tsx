@@ -16,7 +16,7 @@ export function productQuoteCardSections(row: ProductRow) {
   return { primary, other, reviewCount: row.offers.filter((offer) => offer.status === "review").length }
 }
 
-function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeConfirm }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean> }) {
+function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeConfirm, finalized = false }: { row: ProductRow; offer: ProductOffer; onSelect: (bidId: string) => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean>; finalized?: boolean }) {
   const lowest = offer.eligible && offer.unitPrice === row.lowest?.unitPrice
   const selected = row.selected?.bid.id === offer.bid.id
   const source = offer.bid.quote_comparison_prices?.find(price => price.item_id === row.item.id)?.notes?.trim() || ""
@@ -34,7 +34,7 @@ function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeC
       {source ? <span className="mt-1 block whitespace-pre-wrap break-words text-xs leading-5 text-slate-600" aria-label="Original supplier wording">{source}</span> : <span className="mt-1 block text-xs text-slate-500">Source wording not recorded</span>}
       <span className="mt-1 flex flex-wrap gap-1 text-[10px] font-bold">
         {lowest ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">Lowest eligible price</span> : null}
-        {selected ? <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">Draft choice</span> : null}
+        {selected ? <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">{finalized ? "Finalized choice" : "Draft choice"}</span> : null}
         {offer.status === "review" ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Match needs review · excluded</span> : null}
         {offer.blocked ? <span className="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">Supplier excluded</span> : null}
         {source && offer.matchStatus === "exact" ? <span className="text-slate-600">Source wording matches</span> : null}
@@ -47,18 +47,18 @@ function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeC
   </label>{beforeConfirm && offer.status === "review" && !offer.blocked ? <ProductMatchReview item={row.item} bid={offer.bid} disabled={choiceDisabled} beforeConfirm={beforeConfirm}/> : null}</>
 }
 
-export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisabled = false, beforeConfirm }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean> }) {
+export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisabled = false, beforeConfirm, finalized = false }: { row: ProductRow; onSelect: (bidId: string) => void; onClear: () => void; onReview?: () => void; choiceDisabled?: boolean; beforeConfirm?:()=>Promise<boolean>; finalized?: boolean }) {
   const { primary, other, reviewCount } = productQuoteCardSections(row)
   return <article className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white" data-testid="product-quote-card">
     <details name="requested-product-offers" className="group/product">
     <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 [&::-webkit-details-marker]:hidden"><div className="min-w-0 flex-1">
       <div className="flex items-start justify-between gap-2"><h3 className="min-w-0 break-words text-sm font-bold leading-5">{row.item.description}</h3><span className="max-w-[45%] shrink-0 break-words text-right text-xs font-bold text-[#0066cc]">{row.item.quantity.toLocaleString()} {row.item.unit}</span></div>
       {row.item.specification ? <p className="mt-1 break-words text-xs leading-5 text-slate-600">{row.item.specification}</p> : null}
-      {row.selected ? <p className="mt-1 break-words text-xs text-sky-800">Draft · {row.selected.bid.supplier_name_snapshot} · {formatComparisonMoney(row.selected.unitPrice!)} / {row.item.unit}</p> : <p className="mt-1 text-xs text-slate-500">{row.offers.length} quote entries{reviewCount ? ` · ${reviewCount} need review` : ""}</p>}
+      {row.selected ? <p className="mt-1 break-words text-xs text-sky-800">{finalized ? "Finalized" : "Draft"} · {row.selected.bid.supplier_name_snapshot} · {formatComparisonMoney(row.selected.unitPrice!)} / {row.item.unit}</p> : <p className="mt-1 text-xs text-slate-500">{row.offers.length} quote entries{reviewCount ? ` · ${reviewCount} need review` : ""}</p>}
       {!row.validQuantity ? <p className="mt-1 text-xs font-semibold text-rose-700">Check requested quantity.</p> : !row.lowest ? <p className="mt-1 text-xs font-semibold text-amber-800">No confirmed price yet.</p> : null}
     </div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 group-open/product:rotate-180" aria-hidden="true"/></summary>
     <fieldset><legend className="sr-only">Draft supplier choice for {row.item.description}</legend>
-      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} choiceDisabled={choiceDisabled} beforeConfirm={beforeConfirm} />)}</div>
+      <div className="divide-y divide-slate-100 border-t border-slate-100 bg-slate-50/60" data-testid="primary-product-offers">{[...primary,...other].map((offer) => <ProductOfferRow key={offer.bid.id} row={row} offer={offer} onSelect={onSelect} choiceDisabled={choiceDisabled} beforeConfirm={beforeConfirm} finalized={finalized} />)}</div>
       {!row.offers.length ? <p className="px-3 py-4 text-xs text-slate-500">No supplier quotes yet.</p> : null}
     </fieldset>
     {onReview ? <button type="button" onClick={onReview} className="min-h-11 w-full border-t border-slate-100 px-3 text-left text-xs font-semibold text-sky-800">Compare details / review matches</button> : null}

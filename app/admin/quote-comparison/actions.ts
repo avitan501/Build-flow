@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireStaffProfile } from "@/lib/auth";
@@ -501,6 +502,7 @@ export async function awardQuoteComparisonBidAction(input: {
 export async function saveClientQuoteAction(input: {
   comparisonId: string;
   expectedRouteId?: string | null;
+  expectedClientSnapshot?: unknown;
   clientId: string;
   quoteNumber: string;
   expiresOn: string | null;
@@ -508,7 +510,7 @@ export async function saveClientQuoteAction(input: {
   clientDeliveryCharge: number;
   clientTaxPercent: number;
   items: Array<{ itemId: string; markupPercent: number; clientUnitPrice: number }>;
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ clientSnapshot: unknown }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const comparisonId = cleanText(input.comparisonId, 100);
   const clientId = cleanText(input.clientId, 100);
@@ -534,11 +536,14 @@ export async function saveClientQuoteAction(input: {
       client_unit_price: cleanUnitPrice(item.clientUnitPrice),
     })),
   };
-  const { error } = parent.data.active_route_id
-    ? await createAdminClient().rpc("staff_save_finalized_route_client_quote", { ...parameters, p_route_id: parent.data.active_route_id, p_actor_id: user.id })
+  const { data, error } = parent.data.active_route_id
+    ? await createAdminClient().rpc("staff_save_finalized_route_client_quote", { ...parameters, p_route_id: parent.data.active_route_id, p_actor_id: user.id, p_expected_client: input.expectedClientSnapshot ?? null })
     : await supabase.rpc("staff_save_quote_comparison_client_quote", parameters);
   if (error) {
     if (error.code === "23505") return { ok: false, error: "This quote number is already in use." };
+    if (error.code === "55P03" || error.code === "40P01") return { ok: false, error: "Another update is finishing. Nothing was saved; retry in a moment." };
+    if (error.message.includes("Client quote changed")) return { ok: false, error: "Someone changed this client quote. Reload and review before saving; your edits were not applied." };
+    if (error.message.includes("Client delivery") || error.message.includes("Sent quote")) return { ok: false, error: "Delivery has already started. Check delivery history before changing this quote." };
     if (error.message.includes("supplier_selection_required")) return { ok: false, error: "Select the winning supplier before preparing the client quote." };
     if (error.message.includes("client_not_found")) return { ok: false, error: "Choose an active client with an email address." };
     if (error.message.includes("client_prices_incomplete")) return { ok: false, error: "Every material needs a client price." };
@@ -548,10 +553,10 @@ export async function saveClientQuoteAction(input: {
 
   revalidatePath(comparisonPath(comparisonId));
   revalidatePath("/admin/quote-comparison");
-  return { ok: true };
+  return { ok: true, data: { clientSnapshot: parent.data.active_route_id ? data : null } };
 }
 
-export async function sendClientQuoteAction(comparisonId: string): Promise<ActionResult<{ recipient: string; providerId: string | null }>> {
+export async function sendClientQuoteAction(comparisonId: string, expectedClientSnapshot?: unknown): Promise<ActionResult<{ recipient: string; providerId: string | null }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const safeComparisonId = cleanText(comparisonId, 100);
   const [comparisonResult, itemsResult, bidsResult, attachmentsResult] = await Promise.all([
@@ -596,16 +601,17 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
     clientAttachments.push({ filename: cleanAttachmentDisplayName(attachment.file_name), content: Buffer.from(await data.arrayBuffer()).toString("base64") });
   }
   const deliveryId = crypto.randomUUID();
+  const pdfAttachment = { filename: cleanAttachmentDisplayName(`${comparison.quote_number}.pdf`), content: pdf.toString("base64") };
   if (finalized.route) {
-    // The legacy Edge Function rebuilds from a single awarded bid, so it must
-    // never reconstruct a mixed quote. Keep the saved PDF available if direct
-    // delivery is not configured, with no claim or provider call.
-    if (!process.env.RESEND_API_KEY?.trim()) return { ok: false, error: "Email for a combined supplier quote is not configured. Preview the saved quote; contact the manager to enable sending." };
-    const claim = await createAdminClient().rpc("staff_claim_finalized_route_send", { p_comparison_id: comparison.id, p_route_id: finalized.route.id, p_actor_id: user.id, p_expected: finalizedClientSnapshot(comparison, items), p_token: deliveryId });
+    // The displayed/acknowledged quote, the PDF input and the locked DB record
+    // must all agree; don't send a coworker's later save under this click.
+    const manifest = [pdfAttachment, ...clientAttachments].map(attachment => { const bytes = Buffer.from(attachment.content,"base64"); return { filename:attachment.filename,sha256:createHash("sha256").update(bytes).digest("hex"),bytes:bytes.length }; });
+    if (manifest.reduce((total,file)=>total+file.bytes,0)>25*1024*1024) return { ok:false, error:"The quote and attachments exceed 25 MB. Remove an attachment before sending." };
+    const claim = await createAdminClient().rpc("staff_claim_finalized_route_send", { p_comparison_id: comparison.id, p_route_id: finalized.route.id, p_actor_id: user.id, p_expected: expectedClientSnapshot ?? null, p_loaded: finalizedClientSnapshot(comparison, items), p_token: deliveryId, p_manifest:manifest });
     if (claim.error) return { ok: false, error: "This quote changed or delivery has already started. Reload and check delivery history before sending again." };
   }
   const delivery = await deliverEmailWithSupabaseFallback(
-    () => sendClientQuoteEmail({
+    () => finalized.route ? Promise.resolve({ status:"not_configured" as const }) : sendClientQuoteEmail({
       comparisonId: comparison.id,
       quoteNumber: comparison.quote_number,
       recipientName: comparison.client_name_snapshot || "Client",
@@ -629,12 +635,14 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
       attachments: clientAttachments,
       idempotencyKey: `avantia-client-quote-${comparison.id}-${deliveryId}`,
     }),
-    () => finalized.route ? Promise.resolve({ data: null, error: { message: "Combined quote requires the direct email provider." } }) : supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
+    () => supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
       body: {
         action: "send_client_quote",
         requestId: comparison.id,
         deliveryId,
-        attachment: { filename: `${comparison.quote_number}.pdf`, content: pdf.toString("base64") },
+        routeId: finalized.route?.id,
+        attachment: pdfAttachment,
+        ...(finalized.route ? { attachments:clientAttachments } : {}),
       },
     }),
   );
@@ -696,7 +704,7 @@ export async function reopenQuoteComparisonAction(comparisonId: string): Promise
   const { error } = parent.data.active_route_id
     ? await createAdminClient().rpc("staff_reopen_finalized_route", { p_comparison_id: comparisonId, p_actor_id:user.id })
     : await supabase.rpc("staff_reopen_quote_comparison", { p_comparison_id: comparisonId });
-  if (error) return { ok: false, error: "Could not reopen this comparison." };
+  if (error) return { ok: false, error: parent.data.active_route_id ? "This supplier route could not be reopened. If client delivery already started, keep that quote unchanged and create a new comparison." : "Could not reopen this comparison." };
   revalidatePath(comparisonPath(comparisonId));
   revalidatePath("/admin/quote-comparison");
   return { ok: true };

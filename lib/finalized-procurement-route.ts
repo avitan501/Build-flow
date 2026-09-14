@@ -6,7 +6,7 @@ import { normalizeSupplierQuoteUnit } from "@/lib/supplier-quote-pricing"
 
 export type FinalizedRouteItem = { item_id: string; source_request_item_id: string | null; supplier_id: string; bid_id: string; quantity: number; unit: string; unit_cost: number; line_cost: number }
 export type FinalizedRouteSupplier = { supplier_id: string; supplier_name: string; bid_id: string; material_subtotal: number; delivery_charge: number; tax_percent: number; tax_amount: number; landed_total: number; lead_time_days: number | null }
-export type FinalizedProcurementRoute = { id: string; comparison_id: string; request_id: string | null; items: FinalizedRouteItem[]; suppliers: FinalizedRouteSupplier[]; material_subtotal: number; delivery_total: number; supplier_tax_total: number; landed_total: number }
+export type FinalizedProcurementRoute = { id: string; comparison_id: string; request_id: string | null; items: FinalizedRouteItem[]; suppliers: FinalizedRouteSupplier[]; material_subtotal: number; delivery_total: number; supplier_tax_total: number; landed_total: number; client_send_started_at?: string | null }
 
 const normalized = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase()
 /** Website source semantics; RPC locks and compares this same raw source snapshot. */

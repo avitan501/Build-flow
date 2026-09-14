@@ -31,7 +31,7 @@ import {
 } from "@/lib/quote-comparison";
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms";
 import { createClient } from "@/lib/supabase/client";
-import { procurementItemCosts, buildProcurementClientQuoteSummary } from "@/lib/procurement-client-quote";
+import { procurementItemCosts, buildProcurementClientQuoteSummary, finalizedClientSnapshot } from "@/lib/procurement-client-quote";
 
 const MAX_ATTACHMENT_FILES = 10;
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
@@ -145,6 +145,7 @@ export function ClientQuoteBuilder({
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [clientQuoteStatus, setClientQuoteStatus] = useState(comparison.client_quote_status);
+  const [clientBaseline, setClientBaseline] = useState<unknown>(() => procurementRoute ? finalizedClientSnapshot(comparison, items) : null);
   const [attachments, setAttachments] = useState(initialAttachments);
 
   const supplierPrices = useMemo(
@@ -180,8 +181,9 @@ export function ClientQuoteBuilder({
     [clientDeliveryCharge, clientTaxPercent, draftItems, selectedBid, procurementRoute],
   );
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-  const canPrepare = Boolean(selectedClient && (selectedBid || procurementRoute) && !routeError && summary.complete && quoteNumber.trim()
-    && !(procurementRoute && ["sent", "accepted"].includes(clientQuoteStatus)));
+  const canPreview = Boolean(selectedClient && (selectedBid || procurementRoute) && !routeError && summary.complete && quoteNumber.trim());
+  const lockedMixedQuote = Boolean(procurementRoute && (procurementRoute.client_send_started_at || ["sent", "accepted"].includes(clientQuoteStatus)));
+  const canPrepare = canPreview && !lockedMixedQuote;
 
   function updateMarkup(itemId: string, rawValue: string) {
     const supplierPrice = supplierPrices.get(itemId);
@@ -235,6 +237,7 @@ export function ClientQuoteBuilder({
     return {
       comparisonId: comparison.id,
       expectedRouteId: procurementRoute?.id ?? null,
+      expectedClientSnapshot: clientBaseline,
       clientId: selectedClientId,
       quoteNumber,
       expiresOn: null,
@@ -363,6 +366,7 @@ export function ClientQuoteBuilder({
       }
       setClientQuoteStatus("ready");
       setMessage("Client quote saved. Profit remains visible only to your team.");
+      setClientBaseline(result.data.clientSnapshot);
     });
   }
 
@@ -384,7 +388,8 @@ export function ClientQuoteBuilder({
         setError(saved.error);
         return;
       }
-      const sent = await sendClientQuoteAction(comparison.id);
+      setClientBaseline(saved.data.clientSnapshot);
+      const sent = await sendClientQuoteAction(comparison.id, saved.data.clientSnapshot);
       if (!sent.ok) {
         setError(sent.error);
         return;
@@ -412,6 +417,8 @@ export function ClientQuoteBuilder({
         </div>
       </div>
 
+      {lockedMixedQuote ? <div className="p-5"><p className="text-sm text-slate-600">Delivery started · Saved client copy is read-only.</p><button type="button" onClick={()=>setShowPreview(true)} disabled={!canPreview} className="mt-2 min-h-11 rounded-lg border px-4 text-sm font-bold">View saved client copy</button></div> : null}
+      <fieldset disabled={pending || lockedMixedQuote} className="min-w-0">
       <div className="grid gap-4 border-b border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(15rem,1.4fr)_repeat(3,minmax(9rem,.7fr))]">
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
           Client
@@ -478,7 +485,7 @@ export function ClientQuoteBuilder({
               {attachments.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{attachments.map((attachment) => <div key={attachment.id} className="flex min-w-0 items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" /><span className="min-w-0 flex-1 break-all text-xs font-semibold leading-5">{attachment.file_name}</span><span className="shrink-0 text-[10px] leading-5 text-slate-400">{formatFileSize(attachment.file_size)}</span><button type="button" onClick={() => removeAttachment(attachment)} disabled={attachmentPending} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" aria-label={`Remove ${attachment.file_name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div> : <p className="mt-3 text-xs font-semibold text-slate-400">No extra attachments yet.</p>}
             </div>
             <div className="flex flex-col justify-end gap-2 sm:flex-row">
-              <button type="button" onClick={() => setShowPreview(true)} disabled={!canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Eye className="h-4 w-4" /> Preview client copy</button>
+              <button type="button" onClick={() => setShowPreview(true)} disabled={!canPreview} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Eye className="h-4 w-4" /> Preview client copy</button>
               <button type="button" onClick={saveQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save quote</button>
               <button type="button" onClick={sendQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:opacity-40"><Mail className="h-4 w-4" /> Send to client</button>
             </div>
@@ -486,11 +493,12 @@ export function ClientQuoteBuilder({
         </>
       )}
 
+      </fieldset>
       {error ? <div role="alert" className="mx-5 mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 sm:mx-6">{error}</div> : null}
       {message ? <div role="status" className="mx-5 mb-5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 sm:mx-6"><CheckCircle2 className="h-4 w-4 shrink-0" /> {message}</div> : null}
 
       {showPreview && selectedClient ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="client-preview-title">
+        <div className="fixed inset-0 z-[100] grid items-start justify-items-center overflow-y-auto bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="client-preview-title">
           <div className="my-8 w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0066cc]">Client view</p><h3 id="client-preview-title" className="mt-1 text-lg font-bold">Branded quote preview</h3></div><button type="button" onClick={() => setShowPreview(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200" aria-label="Close quote preview"><X className="h-4 w-4" /></button></div>
             <div className="p-5 sm:p-8">

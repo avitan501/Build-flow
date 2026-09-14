@@ -2,7 +2,7 @@
 -- Run after finalized-route.local.sql in a disposable database only.
 insert into public.profiles(id,is_active,approval_status,role,full_name,email) values('00000000-0000-4000-8000-000000000040',true,'approved','client','Test client','client@example.invalid');
 create function public.test_route_client_save(p_items jsonb default '[{"item_id":"00000000-0000-4000-8000-000000000011","markup_percent":50,"client_unit_price":30},{"item_id":"00000000-0000-4000-8000-000000000012","markup_percent":100,"client_unit_price":60}]') returns void language sql as $$
-select public.staff_save_finalized_route_client_quote('00000000-0000-4000-8000-000000000010',(select active_route_id from public.quote_comparisons where id='00000000-0000-4000-8000-000000000010'),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000040','MIX-001',null,'Test',10,10,p_items)
+select public.staff_save_finalized_route_client_quote('00000000-0000-4000-8000-000000000010',(select active_route_id from public.quote_comparisons where id='00000000-0000-4000-8000-000000000010'),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000040','MIX-001',null,'Test',10,10,p_items,public.finalized_route_client_snapshot('00000000-0000-4000-8000-000000000010'))
 $$;
 do $$declare r uuid;begin
  select active_route_id into r from public.quote_comparisons where id='00000000-0000-4000-8000-000000000010';
@@ -21,22 +21,30 @@ end $$;
 set role service_role;
 select public.test_route_client_save();
 reset role;
-do $$declare r uuid;s jsonb;begin
+do $$declare r uuid;s jsonb;m jsonb:='[{"filename":"MIX-001.pdf","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":100}]';begin
  select active_route_id into r from public.quote_comparisons where id='00000000-0000-4000-8000-000000000010';
  assert public.quote_finalized_route_is_current('00000000-0000-4000-8000-000000000010',r),'client markup invalidated supplier route';
  assert (select sum(quantity*client_unit_price)=120 from public.quote_comparison_items),'client price changed';
  s:=public.finalized_route_client_snapshot('00000000-0000-4000-8000-000000000010');
- begin perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001','{}','00000000-0000-4000-8000-000000000050');raise exception 'stale send passed';exception when raise_exception then assert sqlerrm='Client quote changed. Reload before sending.';end;
+ begin perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001','{}','00000000-0000-4000-8000-000000000050',s,m);raise exception 'stale send passed';exception when raise_exception then assert sqlerrm='Client quote changed. Reload before sending.';end;
  -- Reopen retains real allocations but invalidates old idempotency success.
  perform public.staff_reopen_finalized_route('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001');
  assert (select count(*)=1 from public.quote_comparison_routes),'reopen erased financial history';
  begin perform public.test_finalize();raise exception 'inactive retry passed';exception when raise_exception then assert sqlerrm='Finalized route is no longer active';end;
  update public.quote_comparisons set active_route_id=r,status='awarded',client_quote_status='ready';
- perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001',s,'00000000-0000-4000-8000-000000000050');
- begin perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001',s,'00000000-0000-4000-8000-000000000051');raise exception 'duplicate send passed';exception when raise_exception then assert sqlerrm='Delivery already started. Check delivery history; do not send twice.';end;
+ perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001',s,'00000000-0000-4000-8000-000000000050',s,m);
+ begin perform public.staff_claim_finalized_route_send('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000001',s,'00000000-0000-4000-8000-000000000051',s,m);raise exception 'duplicate send passed';exception when raise_exception then assert sqlerrm='Delivery already started. Check delivery history; do not send twice.';end;
  begin perform public.test_route_client_save();raise exception 'inflight overwrite passed';exception when raise_exception then assert sqlerrm like 'Client delivery already started%';end;
  begin perform public.staff_reopen_finalized_route('00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001');raise exception 'inflight reopen passed';exception when raise_exception then assert sqlerrm like 'Client delivery already started%';end;
  assert (select client_send_snapshot=s from public.quote_comparison_routes where id=r),'send snapshot not retained';
- assert not has_function_privilege('authenticated','public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid)','execute'),'untrusted direct send claim';
+ assert not has_function_privilege('authenticated','public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid,jsonb,jsonb)','execute'),'untrusted direct send claim';
+ assert public.staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000050','00000000-0000-4000-8000-000000000001')->>'status'='claimed';
+ assert public.staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000050','00000000-0000-4000-8000-000000000001')->>'status'='ambiguous';
+ perform public.staff_finish_finalized_route_delivery('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000050','00000000-0000-4000-8000-000000000001','fixture-provider');
+ assert public.staff_start_finalized_route_delivery('00000000-0000-4000-8000-000000000010',r,'00000000-0000-4000-8000-000000000050','00000000-0000-4000-8000-000000000001')->>'status'='sent';
+ begin perform public.staff_reopen_quote_comparison('00000000-0000-4000-8000-000000000010');raise exception 'legacy reopen bypass';exception when raise_exception then assert sqlerrm='Use the reviewed product-route reopen action.';end;
+ begin update public.quote_comparisons set client_delivery_charge=0;raise exception 'direct client overwrite';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+ begin update public.quote_comparison_items set client_unit_price=0;raise exception 'direct item overwrite';exception when raise_exception then assert sqlerrm like 'Client delivery snapshot is immutable%';end;
+ update public.quote_comparisons set client_quote_status='sent',quote_sent_at=now();
 end $$;
 select 'mixed route client draft/source/send guard checks passed';

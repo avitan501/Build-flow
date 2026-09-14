@@ -27,6 +27,7 @@ export async function finalizeProductChoicesAction(input: { comparisonId: string
     p_source_fingerprint: input.expectedSourceFingerprint, p_idempotency_key: input.idempotencyKey,
     p_expected_request_items: requestRouteSnapshot(originals.data ?? []),
   })
+  if (finalizeError?.code === "55P03" || finalizeError?.code === "40P01") return { ok: false as const, error: "Another update is finishing. No route was saved; retry in a moment." }
   if (finalizeError || !data?.ok) return { ok: false as const, error: "Route not finalized. Review changed prices, product matches and supplier delivery/tax, then retry." }
   revalidatePath(`/admin/quote-comparison/${comparison.id}`)
   if (comparison.request_id) revalidatePath(`/owner/materials/requests/${comparison.request_id}`)

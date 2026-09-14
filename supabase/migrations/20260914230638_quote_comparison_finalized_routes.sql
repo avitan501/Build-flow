@@ -31,6 +31,9 @@ create table public.quote_comparison_route_items (
 );
 alter table public.quote_comparisons add column active_route_id uuid;
 alter table public.quote_comparison_routes add column client_send_token uuid, add column client_send_snapshot jsonb, add column client_send_started_at timestamptz;
+alter table public.quote_comparison_routes add column client_send_actor_id uuid references auth.users(id), add column client_send_manifest jsonb,
+ add column client_send_dispatch_started_at timestamptz, add column client_send_provider_id text;
+alter table public.quote_comparison_routes add column sealed_at timestamptz;
 alter table public.quote_comparisons add constraint quote_comparison_active_route_scope foreign key(id,active_route_id) references public.quote_comparison_routes(comparison_id,id);
 create index quote_routes_request_idx on public.quote_comparison_routes(request_id);
 create index quote_routes_actor_idx on public.quote_comparison_routes(created_by);
@@ -111,7 +114,7 @@ begin
   v_material:=v_material+v_subtotal; v_delivery:=v_delivery+v_bid.delivery_charge; v_taxes:=v_taxes+v_tax;
  end loop;
  insert into public.quote_comparison_route_items select v_route,(a->>'item_id')::uuid,(a->>'source_request_item_id')::uuid,a->>'supplier_id',(a->>'bid_id')::uuid,(a->>'quantity')::numeric,a->>'unit',(a->>'unit_cost')::numeric,(a->>'line_cost')::numeric,a->'source_snapshot' from jsonb_array_elements(v_alloc) a;
- update public.quote_comparison_routes set material_subtotal=v_material,delivery_total=v_delivery,supplier_tax_total=v_taxes,landed_total=v_material+v_delivery+v_taxes where id=v_route;
+ update public.quote_comparison_routes set material_subtotal=v_material,delivery_total=v_delivery,supplier_tax_total=v_taxes,landed_total=v_material+v_delivery+v_taxes,sealed_at=clock_timestamp() where id=v_route;
  -- This is procurement selection only. Do not send, generate invoices or rewrite client prices.
  update public.quote_comparisons set active_route_id=v_route,status='awarded' where id=p_comparison_id;
  return jsonb_build_object('ok',true,'routeId',v_route,'alreadyFinalized',false);
@@ -174,13 +177,14 @@ grant execute on function public.lock_finalized_route_evidence(uuid,uuid) to ser
 
 create function public.staff_save_finalized_route_client_quote(
  p_comparison_id uuid,p_route_id uuid,p_actor_id uuid,p_client_id uuid,p_quote_number text,p_expires_on date,
- p_client_message text,p_client_delivery_charge numeric,p_client_tax_percent numeric,p_items jsonb
-) returns void language plpgsql security invoker set search_path='' as $$
+ p_client_message text,p_client_delivery_charge numeric,p_client_tax_percent numeric,p_items jsonb,p_expected_client jsonb
+) returns jsonb language plpgsql security invoker set search_path='' as $$
 declare v_client public.profiles%rowtype; v_count integer;
 begin
  if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
  and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
  perform public.lock_finalized_route_evidence(p_comparison_id,p_route_id);
+ if p_expected_client is null or public.finalized_route_client_snapshot(p_comparison_id) is distinct from p_expected_client then raise exception 'Client quote changed. Reload before saving.'; end if;
  if exists(select 1 from public.quote_comparison_routes where id=p_route_id and client_send_token is not null) then raise exception 'Client delivery already started. Check delivery history before changing this quote.'; end if;
  if exists(select 1 from public.quote_comparisons where id=p_comparison_id and client_quote_status in ('sent','accepted')) then raise exception 'Sent quote is immutable'; end if;
  select * into v_client from public.profiles where id=p_client_id and role='client' and is_active and nullif(btrim(email),'') is not null;
@@ -197,9 +201,10 @@ begin
  client_delivery_charge=p_client_delivery_charge,client_tax_percent=p_client_tax_percent,client_quote_status='ready',quote_sent_at=null where id=p_comparison_id;
  update public.quote_comparison_items i set markup_percent=q.markup_percent,client_unit_price=q.client_unit_price
  from jsonb_to_recordset(p_items) q(item_id uuid,markup_percent numeric,client_unit_price numeric) where i.id=q.item_id and i.comparison_id=p_comparison_id;
+ return public.finalized_route_client_snapshot(p_comparison_id);
 end $$;
-revoke all on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb) from public,anon,authenticated;
-grant execute on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb) to service_role;
+revoke all on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb,jsonb) from public,anon,authenticated;
+grant execute on function public.staff_save_finalized_route_client_quote(uuid,uuid,uuid,uuid,text,date,text,numeric,numeric,jsonb,jsonb) to service_role;
 
 create function public.staff_reopen_finalized_route(p_comparison_id uuid,p_actor_id uuid)
 returns void language plpgsql security invoker set search_path='' as $$
@@ -228,18 +233,113 @@ $$;
 revoke all on function public.finalized_route_client_snapshot(uuid) from public,anon,authenticated;
 grant execute on function public.finalized_route_client_snapshot(uuid) to service_role;
 
-create function public.staff_claim_finalized_route_send(p_comparison_id uuid,p_route_id uuid,p_actor_id uuid,p_expected jsonb,p_token uuid)
+create function public.staff_claim_finalized_route_send(p_comparison_id uuid,p_route_id uuid,p_actor_id uuid,p_expected jsonb,p_token uuid,p_loaded jsonb,p_manifest jsonb)
 returns void language plpgsql security invoker set search_path='' as $$
 begin
  if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
  and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
  perform public.lock_finalized_route_evidence(p_comparison_id,p_route_id);
- if p_token is null or p_expected is null or public.finalized_route_client_snapshot(p_comparison_id) is distinct from p_expected then raise exception 'Client quote changed. Reload before sending.'; end if;
+ if p_token is null or p_expected is null or p_loaded is distinct from p_expected or public.finalized_route_client_snapshot(p_comparison_id) is distinct from p_expected then raise exception 'Client quote changed. Reload before sending.'; end if;
  if not exists(select 1 from public.quote_comparisons where id=p_comparison_id and client_quote_status='ready' and client_id is not null and nullif(btrim(client_email_snapshot),'') is not null) then raise exception 'Save the client quote first'; end if;
- update public.quote_comparison_routes set client_send_token=p_token,client_send_snapshot=p_expected,client_send_started_at=now()
+ if jsonb_typeof(p_manifest) is distinct from 'array' or jsonb_array_length(p_manifest) not between 1 and 11 then raise exception 'Invalid attachment manifest'; end if;
+ if exists(select 1 from jsonb_array_elements(p_manifest) m where jsonb_typeof(m) is distinct from 'object' or nullif(btrim(m->>'filename'),'') is null
+ or (m->>'sha256') is null or (m->>'sha256')!~'^[a-f0-9]{64}$' or (m->>'bytes') is null or (m->>'bytes')!~'^[0-9]+$' or (m->>'bytes')::numeric<=0 or (m->>'bytes')::numeric>26214400) then raise exception 'Invalid attachment manifest'; end if;
+ update public.quote_comparison_routes set client_send_token=p_token,client_send_snapshot=p_expected,client_send_started_at=now(),client_send_actor_id=p_actor_id,client_send_manifest=p_manifest
  where id=p_route_id and comparison_id=p_comparison_id and client_send_token is null;
  if not found then raise exception 'Delivery already started. Check delivery history; do not send twice.'; end if;
  -- Retain this claim even on an ambiguous provider timeout. No blind duplicate send.
 end $$;
-revoke all on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid) from public,anon,authenticated;
-grant execute on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid) to service_role;
+revoke all on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid,jsonb,jsonb) from public,anon,authenticated;
+grant execute on function public.staff_claim_finalized_route_send(uuid,uuid,uuid,jsonb,uuid,jsonb,jsonb) to service_role;
+
+create function public.staff_start_finalized_route_delivery(p_comparison_id uuid,p_route_id uuid,p_token uuid,p_actor_id uuid)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+declare r public.quote_comparison_routes%rowtype;
+begin
+ if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
+ and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
+ select * into r from public.quote_comparison_routes where id=p_route_id and comparison_id=p_comparison_id and client_send_token=p_token and client_send_actor_id=p_actor_id for update;
+ if not found then raise exception 'Delivery claim unavailable'; end if;
+ if r.client_send_provider_id is not null then return jsonb_build_object('status','sent','providerId',r.client_send_provider_id); end if;
+ if r.client_send_dispatch_started_at is not null then return jsonb_build_object('status','ambiguous'); end if;
+ update public.quote_comparison_routes set client_send_dispatch_started_at=now() where id=r.id;
+ return jsonb_build_object('status','claimed');
+end $$;
+revoke all on function public.staff_start_finalized_route_delivery(uuid,uuid,uuid,uuid) from public,anon,authenticated;
+grant execute on function public.staff_start_finalized_route_delivery(uuid,uuid,uuid,uuid) to service_role;
+
+create function public.staff_finish_finalized_route_delivery(p_comparison_id uuid,p_route_id uuid,p_token uuid,p_actor_id uuid,p_provider_id text)
+returns jsonb language plpgsql security invoker set search_path='' as $$
+begin
+ if not exists(select 1 from public.profiles p join auth.users u on u.id=p.id where p.id=p_actor_id and p.is_active and p.approval_status='approved'
+ and ((p.role='admin' and lower(btrim(u.email))='avitanneto@gmail.com') or (p.role='staff' and lower(btrim(u.email)) in ('buildavantiap@gmail.com','info@fivetownsbuilders.com')))) then raise exception 'Not authorized'; end if;
+ if nullif(btrim(p_provider_id),'') is null or length(p_provider_id)>300 then raise exception 'Provider receipt required'; end if;
+ update public.quote_comparison_routes set client_send_provider_id=p_provider_id where id=p_route_id and comparison_id=p_comparison_id and client_send_token=p_token and client_send_actor_id=p_actor_id
+ and client_send_dispatch_started_at is not null and (client_send_provider_id is null or client_send_provider_id=p_provider_id);
+ if not found then raise exception 'Delivery claim unavailable'; end if;
+ return jsonb_build_object('ok',true);
+end $$;
+revoke all on function public.staff_finish_finalized_route_delivery(uuid,uuid,uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.staff_finish_finalized_route_delivery(uuid,uuid,uuid,uuid,text) to service_role;
+
+-- Close the older authenticated SECURITY DEFINER entry point for real routes.
+-- Legacy single-bid comparisons retain their existing behavior.
+create or replace function public.staff_reopen_quote_comparison(p_comparison_id uuid)
+returns void language plpgsql security definer set search_path='' as $$
+begin
+ if not (select private.is_admin()) and not (select private.has_staff_capability('suppliers')) then raise exception 'Supplier management permission is required.'; end if;
+ perform 1 from public.quote_comparisons where id=p_comparison_id for update;
+ if not found then raise exception 'comparison_not_found'; end if;
+ if exists(select 1 from public.quote_comparison_routes where comparison_id=p_comparison_id) then raise exception 'Use the reviewed product-route reopen action.'; end if;
+ update public.quote_comparisons set awarded_bid_id=null,status='review' where id=p_comparison_id;
+ update public.quote_comparison_bids set status='received' where comparison_id=p_comparison_id;
+end $$;
+revoke all on function public.staff_reopen_quote_comparison(uuid) from public,anon;
+grant execute on function public.staff_reopen_quote_comparison(uuid) to authenticated;
+
+create function public.guard_claimed_route_client_data() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare v_comparison uuid; v_claimed boolean;
+begin
+ if tg_table_name='quote_comparisons' then
+  v_comparison:=old.id;
+ else
+  v_comparison:=case when tg_op='DELETE' then old.comparison_id else new.comparison_id end;
+  if tg_op='UPDATE' and old.comparison_id is distinct from new.comparison_id and exists(select 1 from public.quote_comparison_routes where comparison_id=old.comparison_id and client_send_token is not null) then raise exception 'Client delivery snapshot is immutable. Create a new quote version.'; end if;
+  -- Same parent fence as the send claim, but fail safely for a child-first writer.
+  perform 1 from public.quote_comparisons where id=v_comparison for update nowait;
+ end if;
+ select exists(select 1 from public.quote_comparison_routes r where r.comparison_id=v_comparison and r.client_send_token is not null) into v_claimed;
+ if v_claimed then
+  if tg_table_name='quote_comparisons' and tg_op='UPDATE' then
+   if old.client_quote_status is distinct from new.client_quote_status and new.client_quote_status not in ('sent','accepted','declined') then raise exception 'Client delivery already started.'; end if;
+   -- Delivery recording and CAS bookkeeping may advance, never customer data.
+   if (to_jsonb(old)-array['updated_at','product_choice_draft_revision','quote_sent_at','client_quote_status'])
+      is distinct from (to_jsonb(new)-array['updated_at','product_choice_draft_revision','quote_sent_at','client_quote_status']) then raise exception 'Client delivery snapshot is immutable. Create a new quote version.'; end if;
+  elsif tg_op<>'UPDATE' or (to_jsonb(old)-'updated_at') is distinct from (to_jsonb(new)-'updated_at') then
+   raise exception 'Client delivery snapshot is immutable. Create a new quote version.';
+  end if;
+ end if;
+ if tg_op='DELETE' then return old; end if;
+ return new;
+end $$;
+revoke all on function public.guard_claimed_route_client_data() from public,anon,authenticated;
+create trigger protect_claimed_route_parent before update or delete on public.quote_comparisons for each row execute function public.guard_claimed_route_client_data();
+create trigger protect_claimed_route_items before insert or update or delete on public.quote_comparison_items for each row execute function public.guard_claimed_route_client_data();
+
+create function public.guard_finalized_route_history() returns trigger language plpgsql security invoker set search_path='' as $$
+begin
+ if tg_op='DELETE' or tg_table_name<>'quote_comparison_routes' then raise exception 'Finalized supplier allocations are immutable'; end if;
+ if old.sealed_at is null and new.sealed_at is not null and old.client_send_token is null then return new; end if;
+ if (to_jsonb(old)-array['client_send_token','client_send_snapshot','client_send_started_at','client_send_actor_id','client_send_manifest','client_send_dispatch_started_at','client_send_provider_id'])
+ is distinct from (to_jsonb(new)-array['client_send_token','client_send_snapshot','client_send_started_at','client_send_actor_id','client_send_manifest','client_send_dispatch_started_at','client_send_provider_id']) then raise exception 'Finalized supplier allocations are immutable'; end if;
+ if old.client_send_token is not null and jsonb_build_array(old.client_send_token,old.client_send_snapshot,old.client_send_started_at,old.client_send_actor_id,old.client_send_manifest)
+ is distinct from jsonb_build_array(new.client_send_token,new.client_send_snapshot,new.client_send_started_at,new.client_send_actor_id,new.client_send_manifest) then raise exception 'Delivery claim is immutable'; end if;
+ if old.client_send_dispatch_started_at is not null and new.client_send_dispatch_started_at is distinct from old.client_send_dispatch_started_at then raise exception 'Delivery attempt cannot be reset'; end if;
+ if old.client_send_provider_id is not null and new.client_send_provider_id is distinct from old.client_send_provider_id then raise exception 'Provider receipt is immutable'; end if;
+ return new;
+end $$;
+revoke all on function public.guard_finalized_route_history() from public,anon,authenticated;
+create trigger immutable_finalized_route before update or delete on public.quote_comparison_routes for each row execute function public.guard_finalized_route_history();
+create trigger immutable_finalized_route_items before update or delete on public.quote_comparison_route_items for each row execute function public.guard_finalized_route_history();
+create trigger immutable_finalized_route_suppliers before update or delete on public.quote_comparison_route_suppliers for each row execute function public.guard_finalized_route_history();
