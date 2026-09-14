@@ -1,12 +1,7 @@
 "use client"
 
 import { useState } from "react"
-
-export function splitQuotedEmail(text: string) {
-  const match = /\n(?:On [^\n]{1,240}wrote:|-{2,}\s*Original Message\s*-{2,}|>{1,}\s)/i.exec(text)
-  if (!match || match.index < 1) return { current: text, previous: "" }
-  return { current: text.slice(0, match.index).trimEnd(), previous: text.slice(match.index).trim() }
-}
+import { splitQuotedEmail } from "@/lib/communication-presentation"
 
 export function CommunicationMessageText({ text, email }: { text: string; email: boolean }) {
   const [expanded, setExpanded] = useState(false)

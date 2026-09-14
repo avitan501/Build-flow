@@ -123,9 +123,10 @@ test("communications page starts small and preserves an exact thread deep link",
 });
 
 test("incremental history leaves live delta polling in place", async () => {
-  const [inbox, updates] = await Promise.all([
+  const [inbox, updates, broker] = await Promise.all([
     read("components/buildflow/unified-communication-inbox.tsx"),
     read("app/api/admin/communications/updates/route.ts"),
+    read("supabase/functions/aura-messaging-broker/index.ts"),
   ]);
 
   expect(inbox).toContain("/api/admin/communications/updates?after=");
@@ -133,8 +134,11 @@ test("incremental history leaves live delta polling in place", async () => {
   expect(inbox).toContain("Load older conversations");
   expect(inbox).toContain("Load earlier messages");
   expect(inbox).toContain("Beginning of conversation");
-  expect(updates).toContain("loadAuraCommunicationLinks");
-  expect(updates).toContain("linksByCommunication");
+  // The deployed delta route delegates link hydration to the broker SQL.
+  expect(updates).toContain('action: "load_communication_updates"');
+  expect(updates).toContain("normalizeAuraCommunications(data.communications)");
+  const delta = broker.slice(broker.indexOf('if (input.action === "load_communication_updates")'));
+  expect(delta.slice(0, delta.indexOf('return json({ ok: true, communications });'))).toContain("from public.aura_communication_links as link");
   expect(updates).toContain("session.supabase");
   expect(updates).not.toContain("createAdminClient");
 });

@@ -18,11 +18,16 @@ export function useCommunicationDraft(scope: string, thread: string, fallback: s
     try { return sessionStorage.getItem(key) ?? fallback } catch { return fallback }
   }, [key, fallback])
   const draft = useSyncExternalStore(subscribe, read, () => fallback)
-  const setDraft = useCallback((value: string) => {
-    memory.set(key, value)
-    try { sessionStorage.setItem(key, value); setStorageFailed(false) }
+  const setDraft = useCallback((value: string, targetThread?: string) => {
+    const targetKey = targetThread === undefined ? key : `avantia:reply:v1:${scope}:${targetThread}`
+    memory.set(targetKey, value)
+    try { sessionStorage.setItem(targetKey, value); setStorageFailed(false) }
     catch { setStorageFailed(true) }
     window.dispatchEvent(new Event(eventName))
-  }, [key])
-  return [draft, setDraft, storageFailed] as const
+  }, [key, scope])
+  // A completed send must not erase text typed while the request was in flight.
+  const clearSentDraft = useCallback((sentValue: string) => {
+    if (read() === sentValue) setDraft("")
+  }, [read, setDraft])
+  return [draft, setDraft, storageFailed, clearSentDraft] as const
 }

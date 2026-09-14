@@ -2,6 +2,7 @@
 
 import { CommunicationMessageText } from "@/components/buildflow/communication-message-text"
 import { useCommunicationDraft } from "@/components/buildflow/use-communication-draft"
+import { isAutomatedSender } from "@/lib/communication-presentation"
 
 import { ArrowLeft, Bot, CheckCheck, CircleAlert, ClipboardList, Clock3, ExternalLink, Mail, MapPin, MessageCircle, Paperclip, Pencil, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -377,7 +378,6 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
   const [recipient, setRecipient] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || ""))
   const [subject, setSubject] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : ""))
-  const [message, setMessage, draftStorageFailed] = useCommunicationDraft(draftScope, activeKey, activeKey === "__new__" ? initialDraft : smsReplyDrafts.find(draft => draft.communication_id === liveCommunications.find(item => initialConversationKey(item, contacts) === activeKey)?.id)?.reply_text || "")
   const [attachments, setAttachments] = useState<File[]>([])
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error"
@@ -411,6 +411,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
 
   useEffect(() => {
     const controller = new AbortController()
+    const directoryCacheKey = `${COMMUNICATION_DIRECTORY_CACHE_KEY}:${draftScope}`
     let hasFreshCache = false
     const applyDirectory = (payload: CommunicationDirectoryPayload) => {
       setContacts(payload.contacts || [])
@@ -421,13 +422,13 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       setSmsReplyDrafts(payload.smsReplyDrafts || [])
     }
     try {
-      const cached = JSON.parse(sessionStorage.getItem(COMMUNICATION_DIRECTORY_CACHE_KEY) || "null") as { savedAt?: number; data?: CommunicationDirectoryPayload } | null
+      const cached = JSON.parse(sessionStorage.getItem(directoryCacheKey) || "null") as { savedAt?: number; data?: CommunicationDirectoryPayload } | null
       if (cached?.data && Date.now() - Number(cached.savedAt || 0) < COMMUNICATION_DIRECTORY_CACHE_MS) {
         applyDirectory(cached.data)
         hasFreshCache = true
       }
     } catch {
-      sessionStorage.removeItem(COMMUNICATION_DIRECTORY_CACHE_KEY)
+      try { sessionStorage.removeItem(directoryCacheKey) } catch { /* Storage may be disabled. */ }
     }
     if (hasFreshCache) return () => controller.abort()
     void fetch("/api/admin/communications/directory", {
@@ -439,14 +440,14 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
         if (!payload) return
         applyDirectory(payload)
         try {
-          sessionStorage.setItem(COMMUNICATION_DIRECTORY_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data: payload }))
+          sessionStorage.setItem(directoryCacheKey, JSON.stringify({ savedAt: Date.now(), data: payload }))
         } catch {
           // Private browsing and storage quotas can disable session storage.
         }
       })
       .catch(() => undefined)
     return () => controller.abort()
-  }, [])
+  }, [draftScope])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -752,7 +753,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     return conversations.filter((conversation) => {
       if (contactFilter !== "all" && conversation.kind !== contactFilter) return false
       const hasAiDraft = smsReplyDrafts.some((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
-      const systemEmail = /^(?:no[-_.]?reply|do[-_.]?not[-_.]?reply)@/i.test(conversation.email)
+      const systemEmail = conversation.latest.channel === "email" && isAutomatedSender(conversation.latest.counterparty_email || conversation.email)
       if (workFilter === "system" && !systemEmail) return false
       if (workFilter === "needs_reply" && (conversation.latest.direction !== "incoming" || systemEmail)) return false
       if (workFilter === "unread" && conversation.unread < 1) return false
@@ -765,13 +766,18 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }, [contactFilter, conversations, query, smsReplyDrafts, workFilter])
 
   const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (initialCommunicationId ? conversations.find((conversation) => conversation.messages.some((message) => message.id === initialCommunicationId)) : undefined) || (activeKey !== "__new__" ? conversations[0] : undefined)
+  const [message, setMessage, draftStorageFailed, clearSentDraft] = useCommunicationDraft(
+    draftScope,
+    activeKey === "__new__" ? `${activeKey}:${channel}` : `${channel}:${channel === "email" ? recipient.trim().toLowerCase() : normalizeAuraPhone(recipient) || recipient}`,
+    activeKey === "__new__" ? initialDraft : ["sms", "whatsapp"].includes(channel) ? smsReplyDrafts.find(draft => activeConversation?.messages.some(item => item.id === draft.communication_id && item.channel === channel))?.reply_text || "" : "",
+  )
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
   const selectedChannelReady = channel === "call" || (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
   const activeThreadHasMore = Boolean(activeConversation && (activeThreadHistory?.hasMore ?? true))
 
   useEffect(() => {
-    if (threadView !== "chat" || !activeConversation || initialCommunicationId) return
+    if (threadView !== "chat" || !activeConversation || activeConversation.messages.some(item => item.id === initialCommunicationId)) return
     if (positionedThreadRef.current === activeConversation.key) return
     const container = messageScrollRef.current
     if (!container) return
@@ -852,6 +858,9 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function openConversation(conversation: Conversation) {
+    if (pending) return
+    setAttachments([])
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setThreadView("chat")
     setActiveKey(conversation.key)
     setMobileThreadOpen(true)
@@ -901,6 +910,9 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function changeChannelFilter(nextFilter: string) {
+    if (pending) return
+    setAttachments([])
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setChannelFilter(nextFilter)
     const currentMatch = activeConversation?.messages.find((item) => nextFilter === "all" || item.channel === nextFilter)
     const nextCommunication = currentMatch || initialCommunicationForQuery(liveCommunications, query, nextFilter)
@@ -958,9 +970,11 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
         setFeedback({ tone: "error", text: result.error })
         return
       }
-      setChannel(incoming.channel === "whatsapp" ? "whatsapp" : "sms")
-      setRecipient(activeConversation?.phone || "")
-      setMessage(result.reply)
+      const replyChannel = incoming.channel === "whatsapp" ? "whatsapp" : "sms"
+      const replyPhone = activeConversation?.phone || ""
+      setChannel(replyChannel)
+      setRecipient(replyPhone)
+      setMessage(result.reply, `${replyChannel}:${normalizeAuraPhone(replyPhone) || replyPhone}`)
       setFeedback({
         tone: "success",
         text: `${result.safetyReason}${result.requestDetected ? " A material-request draft was also added to the request queue." : ""}`,
@@ -998,7 +1012,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       setConfirmationCommunicationId("")
       setChannel("sms")
       setRecipient(requestReview.phone)
-      setMessage(result.invitation)
+      setMessage(result.invitation, `sms:${normalizeAuraPhone(requestReview.phone) || requestReview.phone}`)
       setFeedback({
         tone: "success",
         text: `Request #${result.publicNumber || "created"} is assigned to Carlos. The secure portal invitation is ready for review and sending.`,
@@ -1047,6 +1061,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function newConversation() {
+    if (pending) return
     setActiveKey("__new__")
     setMobileThreadOpen(true)
     setChannel("whatsapp")
@@ -1079,6 +1094,9 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function changeChannel(nextChannel: Channel) {
+    if (pending) return
+    setAttachments([])
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setChannel(nextChannel)
     const entry = recipientOptions.find((item) => item.id === selectedRecipientId)
     if (activeConversation) setRecipient(nextChannel === "email" ? activeConversation.email : activeConversation.phone)
@@ -1187,6 +1205,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   function sendMessage() {
     if (channel === "call") return
     const messageChannel = channel
+    const sentDraftText = message
     const sentText = message.trim()
     const sentRecipient = recipient.trim()
     const sentSubject = subject.trim()
@@ -1310,13 +1329,13 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
         setTeachAi(false)
         setCorrectionReasons([])
         if (!completed.ok) {
-          setMessage("")
+          clearSentDraft(sentDraftText)
           setFeedback({ tone: "error", text: completed.error })
           router.refresh()
           return
         }
       }
-      setMessage("")
+      clearSentDraft(sentDraftText)
       setFeedback({
         tone: "success",
         text: `${messageChannel === "sms" ? "Text sent and saved. AI replies are paused for this conversation until you turn them on again." : messageChannel === "whatsapp" ? "WhatsApp sent and saved." : "Email sent and saved."}${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}`,
@@ -1466,7 +1485,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0071e3]" />
             </label>
             <div className="mt-2 flex gap-1" aria-label="Inbox views">
-              {([ ["all", "Inbox"], ["needs_reply", "Needs reply"], ["system", "System"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={workFilter === value} onClick={() => setWorkFilter(value)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold focus-visible:ring-2 ${workFilter === value ? "bg-slate-950 text-white" : "text-slate-500"}`}>{label}</button>)}
+              {([ ["all", "All"], ["unread", "Unread"], ["needs_reply", "Needs reply"], ["system", "System"] ] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={workFilter === value} onClick={() => setWorkFilter(value)} className={`min-h-11 rounded-lg px-3 text-xs font-semibold focus-visible:ring-2 ${workFilter === value ? "bg-slate-950 text-white" : "text-slate-500"}`}>{label}</button>)}
             </div>
             <details className="mt-2 rounded-lg border border-slate-200 px-3">
               <summary className="flex min-h-11 cursor-pointer items-center justify-between text-xs font-semibold">Filters <span className="text-slate-500">{contactFilter !== "all" || channelFilter !== "all" || workFilter !== "all" ? "Active" : "All conversations"}</span></summary>
@@ -1971,6 +1990,9 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                         <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.safety_level === "green" ? "bg-emerald-100 text-emerald-800" : activeSmsDraft.safety_level === "red" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{activeSmsDraft.safety_level || "yellow"} safety</span>
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>
+                      <details className="mt-1">
+                        <summary className="flex min-h-9 cursor-pointer items-center text-xs font-semibold text-sky-800">Review details & optional AI training</summary>
+                        <p className="my-1 text-xs leading-5 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>
                       {activeDraftEdited ? (
                         <div className="mt-2">
                           <p className="text-[9px] font-bold uppercase tracking-wide text-sky-900">Why did you edit it?</p>
@@ -1991,6 +2013,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                         Nothing is learned unless you check this box and send. Customer details are redacted before reuse. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}
                         {activeSmsDraft.latency_ms ? ` · ${activeSmsDraft.latency_ms} ms` : ""}.
                       </p>
+                      </details>
                     </div>
                   </div>
                 </section>
