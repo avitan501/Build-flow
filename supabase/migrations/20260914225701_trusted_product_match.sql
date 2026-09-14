@@ -77,8 +77,9 @@ begin
  'bid',jsonb_build_object('id',v_bid.id,'supplier_id',v_bid.supplier_id,'trust_level_snapshot',v_bid.trust_level_snapshot),
  'price',jsonb_build_object('unit_price',v_price.unit_price,'is_available',v_price.is_available,'notes',v_price.notes));
  if v_snapshot is distinct from p_expected or p_source_fingerprint !~ '^[a-f0-9]{64}$' or p_source_fingerprint is null
- or not v_price.is_available or v_price.unit_price is null or v_price.unit_price<0 or v_item.quantity<=0
- or length(btrim(v_price.notes))=0 or length(btrim(v_item.unit))=0 or lower(btrim(p_selling_unit)) is distinct from lower(btrim(v_item.unit))
+ or v_price.is_available is distinct from true or v_price.unit_price is null or v_price.unit_price::text in ('NaN','Infinity','-Infinity') or v_price.unit_price<0
+ or v_item.quantity is null or v_item.quantity::text in ('NaN','Infinity','-Infinity') or v_item.quantity<=0
+ or length(btrim(coalesce(v_price.notes,'')))=0 or length(btrim(coalesce(v_item.unit,'')))=0 or lower(btrim(p_selling_unit)) is distinct from lower(btrim(v_item.unit))
  or v_bid.trust_level_snapshot='do-not-use' or v_bid.status='declined'
  or v_price.notes ~* '\m(not available|unavailable|out of stock|not included|excluded)\M'
  then return jsonb_build_object('ok',false); end if;
@@ -99,7 +100,7 @@ begin
  select * into v_item from public.quote_comparison_items where id=p_item_id;
  select * into v_bid from public.quote_comparison_bids where id=p_bid_id and comparison_id=v_item.comparison_id;
  select * into v_price from public.quote_comparison_prices where bid_id=p_bid_id and item_id=p_item_id;
- if v_item.id is null or v_bid.id is null or v_price.item_id is null or v_item.quantity is null or v_item.quantity<=0 or length(btrim(coalesce(v_item.unit,'')))=0 or v_price.is_available is distinct from true or v_price.unit_price is null or v_price.unit_price<0 or length(btrim(coalesce(v_price.notes,'')))=0 or v_bid.status='declined' or v_bid.trust_level_snapshot='do-not-use' then return false; end if;
+ if v_item.id is null or v_bid.id is null or v_price.item_id is null or v_item.quantity is null or v_item.quantity::text in ('NaN','Infinity','-Infinity') or v_item.quantity<=0 or length(btrim(coalesce(v_item.unit,'')))=0 or v_price.is_available is distinct from true or v_price.unit_price is null or v_price.unit_price::text in ('NaN','Infinity','-Infinity') or v_price.unit_price<0 or length(btrim(coalesce(v_price.notes,'')))=0 or v_bid.status='declined' or v_bid.trust_level_snapshot='do-not-use' then return false; end if;
  v_snapshot:=jsonb_build_object('item',jsonb_build_object('id',v_item.id,'description',v_item.description,'specification',v_item.specification,'quantity',v_item.quantity,'unit',v_item.unit),'bid',jsonb_build_object('id',v_bid.id,'supplier_id',v_bid.supplier_id,'trust_level_snapshot',v_bid.trust_level_snapshot),'price',jsonb_build_object('unit_price',v_price.unit_price,'is_available',v_price.is_available,'notes',v_price.notes));
  if exists(select 1 from public.quote_product_match_confirmations c where c.bid_id=p_bid_id and c.item_id=p_item_id and c.revoked_at is null and c.source_snapshot=v_snapshot and lower(btrim(c.selling_unit))=lower(btrim(v_item.unit))) then
    if v_price.notes ~* '\m(not available|unavailable|out of stock|not included|exclud\w*)\M' then return false; end if;

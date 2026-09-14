@@ -5,12 +5,23 @@ import { useRouter } from "next/navigation";
 import { confirmProductMatchAction } from "@/app/admin/quote-comparison/product-match-actions";
 import { canonicalProductMatch, productMatchSnapshot, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison";
 
-export function ProductMatchReview({item,bid,disabled,beforeConfirm}:{item:QuoteComparisonItemRecord;bid:QuoteComparisonBidRecord;disabled:boolean;beforeConfirm:()=>Promise<boolean>}) {
+type ReviewProps = {item:QuoteComparisonItemRecord;bid:QuoteComparisonBidRecord;disabled:boolean;beforeConfirm:()=>Promise<boolean>};
+
+export function ProductMatchReview(props: ReviewProps) {
+  const price = props.bid.quote_comparison_prices?.find(row => row.item_id === props.item.id);
+  if (!price?.notes?.trim()) return <p className="px-3 pb-3 text-xs text-amber-900">Upload the supplier quote with its original wording before reviewing.</p>;
+  // Consent belongs to the displayed source, not merely to this product ID.
+  // A refresh with changed terms remounts the form and clears previous consent.
+  const source = canonicalProductMatch(productMatchSnapshot(props.item, props.bid, price));
+  return <ProductMatchReviewForm key={source} {...props}/>;
+}
+
+function ProductMatchReviewForm({item,bid,disabled,beforeConfirm}: ReviewProps) {
   const router=useRouter();
   const [checked,setChecked]=useState(false),[unit,setUnit]=useState(""),[error,setError]=useState("");
   const [pending,startTransition]=useTransition();
   const price=bid.quote_comparison_prices?.find(row=>row.item_id===item.id);
-  if(!price?.notes.trim())return <p className="px-3 pb-3 text-xs text-amber-900">Upload the supplier quote with its original wording before reviewing.</p>;
+  if(!price?.notes?.trim())return null;
   return <details className="border-t border-amber-100 bg-amber-50/50 px-3 text-xs">
     <summary className="min-h-11 cursor-pointer py-3 font-bold text-sky-800">Review this match</summary>
     <div className="grid gap-3 pb-3">
