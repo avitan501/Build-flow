@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { deliverClaimedClientQuote, type ClaimedRoute, type DeliveryScope } from "../_shared/claimed-client-quote.ts"
 
 const companyEmail = "office@avantiabuild.com"
 const ownerEmail = "avitanneto@gmail.com"
@@ -75,6 +76,38 @@ Deno.serve(async (request) => {
 
   if (action === "send_client_quote") {
     if (!isOwner && !isSupplierStaff) return json({ error: "forbidden" }, 403)
+    if (payload.routeId !== undefined) {
+      const rpcScope = (scope: DeliveryScope) => ({ p_comparison_id: scope.comparisonId, p_route_id: scope.routeId, p_token: scope.token, p_actor_id: scope.actorId })
+      const result = await deliverClaimedClientQuote(payload, authenticated.user.id, {
+        loadClaim: async (comparisonId, routeId) => {
+          const { data, error } = await admin.from("quote_comparison_routes")
+            .select("id,comparison_id,client_send_token,client_send_actor_id,client_send_started_at,client_send_snapshot,client_send_manifest")
+            .eq("id", routeId).eq("comparison_id", comparisonId).maybeSingle<ClaimedRoute>()
+          if (error) throw Error("claim_unavailable")
+          return data
+        },
+        start: async scope => {
+          const { data, error } = await admin.rpc("staff_start_finalized_route_delivery", rpcScope(scope))
+          if (error || !data) throw Error("claim_unavailable")
+          return data
+        },
+        finish: async (scope, providerId) => {
+          const { data, error } = await admin.rpc("staff_finish_finalized_route_delivery", { ...rpcScope(scope), p_provider_id: providerId })
+          return !error && data?.ok === true
+        },
+        send: async (email, idempotencyKey) => {
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST", signal: AbortSignal.timeout(15_000),
+            headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json", "idempotency-key": idempotencyKey },
+            body: JSON.stringify({ ...email, from: Deno.env.get("QUOTE_SUBMISSION_FROM") || `Avantia Build <${companyEmail}>`, reply_to: companyEmail }),
+          })
+          const result = await response.json().catch(() => null) as { id?: string } | null
+          if (!response.ok || !result?.id) throw Error("provider_not_confirmed")
+          return result.id
+        },
+      })
+      return json(result.body, result.status)
+    }
     const attachment = payload.attachment && typeof payload.attachment === "object"
       ? payload.attachment as { filename?: unknown; content?: unknown }
       : null
