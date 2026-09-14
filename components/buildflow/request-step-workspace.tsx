@@ -9,8 +9,8 @@ import { requestStepAttention, type RequestStep, type RequestStepPatch, type Req
 import type { RequestActivityEvent } from "@/components/buildflow/request-activity-log"
 import { formatSiteDateTime } from "@/lib/site-date-time"
 
-type StepDraft = { state: RequestStepState; patch: RequestStepPatch; pending: boolean; error: string }
-type Workspace = { steps: StepDraft[]; available: boolean; change: (step: RequestStep, patch: RequestStepPatch, debounce?: boolean) => void; flush: (step: RequestStep, retry?: boolean) => void }
+type StepDraft = { state: RequestStepState; patch: RequestStepPatch; pending: boolean; error: string; review?: boolean; latest?: RequestStepState | null }
+type Workspace = { steps: StepDraft[]; available: boolean; change: (step: RequestStep, patch: RequestStepPatch, debounce?: boolean) => void; flush: (step: RequestStep, retry?: boolean) => void; resolve: (step: RequestStep, keep: boolean) => void; refresh: () => void }
 const Context = createContext<Workspace | null>(null)
 export function useRequestStepWorkspace() { return useContext(Context) }
 
@@ -26,26 +26,31 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
   useEffect(() => {
     publish(current.current.map(draft => {
       const fresh = initial.find(state => state.step === draft.state.step)!
+      if (draft.review) return { ...draft, latest: fresh }
       return Object.keys(draft.patch).length || draft.pending ? { ...draft, state: { ...draft.state, eligible: fresh.eligible, completed: fresh.eligible && draft.state.completed } } : { ...draft, state: fresh }
     }))
   }, [initial])
   useEffect(() => {
     try {
-      const stored = JSON.parse(sessionStorage.getItem(draftKey) || "null") as Array<{ step: RequestStep; patch: RequestStepPatch }> | null
+      const stored = JSON.parse(sessionStorage.getItem(draftKey) || "null") as Array<{ step: RequestStep; patch: RequestStepPatch; revision?: number }> | null
       if (Array.isArray(stored)) publish(current.current.map(row => {
-        const restored = stored.find(item => item.step === row.state.step)?.patch
+        const recovered = stored.find(item => item.step === row.state.step)
+        const restored = recovered?.patch
         if (!restored || typeof restored !== "object") return row
         const patch: RequestStepPatch = {}
         if (typeof restored.note === "string") patch.note = restored.note.slice(0, 2000)
         if (["carlos", "david"].includes(restored.assignee || "")) patch.assignee = restored.assignee
         if (typeof restored.completed_override === "boolean") patch.completed_override = restored.completed_override
-        return Object.keys(patch).length ? { ...row, patch, error: "Unsaved changes recovered. Review and retry." } : row
+        const revision = recovered?.revision
+        // Even a matching revision needs an explicit review after recovery. Legacy
+        // drafts have no baseline and must never silently rebase onto fresh data.
+        return Object.keys(patch).length ? { ...row, state: { ...row.state, revision: typeof revision === "number" && Number.isSafeInteger(revision) && revision >= 0 ? revision : row.state.revision }, patch, review: true, latest: row.state, error: "Unsaved changes recovered. Compare with the saved step before continuing." } : row
       }))
     } catch { /* Storage is optional; visible navigation guards still protect drafts. */ }
   }, [draftKey])
   useEffect(() => {
     try {
-      const unsaved = steps.filter(row => Object.keys(row.patch).length).map(row => ({ step: row.state.step, patch: row.patch }))
+      const unsaved = steps.filter(row => Object.keys(row.patch).length).map(row => ({ step: row.state.step, patch: row.patch, revision: row.state.revision }))
       if (unsaved.length) sessionStorage.setItem(draftKey, JSON.stringify(unsaved))
       else sessionStorage.removeItem(draftKey)
     } catch { /* Keep the visible draft even if browser storage is unavailable. */ }
@@ -56,6 +61,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     clearTimeout(timers.current.get(step))
     if (saving.current.has(step) || !available) return
     const draft = current.current.find(row => row.state.step === step)!
+    if (draft.review) return
     if (draft.error && !retry) return
     if (!Object.keys(draft.patch).length) return
     const patch = { ...draft.patch }
@@ -65,7 +71,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
       const result = await saveAction({ requestId: draft.state.request_id, step, revision: draft.state.revision, patch })
       if (!active.current) return
       if (!result.ok) {
-        publish(current.current.map(row => row.state.step === step ? { ...row, pending: false, error: result.error, state: "current" in result && result.current ? { ...row.state, ...result.current, completed: row.state.eligible && (result.current.completed_override ?? row.state.completed) } : row.state } : row))
+        publish(current.current.map(row => row.state.step === step ? { ...row, pending: false, error: result.error, ...("current" in result ? { review: true, latest: result.current ? { ...row.state, ...result.current, completed: row.state.eligible && (result.current.completed_override ?? row.state.completed) } : null } : {}) } : row))
         return
       }
       publish(current.current.map(row => {
@@ -83,10 +89,16 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
   }, [available, router, saveAction])
 
   function change(step: RequestStep, patch: RequestStepPatch, debounce = false) {
-    publish(current.current.map(row => row.state.step === step ? { ...row, patch: { ...row.patch, ...patch }, error: "" } : row))
+    publish(current.current.map(row => row.state.step === step ? { ...row, patch: { ...row.patch, ...patch } } : row))
     clearTimeout(timers.current.get(step))
     if (debounce) timers.current.set(step, setTimeout(() => void flush(step), 600))
     else void flush(step)
+  }
+  function resolve(step: RequestStep, keep: boolean) {
+    const row = current.current.find(draft => draft.state.step === step)!
+    if (!row.review || !row.latest || row.pending) return
+    publish(current.current.map(draft => draft.state.step === step ? { state: row.latest!, patch: keep ? row.patch : {}, pending: false, error: "" } : draft))
+    if (keep) void flush(step)
   }
   useEffect(() => {
     active.current = true
@@ -101,7 +113,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     const scheduled = timers.current
     return () => { active.current = false; window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); scheduled.forEach(clearTimeout) }
   }, [])
-  return <Context.Provider value={{ steps, available, change, flush }}>{children}</Context.Provider>
+  return <Context.Provider value={{ steps, available, change, flush, resolve, refresh: () => router.refresh() }}>{children}</Context.Provider>
 }
 
 export function RequestStepStatusPopover({ step }: { step: RequestStep }) {
@@ -121,7 +133,7 @@ export function RequestStepStatusPopover({ step }: { step: RequestStep }) {
         <label className="grid gap-1 text-xs font-semibold">Status<select value={String(draft.patch.completed_override ?? completed)} onChange={event => workspace.change(step, { completed_override: event.target.value === "true" })} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3"><option value="false">In progress</option><option value="true">Done</option></select></label>
         <label className="grid gap-1 text-xs font-semibold">Internal note<textarea value={effective.note} maxLength={2000} onChange={event => workspace.change(step, { note: event.target.value }, true)} onBlur={() => workspace.flush(step)} rows={3} placeholder="What needs to happen?" className="resize-y rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label>
       </fieldset>
-      <div className="mt-2 text-xs" aria-live="polite">{draft.error ? <div role="alert" className="text-amber-900"><p>{draft.error}</p><button type="button" onClick={() => workspace.flush(step, true)} className="mt-1 min-h-11 font-bold underline">Retry changes</button></div> : <span className="text-slate-500">{draft.pending ? "Saving…" : Object.keys(draft.patch).length ? "Waiting to save…" : "Changes save automatically · staff only"}</span>}</div>
+      <div className="mt-2 text-xs" aria-live="polite">{draft.error ? <div role="alert" className="text-amber-900"><p>{draft.error}</p>{draft.review ? <section aria-label="Review saved step" className="mt-2 grid gap-2 rounded-lg border border-amber-200 p-2">{draft.latest ? <><p className="font-bold">Currently saved · {draft.latest.assignee === "david" ? "David" : "Carlos"} · {draft.latest.completed ? "Done" : "In progress"}</p><p className="whitespace-pre-wrap break-words">{draft.latest.note || "No saved note"}</p><p>Your draft stays in the fields above.</p><button type="button" onClick={() => workspace.resolve(step, true)} className="min-h-11 font-bold underline">Use my changes on this version</button><button type="button" onClick={() => workspace.resolve(step, false)} className="min-h-11 font-bold underline">Keep saved version</button></> : <button type="button" onClick={workspace.refresh} className="min-h-11 font-bold underline">Refresh saved version</button>}</section> : <button type="button" onClick={() => workspace.flush(step, true)} className="mt-1 min-h-11 font-bold underline">Retry changes</button>}</div> : <span className="text-slate-500">{draft.pending ? "Saving…" : Object.keys(draft.patch).length ? "Waiting to save…" : "Changes save automatically · staff only"}</span>}</div>
     </dialog>
   </>
 }
