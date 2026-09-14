@@ -17,6 +17,15 @@ import {
 
 const root = process.cwd()
 
+test("dashboard Company screen shortcut includes Carlos without exposing owner tools", async () => {
+  const source = await readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8")
+  expect(source).toContain("const canOpenCompanyScreen = access.owner ||")
+  expect(source).toContain('String(user.email || profile?.email || "").trim().toLowerCase() === CARLOS_WORK_BROWSER_EMAIL')
+  expect(source).toMatch(/canOpenCompanyScreen\s*\? \[\{ href: "\/admin\/ai-tools\/work-browser", label: "Company screen" \}\]/)
+  expect(source.match(/href: "\/admin\/ai-tools\/work-browser"/g)).toHaveLength(1)
+  expect(source).toMatch(/access\.owner\s*\? \[\s*\{\s*href: "\/admin\/goals-progress\/website-work",\s*label: "David Dashboard",\s*\},\s*\{ href: "\/admin\/payments", label: "Payment Center" \}/)
+})
+
 test("work-browser acknowledgement is explicit, versioned, and parseable", () => {
   expect(CARLOS_WORK_BROWSER_STATEMENT).toContain("viewed and monitored by management at any time")
   const details = serializeCarlosWorkBrowserAcknowledgement({

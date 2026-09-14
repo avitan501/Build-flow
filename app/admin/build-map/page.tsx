@@ -31,6 +31,7 @@ import {
   parseDailyWorkSummary,
 } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { CARLOS_WORK_BROWSER_EMAIL } from "@/lib/carlos-work-browser";
 import {
   DASHBOARD_AI_HISTORY_PREFIX,
   parseDashboardAiHistory,
@@ -171,7 +172,9 @@ export default async function AdminDashboardPage({
   const selectedStage = pipelineStages.some((item) => item.id === stage)
     ? (stage as ManagerPipelineStage)
     : null;
-  const { supabase, access } = await requireManagerPortalProfile();
+  const { supabase, access, user, profile } = await requireManagerPortalProfile();
+  const canOpenCompanyScreen = access.owner ||
+    String(user.email || profile?.email || "").trim().toLowerCase() === CARLOS_WORK_BROWSER_EMAIL;
   if (view === "blueprint" && access.owner) {
     const { data, error } = await supabase
       .from("website_work_items")
@@ -499,6 +502,9 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
+              ...(canOpenCompanyScreen
+                ? [{ href: "/admin/ai-tools/work-browser", label: "Company screen" }]
+                : []),
               {
                 href: "/admin/ai-tools/website-defects",
                 label: "Website Defects",
@@ -508,10 +514,6 @@ export default async function AdminDashboardPage({
                     {
                       href: "/admin/goals-progress/website-work",
                       label: "David Dashboard",
-                    },
-                    {
-                      href: "/admin/ai-tools/work-browser",
-                      label: "Company screen",
                     },
                     { href: "/admin/payments", label: "Payment Center" },
                   ]
