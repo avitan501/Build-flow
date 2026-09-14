@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { readFile } from "node:fs/promises"
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import ts from "typescript"
 import { ProductQuoteCard, productQuoteCardSections } from "../components/buildflow/product-quote-card"
@@ -42,11 +42,12 @@ test("manual override stays visible alongside cheapest and every other quote sta
   expect(source.selected?.lineTotal).toBe(40)
 })
 
-test("SSR renders collapsed secondary quotes with accessible radios and full specs", () => {
+test("SSR renders collapsed product accordion with all accessible offers and full specs", () => {
   const html = renderToStaticMarkup(createElement(serverExports.ProductQuoteCard, { row: row(), onSelect: () => {}, onClear: () => {} }))
   expect(html).toContain(item.description)
   expect(html).toContain(item.specification)
-  expect(html).toContain("Other quotes (4)")
+  expect(html).toContain('name="requested-product-offers"')
+  expect(html).toContain("5 supplier responses")
   expect(html).toContain("1 need review")
   expect(html).not.toMatch(/<details[^>]*\sopen(?:=|\s|>)/)
   expect(html.match(/type="radio"/g)).toHaveLength(5)
@@ -61,7 +62,7 @@ test("no eligible or no supplier prices have truthful compact empty states", () 
   expect(productQuoteCardSections(unknownRow).primary).toHaveLength(0)
   const html = renderToStaticMarkup(createElement(serverExports.ProductQuoteCard, { row: unknownRow, onSelect: () => {}, onClear: () => {} }))
   expect(html).toContain("No confirmed price yet.")
-  expect(html).toContain("Supplier responses (1)")
+  expect(html).toContain("1 supplier responses")
   const emptyRow = buildProductQuotePreview([item], []).rows[0]
   expect(renderToStaticMarkup(createElement(serverExports.ProductQuoteCard, { row: emptyRow, onSelect: () => {}, onClear: () => {} }))).toContain("No supplier quotes yet.")
 })
@@ -75,4 +76,24 @@ test("workspace keeps draft warning and existing cheapest computation, not award
   expect(card).not.toContain("Action(")
   expect(card).not.toContain("useEffect")
   expect(card).toContain("focus({ preventScroll: true })")
+})
+
+for (const width of [390,1440]) test(`product accordion opens only one product and preserves review evidence at ${width}px`, async ({page})=>{
+  const css=readdirSync(".next/static/css").filter(name=>name.endsWith(".css")).map(name=>readFileSync(`.next/static/css/${name}`,"utf8")).join("\n")
+  const first=renderToStaticMarkup(createElement(serverExports.ProductQuoteCard,{row:row(),onSelect:()=>{},onClear:()=>{}}))
+  const second=renderToStaticMarkup(createElement(serverExports.ProductQuoteCard,{row:{...row(),item:{...item,id:"second",description:"Second requested product"}},onSelect:()=>{},onClear:()=>{}}))
+  await page.setViewportSize({width,height:900})
+  await page.setContent(`<style>${css}</style><main style="max-width:1000px;margin:auto;padding:16px">${first}${second}</main>`)
+  const cards=page.getByTestId("product-quote-card")
+  await expect(page.locator('details[open]')).toHaveCount(0)
+  await cards.nth(0).locator("summary").click()
+  await expect(cards.nth(0).getByText("Unrelated product",{exact:true})).toBeVisible()
+  await expect(cards.nth(0).getByRole("radio",{name:/Choose review /})).toBeDisabled()
+  await expect(cards.nth(0).getByRole("radio",{name:/Choose lowest /})).toBeEnabled()
+  await cards.nth(1).locator("summary").focus()
+  await page.keyboard.press("Enter")
+  await expect(page.locator('details[open]')).toHaveCount(1)
+  await expect(cards.nth(0).getByText("Unrelated product",{exact:true})).not.toBeVisible()
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await page.screenshot({path:`/tmp/step2-product-accordion-${width}.png`,fullPage:true})
 })
