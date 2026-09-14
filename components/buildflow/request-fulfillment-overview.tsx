@@ -3,6 +3,13 @@ import type { ReactNode } from "react"
 
 export const FULFILLMENT_PHASES = ["Estimate", "Approval", "Payment", "Receipt", "Delivery"] as const
 
+export function SavedClientPriceTotals({ amounts }: { amounts: { subtotal: number; delivery: number; tax: number; taxRate: number; total: number } }) {
+  const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+  return <dl aria-label="Saved document totals" className="mt-3 grid gap-2 border-t border-slate-200 pt-3 text-xs">
+    {[["Subtotal", amounts.subtotal], ["Delivery", amounts.delivery], [`Sales tax (${amounts.taxRate}%)`, amounts.tax], ["Total", amounts.total]].map(([label, amount]) => <div key={label} className="flex justify-between gap-3"><dt>{label}</dt><dd className="font-semibold tabular-nums">{money(Number(amount))}</dd></div>)}
+  </dl>
+}
+
 export function RequestFulfillmentOverview({ phase, done, status, document, primaryAction, priceBreakdown, paymentDetails, deliveryDetails, deliveryLabel }: {
   phase: number
   done: boolean[]
@@ -18,7 +25,7 @@ export function RequestFulfillmentOverview({ phase, done, status, document, prim
     <p className="mb-2 text-xs font-medium text-slate-500 sm:hidden">{done.every(Boolean) ? "Delivery scheduled" : `${phase + 1} of 5 · ${FULFILLMENT_PHASES[phase]}`}</p>
     <ol aria-label="Client and delivery progress" className="mb-5 flex gap-1 sm:gap-3">{FULFILLMENT_PHASES.map((label, index) => <li key={label} aria-current={phase === index ? "step" : undefined} className="min-w-0 flex-1">
       <span className={`block h-1.5 rounded-full sm:hidden ${done[index] ? "bg-emerald-500" : phase === index ? "bg-amber-400" : "bg-slate-200"}`} />
-      <span className="sr-only sm:hidden">{label}: {done[index] ? "Complete" : phase === index ? "Current" : "Pending"}</span>
+      <span className="sr-only sm:hidden">{label}: {done[index] ? "Complete" : phase === index ? "Current" : index < phase ? "Not recorded" : "Pending"}</span>
       <div className="hidden items-center gap-2 sm:flex"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs ${done[index] ? "bg-emerald-600 text-white" : phase === index ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"}`}>{done[index] ? <Check className="h-4 w-4" /> : index + 1}</span><span className={`text-xs ${phase === index ? "font-bold text-slate-950" : "text-slate-600"}`}>{label}</span></div>
     </li>)}</ol>
     <section aria-label="Current client action" className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 sm:items-center sm:p-5">

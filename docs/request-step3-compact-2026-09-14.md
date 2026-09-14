@@ -1,5 +1,16 @@
 # REQ05 compact Step 3 — local candidate
 
+## Review corrections, September 14
+
+Correction worktree `/tmp/avantia-step3-review-fixes-20260914`, branch `codex/step3-review-fixes-20260914`, based on `154efb31` plus original compact UI cherry-pick `f1a35eb7` (source `cce397c4`).
+
+- Current phase now follows `workflow.step3Action`. A paid legacy request without earlier history advances to receipt/delivery; missing historical completion flags remain false and are described as not recorded. No fabricated estimate approval or completed delivery.
+- Subtotal, delivery, sales tax and total use the same saved document snapshot and arithmetic as the headline total. Unsaved editor changes cannot alter that breakdown.
+- Changed files: overview and management panel, new `lib/request-fulfillment-presentation.ts`, regression specification and this report. Step 2, handlers, completion guards and database code were not changed in this correction.
+- Verification: 45 targeted workflow/completion/render/browser tests passed, including actual component with compiled CSS at 390px and 1440px, keyboard accordion operation and no horizontal overflow. Both fixture screenshots visually inspected. These are isolated synthetic fixtures, not authenticated live action verification.
+- Production webpack build passed with 153 routes; standalone TypeScript and diff whitespace checks passed. Full lint passed with zero errors and 31 existing unrelated warnings. Changed-file secret-pattern scan found no credentials. No external sends, provider calls, payments, database mutations, push or deployment.
+- Parent owns master-context updates and serialized integration. Authenticated combined Step 1/2/3 verification remains a release gate; partial financial/delivery ledger remains separate unfinished work.
+
 Branch/worktree: `codex/request-step3-design-20260914`, `/tmp/avantia-request-step3-design-20260914`. Based on `c6b8138f`, with isolated release-safety fixes `e1bb21f6` (all-current-item delivery coverage) and `71fa1fdf` (request/account draft isolation).
 
 ## Implemented

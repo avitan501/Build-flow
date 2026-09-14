@@ -13,7 +13,8 @@ import { LocationAutocomplete } from "@/components/buildflow/location-autocomple
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
-import { RequestFulfillmentOverview } from "@/components/buildflow/request-fulfillment-overview"
+import { RequestFulfillmentOverview, SavedClientPriceTotals } from "@/components/buildflow/request-fulfillment-overview"
+import { fulfillmentPhaseForAction, savedClientDocumentAmounts } from "@/lib/request-fulfillment-presentation"
 import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import { buildClientLinkMessage, splitClientLinkMessage } from "@/lib/client-link-message"
@@ -151,11 +152,7 @@ function SupplierNoteAutosave({ requestId, supplierId, supplierName, initialNote
   return <div className="relative"><input aria-label={`Note for ${supplierName}`} value={note} onChange={(event) => { setNote(event.target.value); setMessage("") }} placeholder="Supplier note" maxLength={2000} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 pr-14 text-[11px] text-slate-800" /><span aria-live="polite" aria-label={message || saveLabel} title={message || undefined} className={`pointer-events-none absolute inset-y-0 right-2 flex items-center text-[9px] font-bold ${message && message !== "Saved" ? "text-rose-700" : "text-emerald-700"}`}>{saveLabel}</span></div>
 }
 function savedDocumentTotal(documentData: RequestClientDocumentSnapshot["documentData"]) {
-  const subtotal = (documentData.lines ?? []).reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0)
-  const deliveryCharge = Number(documentData.deliveryCharge || 0)
-  const salesTaxRate = Number(documentData.salesTaxRate || 0)
-  const tax = (subtotal + (documentData.taxableDelivery === false ? 0 : deliveryCharge)) * salesTaxRate / 100
-  return subtotal + deliveryCharge + tax
+  return savedClientDocumentAmounts(documentData).total
 }
 
 const REPLY_BLOCKS = [
@@ -931,11 +928,12 @@ export function RequestManagementPanel({
       : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
   const latestClientDocument = clientDocuments[0] ?? null
   const fulfillmentDone = [estimateSent, clientApproved, paymentReceived, receiptSent, deliveryScheduled]
-  const fulfillmentPhase = fulfillmentDone.every(Boolean) ? 4 : fulfillmentDone.findIndex((done) => !done)
+  const fulfillmentPhase = fulfillmentPhaseForAction(workflow.step3Action)
+  const fulfillmentAmounts = latestClientDocument ? savedClientDocumentAmounts(latestClientDocument.documentData) : null
   const fulfillmentDocument = latestClientDocument ? {
     label: latestClientDocument.documentType === "invoice" ? "Invoice" : latestClientDocument.documentType === "receipt" ? "Receipt" : "Estimate",
     number: latestClientDocument.documentNumber,
-    total: savedDocumentTotal(latestClientDocument.documentData),
+    total: fulfillmentAmounts!.total,
     updated: new Date(latestClientDocument.updatedAt).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET",
     href: `${PRODUCTION_SITE_ORIGIN}/client-document/${latestClientDocument.publicToken}?preview=${latestClientDocument.managerPreviewToken}`,
   } : null
@@ -1089,6 +1087,7 @@ export function RequestManagementPanel({
         <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
           <RequestFulfillmentOverview phase={fulfillmentPhase} done={fulfillmentDone} status={fulfillmentDetail} document={fulfillmentDocument} primaryAction={renderStep3PrimaryAction()} deliveryLabel={deliveryScheduled ? "Scheduled" : scheduledItemIds.size ? "Partly scheduled" : "Not scheduled"} priceBreakdown={<>
           {latestClientDocument?.documentData.lines?.length ? <ul className="divide-y divide-slate-100" aria-label="Saved document prices">{latestClientDocument.documentData.lines.map((line, index) => <li key={index} className="flex items-start justify-between gap-3 py-2 text-xs"><span className="min-w-0 break-words">{line.description}<span className="mt-1 block text-slate-500">{line.quantity} {line.unit} × {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.unitPrice)}</span></span><span className="shrink-0 font-semibold">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</span></li>)}</ul> : <p className="text-xs text-slate-500">No saved client prices yet.</p>}
+          {fulfillmentAmounts ? <SavedClientPriceTotals amounts={fulfillmentAmounts} /> : null}
           {clientDocuments.length ? <div className="mt-2 grid gap-2" aria-label="Saved client documents">{clientDocuments.map((saved) => {
             const label = saved.documentType === "invoice" ? "Invoice" : saved.documentType === "receipt" ? "Receipt" : "Estimate"
             const deletionKey = `${saved.documentType}:${saved.version}`
