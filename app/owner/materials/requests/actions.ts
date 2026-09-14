@@ -31,6 +31,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { requestSupplierRouteGroupKey, supplierRouteRevision, type SupplierRouteMode } from "@/lib/request-supplier-group-route"
 import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing"
 import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage"
+import { canonicalItemValue, itemEditSnapshot } from "@/lib/request-item-continuity"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 export type QuoteResult =
@@ -581,6 +582,7 @@ export async function saveOriginalMaterialItemAction(input: {
   details?: string
   fields?: RequestItemField[]
   version?: number
+  expectedItemSnapshot?: ReturnType<typeof itemEditSnapshot>
 }) {
   const requestId = String(input.requestId || "").trim()
   const itemId = String(input.itemId || "").trim()
@@ -599,37 +601,28 @@ export async function saveOriginalMaterialItemAction(input: {
   if (!request) return { ok: false as const, error: "Request not found.", version }
 
   if (itemId) {
-    const { data: current } = await supabase.from("quote_request_items").select("id,name,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; name: string; metadata: Record<string, unknown> | null }>()
+    const { data: current } = await supabase.from("quote_request_items").select("id,name,department,quantity,unit,metadata,qualification_status").eq("id", itemId).eq("request_id", requestId).maybeSingle<ReviewableMaterialItem>()
     if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here.", version }
-    const { data: organizedRows } = await supabase
+    if (!input.expectedItemSnapshot || canonicalItemValue(input.expectedItemSnapshot) !== canonicalItemValue(itemEditSnapshot(current))) return { ok: false as const, conflict: true as const, error: "The original changed since you opened it. Your draft is still here. Review the latest original before saving.", version }
+    const { data: organizedRows, error: organizedError } = await supabase
       .from("quote_request_items")
       .select("id,metadata")
       .eq("request_id", requestId)
       .contains("metadata", { ai_organized: true, source_item_id: itemId })
       .returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
+    if (organizedError) return { ok: false as const, error: "The linked products could not be checked. Your original was not changed.", version }
     const isRawRequest = current.name.trim().toLowerCase() === "free-text material list"
     const details = isRawRequest ? multilineDetails : compactDetails
-    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, ...(organizedRows?.length ? { ai_organization_status: "draft_changed", ai_organization_summary: "Original request changed. Reorganize to refresh the AI copy." } : {}), manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
+    // The RPC locks the original and compares the full displayed snapshot again.
+    // Never mirror source edits into a reviewed/priced organized product.
+    const { data: saved, error } = await createAdminClient().rpc("staff_apply_request_item_edit", {
+      p_request_id: requestId, p_item_id: itemId, p_actor_id: user.id, p_receipt_id: randomUUID(),
+      p_expected: itemEditSnapshot(current), p_source_id: null, p_source_expected: null,
+      p_patch: { name, quantity, unit, metadata: { ...(current.metadata ?? {}), ...fieldMetadata, request_details: details, ...(organizedRows?.length ? { ai_organization_status: "draft_changed", ai_organization_summary: "Original request changed. Review the organized products before using them." } : {}), manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } },
+      p_undo: false,
+    })
     if (error) return { ok: false as const, error: "The original item could not be saved.", version }
-    if (!isRawRequest && organizedRows?.length === 1) {
-      const organized = organizedRows[0]
-      const { error: syncError } = await supabase
-        .from("quote_request_items")
-        .update({
-          quantity,
-          unit,
-          metadata: {
-            ...(organized.metadata ?? {}),
-            quantity_defaulted: false,
-            unit_defaulted: false,
-            source_quantity_synced_at: new Date().toISOString(),
-          },
-        })
-        .eq("id", organized.id)
-        .eq("request_id", requestId)
-      if (syncError)
-        return { ok: false as const, error: "The original item saved, but its organized quantity could not be synchronized. Refresh and try again.", version }
-    }
+    if (!saved?.ok) return { ok: false as const, conflict: true as const, error: "A newer edit arrived before saving. Your draft is still here; review the latest original first.", version }
   } else {
     const { data: departmentSource } = await supabase
       .from("quote_request_items")

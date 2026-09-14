@@ -9,6 +9,7 @@ import { organizeClientMaterialRequestAction, saveOriginalMaterialItemAction, up
 import { saveReviewedRequestItemAction } from "@/app/owner/materials/requests/item-edit-actions"
 import { cleanMaterialRequestDetails, materialQuantity, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
 import { COMMON_REQUEST_ITEM_FIELDS, requestItemFieldDefinition, requestItemFieldsFromMetadata, type RequestItemField } from "@/lib/request-item-fields"
+import { itemEditSnapshot } from "@/lib/request-item-continuity"
 
 type ItemDraft = { name: string; quantity: string; unit: string; details: string; fields: RequestItemField[] }
 const COMMON_UNITS = ["each", "box", "bundle", "sheet", "piece", "roll", "bag", "pallet", "linear ft.", "sq. ft.", "cu. yd."]
@@ -37,6 +38,7 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<ItemDraft>(() => draftFromItem(item))
+  const [expectedItemSnapshot, setExpectedItemSnapshot] = useState(() => item ? itemEditSnapshot(item) : undefined)
   const [fieldToAdd, setFieldToAdd] = useState("")
   const [feedback, setFeedback] = useState("")
   const [organizeAfterSave, setOrganizeAfterSave] = useState(false)
@@ -45,6 +47,7 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
 
   function openEditor() {
     setDraft(draftFromItem(item))
+    setExpectedItemSnapshot(item ? itemEditSnapshot(item) : undefined)
     setFeedback("")
     setFieldToAdd("")
     setOpen(true)
@@ -61,7 +64,7 @@ export function OriginalRequestItemEditor({ requestId, item, mode = "edit", item
       return result
     }
     if (mode === "add" || itemKind === "original") {
-      const result = await saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields })
+      const result = await saveOriginalMaterialItemAction({ requestId, itemId: item?.id, name: value.name, quantity: Number(value.quantity), unit: value.unit, details: value.details, fields: value.fields, expectedItemSnapshot })
       if (result.ok) onOriginalSaved?.()
       return result
     }

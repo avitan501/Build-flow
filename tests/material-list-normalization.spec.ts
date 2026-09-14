@@ -110,11 +110,12 @@ test("the organizer preserves line breaks and grounds saved rows before replacin
   expect(source.indexOf("const explicitEvidence")).toBeLessThan(source.indexOf('insert(rows).select("id")'))
 })
 
-test("editing one original row synchronizes its sole organized quantity", async () => {
+test("editing an original flags re-review without overwriting organized quantities", async () => {
   const actions = await readFile(path.join(process.cwd(), "app/owner/materials/requests/actions.ts"), "utf8")
   expect(actions).toContain('.contains("metadata", { ai_organized: true, source_item_id: itemId })')
-  expect(actions).toContain("organizedRows?.length === 1")
-  expect(actions).toContain("quantity_defaulted: false")
+  expect(actions).not.toContain("source_quantity_synced_at")
+  expect(actions).toContain('ai_organization_status: "draft_changed"')
+  expect(actions).toContain("input.expectedItemSnapshot")
 })
 
 test("keeps a leading lumber count separate from 2x4x8 dimensions", () => {
