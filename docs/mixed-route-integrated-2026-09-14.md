@@ -30,6 +30,7 @@ Requires the coordinated five predecessor migrations including final trusted-mat
 - Actual React ClientQuoteBuilder Chrome/WebKit tests: real A/B costs, client143.00 preview, acknowledged save→send snapshot, stale route disabled. Styled390/1440 exposed then verified the preview-close correction.
 - Real generated branded PDF was parsed: Valve + Pipe +143.00; no107.50 supplier cost or profit leaked.
 - Earlier integrated build153 routes and standalone TypeScript passed; full lint0errors/31existing warnings and7release guards passed. Final post-follow-up build and targeted reruns are in progress at handoff; root must run final combined gates.
+- Final scoped follow-up `2b45bab3`: 68 focused checks passed across Chromium/WebKit (autosave, choices, trusted match, source coverage, mixed client/PDF). Standalone TypeScript passed. Then 6 additional actual React UI checks passed with explicit mobile viewport metadata, production CSS, reachable preview Close and no page-width overflow at390/1440. Final combined build remains root-owned.
 
 ## Explicit limits / release gates
 

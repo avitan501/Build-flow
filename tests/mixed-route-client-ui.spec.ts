@@ -28,7 +28,7 @@ async function fixture(page: Page, stale = false) {
   const comparison={id:'comparison',active_route_id:'route',client_id:'client',client_name_snapshot:'Test client',client_email_snapshot:'client@example.invalid',quote_number:'MIX-001',client_message:'',client_delivery_charge:10,client_tax_percent:10,client_quote_status:'draft',job_address:'Test address'};
   const items=[{id:'a',description:'Valve',specification:'',quantity:2,unit:'each',markup_percent:50,client_unit_price:30},{id:'b',description:'Pipe',specification:'',quantity:1,unit:'each',markup_percent:100,client_unit_price:60}];
   const route={id:'route',items:[{item_id:'a',unit_cost:20,supplier_id:'supplier-a'},{item_id:'b',unit_cost:30,supplier_id:'supplier-b'}],suppliers:[{supplier_id:'supplier-a',supplier_name:'Supplier A'},{supplier_id:'supplier-b',supplier_name:'Supplier B'}],material_subtotal:70,delivery_total:30,supplier_tax_total:7.5,landed_total:107.5};
-  await page.setContent('<div id="root"></div>');
+  await page.setContent('<meta name="viewport" content="width=device-width, initial-scale=1"><div id="root"></div>');
   if (existsSync('.next/static/css')) for (const name of readdirSync('.next/static/css').filter(name=>name.endsWith('.css'))) await page.addStyleTag({content:readFileSync(resolve('.next/static/css',name),'utf8')});
   await page.addScriptTag({content:`(()=>{const process={env:{NODE_ENV:'production'}},cache={},modules={${Object.entries(modules).map(([id,code])=>`${JSON.stringify(id)}:function(module,exports,require){${code}}`).join(',')}};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](m,m.exports,require);return m.exports}require(${JSON.stringify(dom)}).createRoot(document.getElementById('root')).render(require(${JSON.stringify(react)}).createElement(require(${JSON.stringify(component)}).ClientQuoteBuilder,${JSON.stringify({comparison,items,selectedBid:null,procurementRoute:route,routeError:stale?'Supplier source changed. Review again.':null,clients:[{id:'client',name:'Test client',email:'client@example.invalid',companyName:'',phone:''}],initialAttachments:[],previewMode:false})}));})()`});
 }
@@ -54,6 +54,7 @@ for (const width of [390,1440]) test(`real mixed client builder uses A/B allocat
   expect(calls[1].input?.expectedClientSnapshot).toEqual({ack:1});
   expect(calls[2].snapshot).toEqual({ack:2});
   expect(errors).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:`/tmp/mixed-client-actual-${width}.png`,fullPage:true});
 });
 test('stale route never enables client save or send',async({page})=>{
