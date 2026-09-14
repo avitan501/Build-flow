@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import {
-  applyDailyAttendanceAction,
-  dailyWorkDateKey,
   DAILY_WORK_SUMMARY_PREFIX,
   DAILY_WORK_SUMMARY_TITLE_PREFIX,
   isValidDailyWorkDateKey,
@@ -111,76 +109,27 @@ export async function recordDailyAttendanceAction(input: {
   open?: string
   problems?: string
 }): Promise<SaveDailySummaryResult> {
-  const { supabase, user } = await requireManagerPortalProfile()
-  const date = input.date.trim()
-  const now = new Date()
-  const nowAt = now.toISOString()
-
-  if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
-  if (date !== dailyWorkDateKey(now)) return { ok: false, error: "Attendance actions are available only for today's Eastern Time work date." }
-
-  const existing = await findDailySummary(supabase, date)
-  if (existing.error) return { ok: false, error: "Attendance could not be checked. Please try again." }
-
-  const current = existing.data ? parseDailyWorkSummary(existing.data) : null
-  const transition = applyDailyAttendanceAction(current, input.action, nowAt)
-  if (!transition.ok) return transition
-
-  const checkoutSections = input.action === "check_out"
-    ? normalizeDailyWorkSummarySections({
-        completed: String(input.completed || "").trim().slice(0, 4000),
-        open: String(input.open || "").trim().slice(0, 4000),
-        problems: String(input.problems || "").trim().slice(0, 4000),
-      })
-    : null
-  const checkoutCompleted = checkoutSections?.completed ?? ""
-  if (input.action === "check_out" && !checkoutCompleted) return { ok: false, error: "Write what you completed today before checking out." }
-
-  const { checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds } = transition.attendance
-  const completed = input.action === "check_out" ? checkoutCompleted : current?.completed ?? ""
-  const open = checkoutSections?.open ?? current?.open ?? ""
-  const problems = checkoutSections?.problems ?? current?.problems ?? ""
-  const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds, paidAt: current?.paidAt })
-  const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
-  const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
-  if (existing.data) {
-    const result = await updateDailySummaryIfCurrent(supabase, existing.data, { details, status })
-    if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
-    if (!result.data) return { ok: false, error: "The time log changed in another window. Refresh before recording attendance." }
-  } else {
-    const result = await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status, created_by: user.id })
-    if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
-  }
-
+  const { supabase } = await requireManagerPortalProfile()
+  const sections = normalizeDailyWorkSummarySections({ completed: input.completed || "", open: input.open || "", problems: input.problems || "" })
+  if (!validDate(input.date)) return { ok: false, error: "Choose a valid work date." }
+  const { error } = await supabase.rpc("record_carlos_attendance", {
+    p_date: input.date, p_action: input.action,
+    p_completed: sections.completed, p_open: sections.open, p_problems: sections.problems,
+  })
+  if (error) return { ok: false, error: "Attendance could not be saved. Check today's date and completed summary, then refresh and try again." }
   revalidateDailySummary()
   return { ok: true }
 }
 
 export async function markDailySummaryPaidAction(input: { date: string }): Promise<SaveDailySummaryResult> {
-  const { supabase, access } = await requireManagerPortalProfile()
-  if (!access.owner) return { ok: false, error: "Only the owner can mark time as paid." }
-  const date = input.date.trim()
-  if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
-  const existing = await findDailySummary(supabase, date)
-  if (existing.error || !existing.data) return { ok: false, error: "The time summary could not be found." }
-  const current = parseDailyWorkSummary(existing.data)
-  if (!current) return { ok: false, error: "The time summary could not be read." }
-  if (current.paidAt) return { ok: true }
-  const details = serializeDailyWorkSummary({
-    date,
-    completed: current.completed,
-    open: current.open,
-    problems: current.problems,
-    problemAttachments: current.problemAttachments,
-    checkInAt: current.checkInAt,
-    checkOutAt: current.checkOutAt,
-    pauseStartedAt: current.pauseStartedAt,
-    pausedMilliseconds: current.pausedMilliseconds,
-    paidAt: new Date().toISOString(),
-  })
-  const result = await updateDailySummaryIfCurrent(supabase, existing.data, { details })
-  if (result.error) return { ok: false, error: "Paid status could not be saved. Please try again." }
-  if (!result.data) return { ok: false, error: "The time log changed in another window. Refresh before marking it paid." }
+  const { supabase, user } = await requireManagerPortalProfile()
+  if (user.email?.trim().toLowerCase() !== "avitanneto@gmail.com") return { ok: false, error: "Only David can mark time as paid." }
+  if (!validDate(input.date)) return { ok: false, error: "Choose a valid work date." }
+  const { data, error: readError } = await supabase.rpc("carlos_payroll_days")
+  const day = (data as Array<{date:string;version:number}> | null)?.find(day => day.date === input.date)
+  if (readError || !day) return { ok: false, error: "A completed workday is required." }
+  const { error } = await supabase.rpc("set_carlos_day_paid", {p_date:input.date,p_paid:true,p_version:day.version})
+  if (error) return { ok: false, error: "Payment status changed. Refresh and try again." }
   revalidateDailySummary()
   return { ok: true }
 }
