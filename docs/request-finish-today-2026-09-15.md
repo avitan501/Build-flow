@@ -1,5 +1,12 @@
 # Remaining work continuation — 2026-09-15
 
+## 05:04 UTC alternate-contact database cutover complete; UI re-enable pending
+
+- Maintenancea6d49df1 LIVE CI34930617793SUCCESS/Verceldpl_FfWepPNRKdNJ74eHmgg9PfBBVrAtREADY; rootauthenticated/accountreadonlyPASS onlyalternatefieldsdisabled, name/phoneeditable/passwordformretained. Fullcandidate build153+48actualbrowser+PG17PASS.
+- Prior800+20-second drain proposal is NOT sufficient admission proof because old deployments can remain reachable via SkewProtection. Replaced with atomic database cutover: shortlocktimeout/auth.users SHAREROWEXCLUSIVE lock, copy2contactfields, invokertrigger rejectingONLYmeaningfullegacyalternatecontactchanges. UnrelatedOAuth/preferences/name/phone/passwordupdates remain allowed. No globalSkewProtection/configurationchange; actualVercelresourceConfigAPI403, no credentialexpansion.
+- FINALcontactSQL972c76dac1c125c5c777e2cd72c38e149dbf6d29a4a099296ec941e45207c123 APPLIED20260915050341 in one transaction. Earlier2ea1678d draft MUSTNOTbeapplied. RootPG17 and independentMaya actualbefore/afterwriterlockrace+restrictedauthrole+combinedprofilebootstrap+newCAS PASS. Readback25contactrows allNULL/revision0, allprofile/authidentityhashesunchanged, RLStrue/fenceenabled/authSELECTonly/publicRPCauthenticatedonly(noanon/serviceEXEC).
+- New self-onlyalternateemail/phone autosave app usesrawpendingtabrecovery, actor/revisionCAS, hydrationgate, noAuth/profile/securitywrites. FullUIpublication pending; mustre-enable fields and runexactSHA live no-opblank-phone-space roundtrip withsameNULLcontacts+before/afterhashes. No actualcontactvaluechanged or externalmessage.
+
 ## 04:54 UTC legacy review live and profile overwrite prevention
 
 - Release32279e23 LIVE: CI34929875980SUCCESS, Verceldpl_3zBBTWhc2br9fhxEDetsZn8A7qtEREADY/canonicalalias/exactproduction/npr. Actual closedrequest638405 fascia row requiresquantity/sellingunitreview, notReady at390/1440; nooverflow/errors, allnonGETblocked, no reopen/datachange. Report `/tmp/avantia-organized-unit-32279e23-report.json`.
