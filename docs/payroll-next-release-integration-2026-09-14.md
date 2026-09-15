@@ -1,5 +1,24 @@
 # PAY next-release integration — Maya
 
+## Root release gate — 2026-09-15 UTC
+
+Integrated the entire PAY implementation on core `b671a247` in isolated
+`/tmp/avantia-payroll-production-release-20260915` (`f3ac2120`, `8712c969`).
+Full combined webpack production build (153 routes), standalone TypeScript,
+32 Chromium/WebKit tests using this build's CSS, and scoped ESLint passed.
+Root independently reran fixture + exact migration + assertions in a separate
+network-isolated PostgreSQL database; passed and removed only that test database.
+No production attendance/payment mutation or payroll migration yet.
+Migration SHA256: `7ed2c3a48e98228c92c84763ec6769af1ab32a568e4031bb99ffd041aad13b05`.
+Core publication and authenticated verification must finish before this rollout.
+Immediately before the payroll cutover, reconfirm the production ref and active
+shift state. Preserve legacy paid markers and the historical unclosed day.
+
+The Vercel deploy hook reads `avitan501/Build-flow`, not merely the canonical
+`AV-Design-and-Build-Org/avantia-build` repository. All approved mirrors must have
+the exact candidate SHA before triggering the serialized workflow. Do not treat
+a canonical push or successful build as live publication.
+
 Branch `codex/payroll-next-release-20260914`, isolated `/tmp/avantia-payroll-next-release-20260914`.
 
 Base `ca908e3d` contains the coordinated request UI/route safety changes. Complete frozen PAY commit `508c8213` integrated cleanly as `20a84133`. No partial cherry-pick, no modification of the root worktree and no deployment.
