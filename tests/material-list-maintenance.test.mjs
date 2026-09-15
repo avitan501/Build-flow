@@ -30,6 +30,18 @@ for(const kind of ['ai','worker'])test(`actual ${kind} handler pauses before pro
  const response=await fn(new Request('https://fixture.invalid',{method:'POST',body:JSON.stringify({action:'drain',requestId:'synthetic'})}));
  assert.equal(response.status,503);assert.equal(work,0);
 });
+for(const kind of ['ai','worker'])test(`explicit activated ${kind} build reaches validation without provider work`,async()=>{
+ const source=read(`supabase/functions/client-material-list-${kind}/index.ts`);
+ const ast=ts.createSourceFile('edge.ts',source,ts.ScriptTarget.Latest,true);
+ const node=ast.statements.find(n=>ts.isExpressionStatement(n)&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(ast)==='Deno.serve');
+ let work=0;
+ const fn=load('export const handler='+node.expression.arguments[0].getText(ast),{}, {
+  ...gate('active'),authorized:async()=>true,json:(b,s=200)=>Response.json(b,{status:s}),
+  openAiKey:async()=>{work++;throw Error('Unexpected lookup')},admin:{rpc:async()=>{work++;throw Error('Unexpected claim')}},
+ }).handler;
+ const response=await fn(new Request('https://fixture.invalid',{method:'POST',body:'invalid json'}));
+ assert.equal(response.status,400);assert.equal(work,0);
+});
 test('public intake never falls back to direct AI; preserves durable queue during maintenance',async()=>{
  const source=read('supabase/functions/_shared/public-material-list-queue.ts');
  for(const scenario of ['http-failed','network-failed','paused','active','nudge-failed']) {

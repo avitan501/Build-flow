@@ -1,6 +1,8 @@
 # AI package integrated rehearsal and release gates
 
-Current base 811ecea5, including PAY, request actor permission repair and queued-only app backport. Selectively integrated the full AI safeguards as acce8f58/fc4a5768/6adba971/1fbdf680/65b98d3e. Queue helper and request action have zero diff from the new base; duplicate queue changes were not reapplied. Core Step1/2/3, source receipts/CAS, mixed-route/client-send and payroll work remain in ancestry.
+Current rollout candidate rebased on verified live1efac76a, preserving its UI parity, PAY, actor permission repair and queued-only app safeguard. FullAIcb663a0a was selectively integrated on the versioned paused maintenance bridge4c94362c. App/lib/components have zero diff from1efac76a. Public intake now has no direct AI fallback; its shared helper durably queues during maintenance and returns truthful enqueue failure. The older readiness notes below are historical; the executable operational procedure in [material-list-operational-rollout-2026-09-15.md](material-list-operational-rollout-2026-09-15.md) supersedes their unresolved intake/gate limitation.
+
+Latest local verification:98 deterministic AI tests;12 executable mocked gate/queue tests including explicit activated validation; cached Deno full3entrypoint check; combined network-none PostgreSQL restricted-role core6+actor+PAY+AI rehearsal134constraints/31triggers, both source/attachment lock orders and completedchunk retry PASS. SQLhash remains443d6d3672683e31672e93cd3f7ddd5215f3f356129154968ff008507477f633. No productionAI/provider call or deployment by this agent. Root owns realPDF62-row source proof and operational gate/drain execution. The current gate remains paused, not implicitly activated by deployment.
 
 AI migration: `20260914180138_resumable_material_list_chunks.sql`, SHA256 `443d6d3672683e31672e93cd3f7ddd5215f3f356129154968ff008507477f633`.
 
