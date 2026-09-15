@@ -505,6 +505,7 @@ export async function organizeClientMaterialRequestAction(formData: FormData) {
   if (!request) return { ok: false as const, error: "This request was not found." }
   const queued = await scheduleClientMaterialListOrganization({ requestId, force })
   if (queued.status === "invalid") return { ok: false as const, error: "This request could not be identified." }
+  if (!queued.queued) return { ok: false as const, error: "Your original is saved. Splitting could not start. Please try again." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/supplier-quotes")
   return { ok: true as const, status: queued.status, itemCount: 0, reviewCount: 0 }

@@ -7,21 +7,6 @@ import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-async function invokeDirectFallback(requestId: string, force: boolean) {
-  const { data, error } = await createAdminClient().functions.invoke<{
-    ok?: boolean
-    error?: string
-  }>("client-material-list-ai", {
-    body: { requestId, force },
-  })
-  if (error || !data?.ok) {
-    console.error("client_material_list_ai_background_failed", {
-      requestId,
-      reason: error?.message || data?.error || "organizer_rejected",
-    })
-  }
-}
-
 export async function scheduleClientMaterialListOrganization(input: { requestId: string; force?: boolean }) {
   const requestId = String(input.requestId || "").trim()
   if (!UUID_PATTERN.test(requestId)) return { queued: false as const, status: "invalid" as const }
@@ -41,32 +26,9 @@ export async function scheduleClientMaterialListOrganization(input: { requestId:
       requestId,
       reason: error.message,
     })
-    try {
-      after(async () => {
-        try {
-          await invokeDirectFallback(requestId, force)
-        } catch (cause) {
-          console.error("client_material_list_ai_background_failed", {
-            requestId,
-            reason: cause instanceof Error ? cause.message : "unknown",
-          })
-        }
-      })
-    } catch (cause) {
-      try {
-        await invokeDirectFallback(requestId, force)
-      } catch (fallbackCause) {
-        console.error("client_material_list_ai_background_failed", {
-          requestId,
-          reason: fallbackCause instanceof Error ? fallbackCause.message : "unknown",
-        })
-      }
-      console.error("client_material_list_after_unavailable", {
-        requestId,
-        reason: cause instanceof Error ? cause.message : "unknown",
-      })
-    }
-    return { queued: false as const, status: "fallback" as const }
+    // No paid extraction without a durable job and claim lease. The caller can
+    // display a retry instead of pretending a failed enqueue was accepted.
+    return { queued: false as const, status: "failed" as const }
   }
 
   try {
