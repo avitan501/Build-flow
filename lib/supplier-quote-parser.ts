@@ -42,6 +42,24 @@ function cleanDescription(value: string) {
   return value.replace(/\s+/g, " ").replace(/^[-|:]+|[-|:]+$/g, "").trim().slice(0, 500)
 }
 
+export function supplierQuoteExtractionWarnings(
+  items: ExtractedSupplierQuoteItem[],
+  textItems: ExtractedSupplierQuoteItem[],
+  subtotal: number | null,
+) {
+  const warnings: string[] = []
+  if (textItems.length > items.length) {
+    warnings.push(`Check missing rows: document text contains ${textItems.length} possible rows, but ${items.length} were extracted.`)
+  }
+  if (subtotal !== null && items.length && items.every(item => item.lineTotal !== null)) {
+    const cents = items.reduce((sum, item) => sum + Math.round(item.lineTotal! * 100), 0)
+    if (Math.abs(cents - Math.round(subtotal * 100)) > 1) {
+      warnings.push(`Check totals: extracted rows total $${(cents / 100).toFixed(2)}, while the document subtotal is $${subtotal.toFixed(2)}. Check missing rows, discounts and charges before routing.`)
+    }
+  }
+  return warnings.join(" ")
+}
+
 function isoDateFromEnglish(value: string) {
   const match = value.trim().match(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s*(\d{4})$/i)
   if (!match) return ""
@@ -68,11 +86,24 @@ function isoDate(value: string) {
 export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMetadata {
   const normalized = text.replace(/\r/g, "")
   const quoteNumber = normalized.match(/^\s*(?:quote|quotation)(?:\s*(?:number|no\.?|#))?\s*:\s*([^\n]+)$/im)?.[1]?.trim().slice(0, 100) ?? ""
-  const expiresText = normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1] ?? ""
+  const expiresText = normalized.match(/\b(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*(\d{1,4}[/-]\d{1,2}[/-]\d{2,4})/i)?.[1]
+    ?? normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1] ?? ""
   const deliveryCharge = amount(normalized.match(/^\s*(?:delivery|freight|shipping)(?:\s+(?:charge|fee))?\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
   const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax(?:\s*\(\s*|\s*:\s*)([0-9]+(?:\.[0-9]+)?)\s*%\s*\)?\s*:?/im)?.[1])
-  const subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?subtotal\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
-  const total = amount(normalized.match(/^\s*(?:grand\s+)?total\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  let subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?subtotal\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  let total = amount(normalized.match(/^\s*(?:grand\s+)?total\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  // PDF text layers may separate the totals header from its values. Accept
+  // only one distinct currency triplet that reconciles, never a material row.
+  if (/\bSUBTOTAL\s+TAX\s+TOTAL\b/i.test(normalized)) {
+    const candidates = [...normalized.matchAll(/^\s*\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s*$/gm)]
+      .map(match => [amount(match[1])!, amount(match[2])!, amount(match[3])!])
+      .filter(([net, tax, gross]) => net > 0 && Math.abs(Math.round(net * 100) + Math.round(tax * 100) - Math.round(gross * 100)) <= 1)
+    const distinct = [...new Map(candidates.map(values => [values.join("|"), values])).values()]
+    if (distinct.length === 1) {
+      subtotal ??= distinct[0][0]
+      total ??= distinct[0][2]
+    }
+  }
   const leadTimeDays = quantity(normalized.match(/^\s*lead\s*time\s*:\s*([0-9]+)\s*(?:business\s+|calendar\s+)?days?\b/im)?.[1])
   return {
     quoteNumber,
@@ -87,7 +118,9 @@ export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMet
 
 export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem[] {
   const rows: ExtractedSupplierQuoteItem[] = []
-  const seen = new Set<string>()
+  // Common yard layout: quantity, SKU, description, pricing unit, price, total.
+  // Keep every printed row: identical products can belong to different floors.
+  const quantitySku = new RegExp(`^([0-9][0-9,.]*)\\s+([A-Z0-9][A-Z0-9._/-]{2,})\\s+(.+?)\\s+(${UNIT_PATTERN})\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
   const leading = new RegExp(`^(?:([A-Z0-9][A-Z0-9._/-]{2,})\\s+)?([0-9][0-9,.]*)\\s+(${UNIT_PATTERN})\\s+(.+?)\\s+${MONEY_PATTERN}(?:\\s+${MONEY_PATTERN})?$`, "i")
   const trailing = new RegExp(`^(?:([A-Z0-9][A-Z0-9._/-]{2,})\\s+)?(.+?)\\s+([0-9][0-9,.]*)\\s+(${UNIT_PATTERN})?\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
   const ocrPriceRow = /^(.+?)\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?(?:\s*[|.]+)?$/i
@@ -98,12 +131,12 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
     const originalLine = sourceLines[index]
     const line = originalLine.replace(/\s+/g, " ").trim()
     const startsMaterial = /^(?=[A-Z0-9._/-]*\d)[A-Z0-9][A-Z0-9._/-]{2,}\s+\S/i.test(line)
-    if (startsMaterial && !line.match(leading) && !line.match(trailing)) {
+    if (startsMaterial && !line.match(quantitySku) && !line.match(leading) && !line.match(trailing)) {
       let combined = line
       let consumed = index
       for (let next = index + 1; next < Math.min(sourceLines.length, index + 4); next += 1) {
         combined = `${combined} ${sourceLines[next].replace(/\s+/g, " ").trim()}`.trim()
-        if (combined.match(leading) || combined.match(trailing)) {
+        if (combined.match(quantitySku) || combined.match(leading) || combined.match(trailing)) {
           consumed = next
           break
         }
@@ -117,14 +150,32 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
     candidateLines.push(originalLine)
   }
 
+  let section = ""
+  let lastYardItem: ExtractedSupplierQuoteItem | null = null
   for (const originalLine of candidateLines) {
     const line = originalLine.replace(/\s+/g, " ").trim()
+    const sectionHeading = line.match(/^([A-Za-z0-9][A-Za-z0-9 /]{2,60}?)\s*-{3,}$/)
+    if (sectionHeading) {
+      section = sectionHeading[1].trim()
+      lastYardItem = null
+      continue
+    }
+    // Printed quantity/length schedules describe the preceding LF row, not
+    // additional priced products. Preserve the evidence without converting units.
+    if (lastYardItem && /^(?:\d+\/\d+(?:\.\d+)?[’'′]\s*)+$/.test(line)) {
+      lastYardItem.specification = `${lastYardItem.specification}${lastYardItem.specification ? " · " : ""}Cut list: ${line}`
+      continue
+    }
     if (line.length < 8 || line.length > 700) continue
     if (/^(subtotal|tax|delivery|freight|shipping|total|page|quote|estimate)\b/i.test(line)) continue
+    const yard = line.match(quantitySku)
     const first = line.match(leading)
     const second = first ? null : line.match(trailing)
     let item: ExtractedSupplierQuoteItem | null = null
-    if (first) {
+    if (yard) {
+      const rowQuantity = quantity(yard[1])
+      if (rowQuantity) item = { itemCode: yard[2], description: cleanDescription(yard[3]), specification: section ? `Section: ${section}` : "", quantity: rowQuantity, unit: normalizeUnit(yard[4]), unitPrice: amount(yard[5]), lineTotal: amount(yard[6]) }
+    } else if (first) {
       const rowQuantity = quantity(first[2])
       const description = cleanDescription(first[4])
       const unitPrice = amount(first[5])
@@ -148,9 +199,7 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
       }
     }
     if (!item || /^(description|item|quantity|qty|unit price)$/i.test(item.description)) continue
-    const key = `${item.itemCode}|${item.description}|${item.quantity}|${item.unitPrice}`.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
+    lastYardItem = yard ? item : null
     rows.push(item)
     if (rows.length >= 500) break
   }

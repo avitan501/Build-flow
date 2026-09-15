@@ -1,7 +1,7 @@
 import "server-only"
 
 import { extractSupplierQuoteWithAi, type SupplierQuoteAiInvoker, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
-import { parseSupplierQuoteMetadata, parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
+import { parseSupplierQuoteMetadata, parseSupplierQuoteText, supplierQuoteExtractionWarnings } from "@/lib/supplier-quote-parser"
 
 const emptyMetadata: SupplierQuoteAiMetadata = {
   supplierName: "",
@@ -84,6 +84,6 @@ export async function extractSupplierQuoteFile(
     text: text.slice(0, 250000),
     items,
     metadata,
-    extractionNote,
+    extractionNote: [extractionNote, supplierQuoteExtractionWarnings(items, parsedItems, metadata.subtotal)].filter(Boolean).join(" "),
   }
 }

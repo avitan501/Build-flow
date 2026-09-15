@@ -223,6 +223,14 @@ function comparisonMatchScore(
     `${quoteItem.item_code || ""} ${quoteItem.description} ${quoteItem.specification}`.trim()
   const requestText =
     `${requestItem.description} ${requestItem.specification}`.trim()
+  // A shared SKU is not sufficient when the same material is ordered on
+  // different floors. Preserve section identity before considering SKU matches.
+  const sectionOf = (text: string) => text.toLowerCase()
+    .replace(/\b1st\b/g, "first").replace(/\b2nd\b/g, "second").replace(/\b3rd\b/g, "third")
+    .match(/\b(?:first floor|second floor|third floor|ceiling joists?)\b/)?.[0]?.replace(/joists$/, "joist")
+  const quoteSection = sectionOf(quoteText)
+  const requestSection = sectionOf(requestText)
+  if (quoteSection && requestSection && quoteSection !== requestSection) return 0
   // An exact supplier SKU is stronger evidence than noisy dimensions copied
   // from a second retailer's quote. Check it before rejecting size conflicts.
   if (requestContainsExactItemCode(requestText, quoteItem.item_code)) return 10
