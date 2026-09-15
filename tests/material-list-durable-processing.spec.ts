@@ -66,10 +66,10 @@ test("queue and worker stay private and scheduled credentials remain in Vault", 
 test("worker processes one bounded job and always records a terminal or retry result", async () => {
   const worker = await source("supabase/functions/client-material-list-worker/index.ts")
 
-  expect(worker).toContain('admin.rpc("claim_client_material_list_jobs", { p_limit: 1 })')
+  expect(worker).toContain('admin.rpc("claim_material_list_checkpoint_jobs", { p_limit: 1 })')
   expect(worker).toContain('fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`')
   expect(worker).toContain("controller.abort(), 120_000")
-  expect(worker).toContain('admin.rpc("finish_client_material_list_job"')
+  expect(worker).toContain('admin.rpc("finish_material_list_checkpoint_job"')
   expect(worker).toContain('payload.status === "processing"')
   expect(worker).toContain('? "organizer_timeout"')
 })
@@ -106,16 +106,19 @@ test("authenticated owners and staff can queue durable organization without a se
 
 test("public intake durably enqueues before its non-blocking worker nudge", async () => {
   const intake = await source("supabase/functions/public-quote-intake/index.ts")
-  const queueFunctionAt = intake.indexOf("async function queueClientMaterialList")
-  const enqueueAt = intake.indexOf("/rest/v1/rpc/enqueue_client_material_list_job", queueFunctionAt)
-  const waitUntilAt = intake.indexOf("EdgeRuntime.waitUntil", enqueueAt)
-  const callAt = intake.indexOf("await queueClientMaterialList", waitUntilAt)
+  const queue = await source("supabase/functions/_shared/public-material-list-queue.ts")
+  const queueFunctionAt = queue.indexOf("async function queuePublicMaterialList")
+  const enqueueAt = queue.indexOf("/rest/v1/rpc/enqueue_client_material_list_job", queueFunctionAt)
+  const waitUntilAt = queue.indexOf("EdgeRuntime.waitUntil", enqueueAt)
 
   expect(queueFunctionAt).toBeGreaterThan(0)
   expect(enqueueAt).toBeGreaterThan(queueFunctionAt)
   expect(waitUntilAt).toBeGreaterThan(enqueueAt)
-  expect(callAt).toBeGreaterThan(waitUntilAt)
-  expect(intake).toContain('queued.ok ? "client-material-list-worker" : "client-material-list-ai"')
+  expect(intake).toContain("await queuePublicMaterialList")
+  expect(queue).toContain("/functions/v1/client-material-list-worker")
+  expect(queue).not.toContain("client-material-list-ai")
+  expect(queue.indexOf("if (!queued.ok)")).toBeLessThan(waitUntilAt)
+  expect(queue.indexOf("if (!materialListProcessingAllowed())")).toBeLessThan(waitUntilAt)
 })
 
 test("the request screen shows queue, processing, and retry states while continuing to poll", async () => {

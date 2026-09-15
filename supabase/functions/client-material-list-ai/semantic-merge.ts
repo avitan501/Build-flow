@@ -10,6 +10,8 @@ export type SemanticMaterialItem = {
   reviewStatus: "ready" | "check" | "missing"
   reviewReasons: string[]
   sourceText: string
+  sourceChunk?: string
+  sourceOccurrence?: string
   attributes?: Array<{ key: string; label?: string; value: string; sourceText: string }>
 }
 
@@ -119,6 +121,9 @@ export function mergeSemanticallyEquivalentMaterialItems<T extends SemanticMater
   for (const item of items) {
     const index = merged.findIndex((candidate) => {
       if (options.preserveSourceRows) {
+        // Matching text does not identify a physical source occurrence. Repeated
+        // rows across pages (or twice on one page) must remain separate quantities.
+        if (candidate.sourceChunk !== item.sourceChunk || candidate.sourceOccurrence !== item.sourceOccurrence) return false
         // Intake must preserve each independently requested quantity. Downstream
         // grounding reads one source row, so summing here would lose quantities.
         if (normalize(candidate.sourceText) !== normalize(item.sourceText)) return false

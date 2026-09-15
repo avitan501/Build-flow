@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { queuePublicMaterialList } from "../_shared/public-material-list-queue.ts"
 
 type QuoteAttachmentPayload = {
   filename: string
@@ -230,38 +231,6 @@ function hasServiceRoleKey(request: Request) {
 
 function hasBearerToken(request: Request) {
   return Boolean(request.headers.get("authorization")?.replace(/^Bearer\s+/i, ""))
-}
-
-async function queueClientMaterialList(supabaseUrl: string, serviceRoleKey: string, requestId: string) {
-  try {
-    const queued = await fetch(`${supabaseUrl}/rest/v1/rpc/enqueue_client_material_list_job`, {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ p_request_id: requestId, p_force: false }),
-    })
-    const functionName = queued.ok ? "client-material-list-worker" : "client-material-list-ai"
-    EdgeRuntime.waitUntil((async () => {
-      const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
-        body: JSON.stringify(queued.ok ? { action: "drain" } : { requestId }),
-      })
-      if (!response.ok) console.error("client_material_list_background_failed", { requestId, status: response.status })
-    })())
-  } catch (cause) {
-    console.error("client_material_list_background_failed", { requestId, reason: cause instanceof Error ? cause.message : "unknown" })
-    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ requestId }),
-    }).then((response) => {
-      if (!response.ok) console.error("client_material_list_fallback_failed", { requestId, status: response.status })
-    }).catch(() => console.error("client_material_list_fallback_failed", { requestId, status: 0 })))
-  }
 }
 
 Deno.serve(async (request) => {
@@ -700,9 +669,9 @@ Deno.serve(async (request) => {
       },
     }).eq("request_id", requestId)
 
-    if (payload.requestKind !== "beat_quote") {
-      await queueClientMaterialList(supabaseUrl, serviceRoleKey, requestId)
-    }
+    const organization = payload.requestKind !== "beat_quote"
+      ? await queuePublicMaterialList(supabaseUrl, serviceRoleKey, requestId)
+      : { queued: false, status: "not_requested" }
     const temporaryPaths = preparedAttachments.flatMap((attachment) => attachment.storagePath ? [attachment.storagePath] : [])
     if (temporaryPaths.length) {
       const { error: temporaryCleanupError } = await supabase.storage.from("project-uploads").remove(temporaryPaths)
@@ -716,6 +685,7 @@ Deno.serve(async (request) => {
       requestId,
       referenceId: payload.referenceId,
       attachmentCount: preparedAttachments.length,
+      organization,
       email: { owner: ownerEmail, client: clientEmail },
     })
   } catch (cause) {

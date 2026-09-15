@@ -1,0 +1,311 @@
+{
+  "grants": [
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "INSERT",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "SELECT",
+      "with_hierarchy": "YES"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "UPDATE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "DELETE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "TRUNCATE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "REFERENCES",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "postgres",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "YES",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "TRIGGER",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "INSERT",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "SELECT",
+      "with_hierarchy": "YES"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "UPDATE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "DELETE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "TRUNCATE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "REFERENCES",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "service_role",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "TRIGGER",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "authenticated",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "INSERT",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "authenticated",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "SELECT",
+      "with_hierarchy": "YES"
+    },
+    {
+      "grantee": "authenticated",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "UPDATE",
+      "with_hierarchy": "NO"
+    },
+    {
+      "grantee": "authenticated",
+      "grantor": "postgres",
+      "table_name": "manager_goals",
+      "is_grantable": "NO",
+      "table_schema": "public",
+      "table_catalog": "postgres",
+      "privilege_type": "DELETE",
+      "with_hierarchy": "NO"
+    }
+  ],
+  "columns": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "default": "gen_random_uuid()",
+      "not_null": true
+    },
+    {
+      "name": "assignee",
+      "type": "text",
+      "default": null,
+      "not_null": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "default": null,
+      "not_null": true
+    },
+    {
+      "name": "details",
+      "type": "text",
+      "default": null,
+      "not_null": false
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "default": "'open'::text",
+      "not_null": true
+    },
+    {
+      "name": "created_by",
+      "type": "uuid",
+      "default": null,
+      "not_null": true
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "default": "now()",
+      "not_null": true
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "default": "now()",
+      "not_null": true
+    },
+    {
+      "name": "is_focus",
+      "type": "boolean",
+      "default": "false",
+      "not_null": true
+    }
+  ],
+  "policies": [
+    {
+      "cmd": "DELETE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = ANY (ARRAY['admin'::text, 'staff'::text])) AND (profiles.approval_status = 'approved'::text) AND (profiles.is_active = true))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "manager_goals",
+      "permissive": "PERMISSIVE",
+      "policyname": "manager_goals_manager_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "manager_goals",
+      "permissive": "PERMISSIVE",
+      "policyname": "manager_goals_manager_insert",
+      "schemaname": "public",
+      "with_check": "((created_by = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = ANY (ARRAY['admin'::text, 'staff'::text])) AND (profiles.approval_status = 'approved'::text) AND (profiles.is_active = true)))))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = ANY (ARRAY['admin'::text, 'staff'::text])) AND (profiles.approval_status = 'approved'::text) AND (profiles.is_active = true))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "manager_goals",
+      "permissive": "PERMISSIVE",
+      "policyname": "manager_goals_manager_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = ANY (ARRAY['admin'::text, 'staff'::text])) AND (profiles.approval_status = 'approved'::text) AND (profiles.is_active = true))))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "manager_goals",
+      "permissive": "PERMISSIVE",
+      "policyname": "manager_goals_manager_update",
+      "schemaname": "public",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = ( SELECT auth.uid() AS uid)) AND (profiles.role = ANY (ARRAY['admin'::text, 'staff'::text])) AND (profiles.approval_status = 'approved'::text) AND (profiles.is_active = true))))"
+    }
+  ],
+  "triggers": [
+    {
+      "function": "CREATE OR REPLACE FUNCTION public.guard_daily_pay_fields()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare a jsonb; b jsonb;\nbegin\n if tg_op<>'INSERT' and old.details like 'daily_work_summary:%' then a:=substring(old.details from 20)::jsonb;end if;\n if tg_op<>'DELETE' and new.details like 'daily_work_summary:%' then b:=substring(new.details from 20)::jsonb;end if;\n if a is null and b is null then return coalesce(new,old);end if;\n -- Only INSERT needs date-creation serialization. UPDATE already owns a row\n -- lock; acquiring the global lock there would invert the RPC lock order.\n if tg_op='INSERT' then perform pg_advisory_xact_lock(7140914);end if;\n if current_user in ('authenticated','anon') then\n  if tg_op='DELETE' or (a is not null and (b is null or new.assignee is distinct from old.assignee or new.title is distinct from old.title)) then raise exception 'time_log_protected';end if;\n  if a is not null and a->>'date' is distinct from b->>'date' then raise exception 'time_log_protected';end if;\n  if jsonb_build_array(a->>'checkInAt',a->>'checkOutAt',a->>'pauseStartedAt',coalesce(a->>'pausedMilliseconds','0'),a->>'paidAt')\n     is distinct from jsonb_build_array(b->>'checkInAt',b->>'checkOutAt',b->>'pauseStartedAt',coalesce(b->>'pausedMilliseconds','0'),b->>'paidAt') then raise exception 'use_attendance_payroll_actions';end if;\n elsif a->>'paidAt' is distinct from b->>'paidAt' then\n  -- A privileged helper is not itself payment authority. Verify the real user.\n  if private.carlos_payroll_actor() is distinct from 'owner' then raise exception 'owner_only' using errcode='42501';end if;\n end if;\n if tg_op='INSERT' and exists(select 1 from public.manager_goals g where g.assignee=new.assignee and g.title=new.title and g.details like 'daily_work_summary:%') then raise exception 'duplicate_work_date';end if;\n return coalesce(new,old);\nend $function$\n",
+      "definition": "CREATE TRIGGER guard_daily_pay_fields BEFORE INSERT OR DELETE OR UPDATE ON public.manager_goals FOR EACH ROW EXECUTE FUNCTION guard_daily_pay_fields()"
+    },
+    {
+      "function": "CREATE OR REPLACE FUNCTION public.log_manager_staff_record_change()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  actor_id uuid := auth.uid();\n  source_row jsonb := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;\n  destination text;\n  label text;\nbegin\n  if actor_id is null or not exists (\n    select 1 from public.profiles\n    where id = actor_id\n      and role in ('admin', 'staff')\n      and approval_status = 'approved'\n      and is_active = true\n  ) then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n  if tg_table_name = 'manager_goals' and source_row ->> 'title' = 'Employee activity' then\n    if tg_op = 'DELETE' then return old; end if;\n    return new;\n  end if;\n\n  destination := case tg_table_name\n    when 'manager_goals' then '/admin/goals-progress'\n    when 'manager_outreach_leads' then '/admin/users'\n    when 'quote_requests' then '/owner/materials/requests/' || coalesce(source_row ->> 'id', '')\n    when 'quote_comparisons' then '/admin/quote-comparison/' || coalesce(source_row ->> 'id', '')\n    when 'supplier_quotes' then '/admin/supplier-quotes/' || coalesce(source_row ->> 'id', '')\n    when 'workflow_manager_settings' then '/admin/vendors'\n    else '/admin/build-map'\n  end;\n  label := left(coalesce(\n    nullif(source_row ->> 'title', ''),\n    nullif(source_row ->> 'full_name', ''),\n    nullif(source_row ->> 'supplier_name', ''),\n    replace(initcap(tg_table_name), '_', ' ')\n  ), 160);\n\n  insert into public.manager_staff_activity_events (\n    user_id, event_type, page_path, page_label, entity_type, entity_id, metadata\n  ) values (\n    actor_id,\n    case tg_op when 'INSERT' then 'record_created' when 'DELETE' then 'record_deleted' else 'record_updated' end,\n    destination,\n    replace(initcap(tg_table_name), '_', ' '),\n    tg_table_name,\n    source_row ->> 'id',\n    jsonb_build_object('label', label)\n  );\n  if tg_op = 'DELETE' then return old; end if;\n  return new;\nend;\n$function$\n",
+      "definition": "CREATE TRIGGER manager_staff_activity_change AFTER INSERT OR DELETE OR UPDATE ON public.manager_goals FOR EACH ROW EXECUTE FUNCTION log_manager_staff_record_change()"
+    },
+    {
+      "function": "CREATE OR REPLACE FUNCTION public.set_manager_goals_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at = now();\n  return new;\nend;\n$function$\n",
+      "definition": "CREATE TRIGGER set_manager_goals_updated_at BEFORE UPDATE ON public.manager_goals FOR EACH ROW EXECUTE FUNCTION set_manager_goals_updated_at()"
+    }
+  ],
+  "constraints": [
+    "CHECK ((assignee = ANY (ARRAY['david'::text, 'carlos'::text])))",
+    "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE RESTRICT",
+    "PRIMARY KEY (id)",
+    "CHECK ((status = ANY (ARRAY['open'::text, 'completed'::text, 'archived'::text])))",
+    "CHECK (((char_length(TRIM(BOTH FROM title)) >= 2) AND (char_length(TRIM(BOTH FROM title)) <= 120)))"
+  ]
+}

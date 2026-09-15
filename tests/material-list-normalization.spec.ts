@@ -107,7 +107,7 @@ test("the organizer preserves line breaks and grounds saved rows before replacin
   expect(source).toContain("findExplicitQuantityUnitEvidence")
   expect(source).toContain("sourceText: groundedSourceText")
   expect(source).toContain("source_text: groundedSourceText")
-  expect(source.indexOf("const explicitEvidence")).toBeLessThan(source.indexOf('insert(rows).select("id")'))
+  expect(source.indexOf("const explicitEvidence")).toBeLessThan(source.lastIndexOf('admin.rpc("publish_material_list_checkpoint"'))
 })
 
 test("editing an original flags re-review without overwriting organized quantities", async () => {

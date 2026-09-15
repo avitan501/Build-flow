@@ -2,11 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
+import { PDFDocument } from "npm:pdf-lib@1.17.1"
+import { materialPageRanges, materialChunkInstruction, nextMissingMaterialChunk, MAX_MATERIAL_CHUNKS, claimMaterialEvidence } from "./chunk-plan.ts"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
 import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedMeasurementReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
 import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
-import { completedMaterialListOutput, MaterialListFailure, materialListFailureCode } from "../_shared/material-list-failure.ts"
+import { completedMaterialListOutput, validMaterialListOutput, MaterialListFailure, materialListFailureCode, materialListDatabaseFailure } from "../_shared/material-list-failure.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -36,6 +38,8 @@ type Attachment = {
 }
 
 type AiItem = {
+  sourceChunk?: string
+  sourceOccurrence?: string
   name: string
   department: string
   quantity: number | null
@@ -264,52 +268,46 @@ async function authorized(request: Request) {
   return ["admin", "staff"].includes(profile?.role || "") && profile?.approval_status === "approved" && profile?.is_active === true
 }
 
-async function updateSource(source: SourceItem, state: Record<string, unknown>) {
-  const { error } = await admin.from("quote_request_items").update({ metadata: { ...(source.metadata ?? {}), ...state } }).eq("id", source.id)
-  if (error) throw new MaterialListFailure("source_state_update_failed")
-}
-
-async function updateSources(sources: SourceItem[], state: Record<string, unknown>) {
-  await Promise.all(sources.map((source) => updateSource(source, state)))
-}
+import { materialListMaintenanceResponse, materialListProcessingAllowed } from "../_shared/material-list-maintenance.ts"
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
   if (!await authorized(request)) return json({ error: "Staff authorization required" }, 401)
+  if (!materialListProcessingAllowed()) return materialListMaintenanceResponse()
 
-  let apiKey: string | null
-  try { apiKey = await openAiKey() } catch {
-    return json({ error: "AI configuration is temporarily unavailable.", failureCode: "key_lookup_timeout" }, 503)
-  }
-  if (!apiKey) return json({ error: "AI is not configured" }, 503)
-
-  let body: { requestId?: unknown; force?: unknown }
+  let body: { requestId?: unknown; force?: unknown; jobId?: unknown; generation?: unknown; lease?: unknown }
   try { body = await request.json() } catch { return json({ error: "Invalid JSON" }, 400) }
   const requestId = clean(body.requestId, 80)
   const force = body.force === true
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return json({ error: "Invalid request" }, 400)
+  const jobId = Number(body.jobId)
+  const generation = Number(body.generation)
+  const lease = clean(body.lease,80)
+  if (!Number.isSafeInteger(jobId) || jobId < 1 || !Number.isSafeInteger(generation) || generation < 1 || !/^[0-9a-f-]{36}$/i.test(lease)) return json({ error: "Queue this request before processing.", failureCode: "job_context_required" }, 409)
 
-  const [{ data: requestRecord }, { data: sourceItems }, { data: attachments }] = await Promise.all([
+  const [requestResult, sourceResult, attachmentResult, jobResult] = await Promise.all([
     admin.from("quote_requests").select("id").eq("id", requestId).maybeSingle(),
     admin.from("quote_request_items").select("id,request_id,project_id,owner_id,name,department,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<SourceItem[]>(),
     admin.from("quote_request_attachments").select("file_name,file_path,file_type,file_size,source_party").eq("request_id", requestId).neq("source_party", "supplier").order("created_at").returns<Attachment[]>(),
+    admin.from("client_material_list_jobs").select("id").eq("id",jobId).eq("request_id",requestId).eq("generation",generation).eq("ai_chunk_lease",lease).eq("status","processing").maybeSingle(),
   ])
+  const sourceError=[requestResult,sourceResult,attachmentResult,jobResult].find(result=>result.error)?.error
+  if (sourceError) return json({ error: "Request data is temporarily unavailable.", failureCode: materialListDatabaseFailure(sourceError,"source_read_unavailable") }, 503)
+  if (!jobResult.data) return json({ error: "This processing attempt is no longer current.", failureCode: "stale_job" }, 409)
+  const requestRecord = requestResult.data
+  const sourceItems = sourceResult.data
+  const attachments = attachmentResult.data
   if (!requestRecord || !sourceItems?.length) return json({ error: "Request not found" }, 404)
 
   const originalSources = sourceItems.filter((item) => item.metadata?.ai_organized !== true)
   const source = originalSources[0] ?? sourceItems[0]
   const existing = sourceItems.filter((item) => item.metadata?.ai_organized === true)
   if (existing.length && !force) {
-    await updateSources(originalSources, { ai_organization_status: "organized", ai_organization_item_count: existing.length })
     const reviewCount = existing.filter((item) => item.metadata?.review_status !== "ready").length
     return json({ ok: true, status: "already_organized", itemCount: existing.length, reviewCount })
   }
-  const startedAt = Date.parse(clean(source.metadata?.ai_organization_started_at, 80))
-  if (source.metadata?.ai_organization_status === "processing" && Number.isFinite(startedAt) && Date.now() - startedAt < 10 * 60 * 1000) {
-    return json({ ok: true, status: "processing", itemCount: 0 })
-  }
+  // The durable job's generation/lease, not stale display metadata, owns processing.
   try {
-    await updateSources(originalSources, { ai_organization_status: "processing", ai_organization_started_at: new Date().toISOString() })
     const typedSource = originalSources.map((originalSource) => {
       const requestDetails = cleanMultiline(originalSource.metadata?.request_details, 20_000)
       const savedFields = savedRequestItemFields(originalSource.metadata)
@@ -319,35 +317,66 @@ Deno.serve(async (request: Request) => {
         : ""
       return [requestDetails, savedFields ? `User-confirmed fields:\n${savedFields}` : "", savedSourceItem].filter(Boolean).join("\n")
     }).filter(Boolean).join("\n\n")
-    const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }]
-    if (typedSource) content.push({ type: "input_text", text: `Customer's typed material notes:\n\n${typedSource}` })
+    const chunks: Array<{ label: string; content: Record<string, unknown> }> = []
+    const evidenceHashes: string[] = []
+    const seenEvidence = new Set<string>()
+    const sha256 = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer))).map(byte => byte.toString(16).padStart(2,"0")).join("")
 
     let includedAttachmentCount = 0
     let includedAttachmentBytes = 0
     const candidates = materialListAttachmentCandidates(attachments ?? [])
+    // Never silently publish a partial list when a saved client file was omitted.
+    if (candidates.length !== (attachments ?? []).length) throw new MaterialListFailure("attachment_limit")
     for (const attachment of candidates) {
       const { data: file, error } = await admin.storage.from("project-uploads").download(attachment.file_path)
       if (error || !file) throw new MaterialListFailure("attachment_unavailable")
 
       const bytes = new Uint8Array(await file.arrayBuffer())
-      if (!canAddMaterialListAttachment(includedAttachmentCount, includedAttachmentBytes, bytes.byteLength)) continue
+      if (!canAddMaterialListAttachment(includedAttachmentCount, includedAttachmentBytes, bytes.byteLength)) throw new MaterialListFailure("attachment_limit")
 
       const mimeType = attachmentMimeType(attachment)
       if (!mimeType) continue
       const fileName = clean(attachment.file_name, 180) || `request-attachment-${includedAttachmentCount + 1}`
-      const dataUrl = `data:${mimeType};base64,${encodeBase64(bytes)}`
-      content.push({
-        type: "input_text",
-        text: `Attachment evidence ${includedAttachmentCount + 1}: ${fileName}`,
-      })
-      content.push(mimeType.startsWith("image/")
-        ? { type: "input_image", image_url: dataUrl, detail: "high" }
-        : { type: "input_file", filename: fileName, file_data: dataUrl })
+      const evidenceHash = await sha256(bytes)
+      // Every saved file remains in the generation fingerprint and download
+      // limits, even if its bytes are already represented by another upload.
+      evidenceHashes.push(`${attachment.file_path}:${evidenceHash}`)
       includedAttachmentCount += 1
       includedAttachmentBytes += bytes.byteLength
+      if (!claimMaterialEvidence(seenEvidence, mimeType, evidenceHash)) continue
+      if (mimeType === "application/pdf") {
+        let pdf: PDFDocument
+        try { pdf = await PDFDocument.load(bytes) } catch { throw new MaterialListFailure("document_unreadable") }
+        for (const range of materialPageRanges(pdf.getPageCount())) {
+          const part = await PDFDocument.create()
+          const pages = await part.copyPages(pdf, Array.from({length:range.last-range.first+1},(_,index)=>range.first+index))
+          pages.forEach(page=>part.addPage(page))
+          const label = `${fileName}, pages ${range.first+1}-${range.last+1}`
+          chunks.push({label,content:{type:"input_file",filename:fileName,file_data:`data:application/pdf;base64,${encodeBase64(await part.save())}`}})
+        }
+      } else chunks.push({label:fileName,content:{type:"input_image",image_url:`data:${mimeType};base64,${encodeBase64(bytes)}`,detail:"high"}})
     }
 
     if (!typedSource && !includedAttachmentCount) throw new MaterialListFailure("source_empty")
+    if (!chunks.length) chunks.push({label:"Typed material list",content:{type:"input_text",text:typedSource}})
+    if (chunks.length>MAX_MATERIAL_CHUNKS) throw new MaterialListFailure("document_page_limit")
+    const fingerprint = await sha256(new TextEncoder().encode(JSON.stringify({typedSource,evidenceHashes,model:AI_MODEL,version:2})))
+    const checkpointInput = {p_job_id:jobId,p_generation:generation,p_lease:lease,p_fingerprint:fingerprint,p_count:chunks.length}
+    const {data:checkpoint,error:checkpointError} = await admin.rpc("material_list_checkpoint",checkpointInput)
+    if (checkpointError) throw new MaterialListFailure(materialListDatabaseFailure(checkpointError,"checkpoint_unavailable"))
+    const results = (checkpoint?.results || {}) as Record<string,{label:string;result:AiResult}>
+    if (Object.values(results).some(chunk => !chunk || typeof chunk.label !== "string" || !validMaterialListOutput(chunk.result))) throw new MaterialListFailure("openai_invalid_shape")
+    const nextChunk = nextMissingMaterialChunk(results,chunks.length)
+    if (nextChunk !== null) {
+    let apiKey: string | null
+    try { apiKey=await openAiKey() } catch (cause) { throw new MaterialListFailure(materialListDatabaseFailure(cause,"key_lookup_timeout")) }
+    if (!apiKey) throw new MaterialListFailure("ai_not_configured")
+    const content: Array<Record<string,unknown>> = [
+      {type:"input_text",text:prompt},
+      {type:"input_text",text:materialChunkInstruction(nextChunk,chunks.length,chunks[nextChunk].label)},
+      ...(typedSource?[{type:"input_text",text:`Request context:\n${typedSource}`}]:[]),
+      chunks[nextChunk].content,
+    ]
 
     const controller = new AbortController()
     const openAiTimeout = setTimeout(() => controller.abort(), 90_000)
@@ -360,7 +389,7 @@ Deno.serve(async (request: Request) => {
         body: JSON.stringify({
           model: AI_MODEL,
           store: false,
-          reasoning: { effort: "medium" },
+          reasoning: { effort: "low" },
           max_output_tokens: 8_000,
           input: [{ role: "user", content }],
           text: { verbosity: "low", format: { type: "json_schema", name: "client_material_list", strict: true, schema } },
@@ -381,17 +410,23 @@ Deno.serve(async (request: Request) => {
       // Include the response body read in the provider budget, not just headers.
       clearTimeout(openAiTimeout)
     }
+    const chunkResult={label:chunks[nextChunk].label,result}
+    const {error:saveError}=await admin.rpc("material_list_checkpoint",{...checkpointInput,p_chunk_index:nextChunk,p_chunk_result:chunkResult})
+    if(saveError) throw new MaterialListFailure(materialListDatabaseFailure(saveError,"checkpoint_unavailable"))
+    results[String(nextChunk)]=chunkResult
+    }
+    if(nextMissingMaterialChunk(results,chunks.length)!==null) return json({ok:true,status:"chunk_completed",chunksDone:Object.keys(results).length,chunksTotal:chunks.length})
+    const completed=Array.from({length:chunks.length},(_,index)=>results[String(index)])
+    const allItems=completed.flatMap((chunk,chunkIndex)=>chunk.result.items.map((item,rowIndex)=>({...item,sourceChunk:chunk.label,sourceOccurrence:`${chunkIndex}:${rowIndex}`})))
+    if(allItems.length>300) throw new MaterialListFailure("material_row_limit")
+    const result:AiResult={documentType:allItems.length?"material_list":completed.some(chunk=>chunk.result.documentType==="plan")?"plan":"other",summary:completed.map(chunk=>chunk.result.summary).join("\n"),items:allItems}
     const items = result.documentType === "material_list"
       ? mergeSemanticallyEquivalentMaterialItems(result.items.slice(0, 300), { preserveSourceRows: true })
       : []
 
     if (!items.length) {
-      await updateSources(originalSources, {
-        ai_organization_status: result.documentType === "plan" ? "plan_requires_takeoff" : "needs_review",
-        ai_organization_failure_code: null,
-        ai_organization_summary: clean(result.summary, 1000),
-        ai_organization_completed_at: new Date().toISOString(),
-      })
+      const {error}=await admin.rpc("publish_material_list_checkpoint",{p_job_id:jobId,p_generation:generation,p_lease:lease,p_fingerprint:fingerprint,p_rows:[],p_summary:result.summary,p_result_status:result.documentType==="plan"?"plan_requires_takeoff":"needs_review"})
+      if(error) throw new MaterialListFailure(materialListDatabaseFailure(error,"checkpoint_publish_failed"))
       return json({ ok: true, status: result.documentType, itemCount: 0 })
     }
 
@@ -456,7 +491,9 @@ Deno.serve(async (request: Request) => {
       })
       const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
-      const reviewStatus = missingThickness || missingLumberType || missingFastenerLength ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
+      const sourceOnHold = /\b(?:hold|provisional|unverified)\b/i.test(`${groundedSourceText} ${details}`)
+        || /\bquantit(?:y|ies)\b[^\n.]{0,120}\b(?:hold|provisional|unverified)\b/i.test(typedSource)
+      const reviewStatus = missingThickness || missingLumberType || missingFastenerLength || (sourceOnHold && quantityWasDefaulted) ? "missing" : sourceOnHold ? "check" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -481,10 +518,13 @@ Deno.serve(async (request: Request) => {
           request_item_field_evidence: requestItemFieldEvidence,
           request_details: details,
           source_text: groundedSourceText,
+          source_chunk: item.sourceChunk,
+          source_occurrence: item.sourceOccurrence,
           quantity_defaulted: quantityWasDefaulted,
           unit_defaulted: unitWasDefaulted,
           review_status: reviewStatus,
           review_reasons: [
+            ...(sourceOnHold ? ["Source quantity or specification is on HOLD; confirm before ordering"] : []),
             ...reviewReasons,
             ...(missingThickness && !reviewReasons.some((reason) => /thickness/i.test(reason)) ? ["Thickness is missing"] : []),
             ...(missingLumberType && !reviewReasons.some((reason) => /\b(?:lumber|wood)\s+(?:type|species|grade)|\btreatment\b/i.test(reason)) ? ["Lumber type is missing"] : []),
@@ -494,36 +534,14 @@ Deno.serve(async (request: Request) => {
         },
       }
     })
-    const { data: insertedRows, error: insertError } = await admin.from("quote_request_items").insert(rows).select("id")
-    if (insertError) throw new MaterialListFailure("organized_items_insert_failed")
-
-    if (existing.length) {
-      const { error: deleteError } = await admin.from("quote_request_items").delete().in("id", existing.map((item) => item.id))
-      if (deleteError) {
-        const insertedIds = (insertedRows ?? []).map((row) => row.id)
-        if (insertedIds.length) await admin.from("quote_request_items").delete().in("id", insertedIds)
-        throw new MaterialListFailure("previous_organized_items_replace_failed")
-      }
-    }
-
-    await updateSources(originalSources, {
-      ai_organization_status: "organized",
-      ai_organization_failure_code: null,
-      ai_organization_summary: clean(result.summary, 1000),
-      ai_organization_item_count: rows.length,
-      ai_organization_completed_at: organizedAt,
-    })
+    const {error:publishError}=await admin.rpc("publish_material_list_checkpoint",{p_job_id:jobId,p_generation:generation,p_lease:lease,p_fingerprint:fingerprint,p_rows:rows,p_summary:result.summary,p_result_status:"organized"})
+    if(publishError) throw new MaterialListFailure(materialListDatabaseFailure(publishError,"checkpoint_publish_failed"))
     const reviewCount = rows.filter((row) => row.metadata.review_status !== "ready").length
     return json({ ok: true, status: "organized", itemCount: rows.length, reviewCount })
   } catch (cause) {
-    const code = materialListFailureCode(cause)
-    try {
-      await updateSources(originalSources, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_failure_code: code, ai_organization_completed_at: new Date().toISOString() })
-    } catch {
-      // Keep the original safe cause in the HTTP response so the durable worker
-      // can record it even when writing source metadata is unavailable.
-      console.error("client_material_list_state_failed", { requestId, code: "source_state_update_failed" })
-    }
+    const code = cause instanceof Error && cause.message==="document_page_limit" ? "document_page_limit" : materialListFailureCode(cause)
+    // Only the generation-fenced queue finalizer updates failure metadata. A stale
+    // attempt must not overwrite new edits or another generation's state.
     console.error("client_material_list_failed", { requestId, code })
     return json({ error: "The material list could not be organized automatically.", failureCode: code }, 502)
   }
