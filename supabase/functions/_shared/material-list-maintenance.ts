@@ -1,6 +1,10 @@
-/** Fail closed while upgrading the document processor. Intake may still enqueue. */
-export function materialListProcessingAllowed(mode = Deno.env.get("MATERIAL_LIST_PROCESSING_MODE")) {
-  return mode === "active"
+/** Versioned deployment switch: change only in an explicit reviewed activation. */
+export const MATERIAL_LIST_DEPLOYMENT_MODE: string = "paused"
+
+/** An environment override may only tighten the build-time gate, never enable it. */
+export function materialListProcessingAllowed() {
+  const override = Deno.env.get("MATERIAL_LIST_PROCESSING_MODE")
+  return MATERIAL_LIST_DEPLOYMENT_MODE === "active" && (override === undefined || override === "active")
 }
 
 export function materialListMaintenanceResponse() {

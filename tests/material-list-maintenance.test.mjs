@@ -9,10 +9,12 @@ function load(source,imports={},globals={}) {
  vm.runInNewContext(code,{exports,require:n=>{if(!(n in imports))throw Error('Unexpected import '+n);return imports[n]},Response,Request,console:{error(){}},...globals});return exports;
 }
 const gateSource=read('supabase/functions/_shared/material-list-maintenance.ts');
-function gate(mode){return load(gateSource,{}, {Deno:{env:{get:()=>mode}}});}
+function gate(mode,override){return load(gateSource.replace('MATERIAL_LIST_DEPLOYMENT_MODE: string = "paused"',`MATERIAL_LIST_DEPLOYMENT_MODE: string = ${JSON.stringify(mode??'paused')}`),{}, {Deno:{env:{get:()=>override}}});}
 test('maintenance is fail-closed for absent, invalid and paused mode',async()=>{
  for(const mode of [undefined,'','paused','true','ACTIVE','active ']) assert.equal(gate(mode).materialListProcessingAllowed(),false);
  assert.equal(gate('active').materialListProcessingAllowed(),true);
+ assert.equal(gate('paused','active').materialListProcessingAllowed(),false);
+ assert.equal(gate('active','paused').materialListProcessingAllowed(),false);
  const response=gate().materialListMaintenanceResponse();assert.equal(response.status,503);assert.equal(response.headers.get('X-Material-List-Gate'),'maintenance-v1');assert.equal((await response.json()).status,'maintenance');
 });
 for(const kind of ['ai','worker'])test(`actual ${kind} handler pauses before provider, source mutation or job claim`,async()=>{
@@ -32,7 +34,7 @@ test('public intake never falls back to direct AI; preserves durable queue durin
  const source=read('supabase/functions/_shared/public-material-list-queue.ts');
  for(const scenario of ['http-failed','network-failed','paused','active','nudge-failed']) {
   const calls=[],pending=[];
-  const fn=load(source,{'./material-list-maintenance.ts':gate(scenario==='active'||scenario==='nudge-failed'?'active':'paused')},{
+  const fn=load(source,{'jsr:@supabase/functions-js/edge-runtime.d.ts':{},'./material-list-maintenance.ts':gate(scenario==='active'||scenario==='nudge-failed'?'active':'paused')},{
    fetch:async(url)=>{calls.push(url);if(scenario==='network-failed'||(scenario==='nudge-failed'&&calls.length===2))throw Error('synthetic');return new Response('{}',{status:scenario==='http-failed'?503:200});},
    EdgeRuntime:{waitUntil:p=>pending.push(p)},
   }).queuePublicMaterialList;

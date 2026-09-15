@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { materialListProcessingAllowed } from "./material-list-maintenance.ts"
 
 /** Intake stays successful when extraction cannot queue; never bypass the durable job. */
