@@ -1,6 +1,6 @@
 import { Bell, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
 
-import { setAccountPassword, updateAlternateContacts, updateNotificationPreferences } from "@/app/account/actions";
+import { setAccountPassword, updateNotificationPreferences } from "@/app/account/actions";
 import { AccountPhoneAutosave } from "@/components/buildflow/account-phone-autosave";
 import { AccountNameAutosave } from "@/components/buildflow/account-name-autosave";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
@@ -18,6 +18,7 @@ type AccountSettingsProps = {
 };
 
 const errorMessages: Record<string, string> = {
+  "contacts-reload": "Alternate contacts are temporarily unavailable while safe autosave is being enabled. Your saved contacts are preserved.",
   name: "Enter a valid name.",
   phone: "Enter a valid phone number.",
   "alternate-email": "Enter a valid alternate email.",
@@ -78,11 +79,11 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
 
         <SectionCard icon={Mail} title="Email & contact" description="Login email and alternate contact details.">
           <div className="rounded-lg border border-[#071126]/8 bg-white/65 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">Login email</p><p className="mt-1 break-words text-sm font-semibold text-[#071126]">{email || profile?.email || "Not available"}</p></div>
-          <form action={updateAlternateContacts} className="mt-3 grid gap-3">
-            <label className="grid gap-1.5 text-sm font-semibold">Alternate email<input name="alternateEmail" type="email" defaultValue={alternateEmail || ""} placeholder="alternate@example.com" autoComplete="email" className={inputClass} /></label>
-            <label className="grid gap-1.5 text-sm font-semibold">Alternate phone<input name="alternatePhone" type="tel" defaultValue={alternatePhone || ""} placeholder="+1 555 123 4567" autoComplete="tel" className={inputClass} /></label>
-            <button type="submit" className={primaryButtonClass}>Save contact details</button>
-          </form>
+          <div className="mt-3 grid gap-3">
+            <label className="grid gap-1.5 text-sm font-semibold">Alternate email<input disabled type="email" value={alternateEmail || ""} className={inputClass} /></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Alternate phone<input disabled type="tel" value={alternatePhone || ""} className={inputClass} /></label>
+            <p role="status" className="text-xs text-amber-800">Alternate contacts are temporarily unavailable while safe autosave is being enabled. Your saved contacts are preserved.</p>
+          </div>
         </SectionCard>
 
         <SectionCard icon={KeyRound} title="Password & security" description="After secure sign-in, you may set a password for later use.">
