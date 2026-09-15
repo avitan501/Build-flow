@@ -184,7 +184,7 @@ const AI_ATTRIBUTE_FIELDS = {
   product_type: { id: "type", label: "Type / material", metadataKey: "product_type" },
   finish: { id: "finish", label: "Finish", metadataKey: "finish" },
   packaging: { id: "packaging", label: "Packaging", metadataKey: "packaging" },
-  coverage: { id: "coverage", label: materialCoverageLabel(), metadataKey: "coverage" },
+  coverage: { id: "source-coverage", label: materialCoverageLabel(), metadataKey: null },
   grade: { id: "grade", label: "Grade", metadataKey: "grade" },
   shipping: { id: "shipping", label: "Shipping / delivery", metadataKey: "shipping" },
   delivery_address: { id: "delivery-address", label: "Delivery address", metadataKey: "delivery_address" },

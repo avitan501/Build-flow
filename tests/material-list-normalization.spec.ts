@@ -2,12 +2,17 @@ import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { materialCoverageLabel } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { requestItemFieldsFromMetadata } from "../lib/request-item-fields"
 
 test("extracted coverage never invents a per-pack denominator", async () => {
   expect(materialCoverageLabel()).toBe("Source coverage (unverified)")
   const code = await readFile(path.join(process.cwd(), "supabase/functions/client-material-list-ai/index.ts"), "utf8")
-  expect(code).toContain('coverage: { id: "coverage", label: materialCoverageLabel(), metadataKey: "coverage" }')
+  expect(code).toContain('coverage: { id: "source-coverage", label: materialCoverageLabel(), metadataKey: null }')
   expect(code).not.toContain('coverage: { id: "coverage", label: "Coverage / pack"')
+  for (const value of ["Approximately 660 LF", "1000 SF total", "32 sq ft per panel"]) {
+    const fields = requestItemFieldsFromMetadata({request_item_fields: [{id: "source-coverage", label: materialCoverageLabel(), value}, {id: "length", label: "Length", value: "10 ft"}]})
+    expect(fields).toEqual([{id: "source-coverage", label: "Source coverage (unverified)", value}, {id: "length", label: "Length", value: "10 ft"}])
+  }
 })
 
 import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
