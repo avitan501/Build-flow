@@ -18,11 +18,12 @@ An additional non-forced already_organized response previously could never finis
 - Six core migrations: 129 constraints/28 triggers, existing role/source/receipt/match and mixed A/B client/CAS/claim/bypass suites pass before AI install.
 - AI checkpoint + source-edit-first and publication-first pass, including failed edit source/generation rollback, checkpoint retention and explicit retry.
 - Attachment-first and publication-first both pass: stale publication rejected, losing attachment insert rolled back, retry succeeds.
+- Actual publication contention -> retry finalizer -> real claim with a new lease retains the completed chunk; resume needs no new provider call for that stored chunk.
 - Non-forced existing-list no-op completes without fabricated checkpoint; forced bypass rejected.
 - 98 deterministic Playwright tests pass (both configured projects; tests do not call a browser/provider).
 - Fresh Next route typegen + full standalone TypeScript pass; targeted lint and diff-check pass.
 - Full AI and worker Deno checks pass with `--cached-only --node-modules-dir=none`.
-- Integrated webpack build running at report creation; final outcome must be recorded before release.
+- Integrated webpack production build passes, including Next TypeScript and all 153 routes.
 
 Rehearsal command:
 `node tests/ai-request-migrations-combined.local.mjs supabase/migrations/20260914230638_quote_comparison_finalized_routes.sql d9521be0ca183572c1f43d50ecb6a5384df52216f35543dcca81cef8a10071ee`
