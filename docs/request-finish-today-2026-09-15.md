@@ -1,5 +1,16 @@
 # Remaining work continuation — 2026-09-15
 
+## 03:49 UTC live verification and controlled cleanup
+
+- LIVE release `863e3e21c9a55aecd3f4aa0e95bd5f30f08cb074`: CI `34925476159` success; Vercel `dpl_GpfB7VnziDuRMa6noGBpH841Gk3r` READY, canonical avantiabuild.com alias and exact production release/Supabase ref verified.
+- Actual existing Carlos browser: contactless synthetic mixed comparison finalized normally; blank product price and unique quote marker autosaved and survived reload. Client unselected, Prepare/Send disabled. Authoritative database confirmed raw draft revision 2, no prepared revision, unchanged financial rows, no send token.
+- Normal reopen succeeded; harness stopped when a transient success message disappeared during refresh. Root database confirmation preceded a clear-only continuation (no duplicate reopen/finalize). Both choices then cleared normally and verified after reload.
+- Root deleted exactly ONE newly created synthetic draft using comparison/request/actor/revision/full-row MD5/marker and restored-parent guards. Readback: zero draft rows, no active route, review/draft status, no client or send claims; all original item and supplier-bid rows unchanged. One immutable synthetic route history retained. Choice revision advanced normally 11 to 17, not reset. No customer draft deleted, no message/order/payment sent. Temporary baseline and checkpoint retain recoverable test evidence.
+- Final payroll read-only phone390/desktop1440 PASS: September11 Missing checkout/Needs review, no growing duration or misleading pause banner; $5/hour and $254.30 unpaid unchanged; no Carlos Paid/Unpaid controls. Actual September11 checkout/breaks still require owner input.
+- Evidence: `/tmp/avantia-client-draft-QA-DRAFT-20260915-FINAL-persist.json`, `-clear-only.json`, `/tmp/avantia-payroll-final-release-verification-20260915.md`.
+- Live QA found one additional display issue: an incomplete price still produced a definitive-looking total/profit. Prepare/Send correctly blocked. Targeted numeric-completeness display correction is in progress; this is not yet a released fix.
+- Broader boundaries remain: universal account/supplier/legacy-quote autosave, quantity-based partial invoice/payment/delivery ledger, approved permanent Meet link, measured resource savings, and actual provider/customer/financial journey verification are not complete.
+
 ## 03:32 UTC final candidate and database dependencies
 
 Final integrated verification:68draft/queue/history +14styledcomparison/payroll browser/helper tests PASS, standaloneTypeScript/targetedlint/diffPASS,10deploymentguardsPASS. Appbuild153PASS; portablefixturefd84d1ad introducednoappchange. Compatibilitymigrationreadbacknullsafe/authgrantonly confirmed. Productionclientdrafttable remains empty before controlledQA.
