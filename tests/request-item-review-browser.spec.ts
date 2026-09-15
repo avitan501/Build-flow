@@ -41,3 +41,23 @@ test("wide work area places the focused question beside the readable list", asyn
   expect(panel.x).toBeGreaterThan(list.x + list.width)
   await page.screenshot({ path: `/tmp/step1-review-wide-${test.info().project.name}.png` })
 })
+
+test("real request preview filter retains selected ready row then releases it on Next", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 })
+  let posts = 0
+  await page.route("**/*", route => { if (route.request().method() === "POST") { posts++; return route.abort() } return route.continue() })
+  await page.goto("/preview/request-items")
+  const rows = page.getByLabel("Request products", { exact: true }).getByRole("button")
+  await expect(rows).toHaveCount(62)
+  await rows.first().click()
+  await page.getByRole("group", { name: "Filter products" }).getByRole("button", { name: /Needs details/ }).click()
+  await expect(rows).toHaveCount(3)
+  await expect(rows.first()).toContainText("Current item")
+  await page.getByRole("button", { name: "Next item needing details", exact: true }).click()
+  await expect(rows).toHaveCount(2)
+  await expect(page.getByLabel("Current product review")).toContainText("product 8")
+  await page.reload()
+  await expect(rows).toHaveCount(62)
+  await expect(page.getByLabel("Current product review")).toContainText("product 8")
+  expect(posts).toBe(0)
+})

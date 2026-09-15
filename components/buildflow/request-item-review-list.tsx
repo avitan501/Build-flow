@@ -25,13 +25,23 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
   const [receipt, setReceipt] = useState<string | null>(null)
   const [feedback, setFeedback] = useState("")
   const [priceOpen, setPriceOpen] = useState(false)
+  const [filter, setFilter] = useState<"all" | "needs-details">("all")
   const [pending, startTransition] = useTransition()
   const busy = useRef(false)
   const restored = useRef(false)
   const panel = useRef<HTMLDivElement>(null)
   const current = products.find(({ item }) => item.id === selectedId) || null
   const latest = pendingVersion || (current && reviewed && hasIncomingItemRevision(current.revision, reviewed.revision, baselineRevision) ? current : null)
-  const needsAttention = products.filter(({ item }) => materialReviewStatus(item) !== "ready" && materialReviewReasons(item).length)
+  const shown = reviewed && reviewed.item.id === selectedId ? reviewed : current
+  // Acknowledged edits can arrive before router.refresh. Use that same visible
+  // version for counts, but never conceal an incoming server/source conflict.
+  const workingProducts = products.map(product => shown && product.item.id === shown.item.id && !latest ? shown : product)
+  const needsAttention = workingProducts.filter(({ item }) => materialReviewStatus(item) !== "ready" && materialReviewReasons(item).length)
+  const needsAttentionIds = new Set(needsAttention.map(({ item }) => item.id))
+  // Keep the current row and its Undo receipt reachable when an answer resolves
+  // its last missing detail. Only explicit item navigation releases this row.
+  const visibleProducts = filter === "all" ? workingProducts : workingProducts.filter(({ item }) => needsAttentionIds.has(item.id) || item.id === selectedId)
+  const currentRetained = filter === "needs-details" && Boolean(shown && !needsAttentionIds.has(shown.item.id))
 
   useEffect(() => {
     if (restored.current) return
@@ -81,20 +91,23 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
     })
   }
 
-  const shown = reviewed && reviewed.item.id === selectedId ? reviewed : current
   const recommendation = shown ? materialReviewRecommendation(shown.item) : null
   const choices = shown?.item.metadata?.ai_organized === true ? recommendation?.choices || [] : []
   const activeChoice = choices.find((choice) => choice.field === field) || choices[0]
 
   return <div className="@container w-full p-3 sm:p-4" data-testid="request-item-review-list">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <div><h3 className="text-sm font-bold text-slate-900">Review your list</h3><p className="text-xs text-slate-500">{products.length} products{needsAttention.length ? ` · ${needsAttention.length} need details` : ""}</p></div>
+      <div><h3 className="text-sm font-bold text-slate-900">Review your list</h3><p className="text-xs text-slate-500" aria-live="polite">{products.length} products{needsAttention.length ? ` · ${needsAttention.length} need details` : ""}</p></div>
+      <div role="group" aria-label="Filter products" className="inline-flex rounded-lg bg-slate-100 p-0.5">
+        {([['all', 'All', products.length], ['needs-details', 'Needs details', needsAttention.length]] as const).map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value} disabled={pending} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-50 ${filter === value ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}>{label}<span className="ml-1.5 text-slate-500">{count}</span></button>)}
+      </div>
     </div>
+    {filter === "needs-details" && !needsAttention.length ? <p role="status" className="mb-3 text-xs text-slate-600">No items need details.{currentRetained ? " Your current item stays open." : " Choose All to see the full list."}</p> : null}
     <div className="grid items-start gap-4 @3xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
       <div className="order-2 min-w-0 overflow-hidden rounded-xl border border-slate-200 @3xl:order-1" aria-label="Request products">
-        {products.map(({ item }) => <button key={item.id} type="button" disabled={pending} aria-pressed={selectedId === item.id} onClick={() => openProduct(item.id)} className={`flex min-h-16 w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-b-0 ${selectedId === item.id ? "bg-sky-50 ring-1 ring-inset ring-sky-200" : "bg-white hover:bg-slate-50"}`}>
+        {visibleProducts.map(({ item }) => <button key={item.id} type="button" disabled={pending} aria-pressed={selectedId === item.id} onClick={() => openProduct(item.id)} className={`flex min-h-16 w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-b-0 ${selectedId === item.id ? "bg-sky-50 ring-1 ring-inset ring-sky-200" : "bg-white hover:bg-slate-50"}`}>
           <span className="min-w-0"><span className="block text-sm font-bold text-slate-900">{item.name}</span><span className="mt-1 block text-xs leading-5 text-slate-600">{requestItemFieldSummary(item.metadata).join(" · ")}</span>{materialReviewStatus(item) !== "ready" && materialReviewReasons(item).length ? <span className="mt-1 block text-xs font-semibold text-amber-800">{materialReviewReasons(item)[0]}</span> : null}</span>
-          <span className="max-w-28 shrink-0 break-words text-right text-xs font-bold text-slate-700">{item.quantity} {item.unit || "unit needed"}</span>
+          <span className="max-w-28 shrink-0 break-words text-right text-xs font-bold text-slate-700">{item.quantity} {item.unit || "unit needed"}{filter === "needs-details" && item.id === selectedId && !needsAttentionIds.has(item.id) ? <span className="mt-1 block text-[10px] font-normal text-slate-500">Current item</span> : null}</span>
         </button>)}
       </div>
       <div ref={panel} tabIndex={-1} className="order-1 min-w-0 rounded-xl border border-slate-200 bg-white p-3 focus:outline-none @3xl:order-2 @3xl:sticky @3xl:top-24" aria-label="Current product review">
@@ -120,7 +133,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
           </>}
           {shown.source ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2"><summary className="min-h-9 cursor-pointer text-xs font-bold text-slate-600">Original source</summary><p className="max-h-56 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-700">{String(shown.source.metadata?.request_details || shown.source.name)}</p></details> : null}
         </> : <p className="py-3 text-xs text-slate-500">Select a product to review its details.</p>}
-        {needsAttention.length ? <button type="button" disabled={pending} onClick={() => { const id = nextUnresolvedItem(products.map(({ item }) => item), selectedId); if (id) openProduct(id) }} className="mt-2 min-h-11 rounded-lg border border-amber-200 px-3 text-xs font-bold text-amber-900 disabled:opacity-40">Next item needing details</button> : <p className="mt-2 text-xs text-slate-500">No missing details flagged in this list.</p>}
+        {needsAttention.length ? <button type="button" disabled={pending} onClick={() => { const id = nextUnresolvedItem(workingProducts.map(({ item }) => item), selectedId); if (id) openProduct(id) }} className="mt-2 min-h-11 rounded-lg border border-amber-200 px-3 text-xs font-bold text-amber-900 disabled:opacity-40">Next item needing details</button> : <p className="mt-2 text-xs text-slate-500">No missing details flagged in this list.</p>}
       </div>
     </div>
   </div>
