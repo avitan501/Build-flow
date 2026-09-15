@@ -26,6 +26,12 @@ function usableUnit(value: unknown) {
   return PLACEHOLDER_UNITS.has(unit.toLowerCase()) ? "" : unit
 }
 
+function hasUnresolvedOrganizedUnit(item: ReviewableMaterialItem) {
+  // Legacy AI rows can inherit the 1-request intake envelope even while their
+  // stored review flag says ready. Manual service requests are not envelopes.
+  return item.metadata?.ai_organized === true && /^requests?$/i.test(text(item.unit))
+}
+
 function unique(values: string[]) {
   return [...new Set(values.filter(Boolean))]
 }
@@ -75,6 +81,7 @@ function normalizedReviewReasons(item: ReviewableMaterialItem) {
 }
 
 export function materialReviewStatus(item: ReviewableMaterialItem): MaterialReviewStatus {
+  if (hasUnresolvedOrganizedUnit(item)) return "missing"
   if (isRequestIntakePlaceholder(item)) return "check"
   const stored = text(item.metadata?.review_status) as MaterialReviewStatus
   const reasons = normalizedReviewReasons(item)
@@ -83,6 +90,7 @@ export function materialReviewStatus(item: ReviewableMaterialItem): MaterialRevi
 }
 
 export function materialReviewReasons(item: ReviewableMaterialItem) {
+  if (hasUnresolvedOrganizedUnit(item)) return ["Confirm the product quantity and selling unit from the source."]
   if (isRequestIntakePlaceholder(item)) return ["Organize this request into products with AI first."]
   const stored = normalizedReviewReasons(item)
   if (stored.length) return stored.slice(0, 5)
