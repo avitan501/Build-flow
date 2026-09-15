@@ -324,6 +324,8 @@ test("comparison room opens with products and retains the compact editing and ro
   expect(workspace).toContain('{ step: 2 as const, label: "Edit prices"');
   expect(workspace).toContain('{ step: 3 as const, label: "Route"');
   expect(workspace).toContain('{ step: 4 as const, label: "Client"');
+  expect(workspace).toContain('label: "Client", meta: hasFinalRoute ? "Open" : "Locked"');
+  expect(workspace).not.toContain('label: "Client", meta: hasFinalRoute ? "Ready" : "Locked"');
   expect(workspace).toContain("Supplier prices");
   expect(workspace).toContain("Choose the route");
   expect(workspace).toContain("Lowest landed cost");

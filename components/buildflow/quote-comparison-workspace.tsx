@@ -491,7 +491,7 @@ export function QuoteComparisonWorkspace({
             { step: 1 as const, label: "Materials", meta: `${items.length}` },
             { step: 2 as const, label: "Edit prices", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
             { step: 3 as const, label: "Route", meta: hasFinalRoute ? "✓" : "" },
-            { step: 4 as const, label: "Client", meta: hasFinalRoute ? "Ready" : "Locked" },
+            { step: 4 as const, label: "Client", meta: hasFinalRoute ? "Open" : "Locked" },
           ]).map((entry) => <button key={entry.step} type="button" onClick={() => { setActiveStep(entry.step); if (entry.step === 0) setWorkspaceToolsOpen(false); }} disabled={entry.step === 4 && !hasFinalRoute} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
         </nav>
         {showDetails ? (
