@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { extractText, getDocumentProxy } from "unpdf"
 
-import { buildClientReadyToPaySummary, buildQuoteBuyingOptions, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "../lib/quote-comparison"
+import { buildClientReadyToPaySummary, buildQuoteBuyingOptions, productMatchSnapshot, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "../lib/quote-comparison"
 import { parseSupplierQuoteMetadata, parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { matchSupplierQuoteItems } from "../lib/supplier-quote-routing"
 
@@ -59,7 +59,25 @@ test("complete supplier PDF preserves rows, delivery, tax, lead time, totals, an
   expect(option.clientTotal).toBe(10865.73)
   expect(option.estimatedGrossProfit).toBe(505.7)
   expect(option.leadTimeDays).toBe(3)
-  expect(option.selectable).toBe(true)
+  // Parsing prices is not evidence that differently worded products were reviewed.
+  expect(option.selectable).toBe(false)
+  expect(option.missingFields).toContain("supplier product match review")
+  const reviewedBid = structuredClone(bid)
+  for (const price of reviewedBid.quote_comparison_prices ?? []) {
+    const item = requestItems.find((row) => row.id === price.item_id)!
+    price.quote_product_match_confirmations = [{
+      id: `qa-confirmation-${item.id}`, actor_id: "qa-reviewer", actor_label: "QA reviewer",
+      created_at: "2026-09-15T00:00:00Z", source_fingerprint: "a".repeat(64),
+      source_snapshot: productMatchSnapshot(item, reviewedBid, price), selling_unit: item.unit,
+    }]
+  }
+  const [reviewedOption] = buildQuoteBuyingOptions(requestItems, [reviewedBid], clientTarget)
+  expect(reviewedOption.selectable).toBe(true)
+  expect(reviewedOption.supplierTotal).toBe(option.supplierTotal)
+  expect(reviewedOption.clientTotal).toBe(option.clientTotal)
+  const changedBid = structuredClone(reviewedBid)
+  changedBid.quote_comparison_prices![0].unit_price = 6
+  expect(buildQuoteBuyingOptions(requestItems, [changedBid], clientTarget)[0].selectable).toBe(false)
 
   const partialMatches = matchSupplierQuoteItems(extracted.items.slice(0, 2).map((item, index) => ({ id: `partial-${index}`, ...item })), requestItems)
   expect(partialMatches).toHaveLength(2)
