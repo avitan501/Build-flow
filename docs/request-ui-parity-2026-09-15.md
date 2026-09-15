@@ -21,7 +21,7 @@ Primary dirty workspace preserved. Root is sole publisher.
 - Root 32 Chrome/WebKit status/conflict/fulfillment checks, 4 clipboard-success/denial checks; follow-up22 checks including nested closed/open arrow orientation. Initial SSR test harness issue corrected to actual TypeScript-transpiled React; initial missing CSS before build rerun successfully.
 - Step1 14 focused checks plus6 real Next-server 62-product/resume/mobile/wide checks; TypeScript/lint pass.
 - Step2 final webpack153 routes, TypeScript/lint pass;30 Chrome/WebKit UI/regression checks and70 choice/match/CAS/comparison checks pass.
-- Combined final build and tests required before publishing; postpublication authenticated read-only real-page checks required. Do not classify local sample screenshots as live.
+- Combined final webpack production build153 routes PASS,72 Chrome/WebKit focused tests PASS on the exact compiled candidate served locally at3118,23 release tests PASS,10 deployment guards PASS. An initial combined run mistakenly targeted older local3104 and overlapped CSS generation; rerun against completed candidate3118 passed all72. Postpublication authenticated read-only real-page checks required. Do not classify local sample screenshots as live.
 
 ## Boundaries and deferred work
 
