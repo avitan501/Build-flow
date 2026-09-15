@@ -6,6 +6,7 @@ import { PDFDocument } from "npm:pdf-lib@1.17.1"
 import { materialPageRanges, materialChunkInstruction, nextMissingMaterialChunk, MAX_MATERIAL_CHUNKS, claimMaterialEvidence } from "./chunk-plan.ts"
 
 import { attachmentMimeType, canAddMaterialListAttachment, materialListAttachmentCandidates } from "./attachment-input.ts"
+import { materialCoverageLabel } from "./material-list-normalization.ts"
 import { dimensionalLumberNeedsType, fastenerNeedsLength, findExplicitQuantityUnitEvidence, findStructuredMaterialSource, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedMeasurementReasons, removeResolvedQuantityUnitReasons, resolveMaterialQuantityUnit, verifiedThickness } from "./material-list-normalization.ts"
 import { mergeSemanticallyEquivalentMaterialItems } from "./semantic-merge.ts"
 import { completedMaterialListOutput, validMaterialListOutput, MaterialListFailure, materialListFailureCode, materialListDatabaseFailure } from "../_shared/material-list-failure.ts"
@@ -183,7 +184,7 @@ const AI_ATTRIBUTE_FIELDS = {
   product_type: { id: "type", label: "Type / material", metadataKey: "product_type" },
   finish: { id: "finish", label: "Finish", metadataKey: "finish" },
   packaging: { id: "packaging", label: "Packaging", metadataKey: "packaging" },
-  coverage: { id: "coverage", label: "Coverage / pack", metadataKey: "coverage" },
+  coverage: { id: "coverage", label: materialCoverageLabel(), metadataKey: "coverage" },
   grade: { id: "grade", label: "Grade", metadataKey: "grade" },
   shipping: { id: "shipping", label: "Shipping / delivery", metadataKey: "shipping" },
   delivery_address: { id: "delivery-address", label: "Delivery address", metadataKey: "delivery_address" },

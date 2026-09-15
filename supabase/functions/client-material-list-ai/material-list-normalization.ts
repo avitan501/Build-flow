@@ -1,5 +1,10 @@
 const UNIT_SOURCE = String.raw`square\s*(?:feet|foot)|sq\.?\s*ft\.?|sq\.?|linear\s*(?:feet|foot)|sheets?|pcs?|pieces?|box(?:es)?|bags?|rolls?|bundles?|squares?|panels?|cartons?|gallons?|pails?|buckets?|tubes?|packs?|cases?|boards?|lengths?|pairs?|sets?|coils?|spools?|each|ea|lf`
 
+/** An extraction key does not establish a packaging denominator. */
+export function materialCoverageLabel() {
+  return "Source coverage (unverified)"
+}
+
 export type DetectedQuantityUnit = {
   quantity: number
   unit: string
