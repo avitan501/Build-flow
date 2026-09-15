@@ -44,9 +44,14 @@ export function draftSourcesEqual(a: unknown, b: unknown): boolean {
 }
 
 /** Draft storage intentionally accepts incomplete numbers; publishing does not. */
+export const validClientQuoteNumber = (raw: string) => raw.trim() !== "" && Number.isFinite(Number(raw)) && Number(raw) >= 0
+
+export function completeClientQuotePricing(draft: ClientQuoteDraft) {
+  return Boolean(validClientQuoteNumber(draft.tax) && Number(draft.tax) <= 100
+    && (draft.delivery.trim() === "" || validClientQuoteNumber(draft.delivery)) && Object.keys(draft.prices).length
+    && Object.values(draft.prices).every(price => validClientQuoteNumber(price.clientUnitPrice) && validClientQuoteNumber(price.markupPercent)))
+}
+
 export function completeClientQuoteDraft(draft: ClientQuoteDraft) {
-  const valid = (raw: string) => raw.trim() !== "" && Number.isFinite(Number(raw)) && Number(raw) >= 0
-  return Boolean(draft.clientId && draft.quoteNumber.trim().length >= 3 && valid(draft.tax) && Number(draft.tax) <= 100
-    && (draft.delivery.trim() === "" || valid(draft.delivery)) && Object.keys(draft.prices).length
-    && Object.values(draft.prices).every(price => valid(price.clientUnitPrice) && valid(price.markupPercent)))
+  return Boolean(draft.clientId && draft.quoteNumber.trim().length >= 3 && completeClientQuotePricing(draft))
 }

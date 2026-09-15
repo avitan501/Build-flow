@@ -136,6 +136,50 @@ for (const raw of ["", "-1"]) test(`mixed draft summary hides inferred totals fo
   expect(await page.evaluate(() => (window as any).calls.some((call: any) => ["prepare", "claim", "send"].includes(call.kind)))).toBe(false);
 });
 
+test("pricing remains visible without quote identity and explicit zero displays actual loss", async ({ page }) => {
+  await mount(page);
+  const summary = page.getByLabel("Quote pricing summary");
+  await page.getByLabel("Quote number", { exact: true }).fill("");
+  await expect(summary).toContainText("$43.55");
+  await expect(summary).not.toContainText("Draft incomplete");
+  await expect(page.getByRole("button", { name: "Prepare quote", exact: true })).toBeDisabled();
+  const row = page.getByRole("row").filter({ hasText: "Valve" });
+  await row.getByRole("spinbutton").nth(1).fill("0");
+  await expect(summary).not.toContainText("Draft incomplete");
+  await expect(summary).toContainText("$0.00");
+  await expect(row.locator("td").last()).toContainText("24.00");
+  await expect(row.locator("td").last()).toHaveClass(/text-rose-700/);
+});
+
+test("invalid tax or delivery hides totals and an already-open preview; invalid bulk apply cannot overwrite prices", async ({ page }) => {
+  await mount(page);
+  const summary = page.getByLabel("Quote pricing summary");
+  await page.getByRole("button", { name: "Preview client copy", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByLabel("Sales tax %", { exact: true }).fill("101", { force: true });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  for (const value of ["", "-1", "101"]) {
+    await page.getByLabel("Sales tax %", { exact: true }).fill(value);
+    await expect(summary).toContainText("Draft incomplete");
+  }
+  await page.getByLabel("Sales tax %", { exact: true }).fill("8.875");
+  // A valid draft may resume its preview; close it before further normal editing.
+  await page.getByRole("button", { name: "Close quote preview", exact: true }).click();
+  await page.getByLabel("Client delivery charge", { exact: true }).fill("-1");
+  await expect(summary).toContainText("Draft incomplete");
+  await page.getByLabel("Client delivery charge", { exact: true }).fill("");
+  await expect(summary).toContainText("$43.55");
+  const price = page.getByRole("row").filter({ hasText: "Valve" }).getByRole("spinbutton").nth(1);
+  for (const value of ["", "-1"]) {
+    await page.getByLabel("Markup for all").fill(value);
+    await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeDisabled();
+    await expect(price).toHaveValue("20");
+  }
+  await page.getByLabel("Markup for all").fill("0");
+  await expect(page.getByRole("button", { name: "Apply", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).calls.some((call: any) => ["prepare", "claim", "send"].includes(call.kind)))).toBe(false);
+});
+
 test("new typing during save is queued with the acknowledged revision; refresh never erases it", async ({ page }) => {
   await mount(page);
   await page.evaluate(() => { (window as any).hold = true; });

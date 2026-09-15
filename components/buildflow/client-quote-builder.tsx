@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { loadClientQuoteDraftAction, prepareClientQuoteDraftAction, saveClientQuoteDraftAction } from "@/app/admin/quote-comparison/client-draft-actions";
-import { completeClientQuoteDraft, draftSourcesEqual, type ClientQuoteDraft, type ClientQuoteDraftEnvelope } from "@/lib/client-quote-draft";
+import { completeClientQuoteDraft, completeClientQuotePricing, validClientQuoteNumber, draftSourcesEqual, type ClientQuoteDraft, type ClientQuoteDraftEnvelope } from "@/lib/client-quote-draft";
 import { useQuoteAutosave } from "@/hooks/use-quote-autosave";
 
 import {
@@ -256,7 +256,7 @@ function ClientQuoteEditor({
   );
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
   const draftComplete = completeClientQuoteDraft(snapshot) && Object.keys(priceDrafts).length === items.length && items.every(item => Boolean(priceDrafts[item.id]));
-  const incompleteDraftSummary = Boolean(draftEnvelope && (!draftComplete || !summary.complete));
+  const incompleteDraftSummary = Boolean(draftEnvelope && (!completeClientQuotePricing(snapshot) || Object.keys(priceDrafts).length !== items.length || !items.every(item => Boolean(priceDrafts[item.id])) || !summary.complete));
   const lockedMixedQuote = Boolean(procurementRoute && (procurementRoute.client_send_started_at || ["sent", "accepted"].includes(clientQuoteStatus)));
   const canPreview = Boolean(selectedClient && (selectedBid || procurementRoute) && (!routeError || lockedMixedQuote || draftEnvelope?.locked) && summary.complete && draftComplete);
   const canPrepare = canPreview && !lockedMixedQuote && !draftEnvelope?.locked;
@@ -292,6 +292,7 @@ function ClientQuoteEditor({
   }
 
   function applyMarkupToAll() {
+    if (!validClientQuoteNumber(bulkMarkup)) return;
     const markup = nonNegativeNumber(bulkMarkup);
     const next: Record<string, PriceDraft> = {};
     for (const item of items) {
@@ -552,7 +553,7 @@ function ClientQuoteEditor({
             <div><p className="text-sm font-bold">Pricing from {procurementRoute ? procurementRoute.suppliers.map((supplier) => supplier.supplier_name).join(" + ") : selectedBid?.supplier_name_snapshot}</p><p className="mt-1 text-xs text-slate-500">{routeError || "Set a markup or type the final client unit price. Both fields stay synchronized."}</p></div>
             <div className="flex items-end gap-2">
               <label className="grid gap-1 text-xs font-bold text-slate-600">Markup for all<div className="relative"><input type="number" min="0" step="0.1" value={bulkMarkup} onChange={(event) => setBulkMarkup(event.target.value)} placeholder="15" className="min-h-10 w-28 rounded-lg border border-slate-300 pr-8 pl-3 text-right text-sm font-bold" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span></div></label>
-              <button type="button" onClick={applyMarkupToAll} disabled={!bulkMarkup} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold disabled:opacity-40">Apply</button>
+              <button type="button" onClick={applyMarkupToAll} disabled={!validClientQuoteNumber(bulkMarkup)} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold disabled:opacity-40">Apply</button>
             </div>
           </div>
 
@@ -561,19 +562,20 @@ function ClientQuoteEditor({
               <thead><tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500"><th className="px-5 py-3 sm:px-6">Material</th><th className="px-4 py-3 text-right">Supplier cost</th><th className="px-4 py-3 text-right">Markup</th><th className="px-4 py-3 text-right">Client unit price</th><th className="px-5 py-3 text-right sm:px-6">Line profit</th></tr></thead>
               <tbody>{summary.lines.map((line) => {
                 const draft = priceDrafts[line.itemId] ?? { markupPercent: "", clientUnitPrice: "" };
+                const incompleteLine = Boolean(draftEnvelope && (!validClientQuoteNumber(draft.clientUnitPrice) || !validClientQuoteNumber(draft.markupPercent) || line.supplierUnitCost === null));
                 return <tr key={line.itemId} className="border-b border-slate-100 last:border-b-0">
                   <th className="px-5 py-3 sm:px-6"><p className="text-sm font-bold">{line.description}</p><p className="mt-1 text-xs font-medium text-slate-500">{line.quantity.toLocaleString()} {line.unit}{line.specification ? ` · ${line.specification}` : ""}</p></th>
                   <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-500">{line.supplierUnitCost === null ? "Missing" : formatComparisonMoney(line.supplierUnitCost)}</td>
                   <td className="px-4 py-3"><div className="relative ml-auto w-28"><input type="number" min="0" step="0.1" value={draft.markupPercent} onChange={(event) => updateMarkup(line.itemId, event.target.value)} disabled={line.supplierUnitCost === null} className="min-h-10 w-full rounded-lg border border-slate-300 pr-8 pl-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span></div></td>
                   <td className="px-4 py-3"><div className="relative ml-auto w-32"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span><input type="number" min="0" step="0.01" value={draft.clientUnitPrice} onChange={(event) => updateClientPrice(line.itemId, event.target.value)} disabled={line.supplierUnitCost === null} className="min-h-10 w-full rounded-lg border border-slate-300 pl-7 pr-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></div></td>
-                  <td className={`px-5 py-3 text-right text-sm font-bold tabular-nums sm:px-6 ${incompleteDraftSummary ? "text-slate-500" : profitTone(line.profit)}`}>{incompleteDraftSummary ? "—" : formatComparisonMoney(line.profit)}</td>
+                  <td className={`px-5 py-3 text-right text-sm font-bold tabular-nums sm:px-6 ${incompleteLine ? "text-slate-500" : profitTone(line.profit)}`}>{incompleteLine ? "—" : formatComparisonMoney(line.profit)}</td>
                 </tr>;
               })}</tbody>
             </table>
           </div>
 
           <div aria-label="Quote pricing summary" className="grid gap-3 border-y border-slate-200 bg-[#f5f5f7] p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
-            {incompleteDraftSummary ? <p role="status" className="text-sm font-semibold text-amber-800 sm:col-span-2 xl:col-span-4">Draft incomplete · Complete the quote details to calculate totals and profit.</p> : null}
+            {incompleteDraftSummary ? <p role="status" className="text-sm font-semibold text-amber-800 sm:col-span-2 xl:col-span-4">Draft incomplete · Complete pricing to calculate totals and profit.</p> : null}
             <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Supplier landed cost</p><p className="mt-1 text-lg font-bold tabular-nums">{formatComparisonMoney(summary.supplierLandedCost)}</p></div>
             <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Client quote total</p><p className="mt-1 text-lg font-bold tabular-nums">{incompleteDraftSummary ? "Incomplete" : formatComparisonMoney(summary.clientTotal)}</p></div>
             <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Private profit</p><p className={`mt-1 text-lg font-bold tabular-nums ${incompleteDraftSummary ? "text-slate-500" : profitTone(summary.profit)}`}>{incompleteDraftSummary ? "—" : formatComparisonMoney(summary.profit)}</p></div>
