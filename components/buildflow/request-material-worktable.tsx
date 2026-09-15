@@ -188,6 +188,11 @@ export function RequestMaterialWorktable({
     ? sourceItems.filter((item) => !isRawFreeTextContainer(item))
     : sourceItems
   const aiCoversEverySource = comparisonSources.every((item) => representedSourceIds.has(item.id))
+  // Only a known successful, unchanged source may start collapsed. Unknown,
+  // failed, running and changed-source states retain their visible recovery UI.
+  const compactOriginal = organizationStatus === "organized" && aiItems.length > 0 && aiCoversEverySource
+    && !sourceItems.some((item) => item.metadata?.ai_organization_status && item.metadata.ai_organization_status !== "organized")
+  const OriginalSourceContainer = compactOriginal ? "details" : "div"
   const items = aiItems.length
     ? [...aiItems, ...originalItems.filter((item) => !representedSourceIds.has(item.id) && !isRawFreeTextContainer(item))]
     : originalItems.filter((item) => !isRawFreeTextContainer(item))
@@ -367,11 +372,12 @@ export function RequestMaterialWorktable({
       </div>
 
 
-      {rawDraft ? <div data-testid="original-request-draft" className="border-b border-slate-200 bg-slate-50/70 px-3 py-3 sm:px-4">
+      {rawDraft ? <OriginalSourceContainer key={compactOriginal ? "compact-original" : "visible-original"} data-testid="original-request-draft" className="border-b border-slate-200 bg-slate-50/70 px-3 py-3 sm:px-4">
+        {compactOriginal ? <summary className="min-h-11 cursor-pointer text-xs font-bold text-slate-600 focus-visible:outline-2 focus-visible:outline-sky-600">Original request{attachments.length ? ` · ${attachments.length} ${attachments.length === 1 ? "file" : "files"}` : ""}</summary> : null}
         <div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-slate-500">Original list</p><span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${draftChanged ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{draftChanged ? "AI needs refresh" : "Saved"}</span></div><p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-slate-700">{rawDraftText || "The request is in the attached photo or document."}</p></div><OriginalRequestItemEditor actorId={actorId} requestId={requestId} item={rawDraft} buttonLabel="Edit original" /></div>
         {attachments.length ? <div className="mt-2 flex max-w-full gap-1.5 overflow-x-auto pb-0.5" aria-label="Request photos and documents">{attachments.slice(0, 4).map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="max-w-44 shrink-0 truncate rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="max-w-44 shrink-0 truncate rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-500">{file.file_name}</span>)}</div> : null}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">{organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : !aiItems.length || draftChanged || organizationStatus === "failed" ? <><p className="text-xs text-slate-600">{organizationStatus === "failed" ? "Your original is safe. Splitting did not finish." : "Split into products, quantities and sizes."}</p><OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} compact /></> : <p className="text-xs font-semibold text-emerald-700">{aiItems.length} products extracted</p>}</div>
-      </div> : null}
+      </OriginalSourceContainer> : null}
 
       {!rawDraft && sourceItems.length ? <details className="group border-b border-slate-200 bg-slate-50/70">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 sm:px-4"><div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-slate-500">Original list · {sourceItems.length} items</p><p className="truncate text-[10px] text-slate-500">Open to compare with the AI-organized version.</p></div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" /></summary>

@@ -89,7 +89,6 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
   return <div className="@container w-full p-3 sm:p-4" data-testid="request-item-review-list">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <div><h3 className="text-sm font-bold text-slate-900">Review your list</h3><p className="text-xs text-slate-500">{products.length} products{needsAttention.length ? ` · ${needsAttention.length} need details` : ""}</p></div>
-      <button type="button" disabled={pending || !needsAttention.length} onClick={() => { const id = nextUnresolvedItem(products.map(({ item }) => item), selectedId); if (id) openProduct(id) }} className="min-h-11 rounded-lg border border-amber-200 px-3 text-xs font-bold text-amber-900 disabled:opacity-40">Next unresolved</button>
     </div>
     <div className="grid items-start gap-4 @3xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]">
       <div className="order-2 min-w-0 overflow-hidden rounded-xl border border-slate-200 @3xl:order-1" aria-label="Request products">
@@ -110,7 +109,6 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
             {activeChoice ? <div className="mt-3 rounded-lg bg-amber-50 p-3">
               <label className="grid gap-2 text-sm font-bold text-amber-950">{activeChoice.label}<select key={`${shown.revision}:${activeChoice.field}`} aria-label={activeChoice.label} defaultValue="" disabled={pending} onFocus={() => setField(activeChoice.field)} onChange={(event) => { setField(activeChoice.field); save(activeChoice.field, event.target.value) }} className="min-h-11 w-full rounded-lg border border-amber-300 bg-white px-2 text-sm text-slate-950"><option value="" disabled>Choose…</option>{activeChoice.options.filter((option) => option.value !== "Other / confirm").map((option) => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>
               {choices.length > 1 ? <button type="button" disabled={pending} onClick={() => setField(choices[(choices.indexOf(activeChoice) + 1) % choices.length].field)} className="mt-1 min-h-11 text-xs font-bold text-amber-900">Next question · {choices.length} remaining</button> : null}
-              <button type="button" disabled={pending} onClick={() => { const id = nextUnresolvedItem(products.map(({ item }) => item), selectedId); if (id) openProduct(id) }} className="min-h-11 text-xs font-semibold text-slate-600">Leave unresolved for now</button>
             </div> : <p className="mt-3 text-xs text-slate-600">{materialReviewReasons(shown.item).join(" · ") || "No missing details flagged."}</p>}
             <div className="mt-2 flex items-center justify-between gap-2"><p role="status" className="text-xs text-slate-600">{pending ? "Saving…" : feedback || (shown.item.metadata?.ai_organized === true ? "Answers save automatically" : "Edits save automatically")}</p>{receipt && shown.item.metadata?.ai_organized === true ? <button type="button" disabled={pending} onClick={() => save(undefined, undefined, true)} className="min-h-11 px-2 text-xs font-bold text-[#0066cc]">Undo edit</button> : null}</div>
             <OriginalRequestItemEditor actorId={actorId} requestId={requestId} item={shown.item} itemKind={shown.item.metadata?.ai_organized === true ? "organized" : "original"} revision={shown.revision} onReviewedSave={(result) => { setReviewed({ item: result.item, source: result.source, revision: result.revision }); setReceipt(result.receiptId); setFeedback("Saved") }} onOriginalSaved={() => { setReviewed(null); setBaselineRevision(null); setLatest(null); setReceipt(null); setFeedback("Saved"); }} buttonLabel="Edit details" />
@@ -122,6 +120,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
           </>}
           {shown.source ? <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2"><summary className="min-h-9 cursor-pointer text-xs font-bold text-slate-600">Original source</summary><p className="max-h-56 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-700">{String(shown.source.metadata?.request_details || shown.source.name)}</p></details> : null}
         </> : <p className="py-3 text-xs text-slate-500">Select a product to review its details.</p>}
+        {needsAttention.length ? <button type="button" disabled={pending} onClick={() => { const id = nextUnresolvedItem(products.map(({ item }) => item), selectedId); if (id) openProduct(id) }} className="mt-2 min-h-11 rounded-lg border border-amber-200 px-3 text-xs font-bold text-amber-900 disabled:opacity-40">Next item needing details</button> : <p className="mt-2 text-xs text-slate-500">No missing details flagged in this list.</p>}
       </div>
     </div>
   </div>
