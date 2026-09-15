@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import { safeMaterialListFailure } from "../_shared/material-list-failure.ts"
+import { materialListMaintenanceResponse, materialListProcessingAllowed } from "../_shared/material-list-maintenance.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -122,6 +123,7 @@ async function runJob(job: MaterialListJob) {
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
   if (!await authorized(request)) return json({ error: "Unauthorized" }, 401)
+  if (!materialListProcessingAllowed()) return materialListMaintenanceResponse()
 
   let body: { action?: unknown }
   try {

@@ -273,9 +273,12 @@ async function updateSources(sources: SourceItem[], state: Record<string, unknow
   await Promise.all(sources.map((source) => updateSource(source, state)))
 }
 
+import { materialListMaintenanceResponse, materialListProcessingAllowed } from "../_shared/material-list-maintenance.ts"
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405)
   if (!await authorized(request)) return json({ error: "Staff authorization required" }, 401)
+  if (!materialListProcessingAllowed()) return materialListMaintenanceResponse()
 
   let apiKey: string | null
   try { apiKey = await openAiKey() } catch {

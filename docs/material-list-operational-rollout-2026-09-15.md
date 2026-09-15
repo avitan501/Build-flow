@@ -1,0 +1,29 @@
+# Document AI: operational gate and bounded drain
+
+Bridge base: verified app `1efac76a`; live Edge AI v23 / worker v3 / public intake v27 were fetched read-only and compared with that base (identical source, ignoring a capture-added terminal newline). Preserve verify_jwt: AI true, worker false, public intake false. No provider invocation or production mutation was performed while developing this bridge.
+
+## Gate contract
+
+`MATERIAL_LIST_PROCESSING_MODE` must equal exactly `active` to process. Missing, `paused`, or any other value fails closed. Shared gate runs after authorization but before AI key lookup/source writes/provider calls and before the worker claims a job. Paused calls return HTTP503 with `X-Material-List-Gate: maintenance-v1` and status `maintenance`. Never use an actual request to probe an unverified ungated endpoint.
+
+Public intake still saves the request and uses the existing durable enqueue RPC. During maintenance it skips the worker nudge. HTTP/network enqueue failure returns `organization.queued:false` plus a truthful saved-but-not-started message; it does not roll back the saved request or invoke direct AI. Worker nudge failure leaves the existing queued job intact. The normal existing intake email behavior is unchanged: do not submit a real intake as a maintenance probe.
+
+## Serialized production procedure (root only)
+
+1. Independently verify production ref `nprfhspwdflpqlopydmp`, latest app SHA and the three actual Edge versions. Record current job IDs/generation/status/attempts and cron identity. Do not delete/reset any job, source or checkpoint.
+2. Set the non-secret processing mode to `paused`, then deploy this **legacy-compatible bridge** for AI, worker and public intake with their existing JWT configuration. It does not require checkpoint SQL. Temporarily disable only the material-list dispatch cron if desired; the gate, not cron alone, prevents web-triggered claims/direct invocations.
+3. Confirm each deployed source/version includes the exact gate/queue helper. Probe worker and AI with an authorized **empty/synthetic body**, only after verifying their gated source: expect503 + maintenance header before body/work. This is not an extraction/provider test. Record UTC time after all bridge deployments/probes are confirmed; do not infer that deployment instantly killed an old invocation.
+4. Drain conservatively for **at least 420 seconds** after that confirmation or the last observed old-version invocation, whichever is later. Supabase documents hosted worker wall-clock maximum150s free /400s paid, covering background tasks. The legacy worker's120s fetch abort is NOT proof that the downstream AI terminated. Inspect function version logs across the window and wait for any outstanding database writer/transaction affecting request/jobs tables to finish. If a delayed old-version invocation appears, restart the window. If hosted custom limits exceed400s, use the verified higher limit plus margin instead. Keep the gate paused throughout. No active old writer is allowed at the migration boundary.
+5. Record zero active processing invocation/DB writer evidence and queued/processing counts. A durable `processing` label alone can be stale after a killed worker: do not manually mark it complete or spend another attempt merely to clear the label. The claim lease/recovery logic must resolve it after rollout. Apply only the reviewed checkpoint migration at its exact hash, then deploy reviewed full AI + worker with the **same paused gate**. Public intake remains queue-only. Re-probe both functions: maintenance, no claims/source changes/provider calls.
+6. Verify migration/RPC grants under the production service_role restriction (no auth.users SELECT/private USAGE), exact Edge source versions and remaining queued jobs. Root reconciles the real62-row source and separately authorizes the supervised extraction proof before declaring ready.
+7. Set mode=`active` only after those gates; restore only the previously enabled material-list cron. Perform the bounded supervised source run, monitor generation/lease/checkpoints and compare the62-row manifest. Do not force-reprocess reviewed/routed/priced records. Failures preserve checkpoints and source; close gate before investigating any unexpected mutation.
+
+## Rollback / limitations
+
+Safe rollback is close processing gate, drain using the same rule, and preserve current data/checkpoints. Do not restore the pre-checkpoint writer after the checkpoint schema is live: it lacks publication/source fences. Gate deployment alone cannot prove old instances drained; recorded wall-clock + actual version/DB-writer observations are required. Provider-side in-flight compute may finish after caller shutdown, but it cannot publish through a dead Edge instance; database work already submitted still needs its own drain check.
+
+Official limits: https://supabase.com/docs/guides/functions/limits ; background lifecycle: https://supabase.com/docs/guides/functions/background-tasks (checked2026-09-15). Changelog reviewed; use current logs API, not the deprecated `logs.all` endpoint.
+
+## Local verification
+
+`node --test tests/material-list-maintenance.test.mjs` exercises actual gated handler bodies with mocked auth/provider/DB calls and queue success/failure/nudge behavior. No network/provider is used. Cached Deno check covers all3 Edge entrypoints. Full AI checkpoint tests/rehearsal remain a separate integrated candidate gate.
