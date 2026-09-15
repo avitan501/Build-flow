@@ -151,7 +151,7 @@ export function QuoteComparisonWorkspace({
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
-  const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => procurementRoute && !routeError ? 4 : items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
+  const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => procurementRoute && !routeError ? 4 : items.length === 0 ? 1 : bids.length === 0 && receivedSupplierQuotes.length === 0 ? 2 : 0);
   const [finalizeKey] = useState(() => crypto.randomUUID());
   const [productSelections, setProductSelections] = useState<Record<string, string>>(procurementRoute ? Object.fromEntries(procurementRoute.items.map((item) => [item.item_id, item.bid_id])) : initialProductSelections);
   const [choiceSourceReviewed, setChoiceSourceReviewed] = useState(!productChoiceWarning);
