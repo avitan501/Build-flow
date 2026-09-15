@@ -8,6 +8,7 @@ import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 import { productChoiceFingerprint, restoreProductChoices, type ProductChoiceDraftColumns } from "@/lib/product-choice-draft";
 import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
+import type { ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -62,6 +63,11 @@ export default async function QuoteComparisonDetailPage({
   const choiceFingerprint = await productChoiceFingerprint(itemsResult.data ?? [], bidsResult.data ?? []);
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
   const finalized = await loadFinalizedProcurementRoute(supabase, comparisonId, comparisonResult.data.active_route_id);
+  const receivedQuotes = await supabase.from("supplier_quotes")
+    .select("id,supplier_name,file_name,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total)")
+    .eq("comparison_id", comparisonId).order("created_at")
+    .returns<Array<{ id: string; supplier_name: string; file_name: string; supplier_quote_items: ReceivedSupplierQuoteLine[] }>>();
+  if (receivedQuotes.error) throw new Error("Could not load received supplier quotes.");
 
   const requestClientQuoteSourcesResult = comparisonResult.data.request_id
     ? await supabase
@@ -100,6 +106,7 @@ export default async function QuoteComparisonDetailPage({
       routeError={finalized.error}
       items={itemsResult.data ?? []}
       bids={bidsResult.data ?? []}
+      receivedSupplierQuotes={(receivedQuotes.data ?? []).map(quote => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, sourceItems: quote.supplier_quote_items ?? [], inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
       suppliers={suppliers}
       projects={projectsResult.data ?? []}
       departments={departments}

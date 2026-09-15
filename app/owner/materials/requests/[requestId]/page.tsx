@@ -94,6 +94,7 @@ type LinkedSupplierQuote = {
   file_path: string;
   supplier_name: string;
   status: string;
+  supplier_quote_items: import("@/components/buildflow/received-supplier-quote-table").ReceivedSupplierQuoteLine[];
 };
 type ComparisonRecord = Pick<
   QuoteComparisonRecord,
@@ -360,7 +361,7 @@ export default async function OwnerMaterialRequestPage({
           .returns<QuoteComparisonBidRecord[]>(),
         supabase
           .from("supplier_quotes")
-          .select("id,comparison_id,supplier_id,supplier_name,status,quote_number,quote_date,file_name,file_path")
+          .select("id,comparison_id,supplier_id,supplier_name,status,quote_number,quote_date,file_name,file_path,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total)")
           .in("comparison_id", comparisonIds)
           .returns<LinkedSupplierQuote[]>(),
       ])
@@ -517,6 +518,7 @@ export default async function OwnerMaterialRequestPage({
         sourceUrl: document.sourceUrl,
         supplierName: document.supplier_name,
         reviewStatus: document.status,
+        sourceItems: document.supplier_quote_items ?? [],
       })),
     };
   });

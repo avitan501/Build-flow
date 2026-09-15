@@ -1,4 +1,5 @@
 "use client";
+import { ReceivedSupplierQuoteTable } from "@/components/buildflow/received-supplier-quote-table";
 
 import {
   Archive,
@@ -115,6 +116,7 @@ export function QuoteComparisonWorkspace({
   clients,
   clientQuoteAttachments,
   requestClientQuoteSources = [],
+  receivedSupplierQuotes = [],
   previewMode = false,
   choiceActorId = "sample",
   initialProductSelections = {},
@@ -133,6 +135,7 @@ export function QuoteComparisonWorkspace({
   clients: QuoteClientOption[];
   clientQuoteAttachments: ClientQuoteAttachmentRecord[];
   requestClientQuoteSources?: RequestClientQuoteSource[];
+  receivedSupplierQuotes?: import("@/components/buildflow/received-supplier-quote-table").ReceivedSupplierQuote[];
   previewMode?: boolean;
   choiceActorId?: string;
   initialProductSelections?: Record<string, string>;
@@ -508,6 +511,7 @@ export function QuoteComparisonWorkspace({
 
         {error ? <div role="alert" className="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div> : null}
         {message ? <div role="status" className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">{message}</div> : null}
+        {activeStep === 0 ? <ReceivedSupplierQuoteTable quotes={receivedSupplierQuotes} /> : null}
         {previewMode && activeStep !== 0 ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 

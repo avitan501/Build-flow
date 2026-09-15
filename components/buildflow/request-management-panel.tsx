@@ -30,6 +30,7 @@ import { requestPaymentGuidanceForMethod, type RequestPaymentMethod } from "@/li
 import type { RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps"
 import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestStoredQuoteCount } from "@/lib/request-stored-quote-count"
+import { ReceivedSupplierQuoteTable, type ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
@@ -50,7 +51,7 @@ export type RequestComparisonSummary = {
   quoteNumber: string
   updatedAt: string
   bids: Array<{ id: string; sourceQuoteId?: string | null; supplierId: string; supplierName: string; landedTotal: number; pricedItemCount: number; unavailableItemCount: number; itemCount: number; recommended: boolean; items: Array<{ id: string; sourceRequestItemId: string | null; name: string; status: "quoted" | "unavailable" | "waiting" }> }>
-  documents: Array<{ id: string; supplierId: string | null; fileName: string; sourceUrl: string | null; supplierName?: string; reviewStatus?: string }>
+  documents: Array<{ id: string; supplierId: string | null; fileName: string; sourceUrl: string | null; supplierName?: string; reviewStatus?: string; sourceItems?: ReceivedSupplierQuoteLine[] }>
 }
 export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
 export type RequestClientDocumentSnapshot = {
@@ -1042,7 +1043,7 @@ export function RequestManagementPanel({
         </>} />
         <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
           <div className="mb-3">{renderStep2PrimaryAction()}</div>
-          {comparisons.some(comparison => comparison.documents.length) ? <div className="mb-3 grid gap-2" aria-label="Received supplier quotes">{comparisons.flatMap(comparison => comparison.documents).map(document => <div key={document.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3"><div className="min-w-0 flex-1"><p className="text-xs font-bold text-[#12263f]">{document.supplierName || document.fileName}</p><p className="truncate text-[10px] text-slate-500">{document.fileName}</p><span className="text-[10px] font-semibold text-amber-800">{document.reviewStatus === "routed" ? "In comparison" : "Needs review"}</span></div><a href={`/admin/supplier-quotes/${document.id}`} className="inline-flex min-h-10 items-center rounded-lg border border-sky-200 px-3 text-xs font-bold text-[#0066cc]">Review quote</a>{document.sourceUrl ? <a href={document.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center px-2 text-[10px] font-bold text-[#0066cc]">Original</a> : null}</div>)}</div> : null}
+          <ReceivedSupplierQuoteTable quotes={comparisons.flatMap(comparison => comparison.documents.map(document => ({ ...document, inComparison: comparison.bids.some(bid => bid.sourceQuoteId === document.id) })))} />
           {supplierRouting}
           {supplierRequestFiles.length ? <details className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60">
             <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-black text-[#12263f] [&::-webkit-details-marker]:hidden">

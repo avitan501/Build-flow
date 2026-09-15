@@ -335,6 +335,7 @@ async function ensureClientRequestComparison(input: {
   clientName: string;
   clientEmail: string;
   fallbackDepartment: string;
+  synchronizeExistingItems?: boolean;
 }) {
   const existing = await input.supabase
     .from("quote_comparisons")
@@ -387,11 +388,13 @@ async function ensureClientRequestComparison(input: {
   const comparisonItems = effectiveRequestComparisonItems(requestItems ?? []);
   if (!comparisonItems.length) throw new Error("request_items_not_ready");
   if (existing.data) {
-    await synchronizeDraftComparisonItems({
-      supabase: input.supabase,
-      comparisonId: existing.data.id,
-      requestItems: requestItems ?? [],
-    });
+    if (input.synchronizeExistingItems !== false) {
+      await synchronizeDraftComparisonItems({
+        supabase: input.supabase,
+        comparisonId: existing.data.id,
+        requestItems: requestItems ?? [],
+      });
+    }
     return { comparisonId: existing.data.id, created: false };
   }
   const department = normalizeMaterialCatalogDepartment(
@@ -682,6 +685,8 @@ export async function uploadSupplierQuoteAction(
         clientName,
         clientEmail: clean(client.email, 320),
         fallbackDepartment: department,
+        // Receiving a document must not rewrite existing comparison rows.
+        synchronizeExistingItems: false,
       });
       comparisonId = comparison.comparisonId;
       createdComparison = comparison.created;
@@ -912,6 +917,8 @@ export async function uploadSupplierQuoteAction(
   }
 
   revalidatePath("/admin/supplier-quotes");
+  if (requestId) revalidatePath(`/owner/materials/requests/${requestId}`);
+  if (comparisonId) revalidatePath(`/admin/quote-comparison/${comparisonId}`);
   return { ok: true, data: { quoteId }, message: extraction.extractionNote };
 }
 
