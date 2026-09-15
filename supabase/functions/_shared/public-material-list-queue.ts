@@ -1,5 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { materialListProcessingAllowed } from "./material-list-maintenance.ts"
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void }
 
 /** Intake stays successful when extraction cannot queue; never bypass the durable job. */
 export async function queuePublicMaterialList(supabaseUrl: string, serviceRoleKey: string, requestId: string) {
