@@ -5,6 +5,7 @@ import { saveAccountName, type AccountNameResult } from "@/app/account/name-acti
 
 export function AccountNameAutosave({ actorId, initialName, inputClass }: { actorId: string; initialName: string | null; inputClass: string }) {
   const [value, setValue] = useState(initialName || "")
+  const [hydrated, setHydrated] = useState(false)
   const [status, setStatus] = useState("Saves automatically")
   const [failed, setFailed] = useState(false)
   const [conflict, setConflict] = useState<{ name: string | null } | null>(null)
@@ -13,6 +14,9 @@ export function AccountNameAutosave({ actorId, initialName, inputClass }: { acto
 
   useEffect(() => {
     state.current.alive = true
+    // Keep SSR input disabled until its client-side autosave handlers are ready.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHydrated(true)
     const current = state.current
     const warn = (event: BeforeUnloadEvent) => {
       if (current.busy || current.draft.trim() !== (current.saved || "")) { event.preventDefault(); event.returnValue = "" }
@@ -59,9 +63,9 @@ export function AccountNameAutosave({ actorId, initialName, inputClass }: { acto
     timer.current = setTimeout(() => { void flush() }, 650)
   }
 
-  return <div className="grid gap-1.5">
-    <label htmlFor="fullName" className="grid gap-1.5 text-sm font-semibold">Name<input id="fullName" name="fullName" type="text" value={value} onChange={event => edit(event.target.value)} onBlur={() => { void flush() }} placeholder="Full name" autoComplete="name" maxLength={200} aria-describedby="account-name-status" aria-invalid={failed || undefined} className={inputClass} /></label>
-    <p id="account-name-status" role="status" className={`text-xs ${failed ? "text-amber-800" : "text-slate-500"}`}>{status}</p>
+  return <div className="grid gap-1.5" aria-busy={!hydrated}>
+    <label htmlFor="fullName" className="grid gap-1.5 text-sm font-semibold">Name<input id="fullName" name="fullName" type="text" value={value} disabled={!hydrated} onChange={event => edit(event.target.value)} onBlur={() => { void flush() }} placeholder="Full name" autoComplete="name" maxLength={200} aria-describedby="account-name-status" aria-invalid={failed || undefined} className={inputClass} /></label>
+    <p id="account-name-status" role="status" className={`text-xs ${failed ? "text-amber-800" : "text-slate-500"}`}>{hydrated ? status : "Loading name…"}</p>
     {conflict ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs"><p>Saved name: <strong>{conflict.name || "No name"}</strong></p><button type="button" className="min-h-11 font-semibold text-[#0066cc]" onClick={() => { state.current.saved = conflict.name; state.current.draft = conflict.name || ""; state.current.blocked = false; setValue(conflict.name || ""); setConflict(null); setFailed(false); setStatus("Saved name loaded. You can edit it now.") }}>Use saved name</button></div> : failed ? <button type="button" className="min-h-11 justify-self-start text-xs font-semibold text-[#0066cc]" onClick={() => { state.current.blocked = false; void flush() }}>Retry</button> : null}
   </div>
 }

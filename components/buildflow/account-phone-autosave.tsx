@@ -5,6 +5,7 @@ import { saveAccountPhone, type AccountPhoneResult } from "@/app/account/phone-a
 
 export function AccountPhoneAutosave({ actorId, initialPhone, inputClass }: { actorId: string; initialPhone: string | null; inputClass: string }) {
   const [value, setValue] = useState(initialPhone || "")
+  const [hydrated, setHydrated] = useState(false)
   const [status, setStatus] = useState("Saves automatically")
   const [failed, setFailed] = useState(false)
   const [conflict, setConflict] = useState<{ phone: string | null } | null>(null)
@@ -42,6 +43,7 @@ export function AccountPhoneAutosave({ actorId, initialPhone, inputClass }: { ac
         }
       }
     } catch { setStorageWarning(true) }
+    setHydrated(true)
     const warn = (event: BeforeUnloadEvent) => {
       if (current.busy || current.draft.trim() !== (current.saved || "")) { event.preventDefault(); event.returnValue = "" }
     }
@@ -92,9 +94,9 @@ export function AccountPhoneAutosave({ actorId, initialPhone, inputClass }: { ac
     timer.current = setTimeout(() => { void flush() }, 650)
   }
 
-  return <div className="grid gap-1.5">
-    <label htmlFor="phone" className="grid gap-1.5 text-sm font-semibold">Primary phone<input id="phone" name="phone" type="tel" value={value} onChange={event => edit(event.target.value)} onBlur={() => { void flush() }} placeholder="+1 555 123 4567" autoComplete="tel" maxLength={40} aria-describedby="account-phone-status" aria-invalid={failed || undefined} className={inputClass} /></label>
-    <p id="account-phone-status" role="status" className={`text-xs ${failed ? "text-amber-800" : "text-slate-500"}`}>{status}</p>
+  return <div className="grid gap-1.5" aria-busy={!hydrated}>
+    <label htmlFor="phone" className="grid gap-1.5 text-sm font-semibold">Primary phone<input id="phone" name="phone" type="tel" value={value} disabled={!hydrated} onChange={event => edit(event.target.value)} onBlur={() => { void flush() }} placeholder="+1 555 123 4567" autoComplete="tel" maxLength={40} aria-describedby="account-phone-status" aria-invalid={failed || undefined} className={inputClass} /></label>
+    <p id="account-phone-status" role="status" className={`text-xs ${failed ? "text-amber-800" : "text-slate-500"}`}>{hydrated ? status : "Loading phone…"}</p>
     {storageWarning ? <p role="alert" className="text-xs text-amber-800">Draft recovery is unavailable in this browser. Stay on this page until Saved appears.</p> : null}
     {conflict ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs"><p>Saved phone: <strong>{conflict.phone || "No phone"}</strong></p><button type="button" className="min-h-11 font-semibold text-[#0066cc]" onClick={() => { clearDraft(); state.current.recovered = false; state.current.saved = conflict.phone; state.current.draft = conflict.phone || ""; state.current.blocked = false; setValue(conflict.phone || ""); setConflict(null); setFailed(false); setStatus("Saved phone loaded. You can edit it now.") }}>Use saved phone</button></div> : failed ? <button type="button" className="min-h-11 justify-self-start text-xs font-semibold text-[#0066cc]" onClick={() => { state.current.blocked = false; void flush() }}>Retry</button> : null}
   </div>

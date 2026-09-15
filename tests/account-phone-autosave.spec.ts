@@ -4,8 +4,10 @@ import { createRequire } from "node:module"
 import { resolve } from "node:path"
 import ts from "typescript"
 import { normalizePhoneNumber } from "../lib/auth-phone"
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
 
-async function mount(page: Page, initialPhone = "+15165550100") {
+async function mount(page: Page, initialPhone = "+15165550100", hydrate = false) {
   const modules: string[] = [], seen = new Map<string, number>()
   const action = modules.push(`exports.saveAccountPhone=input=>new Promise(resolve=>{window.calls.push(input);window.resolveSave=result=>resolve(result)})`)-1
   function bundle(file: string): number {
@@ -18,12 +20,38 @@ async function mount(page: Page, initialPhone = "+15165550100") {
     return id
   }
   const react=bundle(require.resolve('react')),dom=bundle(require.resolve('react-dom/client')),component=bundle(resolve('components/buildflow/account-phone-autosave.tsx'))
-  await page.route('http://phone.test/',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<meta name="viewport" content="width=device-width"><div id="root"></div>'}))
+  let serverHtml = ''
+  if (hydrate) {
+    const compiled = ts.transpileModule(readFileSync('components/buildflow/account-phone-autosave.tsx','utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText
+    const exports: {AccountPhoneAutosave?: import('react').ComponentType<{actorId:string;initialPhone:string;inputClass:string}>} = {}
+    const nodeRequire = createRequire(resolve('package.json'))
+    new Function('require','exports',compiled)((id:string)=>id==='@/app/account/phone-action'?{}:nodeRequire(id),exports)
+    serverHtml = renderToString(createElement(exports.AccountPhoneAutosave!,{actorId:'actor-a',initialPhone,inputClass:''}))
+  }
+  await page.route('http://phone.test/',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<meta charset="utf-8"><meta name="viewport" content="width=device-width"><div id="root">${serverHtml}</div>`}))
   await page.goto('http://phone.test/')
-  await page.addScriptTag({content:`(()=>{window.calls=[];const process={env:{NODE_ENV:'production'}},modules=[${modules.map(code=>`function(module,exports,require){${code}}`).join(',')}],cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](m,m.exports,require);return m.exports}const R=require(${react}),C=require(${component}),root=require(${dom}).createRoot(document.getElementById('root'));window.showActor=(actor='actor-a')=>root.render(R.createElement(C.AccountPhoneAutosave,{key:actor,actorId:actor,initialPhone:actor==='actor-a'?${JSON.stringify(initialPhone)}:'+15165550200',inputClass:''}));window.showActor()})()`})
+  await page.addScriptTag({content:`(()=>{window.calls=[];const process={env:{NODE_ENV:'production'}},modules=[${modules.map(code=>`function(module,exports,require){${code}}`).join(',')}],cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](m,m.exports,require);return m.exports}const R=require(${react}),C=require(${component});let root;const element=(actor='actor-a')=>R.createElement(C.AccountPhoneAutosave,{key:actor,actorId:actor,initialPhone:actor==='actor-a'?${JSON.stringify(initialPhone)}:'+15165550200',inputClass:''});window.showActor=(actor='actor-a')=>root.render(element(actor));window.startHydration=()=>{root=require(${dom}).hydrateRoot(document.getElementById('root'),element())};${hydrate ? '' : `root=require(${dom}).createRoot(document.getElementById('root'));window.showActor()`}})()`})
 }
 async function finish(page:Page,result:unknown){await page.evaluate(result=>(window as unknown as {resolveSave:(result:unknown)=>void}).resolveSave(result),result)}
 const calls=(page:Page)=>page.evaluate(()=>(window as unknown as {calls:Array<{actorId:string;phone:string;expectedPhone:string|null}>}).calls)
+
+test('server-rendered phone stays disabled until hydration and draft recovery finish',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message))
+  page.on('console',message=>{if(message.type()==='error')errors.push(message.text())})
+  await mount(page,'+15165550100',true)
+  const input=page.getByLabel('Primary phone',{exact:true})
+  await expect(input).toBeDisabled();await expect(page.getByRole('status')).toHaveText('Loading phone…')
+  expect(await input.evaluate(element=>(element as HTMLInputElement).matches(':disabled'))).toBe(true)
+  await page.evaluate(()=>sessionStorage.setItem('avantia:account-phone-draft:actor-a',JSON.stringify({draft:'+15165550109',expectedPhone:'+15165550100'})))
+  await page.evaluate(()=>(window as unknown as {startHydration:()=>void}).startHydration())
+  await expect(input).toBeEnabled();await expect(input).toHaveValue('+15165550109')
+  await expect(page.getByRole('status')).toContainText('restored');expect((await calls(page)).length).toBe(0)
+  await page.getByRole('button',{name:'Retry',exact:true}).click()
+  await expect.poll(async()=>(await calls(page)).length).toBe(1)
+  expect((await calls(page))[0].expectedPhone).toBe('+15165550100')
+  await finish(page,{ok:true,phone:'+15165550109'});await expect(page.getByRole('status')).toHaveText('Saved')
+  expect(errors).toEqual([])
+})
 
 test('debounce and blur save without Save button; late acknowledgement preserves and serializes newer typing',async({page})=>{
   await mount(page);await page.getByLabel('Primary phone',{exact:true}).fill('+15165550101')
