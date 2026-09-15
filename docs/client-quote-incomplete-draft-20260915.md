@@ -41,3 +41,9 @@ The dynamic preservation of installed business validators has unique-replacement
 - Mixed send claim: `d01f2291c394b437dc0c1aa67b529bc1`.
 
 No source drift is silently rewritten. Root must review a mismatch before applying.
+
+## Root integration update
+
+- Root reported the original SQL payload `5e76ea8c61c0ea9fede4ea6625763a6f0a26d9ae3deb66894c0a73376b9470d6` applied to the verified live binding under migration version `20260915032604`, before the UI release. This subtask did not run that production action.
+- A compatibility nuance was identified immediately: the added legacy gate initially reused the named actor check, which would narrow existing capability-only legacy staff. The append-only follow-up `20260915032659_client_draft_legacy_capability_guard.sql` restores the original admin-or-suppliers-capability decision, fails closed if either dependency returns NULL, and leaves every new mixed-route named actor check unchanged.
+- The original applied SQL is not rewritten. The follow-up has separate review/hash and a real capability-only legacy Save regression, revoked-grant rejection and null-helper test; root owns its production application and final migration-history alignment.
