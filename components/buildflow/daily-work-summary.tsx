@@ -8,10 +8,7 @@ import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkS
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { calculateDailyWorkMinutes, dailyWorkDateKey, type DailyWorkSummary } from "@/lib/daily-work-summary"
 import { formatSiteDate, formatSiteTime } from "@/lib/site-date-time"
-
-function localToday() {
-  return dailyWorkDateKey() ?? ""
-}
+import { needsHistoricalCheckoutReview } from "@/lib/historical-attendance"
 
 function displayDate(value: string) {
   return formatSiteDate(value)
@@ -29,7 +26,8 @@ function durationLabel(minutes: number | null) {
   return `${hours} hr ${remainingMinutes} min`
 }
 
-function timeLabels(summary: Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">, now: number) {
+function timeLabels(summary: Pick<DailyWorkSummary, "date" | "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">, now: number) {
+  if (needsHistoricalCheckoutReview(summary, now)) return { worked: null, paused: null }
   const totals = calculateDailyWorkMinutes(summary, new Date(now).toISOString())
   return {
     worked: durationLabel(totals.workedMinutes),
@@ -39,7 +37,8 @@ function timeLabels(summary: Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" |
 
 export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: DailyWorkSummary[]; canMarkPaid: boolean }) {
   const router = useRouter()
-  const today = localToday()
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const today = dailyWorkDateKey(currentTime) ?? ""
   const initialSummary = summaries.find((summary) => summary.date === today)
   const [selectedDate, setSelectedDate] = useState(today)
   const selectedSummary = summaries.find((summary) => summary.date === selectedDate)
@@ -50,7 +49,6 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   useEffect(() => {
     if (!selectedSummary?.checkInAt || selectedSummary.checkOutAt) return
@@ -146,6 +144,7 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
 
   const totals = selectedSummary ? timeLabels(selectedSummary, currentTime) : { worked: null, paused: null }
   const attendanceAvailable = selectedDate === today
+  const missingCheckout = Boolean(selectedSummary && needsHistoricalCheckoutReview(selectedSummary, currentTime))
 
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -160,10 +159,11 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
           <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Check in</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkInAt)}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Check out</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkOutAt)}</p></div>
-            <div><p className="text-[10px] font-bold uppercase text-slate-500">Worked</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{totals.worked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Worked</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{missingCheckout ? "Needs review" : totals.worked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Paused</p><p className="mt-1 text-sm font-semibold text-violet-700">{totals.paused ?? "—"}</p></div>
           </div>
           {selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
+          {missingCheckout ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">Missing checkout · needs review. Excluded from pay until the actual finish time is confirmed.</p> : null}
           {!attendanceAvailable ? <p className="mt-3 text-center text-xs font-medium text-slate-500">Select today&apos;s Eastern Time date to record attendance.</p> : null}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || !attendanceAvailable || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
@@ -191,10 +191,11 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
       <div className="max-h-[34rem] overflow-y-auto">
         {summaries.length ? summaries.map((summary) => {
           const summaryTotals = timeLabels(summary, currentTime)
-          const timeSummary = summaryTotals.worked
+          const historicalMissing = needsHistoricalCheckoutReview(summary, currentTime)
+          const timeSummary = historicalMissing ? "Missing checkout · excluded from pay" : summaryTotals.worked
             ? `Worked ${summaryTotals.worked} · Paused ${summaryTotals.paused ?? "0 hr 0 min"}`
             : summary.completed ? "Work recorded" : "Open items only"
-          return <div key={summary.id} className={`flex items-center gap-2 border-b border-slate-100 px-2 py-2 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><button type="button" onClick={() => selectDate(summary.date)} className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-slate-50"><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{timeSummary}</span></button>{summary.paidAt ? <span className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" />Paid</span> : canMarkPaid ? <button type="button" onClick={() => markPaid(summary.date)} disabled={pending} className="min-h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-2 text-[10px] font-bold text-emerald-700 disabled:opacity-40">Mark paid</button> : null}<span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.pauseStartedAt ? "bg-violet-50 text-violet-700" : summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.pauseStartedAt ? "Paused" : summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></div>
+          return <div key={summary.id} className={`flex items-center gap-2 border-b border-slate-100 px-2 py-2 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><button type="button" onClick={() => selectDate(summary.date)} className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-slate-50"><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{timeSummary}</span></button>{summary.paidAt ? <span className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" />Paid</span> : canMarkPaid ? <button type="button" onClick={() => markPaid(summary.date)} disabled={pending} className="min-h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-2 text-[10px] font-bold text-emerald-700 disabled:opacity-40">Mark paid</button> : null}<span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${historicalMissing ? "bg-amber-50 text-amber-700" : summary.pauseStartedAt ? "bg-violet-50 text-violet-700" : summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{historicalMissing ? "Needs review" : summary.pauseStartedAt ? "Paused" : summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></div>
         }) : <p className="p-4 text-sm leading-6 text-slate-500">No daily summaries yet. Carlos can save today&apos;s first update.</p>}
       </div>
     </aside>
