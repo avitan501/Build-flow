@@ -377,7 +377,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   const [recipientType, setRecipientType] = useState<Exclude<ContactKind, "contact">>("customer")
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
   const [recipient, setRecipient] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || ""))
-  const [subject, setSubject] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : ""))
+  const [defaultSubject, setDefaultSubject] = useState(() => (initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : ""))
   const [attachments, setAttachments] = useState<File[]>([])
   const [feedback, setFeedback] = useState<{
     tone: "success" | "error"
@@ -771,6 +771,12 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     activeKey === "__new__" ? `${activeKey}:${channel}` : `${channel}:${channel === "email" ? recipient.trim().toLowerCase() : normalizeAuraPhone(recipient) || recipient}`,
     activeKey === "__new__" ? initialDraft : ["sms", "whatsapp"].includes(channel) ? smsReplyDrafts.find(draft => activeConversation?.messages.some(item => item.id === draft.communication_id && item.channel === channel))?.reply_text || "" : "",
   )
+  const [subject, setSubject, subjectStorageFailed, clearSentSubject] = useCommunicationDraft(
+    draftScope,
+    `${channel}:${channel === "email" ? recipient.trim().toLowerCase() || "__new__" : normalizeAuraPhone(recipient) || recipient || "__new__"}`,
+    defaultSubject,
+    "subject",
+  )
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
   const selectedChannelReady = channel === "call" || (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
@@ -869,7 +875,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     setChannel(nextChannel)
     setRecipient(nextChannel === "email" ? conversation.email : conversation.phone)
     const latestEmail = [...conversation.messages].reverse().find((item) => item.channel === "email")
-    setSubject(latestEmail ? replySubject(latestEmail.subject) : "")
+    setDefaultSubject(latestEmail ? replySubject(latestEmail.subject) : "")
     setSelectedRecipientId("")
     const storedDraft = smsReplyDrafts.find((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
     setActiveDraftId(storedDraft?.id || null)
@@ -921,7 +927,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     const nextChannel = nextCommunication.channel === "email" || nextCommunication.channel === "sms" || nextCommunication.channel === "whatsapp" ? nextCommunication.channel : "whatsapp"
     setChannel(nextChannel)
     setRecipient(nextChannel === "email" ? nextCommunication.counterparty_email || "" : nextCommunication.counterparty_phone || "")
-    setSubject(nextChannel === "email" ? replySubject(nextCommunication.subject) : "")
+    setDefaultSubject(nextChannel === "email" ? replySubject(nextCommunication.subject) : "")
     setSelectedRecipientId("")
     const nextStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === nextCommunication.id)
     setActiveDraftId(nextStoredDraft?.id || null)
@@ -1071,7 +1077,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     setChannel("whatsapp")
     setSelectedRecipientId("")
     setRecipient("")
-    setSubject("")
+    setDefaultSubject("")
     setAttachments([])
     if (attachmentInputRef.current) attachmentInputRef.current.value = ""
     setActiveDraftId(null)
@@ -1217,6 +1223,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     const sentText = message.trim()
     const sentRecipient = recipient.trim()
     const sentSubject = subject.trim()
+    const sentDraftSubject = subject
     const sentAttachments = [...attachments]
     const selectedEntry = recipientOptions.find((entry) => entry.id === selectedRecipientId)
     const recipientLabel = activeConversation?.name || selectedEntry?.name || sentRecipient
@@ -1344,6 +1351,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
         }
       }
       clearSentDraft(sentDraftText)
+      if (messageChannel === "email") clearSentSubject(sentDraftSubject)
       setFeedback({
         tone: "success",
         text: `${messageChannel === "sms" ? "Text sent and saved. AI replies are paused for this conversation until you turn them on again." : messageChannel === "whatsapp" ? "WhatsApp sent and saved." : "Email sent and saved."}${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}`,
@@ -2166,7 +2174,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                 </button>
               </div>
               {channel === "email" ? <details className="mt-1"><summary className="flex min-h-8 cursor-pointer items-center text-xs text-slate-500"><span className="truncate">Subject: {subject || "Add subject"}</span></summary><input aria-label="Email subject" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 text-sm" /></details> : null}
-              {message ? <p role="status" className={`mt-1 text-[11px] ${draftStorageFailed ? "text-amber-700" : "text-slate-400"}`}>{draftStorageFailed ? "Draft kept here; browser storage unavailable." : "Text draft saved in this tab"}</p> : null}
+              {message || (channel === "email" && subject) ? <p role="status" className={`mt-1 text-[11px] ${draftStorageFailed || subjectStorageFailed ? "text-amber-700" : "text-slate-400"}`}>{draftStorageFailed || subjectStorageFailed ? "Draft kept here; browser storage unavailable." : "Draft saved in this tab"}</p> : null}
               {attachments.length ? (
                 <div className="mt-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold">
                   <div className="flex items-center justify-between gap-2">
