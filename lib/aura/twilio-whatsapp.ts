@@ -1,6 +1,8 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import twilio from "twilio";
+import { createRecoveryCoalescer } from "@/lib/aura/recovery-coalescer";
 
 import {
   normalizeAuraPhone,
@@ -65,10 +67,18 @@ export async function sendTwilioWhatsAppMessage(
   return { sent: true as const, messageId: message.sid || null };
 }
 
-export async function syncRecentTwilioWhatsAppMessages() {
+const coalesceRecovery = createRecoveryCoalescer<{ synced: number; commands: number }>();
+
+export async function syncRecentTwilioWhatsAppMessages({ force = false }: { force?: boolean } = {}) {
   const config = getTwilioWhatsAppConfig();
   if (!config) return { synced: 0, commands: 0 };
+  // Configuration changes (including token rotation) cannot reuse another
+  // configuration's cached result. Never keep/log raw credentials as cache keys.
+  const key = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+  return coalesceRecovery(key, () => recoverRecentTwilioWhatsAppMessages(config), force);
+}
 
+async function recoverRecentTwilioWhatsAppMessages(config: NonNullable<ReturnType<typeof getTwilioWhatsAppConfig>>) {
   const client = twilio(config.accountSid, config.authToken);
   const messages = await client.messages.list({
     to: `whatsapp:${config.from}`,
