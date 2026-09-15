@@ -256,6 +256,7 @@ function ClientQuoteEditor({
   );
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
   const draftComplete = completeClientQuoteDraft(snapshot) && Object.keys(priceDrafts).length === items.length && items.every(item => Boolean(priceDrafts[item.id]));
+  const incompleteDraftSummary = Boolean(draftEnvelope && (!draftComplete || !summary.complete));
   const lockedMixedQuote = Boolean(procurementRoute && (procurementRoute.client_send_started_at || ["sent", "accepted"].includes(clientQuoteStatus)));
   const canPreview = Boolean(selectedClient && (selectedBid || procurementRoute) && (!routeError || lockedMixedQuote || draftEnvelope?.locked) && summary.complete && draftComplete);
   const canPrepare = canPreview && !lockedMixedQuote && !draftEnvelope?.locked;
@@ -565,17 +566,18 @@ function ClientQuoteEditor({
                   <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-500">{line.supplierUnitCost === null ? "Missing" : formatComparisonMoney(line.supplierUnitCost)}</td>
                   <td className="px-4 py-3"><div className="relative ml-auto w-28"><input type="number" min="0" step="0.1" value={draft.markupPercent} onChange={(event) => updateMarkup(line.itemId, event.target.value)} disabled={line.supplierUnitCost === null} className="min-h-10 w-full rounded-lg border border-slate-300 pr-8 pl-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span></div></td>
                   <td className="px-4 py-3"><div className="relative ml-auto w-32"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span><input type="number" min="0" step="0.01" value={draft.clientUnitPrice} onChange={(event) => updateClientPrice(line.itemId, event.target.value)} disabled={line.supplierUnitCost === null} className="min-h-10 w-full rounded-lg border border-slate-300 pl-7 pr-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></div></td>
-                  <td className={`px-5 py-3 text-right text-sm font-bold tabular-nums sm:px-6 ${profitTone(line.profit)}`}>{formatComparisonMoney(line.profit)}</td>
+                  <td className={`px-5 py-3 text-right text-sm font-bold tabular-nums sm:px-6 ${incompleteDraftSummary ? "text-slate-500" : profitTone(line.profit)}`}>{incompleteDraftSummary ? "—" : formatComparisonMoney(line.profit)}</td>
                 </tr>;
               })}</tbody>
             </table>
           </div>
 
-          <div className="grid gap-3 border-y border-slate-200 bg-[#f5f5f7] p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
+          <div aria-label="Quote pricing summary" className="grid gap-3 border-y border-slate-200 bg-[#f5f5f7] p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
+            {incompleteDraftSummary ? <p role="status" className="text-sm font-semibold text-amber-800 sm:col-span-2 xl:col-span-4">Draft incomplete · Complete the quote details to calculate totals and profit.</p> : null}
             <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Supplier landed cost</p><p className="mt-1 text-lg font-bold tabular-nums">{formatComparisonMoney(summary.supplierLandedCost)}</p></div>
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Client quote total</p><p className="mt-1 text-lg font-bold tabular-nums">{formatComparisonMoney(summary.clientTotal)}</p></div>
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Private profit</p><p className={`mt-1 text-lg font-bold tabular-nums ${profitTone(summary.profit)}`}>{formatComparisonMoney(summary.profit)}</p></div>
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Margin</p><p className={`mt-1 text-lg font-bold tabular-nums ${profitTone(summary.marginPercent)}`}>{summary.marginPercent.toFixed(1)}%</p></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Client quote total</p><p className="mt-1 text-lg font-bold tabular-nums">{incompleteDraftSummary ? "Incomplete" : formatComparisonMoney(summary.clientTotal)}</p></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Private profit</p><p className={`mt-1 text-lg font-bold tabular-nums ${incompleteDraftSummary ? "text-slate-500" : profitTone(summary.profit)}`}>{incompleteDraftSummary ? "—" : formatComparisonMoney(summary.profit)}</p></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Margin</p><p className={`mt-1 text-lg font-bold tabular-nums ${incompleteDraftSummary ? "text-slate-500" : profitTone(summary.marginPercent)}`}>{incompleteDraftSummary ? "—" : `${summary.marginPercent.toFixed(1)}%`}</p></div>
           </div>
 
           <div className="grid gap-4 p-5 sm:px-6">
@@ -600,7 +602,7 @@ function ClientQuoteEditor({
       {error ? <div role="alert" className="mx-5 mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 sm:mx-6">{error}</div> : null}
       {message ? <div role="status" className="mx-5 mb-5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 sm:mx-6"><CheckCircle2 className="h-4 w-4 shrink-0" /> {message}</div> : null}
 
-      {showPreview && selectedClient ? (
+      {showPreview && selectedClient && !incompleteDraftSummary ? (
         <div className="fixed inset-0 z-[100] grid items-start justify-items-center overflow-y-auto bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="client-preview-title">
           <div className="my-8 w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0066cc]">Client view</p><h3 id="client-preview-title" className="mt-1 text-lg font-bold">Branded quote preview</h3></div><button type="button" onClick={() => setShowPreview(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200" aria-label="Close quote preview"><X className="h-4 w-4" /></button></div>

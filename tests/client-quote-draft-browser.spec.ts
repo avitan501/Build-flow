@@ -103,10 +103,37 @@ test("clearing a client price persists blank, never prepares or previews it as z
   await expect.poll(() => page.evaluate(() => (window as any).envelope.draft?.prices["00000000-0000-4000-8000-000000000101"].clientUnitPrice)).toBe("");
   await page.evaluate(() => (window as any).remount());
   await expect(price).toHaveValue("");
+  await expect(page.getByLabel("Quote pricing summary")).toContainText("Draft incomplete");
+  await expect(page.getByLabel("Quote pricing summary").getByText("Incomplete", { exact: true })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "Valve" }).locator("td").last()).toHaveText("—");
   await expect(page.getByRole("button", { name: "Prepare quote", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Preview client copy", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Send to client", exact: true })).toBeDisabled();
   expect(await page.evaluate(() => (window as any).calls.some((call: any) => call.kind !== "draft"))).toBe(false);
+});
+
+for (const raw of ["", "-1"]) test(`mixed draft summary hides inferred totals for ${raw === "" ? "blank" : "invalid"} price and restores valid totals`, async ({ page }) => {
+  await mount(page);
+  const summary = page.getByLabel("Quote pricing summary");
+  const priceRow = page.getByRole("row").filter({ hasText: "Valve" });
+  const price = priceRow.getByRole("spinbutton").nth(1);
+  await expect(summary).toContainText("$43.55");
+  const completeSummary = await summary.innerText();
+  const completeLineProfit = await priceRow.locator("td").last().innerText();
+  await price.fill(raw);
+  await expect(summary).toContainText("Draft incomplete");
+  await expect(summary).not.toContainText("$43.55");
+  await expect(summary.getByText("Incomplete", { exact: true })).toBeVisible();
+  await expect(summary.getByText("—", { exact: true })).toHaveCount(2);
+  // Known supplier costs remain informative; only inferred client results disappear.
+  await expect(summary).toContainText("$24.00");
+  await expect(priceRow.locator("td").last()).toHaveText("—");
+  await expect(page.getByRole("button", { name: "Send to client", exact: true })).toBeDisabled();
+  await price.fill("20");
+  await expect.poll(() => summary.innerText()).toBe(completeSummary);
+  await expect(priceRow.locator("td").last()).toHaveText(completeLineProfit);
+  await expect(page.getByRole("button", { name: "Prepare quote", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).calls.some((call: any) => ["prepare", "claim", "send"].includes(call.kind)))).toBe(false);
 });
 
 test("new typing during save is queued with the acknowledged revision; refresh never erases it", async ({ page }) => {
@@ -157,6 +184,8 @@ test("Prepare acknowledgment is reused by Send; newer unprepared draft blocks it
 
 test("legacy single supplier keeps explicit manual Save and no draft writes", async ({ page }) => {
   await mount(page, null, false, true);
+  await expect(page.getByLabel("Quote pricing summary")).toContainText("$43.55");
+  await expect(page.getByLabel("Quote pricing summary")).not.toContainText("Draft incomplete");
   await page.getByLabel("Quote number", { exact: true }).fill("LEGACY-EDIT");
   await expect(page.getByRole("button", { name: "Save quote", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Save quote", exact: true }).click();
