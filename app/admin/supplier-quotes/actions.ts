@@ -525,7 +525,34 @@ export async function uploadSupplierQuoteAction(
   if ((sourceCommunicationId || sourceAttachmentId) && !inboundSource)
     return { ok: false, error: "That received email attachment is unavailable or is not a supported supplier quote." };
   const uploadedFile = formData.get("quoteFile");
-  const file = inboundSource?.file ?? (uploadedFile instanceof File ? uploadedFile : null);
+  const requestAttachmentId = clean(formData.get("requestAttachmentId"), 80);
+  let requestAttachmentFile: File | null = null;
+  if (requestAttachmentId) {
+    await requireStaffProfile("customers");
+    const requestedId = clean(formData.get("requestId"), 80);
+    if (!UUID_PATTERN.test(requestAttachmentId) || !UUID_PATTERN.test(requestedId)) return { ok: false, error: "Choose a valid request file." };
+    const { data: sourceRequest } = await supabase.from("quote_requests").select("owner_id,project_id").eq("id", requestedId).maybeSingle<{ owner_id: string; project_id: string }>();
+    if (!sourceRequest) return { ok: false, error: "Request not found." };
+    const { data: attachment } = await supabase.from("quote_request_attachments")
+      .select("file_name,file_path,file_type,source_party,owner_id,project_id")
+      .eq("id", requestAttachmentId).eq("request_id", requestedId)
+      .maybeSingle<{ file_name: string; file_path: string; file_type: string; source_party: string; owner_id: string; project_id: string }>();
+    if (!attachment || attachment.owner_id !== sourceRequest.owner_id || attachment.project_id !== sourceRequest.project_id || attachment.source_party !== "supplier" || !attachment.file_path.startsWith(`${attachment.owner_id}/${attachment.project_id}/`) || attachment.file_path.includes("..")) return { ok: false, error: "Move this file to supplier pricing first." };
+    formData.set("clientSelection", sourceRequest.owner_id);
+    formData.set("linkMode", "request");
+    const { data: linkedComparisons, error: comparisonsError } = await supabase.from("quote_comparisons").select("id").eq("request_id", requestedId);
+    if (comparisonsError) return { ok: false, error: "Existing quotes could not be checked." };
+    const ids = (linkedComparisons ?? []).map(row => row.id);
+    if (ids.length) {
+      const { data: existing, error: existingError } = await supabase.from("supplier_quotes").select("id").in("comparison_id", ids).eq("file_name", attachment.file_name).limit(1).maybeSingle<{ id: string }>();
+      if (existingError) return { ok: false, error: "Existing quotes could not be checked." };
+      if (existing) return { ok: true, data: { quoteId: existing.id }, message: "This quote is already stored. Opening its review." };
+    }
+    const { data: storedFile, error: downloadError } = await supabase.storage.from("project-uploads").download(attachment.file_path);
+    if (downloadError || !storedFile) return { ok: false, error: "The original request file could not be read." };
+    requestAttachmentFile = new File([storedFile], attachment.file_name, { type: attachment.file_type });
+  }
+  const file = inboundSource?.file ?? requestAttachmentFile ?? (uploadedFile instanceof File ? uploadedFile : null);
   if (!(file instanceof File) || file.size === 0)
     return { ok: false, error: "Choose a supplier quote file." };
   if (file.size > MAX_FILE_SIZE)

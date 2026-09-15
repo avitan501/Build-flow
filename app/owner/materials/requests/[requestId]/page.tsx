@@ -92,6 +92,8 @@ type LinkedSupplierQuote = {
   quote_date: string | null;
   file_name: string;
   file_path: string;
+  supplier_name: string;
+  status: string;
 };
 type ComparisonRecord = Pick<
   QuoteComparisonRecord,
@@ -358,7 +360,7 @@ export default async function OwnerMaterialRequestPage({
           .returns<QuoteComparisonBidRecord[]>(),
         supabase
           .from("supplier_quotes")
-          .select("id,comparison_id,supplier_id,quote_number,quote_date,file_name,file_path")
+          .select("id,comparison_id,supplier_id,supplier_name,status,quote_number,quote_date,file_name,file_path")
           .in("comparison_id", comparisonIds)
           .returns<LinkedSupplierQuote[]>(),
       ])
@@ -497,6 +499,7 @@ export default async function OwnerMaterialRequestPage({
         })
         return {
           id: analysis.bidId,
+          sourceQuoteId: bid?.source_supplier_quote_id ?? null,
           supplierId: bid?.supplier_id || "",
           supplierName: analysis.supplierName,
           landedTotal: analysis.landedTotal,
@@ -512,6 +515,8 @@ export default async function OwnerMaterialRequestPage({
         supplierId: document.supplier_id,
         fileName: document.file_name,
         sourceUrl: document.sourceUrl,
+        supplierName: document.supplier_name,
+        reviewStatus: document.status,
       })),
     };
   });
