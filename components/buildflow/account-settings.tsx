@@ -1,6 +1,7 @@
 import { Bell, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
 
-import { setAccountPassword, updateAccountName, updateAccountPhone, updateAlternateContacts, updateNotificationPreferences } from "@/app/account/actions";
+import { setAccountPassword, updateAccountPhone, updateAlternateContacts, updateNotificationPreferences } from "@/app/account/actions";
+import { AccountNameAutosave } from "@/components/buildflow/account-name-autosave";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
 import type { ProfileRecord } from "@/lib/auth";
 
@@ -69,10 +70,7 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
       <div className="mt-4 grid gap-3.5 lg:grid-cols-2">
         <SectionCard icon={UserRound} title="Profile information" description="Your name and primary phone number.">
           <div className="grid gap-4">
-            <form action={updateAccountName} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-              <label htmlFor="fullName" className="grid gap-1.5 text-sm font-semibold">Name<input id="fullName" name="fullName" type="text" defaultValue={profile?.full_name || ""} placeholder="Full name" autoComplete="name" className={inputClass} /></label>
-              <button type="submit" className={primaryButtonClass}>Save</button>
-            </form>
+            <AccountNameAutosave key={profile?.id || "unavailable"} actorId={profile?.id || ""} initialName={profile?.full_name ?? null} inputClass={inputClass} />
             <form action={updateAccountPhone} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
               <label htmlFor="phone" className="grid gap-1.5 text-sm font-semibold">Primary phone<input id="phone" name="phone" type="tel" defaultValue={profile?.phone || ""} placeholder="+1 555 123 4567" autoComplete="tel" className={inputClass} /></label>
               <button type="submit" className={primaryButtonClass}>Save</button>
