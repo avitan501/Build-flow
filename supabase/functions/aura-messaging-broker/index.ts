@@ -85,6 +85,8 @@ import {
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
   prepare: false,
+  idle_timeout: 5,
+  max_lifetime: 60,
 });
 // Keep the fast-poll lease path independent from the long-running poll window.
 // A warm Edge isolate can still be polling when the next pg_net tick arrives;
@@ -93,6 +95,8 @@ const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
 const fastPollControlSql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
   prepare: false,
+  idle_timeout: 5,
+  max_lifetime: 60,
 });
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const secretKeys = JSON.parse(

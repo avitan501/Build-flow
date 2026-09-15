@@ -13,6 +13,8 @@ import {
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
   prepare: false,
+  idle_timeout: 5,
+  max_lifetime: 60,
 });
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const secretKeys = JSON.parse(
