@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { whatsappDeliveryDiagnostic } from "../_shared/whatsapp-delivery-diagnostic.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { Resend } from "npm:resend@6.26.0";
@@ -2355,19 +2356,40 @@ async function handleMetaWhatsAppWebhook(req: Request) {
       for (const receipt of value.statuses || []) {
         const status = ["sent", "delivered", "read", "failed"].includes(receipt.status || "") ? receipt.status! : null;
         if (!receipt.id || !status) continue;
-        const updated = await sql<{ id: string }[]>`
+        const diagnostic = whatsappDeliveryDiagnostic(receipt.errors);
+        // Deliberately exclude recipient, message text, raw error text and credentials.
+        // Mark receipt evidence processed so inbound-message retry workers ignore it.
+        const updated = await sql<{ id: string; status: string }[]>`
+          with receipt_evidence as (
+            insert into public.aura_webhook_events
+              (provider, external_event_id, event_type, activity_id, raw_payload, processed_at)
+            values ('whatsapp', ${`status:${receipt.id}:${status}`}, 'whatsapp.delivery_status',
+              ${receipt.id}, ${sql.json({ status, error_codes: status === "failed" ? diagnostic.codes : [] })}, now())
+            on conflict (provider, external_event_id) do nothing
+          )
           update public.aura_communications
           set status = case
             when status = 'read' then 'read'
             when status = 'delivered' and ${status} <> 'read' then 'delivered'
             when status = 'failed' and ${status} in ('sent', 'accepted') then 'failed'
             else ${status}
+          end,
+          next_steps = case
+            when ${status} = 'failed' and status not in ('read', 'delivered') then
+              coalesce((select jsonb_agg(step) from jsonb_array_elements(coalesce(next_steps, '[]'::jsonb)) step
+                where step #>> '{}' not like 'Meta WhatsApp delivery error%'), '[]'::jsonb)
+              || ${sql.json([diagnostic.message])}::jsonb
+            when ${status} in ('delivered', 'read') then
+              coalesce((select jsonb_agg(step) from jsonb_array_elements(coalesce(next_steps, '[]'::jsonb)) step
+                where step #>> '{}' not like 'Meta WhatsApp delivery error%'), '[]'::jsonb)
+            else next_steps
           end, last_event_at = now(), updated_at = now()
           where provider = 'whatsapp' and external_activity_id = ${receipt.id}
-          returning id
+          returning id, status
         `;
-        if (updated[0]?.id && ["delivered", "read", "failed"].includes(status))
-          await markRequestCommunicationDelivery(updated[0].id, status as "delivered" | "read" | "failed");
+        // Propagate the effective state, not an out-of-order receipt's stale state.
+        if (updated[0]?.id && ["delivered", "read", "failed"].includes(updated[0].status))
+          await markRequestCommunicationDelivery(updated[0].id, updated[0].status as "delivered" | "read" | "failed");
       }
     }
   }

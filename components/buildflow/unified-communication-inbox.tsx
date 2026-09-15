@@ -1189,7 +1189,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       })
       setFeedback({
         tone: "success",
-        text: "Approved WhatsApp template sent and saved.",
+        text: "WhatsApp template accepted. Delivery is not confirmed yet; check the message status.",
       })
     })
   }
