@@ -7,6 +7,8 @@ import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-wo
 import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes"
 import { CarlosPayroll } from "@/components/buildflow/carlos-payroll"
 import { CarlosWorkingTogether } from "@/components/buildflow/carlos-working-together"
+import { CarlosFiveGoals } from "@/components/buildflow/carlos-five-goals"
+import type { CarlosGoalBoard } from "@/lib/carlos-five-goals"
 import type { CarlosPayDay } from "@/lib/carlos-payroll"
 
 type SummaryRow = {
@@ -19,6 +21,8 @@ type SummaryRow = {
 export default async function DailySummaryPage() {
   const { supabase, user } = await requireManagerPortalProfile()
   const email = user.email?.trim().toLowerCase()
+  const canUseGoals = email === "buildavantiap@gmail.com" || email === "avitanneto@gmail.com"
+  const goals = canUseGoals ? await supabase.rpc("get_carlos_five_goals") : null
   const payroll = await supabase.rpc("carlos_payroll_days")
   const result = await supabase
     .from("manager_goals")
@@ -41,6 +45,7 @@ export default async function DailySummaryPage() {
     <div className="mx-auto max-w-5xl">
       <header className="border-b border-slate-200 pb-5"><Link href="/admin/build-map" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#0066cc]"><ArrowLeft className="h-4 w-4" />Carlos Dashboard</Link><h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Time Log &amp; Daily Summary</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Clock in, pause, resume, and check out. Worked and paused totals use Eastern Time work dates.</p></header>
       <CarlosWorkingTogether />
+      {canUseGoals && (goals?.error || !goals?.data ? <p role="alert" className="mt-4 text-sm text-red-700">Your goals could not be loaded. Reload to try again; saved goals have not changed.</p> : <CarlosFiveGoals board={goals.data as CarlosGoalBoard} actorId={user.id} />)}
       <div className="mt-5"><CarlosPayroll days={(payroll.data as CarlosPayDay[]|null)??[]} unavailable={Boolean(payroll.error)} canRequest={email==="buildavantiap@gmail.com"} canMarkPaid={email==="avitanneto@gmail.com"}/><DailyWorkSummaryForm summaries={summaries} canMarkPaid={false} /></div>
     </div>
   </main>
