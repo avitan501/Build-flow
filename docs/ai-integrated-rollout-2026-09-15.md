@@ -24,7 +24,8 @@ An additional non-forced already_organized response previously could never finis
 - 98 deterministic Playwright tests pass (both configured projects; tests do not call a browser/provider).
 - Fresh Next route typegen + full standalone TypeScript pass; targeted lint and diff-check pass.
 - Full AI and worker Deno checks pass with `--cached-only --node-modules-dir=none`.
-- Earlier full-AI webpack build passed; current 811-based webpack production build is running and must be recorded before release. Initial default Turbopack attempt failed because this local worktree reuses dependencies through an external symlink; rerun uses the established webpack release path.
+- Current 811-based webpack production build passed, including Next TypeScript and all 153 routes. Initial default Turbopack attempt failed because this local worktree reuses dependencies through an external symlink; successful rerun uses the established webpack release path.
+- All 16 queued-only/release-guard executable mocked tests passed; no hook, worker or provider was actually called. Local rehearsal container was stopped and removed after verification.
 
 Rehearsal command:
 `node tests/ai-request-migrations-combined.local.mjs supabase/migrations/20260914230638_quote_comparison_finalized_routes.sql d9521be0ca183572c1f43d50ecb6a5384df52216f35543dcca81cef8a10071ee`
