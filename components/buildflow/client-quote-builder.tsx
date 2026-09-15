@@ -15,7 +15,10 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { loadClientQuoteDraftAction, prepareClientQuoteDraftAction, saveClientQuoteDraftAction } from "@/app/admin/quote-comparison/client-draft-actions";
+import { completeClientQuoteDraft, draftSourcesEqual, type ClientQuoteDraft, type ClientQuoteDraftEnvelope } from "@/lib/client-quote-draft";
+import { useQuoteAutosave } from "@/hooks/use-quote-autosave";
 
 import {
   saveClientQuoteAction,
@@ -114,16 +117,7 @@ function attachmentType(file: File) {
   } as Record<string, string>)[extension || ""] || "";
 }
 
-export function ClientQuoteBuilder({
-  comparison,
-  items,
-  selectedBid,
-  procurementRoute = null,
-  routeError = null,
-  clients,
-  initialAttachments,
-  previewMode,
-}: {
+type ClientQuoteBuilderProps = {
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
   selectedBid: QuoteComparisonBidRecord | null;
@@ -132,17 +126,87 @@ export function ClientQuoteBuilder({
   clients: QuoteClientOption[];
   initialAttachments: ClientQuoteAttachmentRecord[];
   previewMode: boolean;
-}) {
+};
+
+export function ClientQuoteBuilder(props: ClientQuoteBuilderProps) {
+  // Route navigation remounts the loader and queue; stale async replies cannot
+  // restore another comparison's draft into this editor.
+  return <ClientQuoteDraftLoader key={props.comparison.id} {...props} />;
+}
+
+function ClientQuoteDraftLoader(incomingProps: ClientQuoteBuilderProps) {
+  // A server refresh must not unmount the user's unsaved editor. Source CAS
+  // rejects stale writes; reviewing a new source requires an explicit reload.
+  const [props] = useState(incomingProps);
+  const [envelope, setEnvelope] = useState<ClientQuoteDraftEnvelope | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const [reviewedStale, setReviewedStale] = useState(false);
+  useEffect(() => {
+    if (props.previewMode || !props.procurementRoute) return;
+    let active = true;
+    void loadClientQuoteDraftAction(props.comparison.id).then(result => {
+      if (!active) return;
+      if (result.ok) setEnvelope(result.data);
+      else setLoadError(result.error);
+    }).catch(() => { if (active) setLoadError("The shared draft could not be loaded. Retry before editing."); });
+    return () => { active = false; };
+  }, [props.comparison.id, props.previewMode, props.procurementRoute, attempt]);
+  if (!props.previewMode && props.comparison.active_route_id && !props.procurementRoute) return <section role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-5">The saved supplier route could not be loaded. Reload before continuing; this is not a single-supplier quote.</section>;
+  // Legacy single-supplier delivery has no atomic prepared-draft claim. Keep
+  // that established manual workflow unchanged until it has its own fence.
+  if (props.previewMode || !props.procurementRoute) return <ClientQuoteEditor {...props} draftEnvelope={null} />;
+  if (!envelope) return <section className="rounded-lg border bg-white p-5" role="status">{loadError || "Loading shared quote draft…"}{loadError ? <button type="button" className="ml-3 min-h-11 underline" onClick={() => { setLoadError(""); setAttempt(value => value + 1); }}>Retry</button> : null}</section>;
+  const source = envelope.source as { client?: unknown; route_current?: boolean; awarded_bid_id?: string | null; legacy_prices?: { item_id: string; unit_price: number | null; is_available: boolean }[]; legacy_bid?: Record<string, unknown> | null };
+  const currentClient = finalizedClientSnapshot(props.comparison, props.items);
+  const legacyMatches = props.procurementRoute || (source.awarded_bid_id === props.comparison.awarded_bid_id
+    && ["id", "supplier_id", "supplier_name_snapshot", "trust_level_snapshot", "status", "delivery_charge", "tax_percent", "lead_time_days"].every(key => (source.legacy_bid?.[key] ?? null) === (props.selectedBid?.[key as keyof QuoteComparisonBidRecord] ?? null))
+    && (source.legacy_prices ?? []).length === (props.selectedBid?.quote_comparison_prices ?? []).length
+    && (source.legacy_prices ?? []).every(price => {
+      const shown = props.selectedBid?.quote_comparison_prices?.find(row => row.item_id === price.item_id);
+      return shown && shown.unit_price === price.unit_price && shown.is_available === price.is_available;
+    }));
+  if (!draftSourcesEqual(source.client, currentClient) || (!envelope.locked && (!source.route_current || !legacyMatches))) return <section className="rounded-lg border border-amber-200 bg-amber-50 p-5" role="alert">The quote or supplier costs changed. Reload and review the supplier route before editing. Your shared draft is retained.</section>;
+  const stale = Boolean(envelope.draft && !draftSourcesEqual(envelope.source, envelope.draftSource));
+  if (stale && !reviewedStale && !envelope.locked) return <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+    <p role="alert">A draft exists from an earlier quote or supplier route. It has not been applied.</p>
+    <details className="mt-2"><summary className="cursor-pointer text-sm font-bold">Review earlier draft</summary><div className="mt-2 max-h-64 space-y-2 overflow-auto text-sm">
+      <p>Quote: {envelope.draft?.quoteNumber || "Not entered"}</p>
+      <p>Client: {props.clients.find(client => client.id === envelope.draft?.clientId)?.name || "Not selected or no longer available"}</p>
+      <p>Delivery: {envelope.draft?.delivery || "Not entered"} · Tax: {envelope.draft?.tax || "Not entered"}</p>
+      <p className="whitespace-pre-wrap break-words">{envelope.draft?.clientMessage}</p>
+      {Object.entries(envelope.draft?.prices ?? {}).map(([id, price]) => <p key={id}>{props.items.find(item => item.id === id)?.description || "Earlier material"}: {price.clientUnitPrice || "No price"} · markup {price.markupPercent || "Not entered"}%</p>)}
+    </div></details>
+    <button type="button" className="mt-3 min-h-11 rounded-lg border bg-white px-3 text-sm font-bold" onClick={() => setReviewedStale(true)}>Use current quote instead</button>
+    <p className="mt-2 text-xs">The earlier draft stays saved until you edit the current quote.</p>
+  </section>;
+  return <ClientQuoteEditor {...props} draftEnvelope={{ ...envelope, draft: stale || envelope.locked ? null : envelope.draft }} />;
+}
+
+function ClientQuoteEditor({
+  comparison,
+  items,
+  selectedBid,
+  procurementRoute = null,
+  routeError = null,
+  clients,
+  initialAttachments,
+  previewMode,
+  draftEnvelope,
+}: ClientQuoteBuilderProps & { draftEnvelope: ClientQuoteDraftEnvelope | null }) {
   const [pending, startTransition] = useTransition();
   const [attachmentPending, startAttachmentTransition] = useTransition();
-  const [selectedClientId, setSelectedClientId] = useState(comparison.client_id || "");
-  const [quoteNumber, setQuoteNumber] = useState(comparison.quote_number);
-  const [clientMessage, setClientMessage] = useState(comparison.client_message);
-  const [clientDeliveryCharge, setClientDeliveryCharge] = useState(String(comparison.client_delivery_charge || ""));
-  const [clientTaxPercent, setClientTaxPercent] = useState(String(comparison.client_tax_percent ?? 8.875));
-  const [bulkMarkup, setBulkMarkup] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(draftEnvelope?.draft?.clientId ?? comparison.client_id ?? "");
+  const [quoteNumber, setQuoteNumber] = useState(draftEnvelope?.draft?.quoteNumber ?? comparison.quote_number);
+  const [clientMessage, setClientMessage] = useState(draftEnvelope?.draft?.clientMessage ?? comparison.client_message);
+  const [clientDeliveryCharge, setClientDeliveryCharge] = useState(draftEnvelope?.draft?.delivery ?? String(comparison.client_delivery_charge || ""));
+  const [clientTaxPercent, setClientTaxPercent] = useState(draftEnvelope?.draft?.tax ?? String(comparison.client_tax_percent ?? 8.875));
+  const [bulkMarkup, setBulkMarkup] = useState(draftEnvelope?.draft?.bulkMarkup ?? "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [conflictReview, setConflictReview] = useState<ClientQuoteDraftEnvelope | null>(null);
+  const [reviewPending, setReviewPending] = useState(false);
+  const [preparedDraft, setPreparedDraft] = useState<{ key: string; clientSnapshot: unknown; draftRevision: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [clientQuoteStatus, setClientQuoteStatus] = useState(comparison.client_quote_status);
   const [clientBaseline, setClientBaseline] = useState<unknown>(() => procurementRoute ? finalizedClientSnapshot(comparison, items) : null);
@@ -153,6 +217,7 @@ export function ClientQuoteBuilder({
     [selectedBid, procurementRoute],
   );
   const [priceDrafts, setPriceDrafts] = useState<Record<string, PriceDraft>>(() => {
+    if (draftEnvelope?.draft) return draftEnvelope.draft.prices;
     const values: Record<string, PriceDraft> = {};
     const prices = procurementItemCosts(procurementRoute, selectedBid);
     for (const item of items) {
@@ -169,6 +234,15 @@ export function ClientQuoteBuilder({
     return values;
   });
 
+  const snapshot: ClientQuoteDraft = { version: 1, clientId: selectedClientId, quoteNumber, clientMessage, delivery: clientDeliveryCharge, tax: clientTaxPercent, bulkMarkup, prices: priceDrafts };
+  const [initialDraft] = useState(snapshot);
+  const autosave = useQuoteAutosave({
+    scopeKey: `client-quote:${draftEnvelope?.actorId ?? "preview"}:${comparison.id}`,
+    snapshot: draftEnvelope ? snapshot : initialDraft, initialSnapshot: initialDraft, initialRevision: draftEnvelope?.revision ?? 0,
+    persist: (draft, expectedRevision) => previewMode ? Promise.resolve({ ok: true as const, revision: expectedRevision + 1 })
+      : saveClientQuoteDraftAction({ comparisonId: comparison.id, expectedRevision, source: draftEnvelope?.source, draft }),
+  });
+
   const draftItems = useMemo<QuoteComparisonItemRecord[]>(() => items.map((item) => ({
     ...item,
     markup_percent: nonNegativeNumber(priceDrafts[item.id]?.markupPercent ?? ""),
@@ -181,9 +255,10 @@ export function ClientQuoteBuilder({
     [clientDeliveryCharge, clientTaxPercent, draftItems, selectedBid, procurementRoute],
   );
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-  const canPreview = Boolean(selectedClient && (selectedBid || procurementRoute) && !routeError && summary.complete && quoteNumber.trim());
+  const draftComplete = completeClientQuoteDraft(snapshot) && Object.keys(priceDrafts).length === items.length && items.every(item => Boolean(priceDrafts[item.id]));
   const lockedMixedQuote = Boolean(procurementRoute && (procurementRoute.client_send_started_at || ["sent", "accepted"].includes(clientQuoteStatus)));
-  const canPrepare = canPreview && !lockedMixedQuote;
+  const canPreview = Boolean(selectedClient && (selectedBid || procurementRoute) && (!routeError || lockedMixedQuote || draftEnvelope?.locked) && summary.complete && draftComplete);
+  const canPrepare = canPreview && !lockedMixedQuote && !draftEnvelope?.locked;
 
   function updateMarkup(itemId: string, rawValue: string) {
     const supplierPrice = supplierPrices.get(itemId);
@@ -359,13 +434,17 @@ export function ClientQuoteBuilder({
       return;
     }
     startTransition(async () => {
-      const result = await saveClientQuoteAction(quotePayload());
+      if (!await autosave.flush()) { setError("Wait until your draft is saved before preparing the quote."); return; }
+      const result = draftEnvelope && procurementRoute
+        ? await prepareClientQuoteDraftAction({ comparisonId: comparison.id, routeId: procurementRoute.id, expectedClient: clientBaseline, expectedRevision: autosave.getRevision(), source: draftEnvelope.source, draft: snapshot })
+        : await saveClientQuoteAction(quotePayload());
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setClientQuoteStatus("ready");
-      setMessage("Client quote saved. Profit remains visible only to your team.");
+      if ("draftRevision" in result.data && typeof result.data.draftRevision === "number") setPreparedDraft({ key: JSON.stringify(snapshot), clientSnapshot: result.data.clientSnapshot, draftRevision: result.data.draftRevision });
+      setMessage(draftEnvelope ? "Quote prepared. You can send it now. Reload and review the saved quote before making further edits." : "Client quote saved. Profit remains visible only to your team.");
       setClientBaseline(result.data.clientSnapshot);
     });
   }
@@ -383,13 +462,19 @@ export function ClientQuoteBuilder({
       return;
     }
     startTransition(async () => {
-      const saved = await saveClientQuoteAction(quotePayload());
+      if (!await autosave.flush()) { setError("Your draft has not been saved. Nothing was sent."); return; }
+      const saved = draftEnvelope && procurementRoute
+        ? preparedDraft?.key === JSON.stringify(snapshot) ? { ok: true as const, data: preparedDraft }
+          : await prepareClientQuoteDraftAction({ comparisonId: comparison.id, routeId: procurementRoute.id, expectedClient: clientBaseline, expectedRevision: autosave.getRevision(), source: draftEnvelope.source, draft: snapshot })
+        : await saveClientQuoteAction(quotePayload());
       if (!saved.ok) {
         setError(saved.error);
         return;
       }
       setClientBaseline(saved.data.clientSnapshot);
-      const sent = await sendClientQuoteAction(comparison.id, saved.data.clientSnapshot);
+      const draftRevision = "draftRevision" in saved.data && typeof saved.data.draftRevision === "number" ? saved.data.draftRevision : undefined;
+      if (draftRevision !== undefined) setPreparedDraft({ key: JSON.stringify(snapshot), clientSnapshot: saved.data.clientSnapshot, draftRevision });
+      const sent = await sendClientQuoteAction(comparison.id, saved.data.clientSnapshot, draftRevision);
       if (!sent.ok) {
         setError(sent.error);
         return;
@@ -417,8 +502,26 @@ export function ClientQuoteBuilder({
         </div>
       </div>
 
-      {lockedMixedQuote ? <div className="p-5"><p className="text-sm text-slate-600">Delivery started · Saved client copy is read-only.</p><button type="button" onClick={()=>setShowPreview(true)} disabled={!canPreview} className="mt-2 min-h-11 rounded-lg border px-4 text-sm font-bold">View saved client copy</button></div> : null}
-      <fieldset disabled={pending || lockedMixedQuote} className="min-w-0">
+      {lockedMixedQuote || draftEnvelope?.locked ? <div className="p-5"><p className="text-sm text-slate-600">Saved client copy is read-only.</p><button type="button" onClick={()=>setShowPreview(true)} disabled={!canPreview} className="mt-2 min-h-11 rounded-lg border px-4 text-sm font-bold">View saved client copy</button></div> : null}
+      {!previewMode && draftEnvelope && !draftEnvelope.locked ? <div className="px-5 py-2 text-xs" aria-live="polite">
+        {autosave.status === "saved" ? autosave.getRevision() ? "Draft saved automatically" : "Changes save automatically" : autosave.status === "saving" ? "Saving draft…" : autosave.status === "error" ? autosave.error : "Draft not saved yet"}
+        {draftEnvelope?.updatedBy && autosave.getRevision() === draftEnvelope.revision ? <span className="ml-2 text-slate-500">Loaded from {draftEnvelope.updatedBy} · shared draft</span> : null}
+        {autosave.status === "error" && !autosave.conflict ? <button type="button" className="ml-2 min-h-11 underline" onClick={() => void autosave.retry()}>Retry</button> : null}
+        {autosave.conflict ? <button type="button" disabled={reviewPending} className="ml-2 min-h-11 underline" onClick={async () => {
+          setReviewPending(true);
+          try { const result = await loadClientQuoteDraftAction(comparison.id); if (result.ok) setConflictReview(result.data); else setError(result.error); }
+          catch { setError("The latest draft could not be loaded. Your edits remain here."); }
+          finally { setReviewPending(false); }
+        }}>{reviewPending ? "Loading latest…" : "Review latest draft"}</button> : null}
+        {conflictReview ? <details open className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <summary className="font-bold">Latest shared draft · {conflictReview.updatedBy || "Team"}</summary>
+          <p className="mt-2">Quote: {conflictReview.draft?.quoteNumber || "Not entered"} · Tax: {conflictReview.draft?.tax || "Not entered"} · Delivery: {conflictReview.draft?.delivery || "Not entered"}</p>
+          <p className="whitespace-pre-wrap break-words">{conflictReview.draft?.clientMessage}</p>
+          {Object.entries(conflictReview.draft?.prices ?? {}).map(([id, price]) => <p key={id}>{items.find(item => item.id === id)?.description || "Earlier material"}: {price.clientUnitPrice || "No price"} · markup {price.markupPercent || "Not entered"}%</p>)}
+          <p className="mt-2 font-bold">Your edits below are unchanged. Keep any text you need before reloading to review the current quote.</p>
+        </details> : null}
+      </div> : null}
+      <fieldset disabled={pending || lockedMixedQuote || draftEnvelope?.locked} className="min-w-0">
       <div className="grid gap-4 border-b border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(15rem,1.4fr)_repeat(3,minmax(9rem,.7fr))]">
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
           Client
@@ -486,7 +589,7 @@ export function ClientQuoteBuilder({
             </div>
             <div className="flex flex-col justify-end gap-2 sm:flex-row">
               <button type="button" onClick={() => setShowPreview(true)} disabled={!canPreview} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Eye className="h-4 w-4" /> Preview client copy</button>
-              <button type="button" onClick={saveQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save quote</button>
+              <button type="button" onClick={saveQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> {draftEnvelope ? "Prepare quote" : "Save quote"}</button>
               <button type="button" onClick={sendQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:opacity-40"><Mail className="h-4 w-4" /> Send to client</button>
             </div>
           </div>

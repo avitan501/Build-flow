@@ -556,7 +556,7 @@ export async function saveClientQuoteAction(input: {
   return { ok: true, data: { clientSnapshot: parent.data.active_route_id ? data : null } };
 }
 
-export async function sendClientQuoteAction(comparisonId: string, expectedClientSnapshot?: unknown): Promise<ActionResult<{ recipient: string; providerId: string | null }>> {
+export async function sendClientQuoteAction(comparisonId: string, expectedClientSnapshot?: unknown, expectedDraftRevision?: number): Promise<ActionResult<{ recipient: string; providerId: string | null }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const safeComparisonId = cleanText(comparisonId, 100);
   const [comparisonResult, itemsResult, bidsResult, attachmentsResult] = await Promise.all([
@@ -607,7 +607,8 @@ export async function sendClientQuoteAction(comparisonId: string, expectedClient
     // must all agree; don't send a coworker's later save under this click.
     const manifest = [pdfAttachment, ...clientAttachments].map(attachment => { const bytes = Buffer.from(attachment.content,"base64"); return { filename:attachment.filename,sha256:createHash("sha256").update(bytes).digest("hex"),bytes:bytes.length }; });
     if (manifest.reduce((total,file)=>total+file.bytes,0)>25*1024*1024) return { ok:false, error:"The quote and attachments exceed 25 MB. Remove an attachment before sending." };
-    const claim = await createAdminClient().rpc("staff_claim_finalized_route_send", { p_comparison_id: comparison.id, p_route_id: finalized.route.id, p_actor_id: user.id, p_expected: expectedClientSnapshot ?? null, p_loaded: finalizedClientSnapshot(comparison, items), p_token: deliveryId, p_manifest:manifest });
+    if (expectedDraftRevision !== undefined && (!Number.isSafeInteger(expectedDraftRevision) || expectedDraftRevision < 0)) return { ok: false, error: "Review the prepared draft before sending." };
+    const claim = await createAdminClient().rpc(expectedDraftRevision === undefined ? "staff_claim_finalized_route_send" : "staff_claim_mixed_client_draft_send", { p_comparison_id: comparison.id, p_route_id: finalized.route.id, p_actor_id: user.id, p_expected: expectedClientSnapshot ?? null, p_loaded: finalizedClientSnapshot(comparison, items), p_token: deliveryId, p_manifest:manifest, ...(expectedDraftRevision === undefined ? {} : { p_expected_draft_revision: expectedDraftRevision }) });
     if (claim.error) return { ok: false, error: "This quote changed or delivery has already started. Reload and check delivery history before sending again." };
   }
   const delivery = await deliverEmailWithSupabaseFallback(
