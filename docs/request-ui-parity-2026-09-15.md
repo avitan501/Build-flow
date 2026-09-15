@@ -1,5 +1,7 @@
 # Request UI parity follow-up
 
+> Historical UI-parity release record. Scope and evidence below remain useful for that release, but any pending-state wording applies only to its checkpoint. Follow [Remaining work continuation — 2026-09-15](request-finish-today-2026-09-15.md) for subsequent fixes, deployment status, live verification, and remaining scope. Do not treat an older pending gate as a current failure, or candidate/local-test evidence as proof of a verified live deployment. This notice does not certify a new deployment.
+
 ## Scope and decisions
 
 User approved correcting the gap between approved UI/UX and live Steps 1–3, and additional Step 1 simplification. Base: verified production `683056426c31816f350099f33fa28b6a45cf4e85`, workflow34913868495 success, Vercel dpl_F7g3xkwDXEeH7vV1dpBMWAkty1gH, avantiabuild.com and Supabase nprfhspwdflpqlopydmp. No database or Edge changes in this release.

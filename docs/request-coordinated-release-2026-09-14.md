@@ -1,5 +1,7 @@
 # Coordinated request release — final publication gate
 
+> Historical release record. The checkpoint headings, pending gates, and exclusions below describe their original snapshots, not the current application. For subsequent implementation, database, deployment, and live-test results, read [Remaining work continuation — 2026-09-15](request-finish-today-2026-09-15.md). In particular, do not infer that payroll, AI extraction, or mixed-client drafts remain unimplemented from the older exclusions here. A candidate or migration record is not proof of a verified live application; use the latest explicit deployment and live-QA checkpoint. This notice does not certify a new deployment.
+
 ## Current frozen release (supersedes historical checkpoints below)
 
 User explicitly reauthorized publication of today's approved work. Root candidate `ca908e3d` plus test-only `e730deb2` preserves live base `8c79820c`. Root is the only production publisher. Primary dirty workspace remains untouched.
