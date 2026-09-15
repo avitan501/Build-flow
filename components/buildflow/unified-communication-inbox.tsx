@@ -2,6 +2,7 @@
 
 import { CommunicationMessageText } from "@/components/buildflow/communication-message-text"
 import { useCommunicationDraft } from "@/components/buildflow/use-communication-draft"
+import { useCommunicationConnections, type CommunicationConnections } from "@/components/buildflow/use-communication-connections"
 import { isAutomatedSender } from "@/lib/communication-presentation"
 
 import { ArrowLeft, Bot, CheckCheck, CircleAlert, ClipboardList, Clock3, ExternalLink, Mail, MapPin, MessageCircle, Paperclip, Pencil, Phone, Plus, Search, Send, Smartphone, Sparkles, UserRound, X } from "lucide-react"
@@ -36,17 +37,7 @@ export type AuraLeadRecipient = {
 }
 type MaterialRequestRecipient = { id: string; title: string; status: string }
 
-type Connections = {
-  voice?: {
-    receive: boolean
-    send: boolean
-    recording: boolean
-    phone: string | null
-  }
-  quo: { receive: boolean; send: boolean }
-  whatsapp: { receive: boolean; send: boolean }
-  email: { receive: boolean; send: boolean }
-}
+type Connections = CommunicationConnections
 
 type CommunicationDirectoryPayload = {
   contacts: AuraContactRow[]
@@ -351,7 +342,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   const updatesCursorRef = useRef(initialCursor)
   const syncCountRef = useRef(0)
   const [liveCommunications, setLiveCommunications] = useState(communications)
-  const [liveConnections, setLiveConnections] = useState(connections)
+  const { connections: liveConnections, state: connectionCheck, refresh: refreshConnections } = useCommunicationConnections(connections, draftScope)
   const [contacts, setContacts] = useState(initialContacts)
   const [customers, setCustomers] = useState(initialCustomers)
   const [leads, setLeads] = useState(initialLeads)
@@ -448,20 +439,6 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
       .catch(() => undefined)
     return () => controller.abort()
   }, [draftScope])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void fetch("/api/admin/communications/status", {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((result: { connections?: Connections } | null) => {
-        if (result?.connections) setLiveConnections(result.connections)
-      })
-      .catch(() => undefined)
-    return () => controller.abort()
-  }, [])
 
   useEffect(() => {
     let stopped = false
@@ -778,7 +755,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
     "subject",
   )
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
-  const selectedChannelReady = channel === "call" || (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send)
+  const selectedChannelReady = channel === "call" || (connectionCheck === "verified" && (channel === "sms" ? liveConnections.quo.send : channel === "whatsapp" ? liveConnections.whatsapp.send : liveConnections.email.send))
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
   const activeThreadHasMore = Boolean(activeConversation && (activeThreadHistory?.hasMore ?? true))
 
@@ -1148,6 +1125,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function sendUtilityTemplate() {
+    if (!selectedChannelReady) return
     const sentRecipient = recipient.trim()
     const selectedEntry = recipientOptions.find((entry) => entry.id === selectedRecipientId)
     const recipientLabel = activeConversation?.name || selectedEntry?.name || sentRecipient
@@ -1217,6 +1195,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   }
 
   function sendMessage() {
+    if (!selectedChannelReady) return
     if (channel === "call") return
     const messageChannel = channel
     const sentDraftText = message
@@ -1561,13 +1540,14 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                   ] as const
                 ).map(({ label, state }) => (
                   <span key={label} className="inline-flex min-w-0 items-center gap-1 rounded bg-white px-1.5 py-1">
-                    <i aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${state.receive && state.send ? "bg-emerald-500" : state.receive || state.send ? "bg-amber-500" : "bg-rose-500"}`} />
+                    <i aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${connectionCheck !== "verified" ? "bg-slate-400" : state.receive && state.send ? "bg-emerald-500" : state.receive || state.send ? "bg-amber-500" : "bg-rose-500"}`} />
                     <span className="truncate">
-                      {label}: {state.receive && state.send ? "Ready" : state.receive ? "Receive only" : state.send ? "Send only" : "Setup"}
+                      {label}: {connectionCheck === "checking" ? "Checking…" : connectionCheck === "unavailable" ? "Check unavailable" : state.receive && state.send ? "Ready" : state.receive ? "Receive only" : state.send ? "Send only" : "Setup"}
                     </span>
                   </span>
                 ))}
               </div>
+              <button type="button" disabled={connectionCheck === "checking"} onClick={refreshConnections} className="mt-1 min-h-11 text-[10px] font-semibold text-slate-500 disabled:opacity-50">Refresh connection status</button>
             </details>
             </details>
           </header>
@@ -2206,7 +2186,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                 </div>
               ) : null}
               {hasUnresolvedTemplatePlaceholder(message) ? <p className="mt-2 text-xs font-semibold text-amber-700">Replace the bracketed placeholder before sending.</p> : null}
-              {!selectedChannelReady ? <p className="mt-2 text-xs font-semibold text-amber-700">This channel still needs a connection.</p> : null}
+              {connectionCheck !== "verified" ? <div className="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600"><p role="status">{connectionCheck === "checking" ? "Checking connection…" : "Connection check unavailable. Your draft is safe."}</p><button type="button" disabled={connectionCheck === "checking"} onClick={refreshConnections} className="min-h-11 shrink-0 font-semibold text-[#0066cc] disabled:opacity-50">Retry check</button></div> : !selectedChannelReady ? <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700"><p role="status">This channel is not connected.</p><button type="button" onClick={refreshConnections} className="min-h-11 shrink-0 font-semibold text-[#0066cc]">Check again</button></div> : null}
               {feedback ? (
                 <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">
                   {feedback.text}

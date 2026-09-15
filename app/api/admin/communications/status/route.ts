@@ -19,5 +19,6 @@ export async function GET() {
   if (!access.communications) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const connections = await loadAuraConnectionStatus(session.supabase)
-  return NextResponse.json({ connections }, { headers: { "Cache-Control": "private, no-store" } })
+  if (!connections) return NextResponse.json({ verified: false, error: "Connection check temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store" } })
+  return NextResponse.json({ verified: true, connections }, { headers: { "Cache-Control": "private, no-store" } })
 }

@@ -195,6 +195,19 @@ export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
     body: { action: "status" },
   }).catch(() => ({ data: null }));
   const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
+  // Unknown is not disconnected. Callers must not turn a broker/network failure
+  // into false channel capabilities or ask staff to reconnect healthy accounts.
+  if (!brokerStatus) return null;
+  const reported = brokerStatus.connections;
+  const capabilities = [
+    reported?.email?.send ?? brokerStatus.email,
+    reported?.email?.receive ?? brokerStatus.emailReceive,
+    reported?.quo?.send ?? brokerStatus.sms,
+    reported?.quo?.receive ?? brokerStatus.smsReceive,
+    reported?.whatsapp?.send ?? brokerStatus.whatsapp,
+    reported?.whatsapp?.receive ?? brokerStatus.whatsapp,
+  ];
+  if (capabilities.some(value => typeof value !== "boolean")) return null;
   const brokerConnections = normalizeBrokerConnections(brokerStatus);
   return {
     voice: {
