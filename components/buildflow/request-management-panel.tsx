@@ -506,6 +506,10 @@ export function RequestManagementPanel({
 
   function openManualPricing(comparisonId?: string) {
     setFeedback("")
+    if (comparisonId) {
+      router.push(`/admin/quote-comparison/${comparisonId}`)
+      return
+    }
     startTransition(async () => {
       try {
         const result = await openRequestPricingComparisonAction(requestId, comparisonId)
