@@ -2,6 +2,9 @@ import "server-only"
 
 import { extractSupplierQuoteWithAi, type SupplierQuoteAiInvoker, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
 import { parseSupplierQuoteMetadata, parseSupplierQuoteText, supplierQuoteExtractionWarnings } from "@/lib/supplier-quote-parser"
+import { supplierQuotePageText } from "@/lib/supplier-quote-pdf-layout"
+import { hasVerifiedSourceRows } from "@/lib/supplier-quote-extraction-choice"
+import { expandSupplierQuoteCutLists } from "@/lib/supplier-quote-cut-list"
 
 const emptyMetadata: SupplierQuoteAiMetadata = {
   supplierName: "",
@@ -34,6 +37,18 @@ export async function extractSupplierQuoteFile(
     try {
       const result = await extractText(pdf, { mergePages: true })
       text = result.text
+      try {
+        const pages: string[] = []
+        for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 100); pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber)
+          pages.push(supplierQuotePageText((await page.getTextContent()).items))
+        }
+        const layoutText = pages.join("\n\f\n")
+        if (pdf.numPages <= 100 && hasVerifiedSourceRows(layoutText, parseSupplierQuoteText(layoutText), parseSupplierQuoteMetadata(layoutText).subtotal)) text = layoutText
+      } catch {
+        // Coordinate reconstruction is optional; preserve the original text
+        // and continue to visual AI if a PDF page cannot be reconstructed.
+      }
     } finally {
       await pdf.loadingTask?.destroy()
     }
@@ -61,8 +76,13 @@ export async function extractSupplierQuoteFile(
     }
   }
 
-  const items = aiResult?.items.length ? aiResult.items : parsedItems
-  const extractionNote = aiResult?.items.length
+  const verifiedSource = hasVerifiedSourceRows(text, parsedItems, parsedMetadata.subtotal)
+  const sourceItems = verifiedSource ? parsedItems : aiResult?.items.length ? aiResult.items : parsedItems
+  const expanded = verifiedSource ? expandSupplierQuoteCutLists(sourceItems) : sourceItems
+  const items = expanded.length <= 500 ? expanded : sourceItems
+  const extractionNote = verifiedSource
+    ? `${sourceItems.length} source rows extracted; line totals match the document subtotal.${items.length !== sourceItems.length ? ` ${items.length} comparison rows derived from complete printed cut lists; source pricing retained.` : " Printed pricing units preserved."} Review product matches and alternatives before routing.`
+    : aiResult?.items.length
     ? `${items.length} line item${items.length === 1 ? "" : "s"} extracted with OCR + AI. Review every value before routing.${aiResult.notes ? ` ${aiResult.notes}` : ""}`
     : items.length
       ? `${items.length} possible line item${items.length === 1 ? "" : "s"} extracted from document text. AI was unavailable or did not improve the result; review quantities and prices.`
@@ -72,13 +92,13 @@ export async function extractSupplierQuoteFile(
   const aiMetadata = aiResult?.metadata
   const metadata: SupplierQuoteAiMetadata = {
     ...(aiMetadata ?? emptyMetadata),
-    quoteNumber: aiMetadata?.quoteNumber || parsedMetadata.quoteNumber,
-    expiresOn: aiMetadata?.expiresOn || parsedMetadata.expiresOn,
-    deliveryCharge: aiMetadata?.deliveryCharge || parsedMetadata.deliveryCharge || 0,
-    taxPercent: aiMetadata?.taxPercent || parsedMetadata.taxPercent || 0,
+    quoteNumber: verifiedSource ? parsedMetadata.quoteNumber || aiMetadata?.quoteNumber || "" : aiMetadata?.quoteNumber || parsedMetadata.quoteNumber,
+    expiresOn: verifiedSource ? parsedMetadata.expiresOn || aiMetadata?.expiresOn || "" : aiMetadata?.expiresOn || parsedMetadata.expiresOn,
+    deliveryCharge: verifiedSource ? parsedMetadata.deliveryCharge ?? aiMetadata?.deliveryCharge ?? 0 : aiMetadata?.deliveryCharge || parsedMetadata.deliveryCharge || 0,
+    taxPercent: verifiedSource ? parsedMetadata.taxPercent ?? aiMetadata?.taxPercent ?? 0 : aiMetadata?.taxPercent || parsedMetadata.taxPercent || 0,
     leadTimeDays: aiMetadata?.leadTimeDays ?? parsedMetadata.leadTimeDays,
-    subtotal: aiMetadata?.subtotal ?? parsedMetadata.subtotal,
-    total: aiMetadata?.total ?? parsedMetadata.total,
+    subtotal: verifiedSource ? parsedMetadata.subtotal : aiMetadata?.subtotal ?? parsedMetadata.subtotal,
+    total: verifiedSource ? parsedMetadata.total : aiMetadata?.total ?? parsedMetadata.total,
   }
   return {
     text: text.slice(0, 250000),

@@ -85,13 +85,15 @@ function isoDate(value: string) {
 
 export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMetadata {
   const normalized = text.replace(/\r/g, "")
-  const quoteNumber = normalized.match(/^\s*(?:quote|quotation)(?:\s*(?:number|no\.?|#))?\s*:\s*([^\n]+)$/im)?.[1]?.trim().slice(0, 100) ?? ""
+  const quoteNumber = normalized.match(/^\s*(?:quote|quotation)(?:\s*(?:number|no\.?|#))?\s*:\s*([^\n]+)$/im)?.[1]?.trim().slice(0, 100)
+    ?? normalized.match(/^\s*QUOTE[ \t]*\n[ \t]*([A-Z0-9-]+)[ \t]*$/im)?.[1] ?? ""
   const expiresText = normalized.match(/\b(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*(\d{1,4}[/-]\d{1,2}[/-]\d{2,4})/i)?.[1]
-    ?? normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1] ?? ""
-  const deliveryCharge = amount(normalized.match(/^\s*(?:delivery|freight|shipping)(?:\s+(?:charge|fee))?\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
-  const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax(?:\s*\(\s*|\s*:\s*)([0-9]+(?:\.[0-9]+)?)\s*%\s*\)?\s*:?/im)?.[1])
-  let subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?subtotal\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
-  let total = amount(normalized.match(/^\s*(?:grand\s+)?total\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+    ?? normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1]
+    ?? normalized.match(/^\s*GOOD THROUGH\s*\n\s*(\d{1,2}\/\d{1,2}\/\d{4})/im)?.[1] ?? ""
+  const deliveryCharge = amount(normalized.match(/^\s*(?:delivery|freight|shipping)(?:\s+(?:charge|fee))?[ \t]*:?[ \t]+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax(?:\s*\(\s*|\s*:\s*|[ \t]+)([0-9]+(?:\.[0-9]+)?)\s*%\s*\)?\s*:?/im)?.[1])
+  let subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?sub[ \t]*total[ \t]*:?[ \t]+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  let total = amount(normalized.match(/^\s*(?:grand\s+)?total[ \t]*:?[ \t]+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
   // PDF text layers may separate the totals header from its values. Accept
   // only one distinct currency triplet that reconciles, never a material row.
   if (/\bSUBTOTAL\s+TAX\s+TOTAL\b/i.test(normalized)) {
@@ -118,6 +120,10 @@ export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMet
 
 export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem[] {
   const rows: ExtractedSupplierQuoteItem[] = []
+  // Dual-rate lumber tables explicitly distinguish Sale/Un from Sale/Ft.
+  // Require their header; never infer which of three numeric columns is price.
+  const dualRateTable = /Sale\s*\/\s*Un/i.test(text) && /Sale\s*\/\s*Ft/i.test(text)
+  const dualRate = new RegExp(`^(\\d+)\\s+([\\d,.]+)\\s+([A-Z0-9][A-Z0-9._/-]+)\\s+(.+?)\\s+(\\d+)\\s*['’′]\\s*(\\d*)\\s*["”″]\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
   // Common yard layout: quantity, SKU, description, pricing unit, price, total.
   // Keep every printed row: identical products can belong to different floors.
   const quantitySku = new RegExp(`^([0-9][0-9,.]*)\\s+([A-Z0-9][A-Z0-9._/-]{2,})\\s+(.+?)\\s+(${UNIT_PATTERN})\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
@@ -131,7 +137,7 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
     const originalLine = sourceLines[index]
     const line = originalLine.replace(/\s+/g, " ").trim()
     const startsMaterial = /^(?=[A-Z0-9._/-]*\d)[A-Z0-9][A-Z0-9._/-]{2,}\s+\S/i.test(line)
-    if (startsMaterial && !line.match(quantitySku) && !line.match(leading) && !line.match(trailing)) {
+    if (startsMaterial && !(dualRateTable && dualRate.test(line)) && !line.match(quantitySku) && !line.match(leading) && !line.match(trailing)) {
       let combined = line
       let consumed = index
       for (let next = index + 1; next < Math.min(sourceLines.length, index + 4); next += 1) {
@@ -154,6 +160,23 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
   let lastYardItem: ExtractedSupplierQuoteItem | null = null
   for (const originalLine of candidateLines) {
     const line = originalLine.replace(/\s+/g, " ").trim()
+    const dual = dualRateTable ? line.match(dualRate) : null
+    if (dual) {
+      const rowQuantity = quantity(dual[2])
+      const heading = dual[4].match(/^\*+\s*([^*]+?)\s*\*+$/)
+      if (!rowQuantity && heading) { section = heading[1].trim(); lastYardItem = null; continue }
+      if (!rowQuantity || heading) continue
+      const feet = Number(dual[5]), inches = Number(dual[6] || 0)
+      if (inches >= 12) continue
+      rows.push({
+        itemCode: dual[3], description: cleanDescription(dual[4]), quantity: rowQuantity,
+        unit: "each", unitPrice: amount(dual[7]), lineTotal: amount(dual[9]),
+        specification: [section ? `Section: ${section}` : "", feet || inches ? `Length: ${feet} ft${inches ? ` ${inches} in` : ""}` : "", `Document row: ${dual[1]}`, `Printed Sale/Un: ${dual[7]}; Sale/Ft: ${dual[8]}`].filter(Boolean).join(" · "),
+      })
+      lastYardItem = null
+      if (rows.length >= 500) break
+      continue
+    }
     const sectionHeading = line.match(/^([A-Za-z0-9][A-Za-z0-9 /]{2,60}?)\s*-{3,}$/)
     if (sectionHeading) {
       section = sectionHeading[1].trim()

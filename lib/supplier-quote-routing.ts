@@ -220,7 +220,7 @@ function comparisonMatchScore(
   requestItem: RequestMatchItem,
 ) {
   const quoteText =
-    `${quoteItem.item_code || ""} ${quoteItem.description} ${quoteItem.specification}`.trim()
+    `${quoteItem.item_code || ""} ${quoteItem.description} ${quoteItem.specification.split(" · Source pricing:")[0].split(" · Printed Sale/Un:")[0]}`.trim()
   const requestText =
     `${requestItem.description} ${requestItem.specification}`.trim()
   // A shared SKU is not sufficient when the same material is ordered on

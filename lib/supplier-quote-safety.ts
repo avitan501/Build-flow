@@ -82,7 +82,7 @@ function measures(value: string) {
 
 function qualifiers(value: string) {
   const text = ` ${normalize(value)} `
-  return ["regular", "type x", "fire rated", "moisture resistant", "mold resistant", "pressure treated", "untreated", "stainless", "galvanized", "copper", "brass", "pvc", "cpvc", "white", "black", "red", "blue", "threaded", "flanged"].filter((word) => text.includes(` ${word} `))
+  return ["regular", "type x", "fire rated", "moisture resistant", "mold resistant", "pressure treated", "untreated", "stainless", "galvanized", "copper", "brass", "pvc", "cpvc", "white", "black", "red", "blue", "threaded", "flanged", "face mount", "top mount"].filter((word) => text.includes(` ${word} `))
 }
 
 function wholeSku(requestText: string, code: string | null | undefined) {
