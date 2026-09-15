@@ -44,6 +44,15 @@ test('network error retains draft and retry; malformed storage warns',async({pag
   await page.evaluate(()=>sessionStorage.setItem('avantia:alternate-contacts:v1:actor-a','invalid'));await mount(page);await expect(page.getByRole('alert')).toContainText('recovery is unavailable');await expect(page.getByLabel('Alternate phone')).toBeEnabled()
 })
 
+test('legacy handlers cannot bypass revision-fenced account writes',()=>{
+  const source=readFileSync('app/account/actions.ts','utf8')
+  expect(source).not.toContain('export async function updateAccountName')
+  expect(source).not.toContain('export async function updateAccountPhone')
+  const legacy=source.slice(source.indexOf('export async function updateAlternateContacts'),source.indexOf('export async function updateNotificationPreferences'))
+  expect(legacy).toContain('requireSignedInProfile');expect(legacy).toContain('contacts-reload');expect(legacy).not.toContain('updateUser');expect(legacy).not.toContain('.update(')
+  expect(source).toContain('export async function setAccountPassword');expect(source).toContain('export async function updateNotificationPreferences')
+})
+
 test('server self-checks, validates, normalizes and forwards exact revision without auth writes',async()=>{
   let calls=0,last:unknown;const compiled=ts.transpileModule(readFileSync('app/account/contact-settings-action.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;const out:{saveAccountContacts?:(i:unknown)=>Promise<unknown>}={}
   new Function('require','exports',compiled)((id:string)=>id==='next/cache'?{revalidatePath:()=>{}}:id==='@/lib/auth-phone'?{normalizePhoneNumber}:{requireSignedInProfile:async()=>({user:{id:'actor-a'},supabase:{rpc:async(_name:string,args:unknown)=>{calls++;last=args;return{data:{ok:true,email:null,phone:null,revision:3},error:null}}}})},out)
