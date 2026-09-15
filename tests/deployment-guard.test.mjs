@@ -8,6 +8,8 @@ import {
   validateLiveRelease,
   validateReleaseContext,
   validateVercelStatus,
+  verifyDeploymentMirror,
+  triggerVercel,
 } from "../scripts/production-release-guard.mjs";
 
 const sha = "a".repeat(40);
@@ -20,6 +22,7 @@ function validContext(overrides = {}) {
     sha,
     headSha: sha,
     remoteMainSha: sha,
+    deploymentMainSha: sha,
     dirty: false,
     hasLocalVercelLink: false,
     hasStaleSupabaseRef: false,
@@ -58,6 +61,8 @@ test("preflight rejects every wrong production identity", () => {
     { repository: "someone/else" },
     { branch: "preview" },
     { remoteMainSha: "c".repeat(40) },
+    { deploymentMainSha: "c".repeat(40) },
+    { deploymentMainSha: undefined },
     { dirty: true },
     { hasLocalVercelLink: true },
     { hasStaleSupabaseRef: true },
@@ -73,6 +78,37 @@ test("preflight rejects every wrong production identity", () => {
       `Expected rejection for ${JSON.stringify(override)}`,
     );
   }
+});
+
+test("bound mirror must resolve exactly main, not an alias or a stale commit", () => {
+  assert.equal(verifyDeploymentMirror(sha, (args) => {
+    assert.deepEqual(args, ["ls-remote", "https://github.com/avitan501/Build-flow.git", "refs/heads/main"]);
+    return `${sha}\trefs/heads/main`;
+  }), sha);
+  for (const output of ["", `${parentSha}\trefs/heads/main`, `${sha}\trefs/heads/preview`, `${sha}\trefs/heads/main\n${sha}\trefs/heads/main`]) {
+    assert.throws(() => verifyDeploymentMirror(sha, () => output), /Release blocked/);
+  }
+  assert.throws(() => verifyDeploymentMirror(sha, () => { throw new Error("Access denied"); }), /Access denied/);
+});
+
+test("direct hook invocation fails closed before any POST when mirror is stale or unreadable", async () => {
+  let posts = 0;
+  const send = async () => { posts += 1; throw new Error("Unexpected POST"); };
+  for (const read of [() => `${parentSha}\trefs/heads/main`, () => "", () => { throw new Error("Access denied"); }]) {
+    await assert.rejects(triggerVercel({ GITHUB_SHA: sha, VERCEL_DEPLOY_HOOK_URL: "https://api.vercel.com/v1/integrations/deploy/synthetic" }, read, send));
+  }
+  assert.equal(posts, 0);
+});
+
+test("matching bound mirror allows one mocked hook POST", async () => {
+  let posts = 0;
+  await triggerVercel({ GITHUB_SHA: sha, VERCEL_DEPLOY_HOOK_URL: "https://api.vercel.com/v1/integrations/deploy/synthetic" },
+    () => `${sha}\trefs/heads/main`, async (_url, options) => {
+      assert.equal(options.method, "POST");
+      posts += 1;
+      return { ok: true, json: async () => ({ job: { id: "synthetic-job", state: "PENDING" } }) };
+    });
+  assert.equal(posts, 1);
 });
 
 test("Vercel status must be fresh and point to the exact team and project", () => {

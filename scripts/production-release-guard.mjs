@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 
 export const RELEASE_TARGET = Object.freeze({
   repository: "AV-Design-and-Build-Org/avantia-build",
+  deploymentRepository: "avitan501/Build-flow",
   branch: "main",
   domain: "https://avantiabuild.com",
   supabaseRef: "nprfhspwdflpqlopydmp",
@@ -49,6 +50,8 @@ export function validateReleaseContext(context) {
     errors.push("Checked-out commit does not match the requested release SHA.");
   if (context.sha !== context.remoteMainSha)
     errors.push("Release SHA is not the current canonical main commit.");
+  if (context.sha !== context.deploymentMainSha)
+    errors.push(`Release SHA is not the current ${expected.deploymentRepository} main commit used by the Vercel hook.`);
   if (context.dirty) errors.push("Release checkout must be clean.");
   if (context.hasLocalVercelLink)
     errors.push("Local .vercel links are forbidden for production releases.");
@@ -127,6 +130,16 @@ function trackedRuntimeContainsStaleRef() {
   }
 }
 
+export function verifyDeploymentMirror(sha, readGit = git) {
+  invariant(/^[a-f0-9]{40}$/i.test(sha || ""), "Release SHA must be a full 40-character commit SHA.");
+  const ref = `refs/heads/${RELEASE_TARGET.branch}`;
+  const output = readGit(["ls-remote", `https://github.com/${RELEASE_TARGET.deploymentRepository}.git`, ref]);
+  const rows = output.trim().split(/\r?\n/).filter(Boolean).map((line) => line.trim().split(/\s+/));
+  invariant(rows.length === 1 && rows[0].length === 2 && rows[0][1] === ref && rows[0][0] === sha,
+    `Release blocked: ${RELEASE_TARGET.deploymentRepository} main must match the exact release SHA before the Vercel hook is called. Synchronize the bound mirror first.`);
+  return rows[0][0];
+}
+
 function currentReleaseContext(env) {
   const remoteLine = git(["ls-remote", "origin", "refs/heads/main"]);
   const remoteMainSha = remoteLine.split(/\s+/)[0] || "";
@@ -141,6 +154,7 @@ function currentReleaseContext(env) {
     sha: env.GITHUB_SHA,
     headSha: git(["rev-parse", "HEAD"]),
     remoteMainSha,
+    deploymentMainSha: verifyDeploymentMirror(env.GITHUB_SHA),
     dirty: Boolean(git(["status", "--porcelain"])),
     hasLocalVercelLink:
       existsSync(".vercel/project.json") || existsSync(".vercel/repo.json"),
@@ -164,14 +178,16 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function triggerVercel(env) {
+export async function triggerVercel(env, readGit = git, send = fetch) {
+  // Recheck here too: direct trigger invocation must never bypass the mirror gate.
+  verifyDeploymentMirror(env.GITHUB_SHA, readGit);
   invariant(
     /^https:\/\/api\.vercel\.com\/v1\/integrations\/deploy\//.test(
       env.VERCEL_DEPLOY_HOOK_URL || "",
     ),
     "The scoped Vercel deploy hook is missing or invalid.",
   );
-  const response = await fetch(env.VERCEL_DEPLOY_HOOK_URL, { method: "POST" });
+  const response = await send(env.VERCEL_DEPLOY_HOOK_URL, { method: "POST" });
   invariant(response.ok, `Vercel deploy hook returned HTTP ${response.status}.`);
   const payload = await response.json().catch(() => null);
   const state = payload?.job?.state;
