@@ -6,6 +6,11 @@ export type DetectedQuantityUnit = {
   itemText: string
 }
 
+/** Intake envelopes describe a request/list, never an individual material amount. */
+function isIntakeQuantityUnit(unit: string | null | undefined) {
+  return /^(?:requests?|quotes?|lists?|projects?|jobs?)$/i.test(String(unit ?? "").trim())
+}
+
 export function resolveMaterialQuantityUnit(input: {
   sourceText: string
   extractedQuantity: number | null
@@ -13,13 +18,14 @@ export function resolveMaterialQuantityUnit(input: {
   structuredSource?: { quantity: number; unit: string | null } | null
 }) {
   const detected = detectExplicitQuantityUnit(input.sourceText)
-  const structuredQuantity = Number(input.structuredSource?.quantity)
+  const structured = isIntakeQuantityUnit(input.structuredSource?.unit) ? null : input.structuredSource
+  const structuredQuantity = Number(structured?.quantity)
   const aiQuantity = Number(input.extractedQuantity)
   const quantity = detected?.quantity
     ?? (Number.isFinite(structuredQuantity) && structuredQuantity > 0 ? structuredQuantity : null)
     ?? (Number.isFinite(aiQuantity) && aiQuantity > 0 ? aiQuantity : null)
   const unit = detected?.unit
-    || String(input.structuredSource?.unit ?? "").trim()
+    || String(structured?.unit ?? "").trim()
     || String(input.extractedUnit ?? "").trim()
   return { quantity, unit, detected }
 }
@@ -47,7 +53,7 @@ export function findStructuredMaterialSource(
 ) {
   const queryWords = materialWords(`${item.name} ${item.sourceText}`)
   const ranked = sources
-    .filter((source) => source.name.trim() && !/^free-text material list$/i.test(source.name.trim()))
+    .filter((source) => source.name.trim() && !isIntakeQuantityUnit(source.unit) && !/^free-text material list$/i.test(source.name.trim()))
     .map((source) => {
       const sourceWords = materialWords(`${source.name} ${source.details ?? ""}`)
       const overlap = [...sourceWords].filter((word) => queryWords.has(word)).length

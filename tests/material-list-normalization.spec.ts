@@ -13,6 +13,21 @@ const sidingFormats = [
   "| siding | 14 | squares |",
 ]
 
+test("generic intake quantity cannot overwrite document material amounts", () => {
+  for (const unit of ["request", "requests", "list", "quote", "project", "job"]) {
+    const container = { id: "intake", name: "Construction quote request", quantity: 1, unit, details: "182 sheets gypsum board; 10 cans metal flashing primer - HOLD" }
+    expect(findStructuredMaterialSource({ name: "Metal flashing primer", sourceText: "Primer for Metal Flashings 1-gallon cans 10 cans - HOLD" }, [container])).toBeNull()
+    expect(resolveMaterialQuantityUnit({ sourceText: "Primer for Metal Flashings 1-gallon cans 10 cans - HOLD", extractedQuantity: 10, extractedUnit: "cans", structuredSource: container })).toMatchObject({ quantity: 10, unit: "cans" })
+    expect(resolveMaterialQuantityUnit({ sourceText: "Temporary protection board 182 sheets - HOLD", extractedQuantity: 182, extractedUnit: "sheets", structuredSource: container })).toMatchObject({ quantity: 182, unit: "sheets" })
+  }
+})
+
+test("actual structured product quantities remain authoritative over AI defaults", () => {
+  const confirmed = { id: "product", name: "Metal flashing primer", quantity: 10, unit: "cans", details: "1-gallon cans - HOLD" }
+  expect(findStructuredMaterialSource({ name: "Metal flashing primer", sourceText: "Metal flashing primer" }, [confirmed])).toEqual(confirmed)
+  expect(resolveMaterialQuantityUnit({ sourceText: "Metal flashing primer", extractedQuantity: 1, extractedUnit: "each", structuredSource: confirmed })).toMatchObject({ quantity: 10, unit: "cans" })
+})
+
 for (const source of sidingFormats) {
   test(`detects an existing siding quantity and unit: ${source}`, () => {
     expect(detectExplicitQuantityUnit(source)).toMatchObject({ quantity: 14, unit: "squares" })
