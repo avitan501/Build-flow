@@ -1,5 +1,23 @@
 # Remaining work continuation — 2026-09-15
 
+## 03:32 UTC final candidate and database dependencies
+
+Final integrated verification:68draft/queue/history +14styledcomparison/payroll browser/helper tests PASS, standaloneTypeScript/targetedlint/diffPASS,10deploymentguardsPASS. Appbuild153PASS; portablefixturefd84d1ad introducednoappchange. Compatibilitymigrationreadbacknullsafe/authgrantonly confirmed. Productionclientdrafttable remains empty before controlledQA.
+
+- Rootintegrated mixed-client drafts a9960d14 (fb7e6d46), compatibility2ae6b84e (22a46ad2), historicalclock10eaf82a+d283c808, portabletestfixturefd84d1ad. Full153build/TSC PASS before SQL-onlycompat/test-onlyfixture;68draft/queue/history tests PASS, finalsmallregressions/standaloneTSC running. Initialhistorytest usedundeclaredesbuild; corrected toexistingTypeScript/Reactbundler, noaddeddependency.
+- ExactdraftSQL5e76ea8c61c0ea9fede4ea6625763a6f0a26d9ae3deb66894c0a73376b9470d6 APPLIED20260915032604. Beforeapply3installedbusinessfunctionhashes matchedcapturedtestschema. Independent141constraints31triggers/revisions/atomicPrepare+claim/oldbypass/forgedrevision testsPASS. Table/newbusinessRPCs serviceonly; noanon/authdirectaccess.
+- Latecompatibilityfinding: initiallegacyhelpernamedactorcheck narrowedexistingcapabilitystaff. Append-onlyff3c7821e9eeadd116e26954714ffba1d573ad6f9c7a123da7caef6fe9bd806b APPLIED20260915033106 restoringadminORsupplierscapability/nullfailclosed; namedmixedauthorizationunchanged. Nooriginalmigrationrewrite. KnownDavid/Carlosunaffectedduringinterval; noobservedcustomerfailure. Readbackhelperhash09d01e6ed5510c71c59a66bb215d07a5, authEXECtrue/anon+servicefalse; actualcapability-onlylegacySave/revoked/nullhelperlocaltestsPASS.
+- Mixedonly: incomplete rawdraftautosaves, atomicPrepareack andrevision-boundSend; legacysingle-suppliermanualSave remains. FurthereditsafterPrepare requireexplicitreview/reload. Notuniversalautosave ornewpartialpaymentledger.
+- Carlosproductionreadonlypermissionprobe underactualUID+authenticatedrole, NULLday: bothPaid/Unpaidowner_only42501; nofinancialchange. HistoricalcheckoutUIonly awaitingapprelease; actualSep11endtimeawaitsowner.
+- QA livepersistence plannedONLY syntheticcomparison5195039c...: beforeactiveNULL/0drafts/0routes, norealcontact. Normalfakechoices/finalize, blankdraft+marker/reload, thennormalreopen/restorechoices androotexactCASnewdraftcleanup; immutableQAroutehistory retained. Notexecutedyet. NoPrepare/Send/order/payment.
+
+## 03:18 UTC live proof
+
+- c5b88a9d6d1e798354a5e49c8d39a137f23bb935 is LIVE; CI34923948685SUCCESS, Verceldpl_EvvrosUU24eQmfp8YJwNNwX9krCD READY andcanonicalalias/exactrelease/ref verified.
+- ExistingCarlos browser390/1440: filtersQA2/framing39/roof62 PASS; repaired66sticks/66sections/10each display PASS. Own-page simulated503 showed unavailable notdisconnected, disabledSend whilelocaldraftfilled; automatic retry reachedreal200 verified:true emailready without losingbody/subject. NoSend; exact2ownedtabdraftkeys restored;19browsernonGETblocked;0pageerrors/overflow. Report /tmp/avantia-live-readiness-c5b88a9d-report.json. GET routes can have existing server recovery side effects; this is no explicit business mutation, not zero-all-database-writes certification.
+- AI28 seven downloadablecodefiles matchfixedpayload exactly (deno.lock omitted bydownload), worker8 threefiles exact; job38 completedgeneration67. Independent all62checkpointqty/unit/source/ID/HOLD reconciliation PASS. No engineering/order approval implied.
+- PayrollreadonlyCarlosUI$5/hr, requestpayvisible, Paid/Unpaidabsent. OldSep11missingcheckout not inpayroll because completed_work_msNULL; noactualhours guessed. UI-onlyhistoricalstatusfix inprogress; owneraskedactualfinish/breaks separately.
+
 ## 03:04 UTC verified state (supersedes earlier pending states)
 
 ### 03:10 UTC release candidate
