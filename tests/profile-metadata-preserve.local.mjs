@@ -14,7 +14,8 @@ const originalFile = read('supabase/migrations/20260812121023_add_scoped_staff_p
 const original = originalFile.slice(originalFile.indexOf('create or replace function private.handle_new_user()'), originalFile.indexOf('create or replace function public.staff_update_customer_contact'));
 const migration = read('supabase/migrations/20260915044821_preserve_profile_edits_on_unrelated_metadata.sql');
 const check = (expression, label) => assert.equal(sql(`select (${expression})::text;`), 'true', label);
-assert.equal(run(['run', '-d', '--rm', '--network', 'none', '--name', container, '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', 'postgres:16-alpine']).status, 0);
+const postgresImage = process.env.PG_TEST_IMAGE || 'postgres:17-alpine';
+assert.equal(run(['run', '-d', '--rm', '--network', 'none', '--name', container, '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', postgresImage]).status, 0);
 try {
   let ready = false;
   for (let i = 0; i < 60; i++) {
