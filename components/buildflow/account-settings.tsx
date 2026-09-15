@@ -1,6 +1,7 @@
 import { Bell, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
 
 import { setAccountPassword, updateNotificationPreferences } from "@/app/account/actions";
+import { AccountContactAutosave } from "@/components/buildflow/account-contact-autosave";
 import { AccountPhoneAutosave } from "@/components/buildflow/account-phone-autosave";
 import { AccountNameAutosave } from "@/components/buildflow/account-name-autosave";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
@@ -11,6 +12,8 @@ type AccountSettingsProps = {
   profile: ProfileRecord | null;
   alternateEmail: string | null;
   alternatePhone: string | null;
+  contactRevision: number;
+  contactsUnavailable?: boolean;
   notificationEmail: boolean;
   notificationSms: boolean;
   feedbackCode?: string | null;
@@ -18,7 +21,7 @@ type AccountSettingsProps = {
 };
 
 const errorMessages: Record<string, string> = {
-  "contacts-reload": "Alternate contacts are temporarily unavailable while safe autosave is being enabled. Your saved contacts are preserved.",
+  "contacts-reload": "Reload this page to edit your contacts safely.",
   name: "Enter a valid name.",
   phone: "Enter a valid phone number.",
   "alternate-email": "Enter a valid alternate email.",
@@ -52,7 +55,7 @@ function SectionCard({ icon: Icon, title, description, children, className = "" 
   </section>;
 }
 
-export function AccountSettings({ email, profile, alternateEmail, alternatePhone, notificationEmail, notificationSms, feedbackCode, feedbackTone }: AccountSettingsProps) {
+export function AccountSettings({ email, profile, alternateEmail, alternatePhone, contactRevision, contactsUnavailable, notificationEmail, notificationSms, feedbackCode, feedbackTone }: AccountSettingsProps) {
   const feedbackText = feedbackCode
     ? feedbackTone === "error"
       ? errorMessages[feedbackCode] || "Account could not be updated."
@@ -79,11 +82,7 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
 
         <SectionCard icon={Mail} title="Email & contact" description="Login email and alternate contact details.">
           <div className="rounded-lg border border-[#071126]/8 bg-white/65 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">Login email</p><p className="mt-1 break-words text-sm font-semibold text-[#071126]">{email || profile?.email || "Not available"}</p></div>
-          <div className="mt-3 grid gap-3">
-            <label className="grid gap-1.5 text-sm font-semibold">Alternate email<input disabled type="email" value={alternateEmail || ""} className={inputClass} /></label>
-            <label className="grid gap-1.5 text-sm font-semibold">Alternate phone<input disabled type="tel" value={alternatePhone || ""} className={inputClass} /></label>
-            <p role="status" className="text-xs text-amber-800">Alternate contacts are temporarily unavailable while safe autosave is being enabled. Your saved contacts are preserved.</p>
-          </div>
+          <AccountContactAutosave key={profile?.id || "unavailable"} actorId={profile?.id || ""} initial={{ email: alternateEmail, phone: alternatePhone, revision: contactRevision }} unavailable={contactsUnavailable} inputClass={inputClass} />
         </SectionCard>
 
         <SectionCard icon={KeyRound} title="Password & security" description="After secure sign-in, you may set a password for later use.">

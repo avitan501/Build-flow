@@ -11,14 +11,17 @@ type AccountPageProps = {
 
 export default async function AccountPage({ searchParams }: AccountPageProps) {
   const params = (await searchParams) ?? {};
-  const { user, profile } = await requireSignedInProfile();
+  const { user, profile, supabase } = await requireSignedInProfile();
+  const contacts = await supabase.from("account_contact_settings").select("alternate_email,alternate_phone,revision").eq("user_id", user.id).maybeSingle();
 
   return (
     <AccountSettings
       email={contactEmailForDisplay(user.email) || null}
       profile={profile}
-      alternateEmail={typeof user.user_metadata.alternate_email === "string" ? user.user_metadata.alternate_email : null}
-      alternatePhone={typeof user.user_metadata.alternate_phone === "string" ? user.user_metadata.alternate_phone : null}
+      alternateEmail={contacts.data?.alternate_email ?? null}
+      alternatePhone={contacts.data?.alternate_phone ?? null}
+      contactRevision={Number(contacts.data?.revision ?? 0)}
+      contactsUnavailable={Boolean(contacts.error)}
       feedbackCode={params.error || params.updated || null}
       feedbackTone={params.error ? "error" : params.updated ? "success" : null}
       notificationEmail={user.user_metadata.notification_email !== false}
