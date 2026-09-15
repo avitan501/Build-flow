@@ -73,6 +73,25 @@ test('zero missing details shows honest empty state and retains current ready it
   await expect(page.getByRole('button',{name:'Next item needing details',exact:true})).toHaveCount(0)
 })
 
+test('acknowledged rows stay resolved after Next while refresh is held; newer server versions win', async({page})=>{
+  await fixture(page);await needs(page).click()
+  await page.evaluate(()=>{(window as unknown as {holdRefresh:boolean}).holdRefresh=true})
+  await page.getByRole('combobox',{name:'Sheet size'}).selectOption('4 x 8 ft.')
+  await expect(needs(page)).toHaveText('Needs details1')
+  await page.getByRole('button',{name:'Next item needing details',exact:true}).click()
+  await expect(needs(page)).toHaveText('Needs details1');await expect(rows(page)).toHaveCount(1)
+  await expect(rows(page).first()).toContainText('CDX plywood B')
+  await all(page).click();await rows(page).filter({hasText:'CDX plywood A'}).click()
+  await expect(page.getByRole('combobox',{name:'Sheet size'})).toHaveCount(0)
+  await page.evaluate(()=>{
+    const w=window as unknown as {initial: Array<{revision:string}>;renderProducts:(products:unknown[])=>void}
+    w.renderProducts(w.initial.map((product,index)=>index===0?{...product,revision:'external-change'}:product))
+  })
+  await expect(needs(page)).toHaveText('Needs details2')
+  await expect(page.getByRole('alert')).toContainText('This product or its original source changed.')
+  expect(await page.evaluate(()=>(window as unknown as {calls:unknown[]}).calls.length)).toBe(1)
+})
+
 test('filter toggles preserve incoming conflict and never resubmit',async({page})=>{
   await fixture(page,'conflict');await needs(page).click();await page.getByRole('combobox',{name:'Sheet size'}).selectOption('4 x 8 ft.')
   await expect(page.getByRole('alert')).toContainText('This product or its original source changed.')

@@ -26,6 +26,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
   const [feedback, setFeedback] = useState("")
   const [priceOpen, setPriceOpen] = useState(false)
   const [filter, setFilter] = useState<"all" | "needs-details">("all")
+  const [acknowledged, setAcknowledged] = useState<Record<string, { version: ProductVersion; baseline: string }>>({})
   const [pending, startTransition] = useTransition()
   const busy = useRef(false)
   const restored = useRef(false)
@@ -33,9 +34,12 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
   const current = products.find(({ item }) => item.id === selectedId) || null
   const latest = pendingVersion || (current && reviewed && hasIncomingItemRevision(current.revision, reviewed.revision, baselineRevision) ? current : null)
   const shown = reviewed && reviewed.item.id === selectedId ? reviewed : current
-  // Acknowledged edits can arrive before router.refresh. Use that same visible
-  // version for counts, but never conceal an incoming server/source conflict.
-  const workingProducts = products.map(product => shown && product.item.id === shown.item.id && !latest ? shown : product)
+  // Keep acknowledgments across item navigation while refreshed props lag. An
+  // unrelated server/source revision always wins over an acknowledged overlay.
+  const workingProducts = products.map(product => {
+    const saved = acknowledged[product.item.id]
+    return saved && product.revision === saved.baseline ? saved.version : product
+  })
   const needsAttention = workingProducts.filter(({ item }) => materialReviewStatus(item) !== "ready" && materialReviewReasons(item).length)
   const needsAttentionIds = new Set(needsAttention.map(({ item }) => item.id))
   // Keep the current row and its Undo receipt reachable when an answer resolves
@@ -65,9 +69,15 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
   function openProduct(id: string) {
     if (busy.current) return
     setSelectedId(id); setField(null); setReceipt(null); setFeedback(""); setLatest(null); setPriceOpen(false)
-    setReviewed(products.find(({ item }) => item.id === id) || null)
+    setReviewed(workingProducts.find(({ item }) => item.id === id) || null)
     setBaselineRevision(products.find(({ item }) => item.id === id)?.revision || null)
     requestAnimationFrame(() => panel.current?.focus())
+  }
+
+  function acknowledge(version: ProductVersion) {
+    const baseline = products.find(({ item }) => item.id === version.item.id)?.revision
+    if (baseline) setAcknowledged(previous => ({ ...previous, [version.item.id]: { version, baseline } }))
+    setReviewed(version)
   }
 
   function save(choiceField?: string, value?: string, undo = false) {
@@ -83,7 +93,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
           if ("conflict" in result && result.conflict) setLatest({ item: result.item, source: result.source, revision: result.revision })
           return
         }
-        setReviewed({ item: result.item, source: result.source, revision: result.revision })
+        acknowledge({ item: result.item, source: result.source, revision: result.revision })
         setReceipt(result.receiptId); setFeedback(undo ? "Edit undone" : "Saved")
         router.refresh()
       } catch { setFeedback("Not saved. Your existing product is unchanged. Try again.") }
@@ -124,7 +134,7 @@ export function RequestItemReviewList({ requestId, actorId, products, defaultZip
               {choices.length > 1 ? <button type="button" disabled={pending} onClick={() => setField(choices[(choices.indexOf(activeChoice) + 1) % choices.length].field)} className="mt-1 min-h-11 text-xs font-bold text-amber-900">Next question · {choices.length} remaining</button> : null}
             </div> : <p className="mt-3 text-xs text-slate-600">{materialReviewReasons(shown.item).join(" · ") || "No missing details flagged."}</p>}
             <div className="mt-2 flex items-center justify-between gap-2"><p role="status" className="text-xs text-slate-600">{pending ? "Saving…" : feedback || (shown.item.metadata?.ai_organized === true ? "Answers save automatically" : "Edits save automatically")}</p>{receipt && shown.item.metadata?.ai_organized === true ? <button type="button" disabled={pending} onClick={() => save(undefined, undefined, true)} className="min-h-11 px-2 text-xs font-bold text-[#0066cc]">Undo edit</button> : null}</div>
-            <OriginalRequestItemEditor actorId={actorId} requestId={requestId} item={shown.item} itemKind={shown.item.metadata?.ai_organized === true ? "organized" : "original"} revision={shown.revision} onReviewedSave={(result) => { setReviewed({ item: result.item, source: result.source, revision: result.revision }); setReceipt(result.receiptId); setFeedback("Saved") }} onOriginalSaved={() => { setReviewed(null); setBaselineRevision(null); setLatest(null); setReceipt(null); setFeedback("Saved"); }} buttonLabel="Edit details" />
+            <OriginalRequestItemEditor actorId={actorId} requestId={requestId} item={shown.item} itemKind={shown.item.metadata?.ai_organized === true ? "organized" : "original"} revision={shown.revision} onReviewedSave={(result) => { acknowledge({ item: result.item, source: result.source, revision: result.revision }); setReceipt(result.receiptId); setFeedback("Saved") }} onOriginalSaved={() => { setReviewed(null); setBaselineRevision(null); setLatest(null); setReceipt(null); setFeedback("Saved"); }} buttonLabel="Edit details" />
             <details className="mt-2"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-500">Product tools</summary>
               <label className="grid gap-1 text-xs text-slate-600">Product group<select aria-label="Product group" value={shown.item.department} disabled={pending} onChange={(event) => { const department = event.target.value; if (busy.current) return; busy.current = true; startTransition(async () => { try { const result = await moveRequestItemDepartmentAction({ requestId, itemId: shown.item.id, department }); setFeedback(result.ok ? "Group saved" : result.error); if (result.ok) router.refresh() } catch { setFeedback("Group was not saved.") } finally { busy.current = false } }) }} className="min-h-11 rounded-lg border bg-white px-2">{[...new Set([shown.item.department, "Unassigned", "Plumbing", "Electrical", "Flooring", "Framing", "Drywall", "Paint", "Other materials"])].filter(Boolean).map((department) => <option key={department}>{department}</option>)}</select></label>
               <button type="button" onClick={() => setPriceOpen(!priceOpen)} className="min-h-11 text-xs font-semibold text-[#0066cc]">Online prices</button>
