@@ -2,12 +2,12 @@ import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
 
 export async function runAiCombined(sql,container,database) {
- assert.equal(container,'avantia-ai-combined-20260915');
+ assert.equal(container,'avantia-ai-current-20260915');
  const request='00000000-0000-4000-8000-000000000120';
  const item='00000000-0000-4000-8000-000000000121';
  const actor='00000000-0000-4000-8000-000000000002';
  const lease='00000000-0000-4000-8000-000000000123';
- const role=`set request.jwt.claims='{"role":"service_role"}';`;
+ const role=`set request.jwt.claims='{"role":"service_role"}';set role service_role;`;
  sql(`insert into quote_requests(id,project_id,owner_id,title) values('${request}','00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001','AI synthetic concurrency');
  insert into quote_request_items(id,request_id,project_id,owner_id,name,department,item_type,quantity,unit) values('${item}','${request}','00000000-0000-4000-8000-000000000010','00000000-0000-4000-8000-000000000001','Original preserved','General','material',1,'each');
  insert into client_material_list_jobs(request_id,status,generation,ai_chunk_lease) values('${request}','processing',1,'${lease}');`);
@@ -19,14 +19,14 @@ export async function runAiCombined(sql,container,database) {
   return new Promise((resolve,reject)=>{
    const p=spawn('docker',['exec','-i',container,'psql','-X','-U','postgres','-d',database,'-At','-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose']);
    let output='';p.stdout.on('data',d=>{output+=d;onData?.(String(d));});p.stderr.on('data',d=>output+=d);
-   p.on('error',reject);p.on('close',code=>resolve({code,output}));p.stdin.end(role+`set statement_timeout='8s';set deadlock_timeout='300ms';`+text);
+   p.on('error',reject);p.on('close',code=>resolve({code,output}));p.stdin.end(`set statement_timeout='8s';set deadlock_timeout='300ms';`+role+text);
   });
  }
  const edit=`select staff_apply_request_item_edit('${request}','${item}','${actor}',gen_random_uuid(),(select jsonb_build_object('name',name,'department',department,'quantity',quantity,'unit',unit,'metadata',metadata,'qualification_status',qualification_status) from quote_request_items where id='${item}'),null,null,'{"name":"Edit preserved"}');`;
  let unlock;
  const locked=new Promise(resolve=>unlock=resolve);
  const first=query(`begin;${edit}select 'EDIT_LOCKED';select pg_sleep(1);commit;`,t=>{if(t.includes('EDIT_LOCKED'))unlock();});
- await locked;
+ await Promise.race([locked,first.then(r=>{throw Error('Editor exited before lock marker: '+r.output);})]);
  const second=query(publication);
  assert.equal((await first).code,0);
  const stale=await second;assert.notEqual(stale.code,0);assert.match(stale.output,/stale_job/);
@@ -37,7 +37,7 @@ export async function runAiCombined(sql,container,database) {
  let start;
  const started=new Promise(resolve=>start=resolve);
  const publisher=query(`begin;select id from client_material_list_jobs where id=${job} for update;select 'JOB_LOCKED';select pg_sleep(1);${publication}commit;`,t=>{if(t.includes('JOB_LOCKED'))start();});
- await started;
+ await Promise.race([started,publisher.then(r=>{throw Error('Publisher exited before lock marker: '+r.output);})]);
  const editor=query(edit.replace('Edit preserved','Second edit preserved'));
  const result=await Promise.all([publisher,editor]);
  console.log('Publication-first outcomes:',JSON.stringify(result));
@@ -61,7 +61,7 @@ export async function runAiCombined(sql,container,database) {
  let fileLocked;
  const fileReady=new Promise(resolve=>fileLocked=resolve);
  const fileFirst=query(`begin;${attachment}select 'FILE_LOCKED';select pg_sleep(1);commit;`,t=>{if(t.includes('FILE_LOCKED'))fileLocked();});
- await fileReady;
+ await Promise.race([fileReady,fileFirst.then(r=>{throw Error('Attachment exited before lock marker: '+r.output);})]);
  const afterFile=query(publication);
  assert.equal((await fileFirst).code,0);
  assert.match((await afterFile).output,/stale_job/);
@@ -70,7 +70,7 @@ export async function runAiCombined(sql,container,database) {
  let fileStart;
  const fileStarted=new Promise(resolve=>fileStart=resolve);
  const beforeFile=query(`begin;select id from client_material_list_jobs where id=${job} for update;select 'JOB_LOCKED';select pg_sleep(1);${publication}commit;`,t=>{if(t.includes('JOB_LOCKED'))fileStart();});
- await fileStarted;
+ await Promise.race([fileStarted,beforeFile.then(r=>{throw Error('Publisher exited before attachment marker: '+r.output);})]);
  const fileSecond=query(attachment.replace('ai-lock.pdf','ai-lock-second.pdf'));
  const fileOutcomes=await Promise.all([beforeFile,fileSecond]);
  assert.equal(fileOutcomes[0].code,0,fileOutcomes[0].output);
@@ -84,7 +84,7 @@ export async function runAiCombined(sql,container,database) {
  let held;
  const heldReady=new Promise(resolve=>held=resolve);
  const readLock=query(`begin;select id from quote_request_items where id='${item}' for update;select 'SOURCE_HELD';select pg_sleep(1);commit;`,t=>{if(t.includes('SOURCE_HELD'))held();});
- await heldReady;
+ await Promise.race([heldReady,readLock.then(r=>{throw Error('Source lock exited before marker: '+r.output);})]);
  const publishRetry=await query(publication);
  assert.match(publishRetry.output,/55P03/);
  assert.equal((await readLock).code,0);

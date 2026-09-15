@@ -10,7 +10,7 @@ const meta = JSON.parse(read('tests/fixtures/request-schema-metadata-20260914.js
 const indexes = JSON.parse(read('tests/fixtures/request-schema-indexes-20260914.json'));
 const grants = JSON.parse(read('tests/fixtures/request-schema-grants-20260914.json'));
 const database = `noam_combined_${Date.now()}`;
-const container = 'avantia-ai-combined-20260915';
+const container = 'avantia-ai-current-20260915';
 // Capture the optional candidate once; reject a mismatched frozen hash rather
 // than accidentally test a moving worktree under a previous version label.
 const mixed = process.argv[2] ? readFileSync(process.argv[2],'utf8') : null;
@@ -43,7 +43,7 @@ try {
  create table public.test_push_events(kind text);
  create function public.queue_manager_push_event(text,text,text,text,text,text) returns void language sql as $$insert into public.test_push_events values($1)$$;
  grant usage on schema auth,private to authenticated,service_role;
- grant select on auth.users to service_role;`);
+ revoke all on auth.users from service_role;`);
  const tables = [...new Set(meta.columns.map(c=>c.table_name))];
  for(const table of tables) sql(`create table public.${quote(table)} (${meta.columns.filter(c=>c.table_name===table).map(c=>`${quote(c.column_name)} ${c.type}${c.not_null?' not null':''}${c.default_expression?' default '+c.default_expression:''}`).join(',')}); alter table public.${quote(table)} enable row level security;`);
  for(const c of [...meta.constraints.filter(c=>c.kind!=='f'),...meta.constraints.filter(c=>c.kind==='f')]) sql(`alter table public.${quote(c.table_name)} add constraint ${quote(c.name)} ${c.definition};`);
@@ -65,6 +65,16 @@ try {
  if(mixed !== null) {
   sql(mixed); console.log('Installed mixed migration SHA256 '+mixedHash);
  }
+ sql(read('supabase/migrations/20260915002415_request_actor_identity_helper.sql'));
+ sql('revoke usage on schema private from service_role;');
+ // Fresh read-only production metadata, no simplified permissive payroll table.
+ const payroll=JSON.parse(read('tests/fixtures/manager-goals-schema-20260915.json'));
+ sql(`create table public.manager_goals (${payroll.columns.map(c=>`${quote(c.name)} ${c.type}${c.not_null?' not null':''}${c.default?' default '+c.default:''}`).join(',')}); alter table public.manager_goals enable row level security;`);
+ for(const constraint of payroll.constraints) sql(`alter table public.manager_goals add ${constraint};`);
+ for(const p of payroll.policies) sql(`create policy ${quote(p.policyname)} on public.manager_goals as ${p.permissive} for ${p.cmd} to ${p.roles.map(quote).join(',')}${p.qual?' using ('+p.qual+')':''}${p.with_check?' with check ('+p.with_check+')':''};`);
+ for(const t of payroll.triggers.filter(t=>!t.definition.includes('guard_daily_pay_fields'))) {sql(t.function);sql(t.definition+';');}
+ for(const g of payroll.grants) sql(`grant ${g.privilege_type} on public.manager_goals to ${quote(g.grantee)};`);
+ sql(read('supabase/migrations/20260914185259_carlos_payroll_authority.sql'));
  sql(read('tests/request-migrations-combined.local.sql'));
  if(process.argv[2]) { sql(read('tests/request-mixed-client-flow.local.sql')); console.log('PASS: mixed A/B allocation, displayed client CAS, claim and bypass guards'); }
  console.log('PASS: combined schema, roles, receipt/source fence, choices and trusted match interactions');
@@ -77,5 +87,21 @@ try {
  sql(`create table public.supplier_packages(id uuid primary key,request_id uuid);
  create or replace function auth.jwt() returns jsonb language sql stable security definer set search_path='' as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb || jsonb_build_object('email',(select email from auth.users where id=auth.uid()))$$;`);
  sql(read('supabase/migrations/20260914180138_resumable_material_list_chunks.sql'));
+ sql(`do $$begin
+ assert not has_table_privilege('service_role','auth.users','select');
+ assert not has_schema_privilege('service_role','private','usage');
+ assert not has_function_privilege('authenticated','public.publish_material_list_checkpoint(bigint,bigint,uuid,text,jsonb,text,text)','execute');
+ assert not has_function_privilege('anon','public.claim_material_list_checkpoint_jobs(integer)','execute');
+ assert has_function_privilege('service_role','public.claim_material_list_checkpoint_jobs(integer)','execute');
+ end $$;`);
  await runAiCombined(sql,container,database);
+ sql(`set test.actor='00000000-0000-4000-8000-000000000002';set role authenticated;
+ do $$begin assert jsonb_typeof(public.carlos_payroll_days())='array';
+ begin perform public.set_carlos_day_paid(current_date,true,0);raise exception 'Carlos paid authority escaped';exception when insufficient_privilege then null;end;
+ end $$;reset role;
+ set test.actor='00000000-0000-4000-8000-000000000003';set role authenticated;
+ do $$begin
+ begin perform public.carlos_payroll_days();raise exception 'Unauthorized payroll read';exception when insufficient_privilege then null;end;
+ end $$;reset role;`);
+ console.log('PASS current actor permissions + real payroll schema + AI service-only grants and contention');
 } finally { sql(`drop database ${database} with (force);`,'postgres'); }
