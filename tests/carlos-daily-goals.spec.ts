@@ -54,20 +54,19 @@ test("record goals count only Carlos activity for eligible unique records", () =
   expect(countUniqueRecordActivity(receipts, "quote_requests", new Set(["request-2"]))).toBe(0)
 })
 
-test("Carlos dashboard counts successful persisted activity without manual self-reporting", async () => {
+test("Carlos dashboard removes daily wins and its queries while preserving activity recording", async () => {
   const [page, card, workflowActions, leadActions] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/carlos-daily-scorecard.tsx"), "utf8"),
     readFile(path.join(root, "app/preview-admin/workflow-actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/lead-actions.ts"), "utf8"),
   ])
-  expect(page).toContain('eq("email", "buildavantiap@gmail.com")')
-  expect(page).toContain('lead.status !== "new"')
-  expect(page).toContain("countUniqueRecordActivity")
-  expect(page).toContain("countUniqueSuccessfulCommunications")
-  expect(page).toContain('neq("contact_status", "not_contacted")')
-  expect(page).toContain('in("document_type", ["estimate", "invoice"])')
-  expect(page).toContain('eq("status", "closed")')
+  expect(page).not.toContain("CarlosDailyScorecard")
+  expect(page).not.toContain("buildCarlosDailyGoals")
+  expect(page).not.toContain("manager_staff_activity_events")
+  expect(page).not.toContain("quote_request_supplier_recommendations")
+  expect(page).not.toContain("request_client_documents")
+  expect(page).toContain('aria-label="Carlos tasks"')
   expect(workflowActions).toContain('entity_type: "quote_requests"')
   expect(leadActions).toContain('entity_type: "manager_outreach_leads"')
   expect(card).toContain("Carlos daily wins")
