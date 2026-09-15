@@ -79,6 +79,16 @@ test("workspace keeps draft warning and existing cheapest computation, not award
   expect(card).toContain("focus({ preventScroll: true })")
 })
 
+test("product-first parity discloses controls without removing finalization safety", async () => {
+  const workspace = await readFile("components/buildflow/quote-comparison-workspace.tsx", "utf8")
+  expect(workspace).toContain('aria-controls="product-workspace-tools"')
+  expect(workspace).toContain('hidden={activeStep === 0 && !workspaceToolsOpen}')
+  expect(workspace).toContain('!locked && !previewMode && productPreview.selectedCount > 0')
+  expect(workspace).toContain('choiceAutosave.conflict || !choiceSourceReviewed || productPreview.selectedCount !== items.length')
+  expect(workspace).toContain('aria-label="Finalize product choices · Continue to client"')
+  expect(workspace).not.toContain('fixed inset-x-0 bottom-0 z-30')
+})
+
 for (const width of [390,1440]) test(`product accordion opens only one product and preserves review evidence at ${width}px`, async ({page})=>{
   const cssRoot=process.env.PLAYWRIGHT_FIXTURE_CSS_ROOT || ".next/static/css"
   const css=readdirSync(cssRoot).filter(name=>name.endsWith(".css")).map(name=>readFileSync(`${cssRoot}/${name}`,"utf8")).join("\n")

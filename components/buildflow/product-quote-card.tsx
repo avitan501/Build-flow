@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react"
+import { CheckCircle2, ChevronDown, FileText } from "lucide-react"
 import { formatComparisonMoney } from "@/lib/quote-comparison"
 import type { buildProductQuotePreview } from "@/lib/product-quote-preview"
 import { ProductMatchReview } from "@/components/buildflow/product-match-review"
@@ -31,18 +31,18 @@ function ProductOfferRow({ row, offer, onSelect, choiceDisabled = false, beforeC
       })
     }} aria-label={`Choose ${offer.bid.supplier_name_snapshot} for ${row.item.description} in draft`} className="mt-1 h-5 w-5 shrink-0 accent-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500" />
     <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{offer.bid.supplier_name_snapshot}</span>
-      {source ? <span className="mt-1 block whitespace-pre-wrap break-words text-xs leading-5 text-slate-600" aria-label="Original supplier wording">{source}</span> : <span className="mt-1 block text-xs text-slate-500">Source wording not recorded</span>}
-      <span className="mt-1 flex flex-wrap gap-1 text-[10px] font-bold">
-        {lowest ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800">Lowest eligible price</span> : null}
-        {selected ? <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800">{finalized ? "Finalized choice" : "Draft choice"}</span> : null}
+      {source ? <span className="mt-1 flex items-start gap-1.5 whitespace-pre-wrap break-words text-xs leading-5 text-slate-600" aria-label="Original supplier wording"><FileText aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0"/>{source}</span> : <span className="mt-1 block text-xs text-slate-500">Source wording not recorded</span>}
+      <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        {lowest ? <span className="sr-only">Lowest eligible price</span> : null}
+        {selected ? <span className="inline-flex items-center gap-1 text-sky-800"><CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5"/>{finalized ? "Finalized choice" : "Draft choice"}</span> : null}
         {offer.status === "review" ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Match needs review · excluded</span> : null}
         {offer.blocked ? <span className="rounded bg-rose-100 px-1.5 py-0.5 text-rose-800">Supplier excluded</span> : null}
-        {source && offer.matchStatus === "exact" ? <span className="text-slate-600">Source wording matches</span> : null}
+        {source && offer.matchStatus === "exact" && !selected ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5"/>Source wording matches</span> : null}
         {offer.confirmation ? <span className="text-sky-800">Match reviewed by {offer.confirmation.actor_label}</span> : null}
       </span>
     </span>
     <span className="max-w-[40%] break-words text-right text-sm font-bold tabular-nums">{offer.status === "unavailable" ? "Unavailable" : offer.status === "unknown" ? "No quote" : offer.unitPrice === null ? "—" : `${formatComparisonMoney(offer.unitPrice)} / ${row.item.unit}`}
-      <span className="mt-1 block text-[10px] font-normal text-slate-500">{offer.status === "unknown" ? "Availability unknown" : offer.status === "unavailable" ? "Marked unavailable" : offer.lineTotal === null ? "Quantity needs review" : `${formatComparisonMoney(offer.lineTotal)} product total`}</span>
+      <span className={`${offer.status === "unknown" || offer.status === "unavailable" || offer.lineTotal === null ? "mt-1 block" : "sr-only"} text-[10px] font-normal text-slate-500`}>{offer.status === "unknown" ? "Availability unknown" : offer.status === "unavailable" ? "Marked unavailable" : offer.lineTotal === null ? "Quantity needs review" : `${formatComparisonMoney(offer.lineTotal)} product total`}</span>
     </span>
   </label>{beforeConfirm && offer.status === "review" && !offer.blocked ? <ProductMatchReview item={row.item} bid={offer.bid} disabled={choiceDisabled} beforeConfirm={beforeConfirm}/> : null}</>
 }
@@ -52,8 +52,7 @@ export function ProductQuoteCard({ row, onSelect, onClear, onReview, choiceDisab
   return <article className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white" data-testid="product-quote-card">
     <details name="requested-product-offers" className="group/product">
     <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 [&::-webkit-details-marker]:hidden"><div className="min-w-0 flex-1">
-      <div className="flex items-start justify-between gap-2"><h3 className="min-w-0 break-words text-sm font-bold leading-5">{row.item.description}</h3><span className="max-w-[45%] shrink-0 break-words text-right text-xs font-bold text-[#0066cc]">{row.item.quantity.toLocaleString()} {row.item.unit}</span></div>
-      {row.item.specification ? <p className="mt-1 break-words text-xs leading-5 text-slate-600">{row.item.specification}</p> : null}
+      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1"><h3 className="min-w-0 break-words text-sm font-bold leading-5">{row.item.description}</h3>{row.item.specification ? <span className="break-words text-sm leading-5 text-slate-600">· {row.item.specification}</span> : null}<span className="break-words text-sm text-slate-600">· {row.item.quantity.toLocaleString()} {row.item.unit}</span></div>
       {row.selected ? <p className="mt-1 break-words text-xs text-sky-800">{finalized ? "Finalized" : "Draft"} · {row.selected.bid.supplier_name_snapshot} · {formatComparisonMoney(row.selected.unitPrice!)} / {row.item.unit}</p> : <p className="mt-1 text-xs text-slate-500">{row.offers.length} quote entries{reviewCount ? ` · ${reviewCount} need review` : ""}</p>}
       {!row.validQuantity ? <p className="mt-1 text-xs font-semibold text-rose-700">Check requested quantity.</p> : !row.lowest ? <p className="mt-1 text-xs font-semibold text-amber-800">No confirmed price yet.</p> : null}
     </div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 group-open/product:rotate-180" aria-hidden="true"/></summary>

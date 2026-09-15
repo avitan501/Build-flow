@@ -147,6 +147,7 @@ export function QuoteComparisonWorkspace({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [workspaceToolsOpen, setWorkspaceToolsOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => procurementRoute && !routeError ? 4 : items.length === 0 ? 1 : bids.length === 0 ? 2 : 0);
   const [finalizeKey] = useState(() => crypto.randomUUID());
   const [productSelections, setProductSelections] = useState<Record<string, string>>(procurementRoute ? Object.fromEntries(procurementRoute.items.map((item) => [item.item_id, item.bid_id])) : initialProductSelections);
@@ -459,8 +460,8 @@ export function QuoteComparisonWorkspace({
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f7] pb-24 text-slate-950">
-      <div className="border-b border-slate-200 bg-white px-3 py-3 sm:px-8 sm:py-5 lg:px-10">
+    <main className={`min-h-screen pb-12 text-slate-950 ${activeStep === 0 ? "bg-white" : "bg-[#f5f5f7]"}`}>
+      <div hidden={activeStep === 0 && !workspaceToolsOpen} className="border-b border-slate-200 bg-white px-3 py-3 sm:px-8 sm:py-5 lg:px-10">
         <div className="mx-auto max-w-[96rem]">
           {previewMode ? <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Preview</span> : <Link href="/admin/quote-comparison" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Comparisons</Link>}
           <div className="mt-2 flex items-end justify-between gap-3 sm:mt-4">
@@ -483,15 +484,15 @@ export function QuoteComparisonWorkspace({
         </div>
       </div>
 
-      <div className="mx-auto max-w-[96rem] px-2.5 py-3 sm:px-8 sm:py-5 lg:px-10">
-        <nav className="sticky top-2 z-20 mb-4 grid grid-cols-5 overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur" aria-label="Quote comparison steps">
+      <div className={`mx-auto px-4 py-5 sm:px-8 sm:py-8 ${activeStep === 0 ? "max-w-5xl" : "max-w-[96rem] lg:px-10"}`}>
+        <nav hidden={activeStep === 0 && !workspaceToolsOpen} className="mb-4 grid grid-cols-5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 [&[hidden]]:hidden" aria-label="Quote comparison steps">
           {([
             { step: 0 as const, label: "Products", meta: `${productPreview.comparableCount}/${items.length}` },
             { step: 1 as const, label: "Materials", meta: `${items.length}` },
             { step: 2 as const, label: "Edit prices", meta: `${pricedSupplierLines}/${totalSupplierLines}` },
             { step: 3 as const, label: "Route", meta: hasFinalRoute ? "✓" : "" },
             { step: 4 as const, label: "Client", meta: hasFinalRoute ? "Ready" : "Locked" },
-          ]).map((entry) => <button key={entry.step} type="button" onClick={() => setActiveStep(entry.step)} disabled={entry.step === 4 && !hasFinalRoute} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
+          ]).map((entry) => <button key={entry.step} type="button" onClick={() => { setActiveStep(entry.step); if (entry.step === 0) setWorkspaceToolsOpen(false); }} disabled={entry.step === 4 && !hasFinalRoute} aria-current={activeStep === entry.step ? "page" : undefined} className={`min-h-11 min-w-0 rounded-lg px-1 py-1 text-center transition disabled:cursor-not-allowed disabled:opacity-40 ${activeStep === entry.step ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><span className="block text-[9px] font-black sm:text-xs">{entry.label}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${activeStep === entry.step ? "text-white/70" : "text-slate-400"}`}>{entry.meta}</span></button>)}
         </nav>
         {showDetails ? (
           <section className="mb-5 border border-slate-200 bg-white p-5 shadow-sm">
@@ -507,37 +508,42 @@ export function QuoteComparisonWorkspace({
 
         {error ? <div role="alert" className="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div> : null}
         {message ? <div role="status" className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">{message}</div> : null}
-        {previewMode ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
+        {previewMode && activeStep !== 0 ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 
-        {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="space-y-4">
+        {activeStep === 0 ? <section aria-labelledby="product-comparison-heading" data-testid="product-comparison-overview" className="flex flex-col gap-4">
           {routeError ? <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{routeError}</p> : null}
-          {!locked && !previewMode ? <button type="button" onClick={finalizeChoices} disabled={pending || pricesNeedSaving || choiceAutosave.conflict || !choiceSourceReviewed || productPreview.selectedCount !== items.length || items.length === 0} className="min-h-11 w-full rounded-lg bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-40">Finalize product choices · Continue to client</button> : null}
-          {!previewMode ? <div className="text-xs" role="status" aria-live="polite">
+          {!locked && !previewMode && productPreview.selectedCount > 0 ? <div className="order-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"><p className="text-xs text-slate-500">{productPreview.selectedCount} of {items.length} products chosen · draft</p><button type="button" aria-label="Finalize product choices · Continue to client" onClick={finalizeChoices} disabled={pending || pricesNeedSaving || choiceAutosave.conflict || !choiceSourceReviewed || productPreview.selectedCount !== items.length || items.length === 0} className="min-h-11 rounded-lg bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-40">Continue to client</button></div> : null}
+          {!previewMode ? <div className="order-5 border-t border-slate-100 pt-3 text-xs" role="status" aria-live="polite">
             {!choiceSourceReviewed ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
             <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (!choiceSourceReviewed && choiceAutosave.status === "saved" ? "Product choices need review" : choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
             {choiceAutosave.error ? choiceAutosave.conflict ? <button type="button" onClick={()=>window.location.reload()} className="min-h-11 font-semibold underline">Reload and review</button> : <button type="button" onClick={()=>void choiceAutosave.retry()} className="min-h-11 font-semibold underline">Retry saving choices</button> : null}
           </div> : null}
-          <header className="flex flex-wrap items-center justify-between gap-3 px-1 py-2">
-            <div><h2 id="product-comparison-heading" className="text-lg font-bold sm:text-xl">Supplier quotes</h2>
-            <p className="mt-1 text-xs text-slate-600">{items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")).length} to review</p></div>
+          <header className="flex flex-wrap items-center justify-between gap-3 pb-2">
+            <div className="min-w-0 flex-1"><p className="mb-2 flex min-w-0 items-center gap-2 text-xs text-slate-500"><span className="shrink-0 font-medium uppercase tracking-wider">Step 2</span><span aria-hidden="true">·</span><span className="truncate" title={comparison.title}>{comparison.title}</span></p><h1 id="product-comparison-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">Supplier quotes</h1>
+            <p className="mt-2 text-sm text-slate-500">{items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")).length} to review</p></div>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={()=>setActiveStep(2)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-semibold text-sky-800"><Plus className="h-4 w-4"/>Add / edit quote</button>
-              <details className="relative"><summary className="min-h-11 cursor-pointer rounded-lg px-3 py-3 text-xs font-semibold">More</summary><div className="absolute right-0 z-30 grid w-64 gap-2 rounded-xl border bg-white p-2 shadow-lg">
-              <button type="button" onClick={() => setProductSelections(productPreview.cheapestSelections)} disabled={!productPreview.comparableCount || locked || pricesNeedSaving || choiceAutosave.conflict} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Draft lowest prices</button>
-              <button type="button" onClick={() => setActiveStep(2)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">Edit prices / review matches</button>
-              </div></details>
+              <button type="button" aria-label="Add quote" onClick={()=>setActiveStep(2)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-sky-500 bg-white px-3 text-xs font-semibold text-sky-800"><Plus className="h-4 w-4"/><span className="hidden sm:inline">Add quote</span></button>
+              <button type="button" aria-expanded={workspaceToolsOpen} aria-controls="product-workspace-tools" onClick={()=>setWorkspaceToolsOpen(value=>!value)} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-slate-500">{workspaceToolsOpen ? "Less" : "More"}</button>
             </div>
           </header>
-          {procurementRoute ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm"><p className="font-bold">Finalized choices · No orders sent</p><p>{procurementRoute.suppliers.map(supplier => supplier.supplier_name).join(" + ")} · {formatComparisonMoney(procurementRoute.landed_total)} including supplier delivery and tax</p></div> : <details aria-label="Draft selection summary" className="rounded-lg border border-slate-200 bg-white px-3 py-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-600">{previewMode ? "Temporary choices · not saved · no orders sent" : "Draft product choices · no orders sent"}</summary><div className="pb-3">
+          <div hidden={!workspaceToolsOpen} id="product-workspace-tools" className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="mb-3 break-words text-xs text-slate-600">{comparison.title}</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setProductSelections(productPreview.cheapestSelections)} disabled={!productPreview.comparableCount || locked || pricesNeedSaving || choiceAutosave.conflict} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Draft lowest prices</button>
+              <button type="button" onClick={() => setActiveStep(2)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-bold">Edit prices / review matches</button>
+              <button type="button" onClick={() => setActiveStep(3)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Whole-order routes and client pricing</button>
+            </div>
+          </div>
+          {procurementRoute ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm"><p className="font-bold">Finalized choices · No orders sent</p><p>{procurementRoute.suppliers.map(supplier => supplier.supplier_name).join(" + ")} · {formatComparisonMoney(procurementRoute.landed_total)} including supplier delivery and tax</p></div> : <details hidden={!workspaceToolsOpen} aria-label="Draft selection summary" className="order-3 rounded-lg border border-slate-200 bg-white px-3 py-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-semibold text-slate-600">{previewMode ? "Temporary choices · not saved · no orders sent" : "Draft product choices · no orders sent"}</summary><div className="pb-3">
             <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-sky-950">{previewMode ? "Temporary preview · Not saved" : "Draft product choices"}</h3><p className="mt-1 text-xs leading-5 text-sky-900">Materials only. Excludes delivery and tax.</p></div><button type="button" onClick={() => setProductSelections({})} disabled={!productPreview.selectedCount || locked || pricesNeedSaving || choiceAutosave.conflict} className="min-h-11 shrink-0 rounded-lg border border-sky-200 bg-white px-3 text-xs font-bold text-sky-950 disabled:opacity-40">Clear draft</button></div>
             <details className="mt-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Preview details and ordering checks</summary><p className="text-xs leading-5 text-sky-900">{previewMode ? "Resets on reload." : "Product choices save automatically; supplier price edits use Save prices."} Does not place an order, select a final route, or contact suppliers. Splitting products can add delivery fees, minimum-order requirements, or change quoted prices. Prices use the current request-row units; no unit conversion is performed here. Confirm units, availability and final charges before ordering. This is not a lowest delivered-order total.</p></details>
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>}
           <div className="grid gap-2">{productPreview.rows.map((row) => <ProductQuoteCard key={row.item.id} row={row} finalized={Boolean(procurementRoute && !routeError)} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} beforeConfirm={previewMode ? undefined : choiceAutosave.flush} />)}</div>
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setActiveStep(3)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold">Whole-order routes and client pricing</button><p className="self-center text-xs text-slate-500">Draft product selections do not change the final route.</p></div>
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_20px_rgba(15,23,42,.08)] backdrop-blur"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="mx-auto grid max-w-[92rem] grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>
+          <div hidden={!workspaceToolsOpen} className="order-3 rounded-lg bg-slate-50 p-3"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="grid grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>
+          {previewMode ? <p className="order-5 border-t border-slate-100 pt-3 text-xs text-slate-500">Temporary choices · not saved · no orders sent</p> : null}
         </section> : null}
 
         {activeStep === 1 ? <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
@@ -674,7 +680,7 @@ export function QuoteComparisonWorkspace({
           previewMode={previewMode}
         /></div> : null}
 
-        {!previewMode ? <details className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details> : null}
+        {!previewMode ? <details hidden={activeStep === 0 && !workspaceToolsOpen} className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details> : null}
       </div>
     </main>
   );
