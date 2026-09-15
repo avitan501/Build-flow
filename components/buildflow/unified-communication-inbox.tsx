@@ -773,7 +773,7 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
   )
   const [subject, setSubject, subjectStorageFailed, clearSentSubject] = useCommunicationDraft(
     draftScope,
-    `${channel}:${channel === "email" ? recipient.trim().toLowerCase() || "__new__" : normalizeAuraPhone(recipient) || recipient || "__new__"}`,
+    activeKey === "__new__" ? `${activeKey}:${channel}` : `${channel}:${channel === "email" ? recipient.trim().toLowerCase() : normalizeAuraPhone(recipient) || recipient}`,
     defaultSubject,
     "subject",
   )
