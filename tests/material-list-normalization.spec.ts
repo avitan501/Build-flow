@@ -165,6 +165,15 @@ test("removes only redundant quantity and unit review reasons", () => {
   ], detected)).toEqual(["Siding color is missing"])
 })
 
+test("generic named intake envelopes remain excluded with absent units", () => {
+  for (const name of ["Construction quote request", "Direct material request", "Material request", "Quote request"]) {
+    for (const unit of [null, ""]) {
+      expect(findStructuredMaterialSource({name: "Protection board", sourceText: "Protection board 182 sheets - HOLD"}, [{id: "envelope", name, unit, quantity: 1, details: "Protection board 182 sheets - HOLD"}])).toBeNull()
+    }
+  }
+  expect(findStructuredMaterialSource({name: "Protection board", sourceText: "Protection board"}, [{id: "product", name: "QA test Protection board", unit: "sheets", quantity: 182}])?.quantity).toBe(182)
+})
+
 test("does not infer invalid or absent quantities", () => {
   expect(detectExplicitQuantityUnit("-5 squares siding")).toBeNull()
   expect(detectExplicitQuantityUnit("siding without quantity")).toBeNull()

@@ -53,7 +53,7 @@ export function findStructuredMaterialSource(
 ) {
   const queryWords = materialWords(`${item.name} ${item.sourceText}`)
   const ranked = sources
-    .filter((source) => source.name.trim() && !isIntakeQuantityUnit(source.unit) && !/^free-text material list$/i.test(source.name.trim()))
+    .filter((source) => source.name.trim() && !isIntakeQuantityUnit(source.unit) && !/^(?:free-text material list|construction quote request|direct material request|material request|quote request)$/i.test(source.name.trim()))
     .map((source) => {
       const sourceWords = materialWords(`${source.name} ${source.details ?? ""}`)
       const overlap = [...sourceWords].filter((word) => queryWords.has(word)).length
