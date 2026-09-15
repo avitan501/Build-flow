@@ -12,7 +12,7 @@ const response = (value: unknown = output) => ({ status: "completed", output: [{
 
 test("database capacity and concurrency failures stay distinct without leaking details", () => {
   expect(materialListDatabaseFailure({code:"53300",message:"private"},"checkpoint_unavailable")).toBe("database_capacity")
-  for (const code of ["40P01","40001"]) expect(materialListDatabaseFailure({code,message:"private"},"checkpoint_unavailable")).toBe("database_retry")
+  for (const code of ["40P01","40001","55P03"]) expect(materialListDatabaseFailure({code,message:"private"},"checkpoint_unavailable")).toBe("database_retry")
   expect(materialListDatabaseFailure({message:"source_changed"},"checkpoint_unavailable")).toBe("source_changed")
   expect(materialListDatabaseFailure({message:"private"},"checkpoint_unavailable")).toBe("checkpoint_unavailable")
 })

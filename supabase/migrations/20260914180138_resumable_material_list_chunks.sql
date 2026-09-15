@@ -35,6 +35,12 @@ begin
   if tg_op='UPDATE' and old.source_party='supplier' and new.source_party='supplier' then return new; end if;
  end if;
  v_request:=case when tg_op='DELETE' then old.request_id else new.request_id end;
+ -- Source row writers must never wait for a job holder that may itself need
+ -- this source row (claim/enqueue/finish/publication). Fail the entire edit
+ -- transaction with 55P03 instead; no generation/source/checkpoint is changed.
+ perform j.id from public.client_material_list_jobs j
+   where j.request_id=v_request or (tg_op='UPDATE' and j.request_id=old.request_id)
+   order by j.id for update nowait;
  update public.client_material_list_jobs set generation=generation+1,updated_at=now() where request_id=v_request;
  if tg_op='UPDATE' and old.request_id is distinct from new.request_id then
   update public.client_material_list_jobs set generation=generation+1,updated_at=now() where request_id=old.request_id;
@@ -135,6 +141,11 @@ begin
   if coalesce(auth.jwt()->>'role','') <> 'service_role' then raise exception 'service_only' using errcode='42501'; end if;
   select * into v_job from public.client_material_list_jobs where id=p_job_id for update;
   if v_job.id is null or v_job.generation<>p_generation or v_job.status<>'processing' or v_job.ai_chunk_lease is distinct from p_lease or p_lease is null then raise exception 'stale_job'; end if;
+  -- Lock the current source before reading its revision or writing organized
+  -- rows. NOWAIT preserves the source writer instead of introducing a cycle.
+  perform id from public.quote_requests where id=v_job.request_id for update nowait;
+  perform id from public.quote_request_items where request_id=v_job.request_id order by id for update nowait;
+  perform id from public.quote_request_attachments where request_id=v_job.request_id order by id for update nowait;
   select * into v_checkpoint from private.client_material_list_checkpoints where job_id=p_job_id and generation=p_generation for update;
   if v_checkpoint.job_id is null or v_checkpoint.source_fingerprint<>p_fingerprint or v_checkpoint.source_revision is distinct from private.material_list_source_revision(v_job.request_id) then raise exception 'source_changed'; end if;
   if v_checkpoint.published_at is not null then
@@ -189,7 +200,15 @@ begin
   select * into v_job from public.client_material_list_jobs where id=p_job_id for update;
   if v_job.id is null or p_generation is null or v_job.generation is distinct from p_generation or v_job.status<>'processing' or v_job.ai_chunk_lease is distinct from p_lease or p_lease is null then return 'stale'; end if;
   if p_succeeded is null then raise exception 'invalid_result'; end if;
-  if p_succeeded and not exists (
+  -- A non-forced job may legitimately find an existing organized list and do
+  -- no provider work. Validate that no-op against locked current rows rather
+  -- than requiring a fabricated publication checkpoint.
+  if p_succeeded and p_result_status='already_organized' and not v_job.force_requested then
+    perform id from public.quote_request_items where request_id=v_job.request_id order by id for update nowait;
+    if not exists(select 1 from public.quote_request_items where request_id=v_job.request_id and metadata->>'ai_organized'='true') then
+      raise exception 'checkpoint_not_published';
+    end if;
+  elsif p_succeeded and not exists (
     select 1 from private.client_material_list_checkpoints c where c.job_id=p_job_id and c.generation=p_generation
       and c.published_at is not null and c.source_revision is not distinct from private.material_list_source_revision(v_job.request_id)
   ) then raise exception 'checkpoint_not_published'; end if;

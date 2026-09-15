@@ -31,7 +31,7 @@ export function materialListDatabaseFailure(cause: unknown, fallback: string): s
   if (cause && typeof cause === "object") {
     const error = cause as {code?:unknown;message?:unknown}
     if(error.code==="53300") return "database_capacity"
-    if(error.code==="40P01" || error.code==="40001") return "database_retry"
+    if(error.code==="40P01" || error.code==="40001" || error.code==="55P03") return "database_retry"
     if(["stale_job","source_changed","organized_work_in_use"].includes(String(error.message))) return String(error.message)
   }
   return safeMaterialListFailure(fallback)
