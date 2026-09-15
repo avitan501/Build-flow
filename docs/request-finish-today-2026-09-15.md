@@ -1,5 +1,13 @@
 # Remaining work continuation — 2026-09-15
 
+## 04:06 UTC summary verified live; phone ready for final release
+
+- Summary release `b627952e8aa354a4e52c5458f5ae515582f4dd27` LIVE: CI34926748778 success, Vercel `dpl_BcUNReUN1WrJLcACgjUGLoerwQPz` READY/canonicalalias/exact production release/ref verified.
+- Second controlled synthetic run verified blank-price persistence and honest Incomplete/—/— totals at390/1440, no document overflow. Normal reopen/clear cleanup passed without retry. Root CAS-deleted exactly the second newly owned QA draft (revision2/fullrowhash/marker/actor/restoredparent guards). Final zero drafts/send claims, no client/active route, review/draft status, all original item and bid rows unchanged. Two immutable synthetic route histories retained, choices revision23. No customer quote/message/payment/order sent. Evidence `/tmp/avantia-client-draft-QA-DRAFT-20260915-SUMMARY-{persist,cleanup}.json` and `-summary-390.png`.
+- Integrated primary contact phone autosave9d8aa225 (Daniel1225c7cb), self-only CAS, strict normalization, actor-scoped pending recovery, explicit retry/conflict review after return. No auth-phone/login/security/alternate-metadata changes or SQL. Root combined153build/68browsertests PASS; independent32phone tests PASS. This remains primary phone only, not universal autosave.
+- Tiny Client-tab availability label Ready to Open preserves Locked/disabled behavior; it does not imply financial readiness. Independent21comparison tests and targetedlint PASS.
+- Final phone formatting-only live test is planned, not executed: identical digits/canonical phone, exact profile/auth hashes before/after, no login/password/other profile changes. Await final deployed candidate and fresh baseline.
+
 ## 03:49 UTC live verification and controlled cleanup
 
 - LIVE release `863e3e21c9a55aecd3f4aa0e95bd5f30f08cb074`: CI `34925476159` success; Vercel `dpl_GpfB7VnziDuRMa6noGBpH841Gk3r` READY, canonical avantiabuild.com alias and exact production release/Supabase ref verified.
