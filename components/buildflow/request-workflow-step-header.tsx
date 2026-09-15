@@ -50,7 +50,7 @@ export function RequestWorkflowStepHeader({
   requestId: string
   step: 1 | 2 | 3 | 4
   title: string
-  detail: string
+  detail?: string
   status: WorkflowStepStatus
   icon: WorkflowStepIcon
   totalSteps?: number
@@ -70,7 +70,7 @@ export function RequestWorkflowStepHeader({
         <span className="min-w-[8rem] flex-1">
           <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of {totalSteps}</span>
           <span className="mt-1 flex items-start gap-2 text-base font-black leading-5 tracking-[-0.01em] text-[#12263f] sm:items-center sm:text-lg"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#8b6a27] sm:mt-0" /><span className="line-clamp-2 sm:line-clamp-1">{title}</span></span>
-          <span className="mt-0.5 hidden text-xs font-medium text-slate-500 group-open/step:block sm:text-sm">{detail}</span>
+          {detail ? <span className="mt-0.5 hidden text-xs font-medium text-slate-500 group-open/step:block sm:text-sm">{detail}</span> : null}
           {badges ? <span className="mt-1 hidden flex-wrap gap-1 group-open/step:flex">{badges}</span> : null}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open/step:rotate-180" aria-hidden="true" />

@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation"
 import { Check, ChevronDown, Circle, X } from "lucide-react"
 import { updateRequestWorkflowStepDetailsAction } from "@/app/owner/materials/requests/actions"
 import { REQUEST_GUIDE_STEPS, type requestWorkflowGuidance } from "@/lib/request-workflow-guidance"
-import { requestStepAttention, type RequestStep, type RequestStepPatch, type RequestStepState } from "@/lib/request-step-state"
+import { requestStepAttention, requestStepDisplayStatus, type RequestStep, type RequestStepPatch, type RequestStepState } from "@/lib/request-step-state"
 import type { RequestActivityEvent } from "@/components/buildflow/request-activity-log"
 import { formatSiteDateTime } from "@/lib/site-date-time"
 
 type StepDraft = { state: RequestStepState; patch: RequestStepPatch; pending: boolean; error: string; review?: boolean; latest?: RequestStepState | null }
 type Workspace = { steps: StepDraft[]; available: boolean; change: (step: RequestStep, patch: RequestStepPatch, debounce?: boolean) => void; flush: (step: RequestStep, retry?: boolean) => void; resolve: (step: RequestStep, keep: boolean) => void; refresh: () => void }
 const Context = createContext<Workspace | null>(null)
+const GuidanceContext = createContext<{ step: number; waiting: boolean } | undefined>(undefined)
 export function useRequestStepWorkspace() { return useContext(Context) }
 
-export function RequestStepWorkspace({ initial, available, actorId, saveAction = updateRequestWorkflowStepDetailsAction, children }: { initial: RequestStepState[]; available: boolean; actorId: string; saveAction?: typeof updateRequestWorkflowStepDetailsAction; children: ReactNode }) {
+export function RequestStepWorkspace({ initial, available, actorId, guidance, saveAction = updateRequestWorkflowStepDetailsAction, children }: { initial: RequestStepState[]; available: boolean; actorId: string; guidance?: { step: number; waiting: boolean }; saveAction?: typeof updateRequestWorkflowStepDetailsAction; children: ReactNode }) {
   const router = useRouter()
   const [steps, setSteps] = useState<StepDraft[]>(() => initial.map(state => ({ state, patch: {}, pending: false, error: "" })))
   const current = useRef(steps)
@@ -113,7 +114,7 @@ export function RequestStepWorkspace({ initial, available, actorId, saveAction =
     const scheduled = timers.current
     return () => { active.current = false; window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); scheduled.forEach(clearTimeout) }
   }, [])
-  return <Context.Provider value={{ steps, available, change, flush, resolve, refresh: () => router.refresh() }}>{children}</Context.Provider>
+  return <GuidanceContext.Provider value={guidance}><Context.Provider value={{ steps, available, change, flush, resolve, refresh: () => router.refresh() }}>{children}</Context.Provider></GuidanceContext.Provider>
 }
 
 export function RequestStepStatusPopover({ step }: { step: RequestStep }) {
@@ -122,9 +123,11 @@ export function RequestStepStatusPopover({ step }: { step: RequestStep }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const effective = { ...draft.state, ...draft.patch }
   const completed = draft.state.completed
+  const guidance = useContext(GuidanceContext)
+  const status = requestStepDisplayStatus(workspace.steps.map(row => row.state), step, guidance)
   function close() { workspace.flush(step); dialog.current?.close() }
   return <>
-    <button type="button" onClick={() => dialog.current?.showModal()} aria-label={`Step ${step}: ${completed ? "Done" : "In progress"}. Open step details`} className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>{completed ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}{draft.pending ? "Saving…" : Object.keys(draft.patch).length ? "Not saved" : completed ? "Done" : "In progress"}</button>
+    <button type="button" onClick={() => dialog.current?.showModal()} aria-label={`Step ${step}: ${status}. Open step details`} className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold ${completed ? "border-emerald-200 bg-emerald-50 text-emerald-800" : status === "Waiting" ? "border-sky-200 bg-sky-50 text-sky-800" : status === "Action needed" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600"}`}>{completed ? <Check className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}{draft.pending ? "Saving…" : Object.keys(draft.patch).length ? "Not saved" : status}</button>
     <dialog ref={dialog} onCancel={() => workspace.flush(step)} className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-xl backdrop:bg-slate-950/30" aria-label={`Step ${step} details`}>
       <div className="flex items-center justify-between"><h3 className="text-sm font-bold">Step {step} · {REQUEST_GUIDE_STEPS[step - 1].label}</h3><button type="button" onClick={close} aria-label="Close step details" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
       {!workspace.available ? <p role="alert" className="my-2 text-xs text-amber-800">Step details are temporarily unavailable. Please refresh and try again.</p> : null}
@@ -165,7 +168,7 @@ export function RequestAttentionIndicator({ guidance, events = [] }: { guidance:
           <nav aria-label="Request steps"><ol className="grid gap-4">{REQUEST_GUIDE_STEPS.map((item, index) => {
             const row = workspace.steps[index].state
             const active = !allDone && attention.step === index + 1
-            const label = row.completed ? "Done" : active ? waiting ? "Waiting" : "Action needed" : "Not started"
+            const label = requestStepDisplayStatus(workspace.steps.map(item => item.state), row.step, guidance)
             return <li key={item.id} className="flex gap-3"><span aria-hidden="true" className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${row.completed ? "border-emerald-600 bg-emerald-600 text-white" : active ? "border-rose-400 text-rose-700" : "border-slate-300 text-slate-400"}`}>{row.completed ? <Check className="h-4 w-4" /> : <Circle className="h-3 w-3" />}</span><div className="min-w-0 flex-1"><button type="button" onClick={() => openStep(index)} className="min-h-8 text-left text-sm font-bold">{index + 1}. {item.label}</button><p className={`text-xs font-semibold ${row.completed ? "text-emerald-700" : active ? waiting ? "text-sky-700" : "text-rose-700" : "text-slate-500"}`}>{label}</p><p className="mt-1 text-xs leading-5 text-slate-500">{active ? `${row.assignee === "david" ? "David" : "Carlos"} · ${text}` : item.description}</p>{active ? <button type="button" onClick={() => openStep(index)} className="mt-2 min-h-11 rounded-lg bg-[#0071e3] px-3 text-xs font-bold text-white">Open {item.label.toLowerCase()} →</button> : null}</div></li>
           })}</ol></nav>
           <section aria-label="Request activity" className="mt-5 border-t border-slate-200 pt-4"><h4 className="text-sm font-bold">Activity</h4>{events.length ? <ol className="mt-2">{events.slice(0, eventLimit).map(event => <li key={event.id} className="border-l border-slate-200 py-3 pl-3"><p className="text-xs font-semibold text-slate-800">{event.title}</p><time dateTime={event.createdAt} className="mt-1 block text-[11px] text-slate-500">{formatSiteDateTime(event.createdAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>{event.description ? <details className="mt-1 text-xs text-slate-600"><summary className="min-h-8 cursor-pointer py-1">Details</summary><p className="whitespace-pre-wrap break-words leading-5">{event.description}</p></details> : null}</li>)}</ol> : <p className="mt-2 text-xs text-slate-500">No activity recorded yet.</p>}{events.length > eventLimit ? <button type="button" onClick={() => setEventLimit(limit => limit + 20)} className="min-h-11 text-xs font-semibold text-[#0066cc]">Show earlier activity ({events.length - eventLimit})</button> : null}</section>

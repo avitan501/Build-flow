@@ -14,6 +14,7 @@ import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildf
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestSubstepFunnel } from "@/components/buildflow/request-substep-funnel"
 import { RequestFulfillmentOverview, SavedClientPriceTotals } from "@/components/buildflow/request-fulfillment-overview"
+import { RequestApprovalLink } from "@/components/buildflow/request-approval-link"
 import { fulfillmentPhaseForAction, savedClientDocumentAmounts } from "@/lib/request-fulfillment-presentation"
 import { RequestAttachmentSourceControl } from "@/components/buildflow/request-attachment-source-control"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
@@ -989,7 +990,9 @@ export function RequestManagementPanel({
   function renderStep3PrimaryAction() {
     if (waitingForSupplierPricing) return <button type="button" onClick={continueToSupplierPricing} className={primaryWorkflowClass}><Route className="h-4 w-4" />Continue supplier pricing</button>
     if (workflow.step3Action === "send-estimate") return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Create & Send Estimate</button>
-    if (workflow.step3Action === "wait-for-approval") return <button type="button" onClick={markClientApproved} disabled={pending} className={primaryWorkflowClass}><CheckCircle2 className="h-4 w-4" />{pending ? "Saving..." : "Mark Client Approved"}</button>
+    if (workflow.step3Action === "wait-for-approval") return documentLinks.estimate
+      ? <RequestApprovalLink key={documentLinks.estimate} href={documentLinks.estimate} className={primaryWorkflowClass} />
+      : <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileText className="h-4 w-4" />Review estimate</button>
     if (workflow.step3Action === "create-invoice") return <button type="button" onClick={() => openDocument("invoice")} className={primaryWorkflowClass}><FileText className="h-4 w-4" />Create & Send Invoice</button>
     if (workflow.step3Action === "send-payment-link") return <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className={primaryWorkflowClass}><Send className="h-4 w-4" />Send Payment Link</button>
     if (workflow.step3Action === "mark-paid") return <button type="button" onClick={markPaymentReceived} disabled={pending} className={primaryWorkflowClass}><CircleDollarSign className="h-4 w-4" />Mark Payment Received</button>
@@ -1081,9 +1084,10 @@ export function RequestManagementPanel({
       </details>
 
       <details id="request-client-delivery" tabIndex={-1} open={paymentDeliveryStatus === "active"} className={`${workflowStepCardClass()} scroll-mt-24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}>
-        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} tools={<>
+        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client & delivery" status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} tools={<>
           <RequestSubstepFunnel requestId={requestId} step={3} currentSubstep={currentSubstep} />
           <button type="button" onClick={() => setContactOpen(true)} className={stepToolClass}><MessageSquareText className="h-4 w-4" />Contact client</button>
+          {workflow.step3Action === "wait-for-approval" ? <button type="button" onClick={markClientApproved} disabled={pending} className={stepToolClass}><CheckCircle2 className="h-4 w-4" />Record confirmed approval</button> : null}
           <button type="button" onClick={() => openDocument("estimate")} className={stepToolClass}><FileCheck2 className="h-4 w-4" />Estimate</button>
           <button type="button" onClick={() => openDocument("invoice")} className={stepToolClass}><FileText className="h-4 w-4" />Invoice</button>
           <button type="button" onClick={() => openDocument("receipt")} className={stepToolClass}><ReceiptText className="h-4 w-4" />Receipt</button>

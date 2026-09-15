@@ -37,3 +37,11 @@ export function requestStepAttention(steps: RequestStepState[]) {
   const next = steps.find(step => !step.completed)
   return next ? { step: next.step, assignee: next.assignee, label: `With ${next.assignee === "david" ? "David" : "Carlos"} · Step ${next.step}` } : { step: 3 as const, assignee: null, label: "All steps done" }
 }
+
+/** Display only: completion still comes from saved state and eligibility guards. */
+export function requestStepDisplayStatus(steps: RequestStepState[], step: RequestStep, guidance?: { step: number; waiting: boolean }) {
+  if (steps.find(item => item.step === step)?.completed) return "Done"
+  const attention = requestStepAttention(steps)
+  if (attention.assignee === null || attention.step !== step) return "Not started"
+  return guidance?.step === step && guidance.waiting ? "Waiting" : "Action needed"
+}
