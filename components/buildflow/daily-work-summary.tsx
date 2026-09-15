@@ -162,7 +162,7 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Worked</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{missingCheckout ? "Needs review" : totals.worked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Paused</p><p className="mt-1 text-sm font-semibold text-violet-700">{totals.paused ?? "—"}</p></div>
           </div>
-          {selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
+          {!missingCheckout && selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
           {missingCheckout ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">Missing checkout · needs review. Excluded from pay until the actual finish time is confirmed.</p> : null}
           {!attendanceAvailable ? <p className="mt-3 text-center text-xs font-medium text-slate-500">Select today&apos;s Eastern Time date to record attendance.</p> : null}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
