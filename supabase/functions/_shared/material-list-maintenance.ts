@@ -1,5 +1,5 @@
 /** Versioned deployment switch: change only in an explicit reviewed activation. */
-export const MATERIAL_LIST_DEPLOYMENT_MODE: string = "paused"
+export const MATERIAL_LIST_DEPLOYMENT_MODE: string = "active"
 
 /** An environment override may only tighten the build-time gate, never enable it. */
 export function materialListProcessingAllowed() {

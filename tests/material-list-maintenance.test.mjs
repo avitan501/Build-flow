@@ -9,7 +9,7 @@ function load(source,imports={},globals={}) {
  vm.runInNewContext(code,{exports,require:n=>{if(!(n in imports))throw Error('Unexpected import '+n);return imports[n]},Response,Request,console:{error(){}},...globals});return exports;
 }
 const gateSource=read('supabase/functions/_shared/material-list-maintenance.ts');
-function gate(mode,override){return load(gateSource.replace('MATERIAL_LIST_DEPLOYMENT_MODE: string = "paused"',`MATERIAL_LIST_DEPLOYMENT_MODE: string = ${JSON.stringify(mode??'paused')}`),{}, {Deno:{env:{get:()=>override}}});}
+function gate(mode,override){return load(gateSource.replace(/MATERIAL_LIST_DEPLOYMENT_MODE: string = "(?:paused|active)"/,`MATERIAL_LIST_DEPLOYMENT_MODE: string = ${JSON.stringify(mode??'paused')}`),{}, {Deno:{env:{get:()=>override}}});}
 test('maintenance is fail-closed for absent, invalid and paused mode',async()=>{
  for(const mode of [undefined,'','paused','true','ACTIVE','active ']) assert.equal(gate(mode).materialListProcessingAllowed(),false);
  assert.equal(gate('active').materialListProcessingAllowed(),true);
