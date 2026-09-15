@@ -1,5 +1,12 @@
 # Remaining work continuation — 2026-09-15
 
+## 04:41 UTC account live completion and legacy material guard
+
+- Guarded account release2682a86f LIVE: CI34928743410SUCCESS, Verceldpl_9yW7m4jRwJMNSUYwb6ubNat9abWnREADY/canonicalalias, exactproduction/npr release. Actual authenticated rawSSR bothname+phonedisabled, bothenabledafterhydration; phone formatting-only exactly1POST/Saved/canonicalreload/390+1440PASS. Root fresh before/after fullprofile/authidentity/phone hashes all identical. No name edit or login/security/number change. Report `/tmp/avantia-live-phone-2682a86f-hydrated-report.json`.
+- Expanded readonly160organizedrows/13requests found one legacy AI material with unitrequest and storedready despite source3ROL. Added narrow shared review guard1fc2e22f (Noame56c4f11): only ai_organized true plus request/requests unit becomes missing, so existing website step/finalization guards reject unresolved quantity. Manual service requests remain valid. No stored data, price, availability, or database eligibility changes.29focused tests plus agentTSC/lintPASS; final rootbuild/publication/livecheck pending.
+- Existing request638405 is CLOSED/business-labelled, not explicitly synthetic; its linked supplier file LowesPro_Quote_TEST88213.pdf explicitly says SAMPLE/TEST, NOT A REAL QUOTE. Saved line establishes3rolls at74.50each/223.50sampletotal but is NOT a genuine Lowe's offer. Do not automatically repair/delete/reopen or change economic data. Owner classification requested asynchronously; conservative review guard only. Evidence `/tmp/avantia-fascia-quantity-readonly-audit-20260915.md`.
+- Remaining boundaries: alternate account metadata and supplier/legacy quote autosave are not universal; quantity-based partial invoice/payment/delivery ledger remains unimplemented; permanent Meet URL and actual September11 finish/breaks need owner input; voice unconfigured; actual external message/payment/order execution not tested or performed. No global100% claim.
+
 ## 04:23 UTC live account proof and early-edit protection
 
 - Release49e88b78 LIVE verified: CI34927594767SUCCESS, Vercel `dpl_HtwaGR3CmmWhtNTAcvq6gRJhJLEe` READY/canonicalalias/exactproductionref.
