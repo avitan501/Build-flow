@@ -1,5 +1,11 @@
 # Remaining work continuation — 2026-09-15
 
+## 04:54 UTC legacy review live and profile overwrite prevention
+
+- Release32279e23 LIVE: CI34929875980SUCCESS, Verceldpl_3zBBTWhc2br9fhxEDetsZn8A7qtEREADY/canonicalalias/exactproduction/npr. Actual closedrequest638405 fascia row requiresquantity/sellingunitreview, notReady at390/1440; nooverflow/errors, allnonGETblocked, no reopen/datachange. Report `/tmp/avantia-organized-unit-32279e23-report.json`.
+- Exact profile-preservation SQL9ef23744d072a8aa904d24ea8cbfef048e7515632d30e6a240966d131d9b24ff APPLIED20260915045303. Only2 assignments in private.handle_new_user now distinguish actual name/phone metadatachanges from unrelatedupdates. Oldbody642c6b42639d8e538506cf3666ca223c fenced; newbodyd4151bad7ae5adaa281803f6b8e5de15. Owner/ACL/security/searchpath and allprofile/authidentitydata hashes unchanged. Root independent network-none PostgreSQL16+17 actualtrigger testsPASS, agent17PASS. No userpreference/auth edit for testing. Independentlive source verification pending.
+- Next code-only checkpoint e63c6c71 disables ONLY alternatecontactediting/legacycontactSave before schema cutover; unused unconditional legacyname/phone handlers removed. Current name/phone CAS UI, login/password/preferences unchanged. Full153buildPASS. Publish maintenance first, verify then drain confirmed oldinvocationbound before copying2metadatafields. FullalternatecontactCAS candidate not yet applied/released; privatebody+self-onlypublicwrapper/RLS/noauthwrites, local46browser+PG17/independent10PASS. Existing25users have0nonemptyalternatecontacts atsample; still preserve exactbaseline and avoidcopygap. Do not leave this temporarycontactpause without completing/rollingback documentedcutover.
+
 ## 04:41 UTC account live completion and legacy material guard
 
 - Guarded account release2682a86f LIVE: CI34928743410SUCCESS, Verceldpl_9yW7m4jRwJMNSUYwb6ubNat9abWnREADY/canonicalalias, exactproduction/npr release. Actual authenticated rawSSR bothname+phonedisabled, bothenabledafterhydration; phone formatting-only exactly1POST/Saved/canonicalreload/390+1440PASS. Root fresh before/after fullprofile/authidentity/phone hashes all identical. No name edit or login/security/number change. Report `/tmp/avantia-live-phone-2682a86f-hydrated-report.json`.
