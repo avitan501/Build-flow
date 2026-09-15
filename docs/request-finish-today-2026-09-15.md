@@ -1,5 +1,20 @@
 # Remaining work continuation — 2026-09-15
 
+## 04:23 UTC live account proof and early-edit protection
+
+- Release49e88b78 LIVE verified: CI34927594767SUCCESS, Vercel `dpl_HtwaGR3CmmWhtNTAcvq6gRJhJLEe` READY/canonicalalias/exactproductionref.
+- Final request390/1440 read-only PASS:62items, filters/sourceHOLD preserved, Step1Actionneeded, Steps2/3collapsedNotstarted. Synthetic ClientLocked/disabled, nooverflow. Finalcommunications390/1440 PASS:verified200/email,text,WhatsApp configuredready; voicefalse/unconfigured. No provider delivery claimed or messages sent.
+- First phone formatting-only harness attempted typing before React hydration and timed out with zero allowed POSTs; root profile/auth/phone hashes unchanged. Read-only reproduction confirmed visible SSR input had no attached handler yet. After explicit approval and fresh unchanged baseline, hydration-aware retry made exactly ONE account action POST, Saved+canonicalreload+390/1440PASS. Root fullprofile/authidentity/phone hashes all unchanged after; no number/security change. Initial failed report preserved; successful report `/tmp/avantia-live-phone-49e88b78-hydrated-report.json`.
+- Treating early editable SSR input as an actual UX risk, not merely a test workaround: integrated Noam3ac4e393 guard for BOTH name and phone; SSR disabled/loading/aria-busy until mounted, phone after recovery reconciliation. No server/CAS changes.36actualSSR/delayedhydration/browser tests PASS and independently repeated by Daniel; TSC/lint PASS. Final guarded release/build/live-check pending.
+
+## 04:13 UTC readonly capacity and background-job audit
+
+- Production database: 88,501,395 bytes (84.4 MiB). Storage:161objects/122.4MiB, all object sizes known. Public relations25.5MiB; largestpublic `aura_audit_log`10.1MiB. Largest operational relation `cron.job_run_details`36.9MiB. These are measured volumes, not remaining quota, filesystem free space, billing-period egress, or proof that a paid upgrade is needed.
+- Snapshot client connections24 (23idle/1active), configured maximum60; no current saturation demonstrated. Dead tuple estimates are not reclaimable-byte measurements. Existing lifecycle changes remain deployed, but reduced overall resource use/cost has not been proven.
+- Actual cron history167,168rows:164,490successful/2,678failed; oldestSeptember4, noneolder30days. No obvious direct cron-history cleanup job found; indirect/external retention not ruled out. No history deleted or schedules changed.
+- Last24hours238cron failures were235generic connection failures and3timeouts. Latestfailure03:03UTC. Since03:04UTC all8activejobs recorded765successes/0failures at audit time. This is scheduler/enqueue health, NOT proof of Edge/provider completion or a proven connection-saturation cause. No current recurring failed job identified for repair.
+- All diagnostics used READ ONLY transactions and ROLLBACK. No billing, quota, cron, storage, database schema, or business-data changes. Evidence `/tmp/noam-supabase-capacity-readonly-20260915.md`.
+
 ## 04:06 UTC summary verified live; phone ready for final release
 
 - Summary release `b627952e8aa354a4e52c5458f5ae515582f4dd27` LIVE: CI34926748778 success, Vercel `dpl_BcUNReUN1WrJLcACgjUGLoerwQPz` READY/canonicalalias/exact production release/ref verified.
