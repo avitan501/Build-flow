@@ -1,3 +1,8 @@
+-- Must run as one migration transaction. Block old metadata writers while the
+-- snapshot is copied and its legacy-write fence is installed. No auth row edits.
+set local lock_timeout = '5s';
+lock table auth.users in share row exclusive mode;
+
 create schema account_contact_private;
 revoke all on schema account_contact_private from public, anon, authenticated, service_role;
 grant usage on schema account_contact_private to authenticated;
@@ -21,6 +26,34 @@ select id,
   case when jsonb_typeof(raw_user_meta_data->'alternate_email')='string' then raw_user_meta_data->>'alternate_email' end,
   case when jsonb_typeof(raw_user_meta_data->'alternate_phone')='string' then raw_user_meta_data->>'alternate_phone' end
 from auth.users;
+
+-- Old deployments may remain reachable through skew protection. Reject only
+-- changes to the two obsolete contact fields, not unrelated Auth mutations.
+-- Invoker needs no table access: this function only inspects OLD/NEW values.
+create function account_contact_private.reject_legacy_contact_changes()
+returns trigger language plpgsql security invoker set search_path='' as $$
+declare old_email text; new_email text; phones text[]; raw text; digits text;
+begin
+  old_email := case when jsonb_typeof(old.raw_user_meta_data->'alternate_email')='string' then nullif(lower(btrim(old.raw_user_meta_data->>'alternate_email')),'') end;
+  new_email := case when jsonb_typeof(new.raw_user_meta_data->'alternate_email')='string' then nullif(lower(btrim(new.raw_user_meta_data->>'alternate_email')),'') end;
+  phones := array[]::text[];
+  foreach raw in array array[
+    case when jsonb_typeof(old.raw_user_meta_data->'alternate_phone')='string' then btrim(old.raw_user_meta_data->>'alternate_phone') else '' end,
+    case when jsonb_typeof(new.raw_user_meta_data->'alternate_phone')='string' then btrim(new.raw_user_meta_data->>'alternate_phone') else '' end
+  ] loop
+    digits := regexp_replace(raw,'[^0-9]','','g');
+    phones := array_append(phones,case when left(raw,1)='+' then '+'||digits when length(digits)=10 then '+1'||digits when digits<>'' then '+'||digits else null end);
+  end loop;
+  if old_email is distinct from new_email or phones[1] is distinct from phones[2] then
+    raise exception 'Alternate contacts moved. Reload Account and use contact autosave.' using errcode='42501';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function account_contact_private.reject_legacy_contact_changes() from public,anon,authenticated,service_role;
+create trigger account_contacts_legacy_write_fence
+  before update of raw_user_meta_data on auth.users
+  for each row execute function account_contact_private.reject_legacy_contact_changes();
 
 -- The private definer is the sole write boundary, necessary because direct DML
 -- would bypass the expected revision. No user ID can be supplied by the caller.
