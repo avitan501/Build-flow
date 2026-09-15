@@ -1,5 +1,19 @@
 # Remaining work continuation — 2026-09-15
 
+## 03:04 UTC verified state (supersedes earlier pending states)
+
+### 03:10 UTC release candidate
+
+- Communication readiness integrated8bf53747 plus fixture05369ac2: unavailable checks no longer falsely say disconnected; bounded retry and fail-closed Send. Full153build/TSC and targetedESLint pass. Regression92/94 initially passed; two full-inbox mock fixtures lacked new verified:true, corrected without weakening assertions,22subject/readiness tests thenpassed. Twelve deployment/lifecycle node tests passed.
+- Connection lifecycle0bf0af64 deployed ONLYsixlines after all live baseline source files matched: broker193/outbox7. Downloaded7+2files exact; worker405 beforedrain, authenticatedreadonlystatus200/oktrue channelflagsready. No messages/configchanges. Singleaggregate10→14idle/28→35total is NOT evidence of reduced overallusage; clients from otherendpoints/oldisolates remain.
+- Incomplete sharedquote draft NOT released: independent review found clean stale draft could bypass a dirty-onlyflush. Candidate held for atomic mixed-route Prepare/Send revisionfence. Legacy stays unchanged for this bounded rollout. No draftSQL applied.
+
+- Website0407415af149c9646472e06368c171083a6fd54c LIVE: workflow34922094241 success, Vercelcanonicalalias and productionSupabase binding verified. Twelve live phone/desktop checks passed, including actualfilter/name-autosaveUI and localtab subject retention. No real email/payment/order sent.
+- Actual638410 extraction completed62items02:42:06. All62 exact source-text occurrences match preserved source material rows; checkpoint quantities/units match literals. Reconciliation caught generic intake quantity1/request overriding checkpoint values in publication. Processing was paused while corrected.
+- Root code19ca5fac includes four quantity/coverage hotfixes after040. Guarded repair SQL rehearsed with ROLLBACK, then committed62 quantity/unit corrections and2 source-coverage field corrections. Preserved all itemIDs, original bytes and evidence, HOLD/review requirements; no second inference. Two-row correction read-back confirmed customsource-coverage and no legacycoverage mirror.
+- FixedAI28/worker8 active, intake30 unchanged. Empty-body AI40003:02:11 verifies maintenance removed without provider work. No cron/config secret changes. Original savedPDF SHA256 unchanged. Engineering suitability/order approval remains explicitly unverified.
+- Remaining active bounded work: false-disconnected communications readiness; private incomplete client-quote drafts with revision/source checks; three database-client idle lifecycle settings. GoogleMeet awaits verified approved room link. Partial invoice/delivery ledger and full-site autosave are not complete.
+
 Root integration: `/tmp/avantia-request-finish-today-20260915`, branch `codex/request-finish-today-20260915`, additive from verified live `1efac76a`. Primary dirty workspace preserved. Root sole publisher.
 
 ## Implemented candidates
