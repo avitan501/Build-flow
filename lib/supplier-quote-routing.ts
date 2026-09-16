@@ -120,10 +120,11 @@ export function planRequestComparisonSync<
     ),
   )
   const missingItems = currentItems.filter((item) => !existingBySourceId.has(item.id))
+  const retainedSourceIds = new Set(requestItems.filter(isSupplierDerivedRequestRow).map(item => item.id))
   const obsoleteItems = existingItems.filter(
     (item) =>
       !item.source_request_item_id ||
-      !currentSourceIds.has(item.source_request_item_id),
+      (!currentSourceIds.has(item.source_request_item_id) && !retainedSourceIds.has(item.source_request_item_id)),
   )
   const semanticTransfers = matchSupplierQuoteItems(
     missingItems.map((item) => ({

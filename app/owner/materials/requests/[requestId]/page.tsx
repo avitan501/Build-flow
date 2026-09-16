@@ -588,7 +588,7 @@ export default async function OwnerMaterialRequestPage({
     comparisons ?? []
   ).map((comparison) => {
     const comparisonItems = (comparisonItemsResult.data ?? []).filter(
-      (item) => item.comparison_id === comparison.id,
+      (item) => item.comparison_id === comparison.id && !(items ?? []).some(source => source.id === item.source_request_item_id && isSupplierDerivedRequestRow(source)),
     );
     const comparisonBids = (comparisonBidsResult.data ?? []).filter(
       (bid) => bid.comparison_id === comparison.id,

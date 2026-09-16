@@ -11,6 +11,16 @@ import {
 } from "../lib/supplier-quote-routing"
 import { detectSupplierMatch } from "../lib/supplier-quote-supplier"
 
+test("supplier-derived historical rows leave request coverage without deleting linked quote history", () => {
+  const client = {id:"client",name:"Lumber",quantity:40,unit:"pieces",department:"Framing",metadata:{ai_organized:true}}
+  const supplier = {...client,id:"supplier",metadata:{ai_organized:true,excluded_from_client_request:true}}
+  const existing = [{id:"client-comparison",source_request_item_id:"client",description:"Lumber",specification:""},{id:"supplier-comparison",source_request_item_id:"supplier",description:"Lumber",specification:""}]
+  expect(effectiveRequestComparisonItems([client,supplier]).map(row=>row.id)).toEqual(["client"])
+  const plan = planRequestComparisonSync([client,supplier],existing)
+  expect(plan.obsoleteItems).toEqual([])
+  expect(plan.semanticTransfers).toEqual([])
+})
+
 test("stale comparison rows are reconciled to the current AI-organized request before matching", () => {
   const requestItems = [
     { id: "original", name: "6 rolls underlayment", quantity: 6, unit: "rolls", department: "Flooring", metadata: {} },
