@@ -15,3 +15,15 @@ Scope limitation: financial draft cards and route calculations retain authoritat
 Attachment provenance: `material_request_five_towns_builders.pdf` is client-classified, created 2026-09-08 17:00:38 UTC. Certified and tPrusea attachments are supplier-classified. Five Towns is the customer name, not a repetition count.
 
 Publication and authenticated live verification pending at this checkpoint.
+
+Matrix refresh LIVE: commit `c6bfee1ca9b3e3d2ef7d57a546d48f7eb224d69a`, official workflow `35152335366` SUCCESS / job `104983428748` all 15 steps; Vercel `dpl_3YZBLBw58XS9onkTq4nFaKctrgH2` READY production exact SHA. Canonical `/api/release` confirms exact SHA and production `nprfhspwdflpqlopydmp`. Authenticated existing 9222 Chrome read-only live check: 39 rows, four supplier columns, 120 priced cells, exact clean-line equality with current Step 1, address-free, desktop/390 phone no document overflow. Temporary tab closed. Screenshot `/tmp/avantia-step2-refreshed-live-desktop.png`.
+
+## Additive original-line/order correction
+
+User requires verbatim original source lines and the same order throughout Step 1 and Step 2. Root cause: historical `source_text` contains reformatted AI snippets; all organized rows share a timestamp. `source_occurrence` is AI chunk/row order, NOT an original document line number.
+
+New `lib/request-original-lines.ts` validates source-backed associations using original saved request text, harmless formatting normalization and explicit floor/section for duplicate lines. It returns the untouched original line. Ambiguities/changed specifications are not guessed. Current products and focused/spreadsheet/supplier views share the source ordering, without changing IDs or persisted economic data. Original source is separate from editable recognition text.
+
+Actual private Framing fixture: all 39 rows resolve to the 39 verbatim original numeric material lines in exactly the same order. 21 targeted tests pass, two unavailable older private fixtures skip. Source association does not certify supplier equivalence or approve the stored item interpretation. Non-matching original associations visibly require verification. This correction requires its own serialized release after the matrix refresh completes.
+
+Additional editor/action/recognition regression: 14 tests pass; final TypeScript/lint and 153-route webpack build pass. Explicit unit contradictions and reordered numerical roles cannot establish a source association. No AI calls, SQL writes, migrations, prices/approvals/routes/messages or credentials changed. Original/order correction publication pending at this checkpoint.

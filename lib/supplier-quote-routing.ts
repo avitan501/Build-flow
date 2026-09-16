@@ -1,5 +1,6 @@
 import { requestItemFieldSummary, requestItemFieldsFromMetadata } from "@/lib/request-item-fields"
 import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
+import { orderRequestOriginalItems } from "@/lib/request-original-lines"
 
 type DirectorySupplier = { id: string; name: string }
 
@@ -95,7 +96,7 @@ export function effectiveRequestComparisonItems<T extends RequestSourceItem>(ite
         : [],
     ),
   )
-  return [
+  return orderRequestOriginalItems([
     ...organizedItems,
     ...visible.filter(
       (item) =>
@@ -103,7 +104,7 @@ export function effectiveRequestComparisonItems<T extends RequestSourceItem>(ite
         !isRawFreeTextContainer(item) &&
         !organizedSourceIds.has(item.id),
     ),
-  ]
+  ],items)
 }
 
 export function planRequestComparisonSync<

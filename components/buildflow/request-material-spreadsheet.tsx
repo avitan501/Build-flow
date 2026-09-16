@@ -8,6 +8,7 @@ import { recognizeRequestProductLine } from "@/app/owner/materials/requests/row-
 import type { ReviewableMaterialItem } from "@/lib/client-material-review"
 import { materialCleanLine } from "@/lib/material-clean-line"
 import { editMaterialMeasurement, materialSpreadsheetDraft, recognizedMaterialDraft, type MaterialSpreadsheetDraft } from "@/lib/material-spreadsheet-draft"
+import { requestOriginalLine } from "@/lib/request-original-lines"
 
 type Version={item:ReviewableMaterialItem;source:ReviewableMaterialItem|null;revision:string}
 type Undo={draft:MaterialSpreadsheetDraft;text:string;questions:string[];dirty:boolean}
@@ -17,7 +18,7 @@ const measurements=[['width','Width'],['depth','Depth / thickness'],['length','L
 function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove}:{requestId:string;version:Version;newRow?:boolean;onDirty:(id:string,dirty:boolean)=>void;onSaved:(version:Version,previousRevision:string)=>void;onRemove?:()=>void}) {
   const [baseline,setBaseline]=useState(version)
   const [draft,setDraft]=useState(()=>materialSpreadsheetDraft(version.item))
-  const [text,setText]=useState(String(version.item.metadata?.recognition_text||version.item.metadata?.source_text||""))
+  const [text,setText]=useState(String(version.item.metadata?.recognition_text||requestOriginalLine(version.item,version.source)?.text||version.item.metadata?.source_text||""))
   const [editing,setEditing]=useState(newRow)
   const [questions,setQuestions]=useState<string[]>(()=>Array.isArray(version.item.metadata?.recognition_questions)?version.item.metadata.recognition_questions.filter((q):q is string=>typeof q==="string"):[])
   const [dirty,setDirty]=useState(newRow)
@@ -28,7 +29,7 @@ function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove
   const [incomingRevision]=useState(version.revision)
   const stale=version.revision!==incomingRevision&&version.revision!==baseline.revision
   const item=baseline.item
-  const received=String(item.metadata?.source_text||"")
+  const received=requestOriginalLine(item,baseline.source)?.text||''
   function changed(){setDirty(true);onDirty(item.id,true)}
   function snapshot(){setUndo({draft,text,questions,dirty})}
   function editField(id:string,label:string,value:string){snapshot();changed();setDraft(editMaterialMeasurement(draft,id,label,value))}
@@ -65,13 +66,13 @@ function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove
   return <tr className="border-t border-slate-200 align-top" data-testid="material-spreadsheet-row">
     <td className="p-3">
       {stale?<p role="alert" className="mb-2 text-xs text-amber-800">A newer version is available. Your draft is retained. Reload after copying the changes you want to keep.</p>:null}
-      {editing?<label className="block text-xs">Source line<textarea autoFocus={newRow} disabled={disabled} aria-label={`Source line ${item.id}`} maxLength={3000} className={`${control} mt-1 min-h-24`} value={text} onChange={e=>{snapshot();setText(e.target.value);changed()}}/></label>:<p className="whitespace-pre-wrap text-sm">{text||"Enter your source line."}</p>}
+      {editing?<label className="block text-xs">Source line<textarea autoFocus={newRow} disabled={disabled} aria-label={`Source line ${item.id}`} maxLength={3000} className={`${control} mt-1 min-h-24`} value={text} onChange={e=>{snapshot();setText(e.target.value);changed()}}/></label>:<p data-testid="original-material-source" className="whitespace-pre-wrap text-sm">{received||(baseline.source?'Original line needs verification.':text||"Enter your source line.")}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" onClick={()=>setEditing(!editing)} disabled={disabled} className="min-h-10 px-2 text-xs text-sky-800">{editing?'Close edit':'Edit line'}</button>
         <button type="button" onClick={recognize} disabled={disabled||!text.trim()} className="min-h-10 rounded-lg border px-3 text-xs font-semibold disabled:opacity-40">{pending?'Working…':'Recognize line'}</button>
         {newRow&&onRemove?<button type="button" onClick={onRemove} disabled={pending} className="min-h-10 px-2 text-xs">Remove draft</button>:null}
       </div>
-      {received&&received!==text?<details className="mt-2 text-xs text-slate-500"><summary className="min-h-10 cursor-pointer">Received original</summary><p className="whitespace-pre-wrap">{received}</p></details>:null}
+      {received!==text&&text?<details className="mt-2 text-xs text-slate-500"><summary className="min-h-10 cursor-pointer">Recognition / edited text</summary><p className="whitespace-pre-wrap">{text}</p></details>:null}
     </td>
     <td className="p-3">
       <div className="grid grid-cols-2 gap-2">

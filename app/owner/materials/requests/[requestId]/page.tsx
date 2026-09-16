@@ -15,7 +15,6 @@ import { requestItemRevision } from "@/lib/request-item-revision";
 import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
 import { RequestProductSupplierRoutes } from "@/components/buildflow/request-product-supplier-routes";
-import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog";
 import type {
@@ -43,6 +42,7 @@ import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } fro
 import { effectiveRequestComparisonItems, isSupplierDerivedRequestRow } from "@/lib/supplier-quote-routing";
 import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage";
 import { currentRequestComparison } from "@/lib/current-request-comparison";
+import { orderRequestOriginalItems } from "@/lib/request-original-lines";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
@@ -407,14 +407,13 @@ export default async function OwnerMaterialRequestPage({
   const suppliers = canonicalSupplierDirectory(
     managerSettings?.state?.qualificationSettings?.suppliers ?? [],
   );
-  const organizedItems = (items ?? []).filter(
+  const organizedItems = orderRequestOriginalItems((items ?? []).filter(
     (item) => item.metadata?.ai_organized === true && !isSupplierDerivedRequestRow(item),
-  );
+  ),items ?? []);
   const originalItems = (items ?? []).filter(
     (item) => item.metadata?.ai_organized !== true && !isSupplierDerivedRequestRow(item),
   );
-  const representedOriginalIds = new Set(organizedItems.map((item) => item.metadata?.source_item_id));
-  const reviewDisplayItems = [...organizedItems, ...originalItems.filter((item) => !representedOriginalIds.has(item.id) && !isRequestIntakePlaceholder(item))];
+  const reviewDisplayItems = effectiveRequestComparisonItems(items ?? []);
   const organizationStatus =
     typeof originalItems[0]?.metadata?.ai_organization_status === "string"
       ? originalItems[0].metadata.ai_organization_status
