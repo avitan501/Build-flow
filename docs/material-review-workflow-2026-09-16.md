@@ -1,4 +1,15 @@
-# Step 1/2 material review candidate — not published
+# Step 1/2 material review — production release and verification
+
+## Current status — 2026-09-16 20:25 UTC (supersedes historical notes below)
+
+- Frontend **LIVE** at `083deaf6665e288d39b536d52c328a684045bcd1`, verified through canonical `/api/release`; production binding `nprfhspwdflpqlopydmp`. Official release workflow `35144813836` succeeded including regression, full build/type/lint and live binding guards. Vercel deployment `dpl_8d7fdUqojuLrK6kMGpR8m9GAXTbd`.
+- Existing noVNC Chrome 9222 authenticated live test: target request shows **39 client rows**, all three supplier names (U.S. Lumber, Certified, Builders FirstSource), and no document overflow at 390px. Own test tab closed; other tabs untouched. No Apply/Save or business approvals submitted.
+- First live recognition failed. Updated the Edge Function authentication to exact configured server-key validation supporting both modern secret keys and legacy service-role keys, with gateway JWT verification disabled only because custom authentication is enforced. Deployed **version2**, bundle SHA `741e3fc2fb628c4e95eca4791d68d5e7b792e9d44ad181c83288ab404b6ce9b8`. Unauthenticated live POST still **401**. Eight local positive/negative auth assertions passed. Same live row then successfully returned a proposal: quantity22, TJI230, length16ft, unresolved10-inch depth explicitly queried. No secret exposed/changed. This demonstrates restored integration, not proof that every possible PDF is accurate.
+- 39 supplier-derived request rows were previously marked excluded additively, not deleted. Release adds retention regression to prevent comparison sync deleting their price history. One historical supplier association still needs source reconciliation; no automatic relinking performed.
+- Evidence: `/tmp/avantia-step1-live-desktop.png`, `/tmp/avantia-step2-live-desktop.png`, `/tmp/avantia-step1-live-phone.png`, `/tmp/avantia-recognition-live.png`. Raw CDP test `/tmp/avantia-material-live-cdp.mjs` (only one proposal request per run).
+- **Not certified complete:** three fresh PDF uploads, actual new-UI persistence/concurrent edit test, original new-row editing, dimension-conflict handling, historical standalone comparison filtering, complete inline Step2 price matrix. Existing `client-material-list-ai` stale-answer source guard has not been separately deployed. Do not present this bounded release as 100% of all requested work.
+
+## Historical pre-release assessment (retained for traceability)
 
 ## Scope and ownership
 

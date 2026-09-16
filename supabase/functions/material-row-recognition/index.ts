@@ -1,13 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 import { recognizeMaterialRows } from "./material-row-recognition.ts"
+import { authorizedRecognitionServer } from "./server-auth.ts"
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false, connect_timeout: 5, idle_timeout: 5, max_lifetime: 60 })
 const reply = (body: unknown, status=200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } })
 Deno.serve(async(request:Request)=>{
   if (request.method !== "POST") return reply({error:"Method not allowed"},405)
-  const expected=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-  if (!expected || request.headers.get("authorization") !== `Bearer ${expected}`) return reply({error:"Server authorization required"},401)
+  if (!authorizedRecognitionServer(request.headers, name => Deno.env.get(name))) return reply({error:"Server authorization required"},401)
   try {
     const raw=await request.text()
     if(raw.length>240000)return reply({error:"Too many source characters"},413)
