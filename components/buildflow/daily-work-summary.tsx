@@ -2,13 +2,21 @@
 
 import { AlertTriangle, BadgeCheck, CalendarDays, CheckCircle2, Clock3, FileImage, LoaderCircle, LogIn, LogOut, Pause, Play, Save, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react"
 
 import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { calculateDailyWorkMinutes, dailyWorkDateKey, type DailyWorkSummary } from "@/lib/daily-work-summary"
 import { formatSiteDate, formatSiteTime } from "@/lib/site-date-time"
 import { needsHistoricalCheckoutReview } from "@/lib/historical-attendance"
+import { attendanceNeedsComputer, DESKTOP_ATTENDANCE_MESSAGE, isAttendanceComputer } from "@/lib/attendance-device"
+
+const subscribeDevice = () => () => {}
+const serverDevice = () => null
+function browserDevice() {
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  return isAttendanceComputer(nav.userAgent, nav.userAgentData?.mobile, nav.maxTouchPoints)
+}
 
 function displayDate(value: string) {
   return formatSiteDate(value)
@@ -49,6 +57,7 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const computer = useSyncExternalStore(subscribeDevice, browserDevice, serverDevice)
 
   useEffect(() => {
     if (!selectedSummary?.checkInAt || selectedSummary.checkOutAt) return
@@ -106,6 +115,10 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
   }
 
   function recordAttendance(action: "check_in" | "pause" | "resume" | "check_out") {
+    if (attendanceNeedsComputer(action) && !computer) {
+      setError(DESKTOP_ATTENDANCE_MESSAGE)
+      return
+    }
     if (action === "check_out" && !completed.trim()) {
       setError("Write what you completed today before checking out.")
       return
@@ -116,6 +129,7 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
       const result = await recordDailyAttendanceAction({
         date: selectedDate,
         action,
+        maxTouchPoints: navigator.maxTouchPoints,
         ...(action === "check_out" ? { completed, open, problems } : {}),
       })
       if (!result.ok) {
@@ -165,12 +179,13 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
           {!missingCheckout && selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
           {missingCheckout ? <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">Missing checkout · needs review. Excluded from pay until the actual finish time is confirmed.</p> : null}
           {!attendanceAvailable ? <p className="mt-3 text-center text-xs font-medium text-slate-500">Select today&apos;s Eastern Time date to record attendance.</p> : null}
+          <p className="mt-3 text-xs text-slate-600" role="status">{computer === null ? "Checking device…" : computer ? "Clock in / out: computer access enabled." : DESKTOP_ATTENDANCE_MESSAGE}</p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || !attendanceAvailable || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
+            <button type="button" onClick={() => recordAttendance("check_in")} disabled={!computer || pending || !attendanceAvailable || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
             {selectedSummary?.pauseStartedAt
               ? <button type="button" onClick={() => recordAttendance("resume")} disabled={pending || !attendanceAvailable || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-violet-50 px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Play className="h-4 w-4" />Resume</button>
               : <button type="button" onClick={() => recordAttendance("pause")} disabled={pending || !attendanceAvailable || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Pause className="h-4 w-4" />Pause</button>}
-            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !attendanceAvailable || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt) || !completed.trim()} title={!attendanceAvailable ? "Attendance uses today's Eastern Time date" : !completed.trim() ? "Write what you completed today first" : undefined} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
+            <button type="button" onClick={() => recordAttendance("check_out")} disabled={!computer || pending || !attendanceAvailable || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt) || !completed.trim()} title={!attendanceAvailable ? "Attendance uses today's Eastern Time date" : !completed.trim() ? "Write what you completed today first" : undefined} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
           </div>
         </section>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today <span className="text-xs font-bold text-rose-600">Required to check out</span></span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} required placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>

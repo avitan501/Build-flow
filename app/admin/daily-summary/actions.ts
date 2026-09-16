@@ -1,6 +1,8 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
+import { attendanceNeedsComputer, DESKTOP_ATTENDANCE_MESSAGE, isAttendanceComputer } from "@/lib/attendance-device"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import {
@@ -108,14 +110,25 @@ export async function recordDailyAttendanceAction(input: {
   completed?: string
   open?: string
   problems?: string
+  maxTouchPoints?: number
 }): Promise<SaveDailySummaryResult> {
   const { supabase } = await requireManagerPortalProfile()
+  const requestHeaders = await headers()
+  const userAgent = (requestHeaders.get("user-agent") || "").slice(0, 1024)
+  const mobileHint = requestHeaders.get("sec-ch-ua-mobile")
+  const maxTouchPoints = Number.isFinite(input.maxTouchPoints) ? Math.max(0, Math.min(100, input.maxTouchPoints!)) : 0
+  if (attendanceNeedsComputer(input.action) && !isAttendanceComputer(userAgent, mobileHint, maxTouchPoints)) {
+    return { ok: false, error: DESKTOP_ATTENDANCE_MESSAGE }
+  }
   const sections = normalizeDailyWorkSummarySections({ completed: input.completed || "", open: input.open || "", problems: input.problems || "" })
   if (!validDate(input.date)) return { ok: false, error: "Choose a valid work date." }
   const { error } = await supabase.rpc("record_carlos_attendance", {
     p_date: input.date, p_action: input.action,
     p_completed: sections.completed, p_open: sections.open, p_problems: sections.problems,
-  })
+  }).setHeader("x-avantia-attendance-user-agent", userAgent)
+    .setHeader("x-avantia-attendance-mobile", mobileHint === "?1" ? "?1" : "?0")
+    .setHeader("x-avantia-attendance-touch", String(maxTouchPoints))
+  if (error?.message.includes("attendance_computer_required")) return { ok: false, error: DESKTOP_ATTENDANCE_MESSAGE }
   if (error) return { ok: false, error: "Attendance could not be saved. Check today's date and completed summary, then refresh and try again." }
   revalidateDailySummary()
   return { ok: true }
