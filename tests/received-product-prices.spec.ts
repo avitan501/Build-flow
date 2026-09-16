@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { receivedProductPriceRows,sourceComparisonReasons } from "../lib/received-product-prices"
+import { receivedProductPriceRows,sourceComparisonReasons,expandPrintedCuts } from "../lib/received-product-prices"
 import type { QuoteComparisonItemRecord } from "../lib/quote-comparison"
 import { readFile, readdir } from "node:fs/promises"
 import React from "react"
@@ -7,6 +7,47 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ReceivedProductPriceMatrix } from "../components/buildflow/received-product-price-matrix"
 const item=(id:string,description:string,specification:string,quantity=10)=>({id,description,specification,quantity,unit:"pieces"} as QuoteComparisonItemRecord)
 const line=(line_number:number,description:string,specification:string,quantity=10)=>({line_number,description,specification,quantity,unit:"pieces",unit_price:12,line_total:120})
+test('ordinal floor notation and encoded lumber lengths prevent wrong lower-row matches',()=>{
+ const rows=receivedProductPriceRows([item('a','2x12 lumber','24 ft · Section: First floor',40)],[{id:'q',fileName:'q',sourceItems:[line(1,'2X12X16 DF WOOD','Section: 1ST FLOOR',40),line(2,'2x12-24 Lumber','Section: 2ND FLOOR',40),line(3,'2X12X24 DF WOOD','Section: 1ST FLOOR',40)]}])
+ expect(rows[0].cells[0].lines.map(l=>l.line_number)).toEqual([3])
+ expect(rows[0].cells[0].reasons).toEqual([])
+})
+test('balanced printed LF cut schedule produces distinct piece candidates without false source reuse',()=>{
+ const bulk={...line(1,'NI-60 I-JOIST','LFT NI-60 2-1/2 x 9-1/2 I-JOIST; sizes listed: 35/20 30/26 22/16 26/10',2092),unit:'lin. ft.',unit_price:3.44,line_total:7196.48}
+ expect(expandPrintedCuts(bulk)).toHaveLength(4)
+ const rows=receivedProductPriceRows([item('a','TJI 230 I-joist','20 ft',35),item('b','TJI 230 I-joist','26 ft',30)],[{id:'q',fileName:'q',sourceItems:[bulk]}])
+ for(const row of rows){expect(row.cells[0].lines).toHaveLength(1);expect(row.cells[0].sharedSource).toBe(false);expect(row.cells[0].reasons).toEqual(['Different joist manufacturer/series; keep as an alternative until approved.'])}
+ expect(rows[0].cells[0].lines[0].unit_price).toBeCloseTo(68.8)
+ expect(rows[1].cells[0].lines[0].unit_price).toBeCloseTo(89.44)
+ expect(bulk.quantity).toBe(2092);expect(bulk.unit).toBe('lin. ft.')
+})
+test('unbalanced, duplicate, missing and inconsistent LF schedules cannot invent piece prices',()=>{
+ for(const specification of ['sizes listed: 35/20 30/26','sizes listed: 35/20 35/20','LVL beam']){
+ const bulk={...line(1,'LVL Beam',specification,2092),unit:'lin. ft.',unit_price:3.44,line_total:7196.48}
+ expect(expandPrintedCuts(bulk)).toEqual([bulk])
+ expect(receivedProductPriceRows([item('a','LVL Beam','20 ft',35)],[{id:'q',fileName:'q',sourceItems:[bulk]}])[0].cells[0].lines).toHaveLength(0)
+ }
+ const bad={...line(1,'NI-60 I-JOIST','sizes listed: 35/20',700),unit:'lin. ft.',unit_price:3.44,line_total:1}
+ expect(expandPrintedCuts(bad)).toEqual([bad])
+})
+test('current four-quote private fixture reconciles KSJ printed cuts and preserves its originals',async()=>{
+ let raw:string
+ try {raw=await readFile('/tmp/avantia-current-supplier-lines.json','utf8')} catch {test.skip(true,'Private read-only production fixture unavailable');return}
+ const quotes=JSON.parse(raw) as Array<{supplier_name:string;lines:Parameters<typeof expandPrintedCuts>[0][]}>
+ expect(quotes).toHaveLength(4)
+ const ksj=quotes.find(q=>q.supplier_name==='KSJ KASLANDER LUMBER LLC')!
+ const before=JSON.stringify(ksj)
+ for(const n of [1,15,16,28]){
+  const source=ksj.lines.find(l=>l.line_number===n)!
+  const cuts=expandPrintedCuts(source)
+  expect(cuts).toHaveLength(n===28?1:4)
+  expect(cuts.every(c=>c.unit==='each'&&Boolean(c.allocationKey))).toBe(true)
+  expect(cuts.reduce((sum,c)=>sum+Number(c.line_total),0)).toBeCloseTo(Number(source.line_total),2)
+ }
+ const missing=ksj.lines.find(l=>l.line_number===2)!
+ expect(expandPrintedCuts(missing)).toEqual([missing])
+ expect(JSON.stringify(ksj)).toBe(before)
+})
 test('no generic problem note is invented when a candidate has no detected difference',()=>{
  expect(sourceComparisonReasons(item('a','2x6 lumber','16 ft'),line(1,'2x6 lumber','16 ft'))).toEqual([])
  expect(sourceComparisonReasons(item('a','Face-mount hanger','10 in'),line(1,'Face-mount hanger','10 in'))).toEqual([])
