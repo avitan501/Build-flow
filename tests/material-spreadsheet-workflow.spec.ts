@@ -38,6 +38,7 @@ async function fixture(page:Page, fail=false) {
 test('recognition immediately fills fields, Undo restores old draft, save/copy/reload agree',async({page})=>{
   await fixture(page)
   const row=page.getByTestId('material-spreadsheet-row')
+  expect(await row.locator('td:nth-child(2) > div > label').evaluateAll(labels=>labels.map(label=>label.firstChild?.textContent))).toEqual(['Quantity','Unit','Product','Width','Depth / thickness','Length','Model / SKU'])
   await expect(row.getByLabel('Depth / thickness',{exact:true})).toHaveValue('10 in')
   await row.getByRole('button',{name:'Recognize line',exact:true}).click()
   await expect(row.getByLabel('Quantity',{exact:true})).toHaveValue('22')
@@ -57,6 +58,17 @@ test('recognition immediately fills fields, Undo restores old draft, save/copy/r
   await page.evaluate(()=>{const w=window as unknown as {props:{products:unknown[]};saved:unknown[];remount:()=>void};w.props.products=w.saved;w.remount()})
   await expect(row.getByLabel('Quantity',{exact:true})).toHaveValue('22')
   await expect(row.getByTestId('clean-material-line')).toHaveText(copied)
+})
+test('item numbering and total include new drafts and update after removal',async({page})=>{
+ await fixture(page)
+ await expect(page.getByTestId('material-item-number')).toHaveText('1')
+ await expect(page.getByTestId('material-item-total')).toHaveText('Total items: 1')
+ await page.getByRole('button',{name:'+ Add line'}).click()
+ await expect(page.getByTestId('material-item-number')).toHaveText(['1','2'])
+ await expect(page.getByTestId('material-item-total')).toHaveText('Total items: 2(1 saved · 1 new unsaved)')
+ await page.getByRole('button',{name:'Remove draft'}).click()
+ await expect(page.getByTestId('material-item-number')).toHaveText('1')
+ await expect(page.getByTestId('material-item-total')).toHaveText('Total items: 1')
 })
 
 test('new source line is editable inline, recognizable, saved once and survives reload',async({page})=>{

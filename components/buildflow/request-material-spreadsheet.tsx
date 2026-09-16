@@ -15,7 +15,7 @@ type Undo={draft:MaterialSpreadsheetDraft;text:string;questions:string[];dirty:b
 const control="min-h-10 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-950"
 const measurements=[['width','Width'],['depth','Depth / thickness'],['length','Length'],['model','Model / SKU']] as const
 
-function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove}:{requestId:string;version:Version;newRow?:boolean;onDirty:(id:string,dirty:boolean)=>void;onSaved:(version:Version,previousRevision:string)=>void;onRemove?:()=>void}) {
+function SpreadsheetRow({requestId,version,itemNumber,newRow=false,onDirty,onSaved,onRemove}:{requestId:string;version:Version;itemNumber:number;newRow?:boolean;onDirty:(id:string,dirty:boolean)=>void;onSaved:(version:Version,previousRevision:string)=>void;onRemove?:()=>void}) {
   const [baseline,setBaseline]=useState(version)
   const [draft,setDraft]=useState(()=>materialSpreadsheetDraft(version.item))
   const [text,setText]=useState(String(version.item.metadata?.recognition_text||requestOriginalLine(version.item,version.source)?.text||version.item.metadata?.source_text||""))
@@ -65,6 +65,7 @@ function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove
   const disabled=pending||stale
   return <tr className="border-t border-slate-200 align-top" data-testid="material-spreadsheet-row">
     <td className="p-3">
+      <span data-testid="material-item-number" aria-label={`Item ${itemNumber}`} className="mb-2 inline-flex min-w-6 items-center justify-center rounded bg-slate-100 px-1.5 py-1 text-xs font-semibold text-slate-600">{itemNumber}</span>
       {stale?<p role="alert" className="mb-2 text-xs text-amber-800">A newer version is available. Your draft is retained. Reload after copying the changes you want to keep.</p>:null}
       {editing?<label className="block text-xs">Source line<textarea autoFocus={newRow} disabled={disabled} aria-label={`Source line ${item.id}`} maxLength={3000} className={`${control} mt-1 min-h-24`} value={text} onChange={e=>{snapshot();setText(e.target.value);changed()}}/></label>:<p data-testid="original-material-source" className="whitespace-pre-wrap text-sm">{received||(baseline.source?'Original line needs verification.':text||"Enter your source line.")}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
@@ -76,9 +77,9 @@ function SpreadsheetRow({requestId,version,newRow=false,onDirty,onSaved,onRemove
     </td>
     <td className="p-3">
       <div className="grid grid-cols-2 gap-2">
-        <label className="col-span-2 text-xs">Product<input disabled={disabled} className={control} aria-label={`Product ${item.id}`} value={draft.name} onChange={e=>{snapshot();changed();setDraft({...draft,name:e.target.value})}}/></label>
         <label className="text-xs">Quantity<input disabled={disabled} type="number" min="0.001" step="any" className={control} value={draft.quantity} onChange={e=>{snapshot();changed();setDraft({...draft,quantity:e.target.value})}}/></label>
         <label className="text-xs">Unit<input disabled={disabled} list="material-unit-options" className={control} value={draft.unit} onChange={e=>{snapshot();changed();setDraft({...draft,unit:e.target.value})}}/></label>
+        <label className="col-span-2 text-xs">Product<input disabled={disabled} className={control} aria-label={`Product ${item.id}`} value={draft.name} onChange={e=>{snapshot();changed();setDraft({...draft,name:e.target.value})}}/></label>
         {measurements.map(([id,label])=><label key={id} className="text-xs">{label}<input disabled={disabled} list={id==='model'?undefined:`material-${id}-options`} className={control} value={draft.fields.find(f=>f.id===id)?.value||''} placeholder="Not specified" onChange={e=>editField(id,label,e.target.value)}/></label>)}
       </div>
       <details className="mt-2"><summary className="min-h-10 cursor-pointer text-xs">All details and fields</summary>
@@ -129,6 +130,7 @@ export function RequestMaterialSpreadsheet({requestId,products}:{requestId:strin
     <datalist id="material-depth-options">{['9.5 in','10 in','11.25 in','11.875 in','0.75 in'].map(x=><option key={x} value={x}/>)}</datalist>
     <datalist id="material-length-options">{[10,16,18,20,24,26,28].map(x=><option key={x} value={`${x} ft`}/>)}</datalist>
     <datalist id="material-width-options">{['1.75 in','2 in','2.5 in'].map(x=><option key={x} value={x}/>)}</datalist>
-    <div className="max-w-full overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[880px] table-fixed text-left"><thead className="bg-slate-50 text-xs text-slate-600"><tr><th className="w-[28%] p-3">Source line</th><th className="w-[44%] p-3">Product fields</th><th className="p-3">Clean material line</th></tr></thead><tbody>{visible.map(({version,newRow})=><SpreadsheetRow key={version.item.id} requestId={requestId} version={version} newRow={newRow} onDirty={rowDirty} onSaved={rowSaved} onRemove={()=>{setAdded(previous=>previous.filter(row=>row.version.item.id!==version.item.id));rowDirty(version.item.id,false)}}/>)}</tbody></table></div>
+    <div className="max-w-full overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[880px] table-fixed text-left"><thead className="bg-slate-50 text-xs text-slate-600"><tr><th className="w-[28%] p-3">Source line</th><th className="w-[44%] p-3">Product fields</th><th className="p-3">Clean material line</th></tr></thead><tbody>{visible.map(({version,newRow},index)=><SpreadsheetRow key={version.item.id} requestId={requestId} version={version} itemNumber={index+1} newRow={newRow} onDirty={rowDirty} onSaved={rowSaved} onRemove={()=>{setAdded(previous=>previous.filter(row=>row.version.item.id!==version.item.id));rowDirty(version.item.id,false)}}/>)}</tbody></table></div>
+    <p data-testid="material-item-total" className="mt-3 text-sm font-semibold text-slate-700">Total items: {visible.length}{visible.some(row=>row.newRow)?<span className="ml-2 text-xs font-normal text-slate-500">({visible.filter(row=>!row.newRow).length} saved · {visible.filter(row=>row.newRow).length} new unsaved)</span>:null}</p>
   </section>
 }

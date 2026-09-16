@@ -1,5 +1,9 @@
 # Step 2 saved-list refresh — 2026-09-16
 
+Quantity-first editing follow-up: user requested quantity before product, consistent with incoming messages. Clean/copy/matrix lines already quantity-first. Reordered spreadsheet controls to Quantity + Unit, Product, Width/Depth, Length/Model. DOM and keyboard order now match visual order; no CSS-only reorder. Added actual React browser regression asserting control order; persistence/recognition/undo/source ordering unchanged. Publication/live verification pending.
+
+Additive follow-up: duplicate clean dimensions/model, line numbering and bottom item count. The formatter suppresses only explicit dimensions already represented by name (retaining measurement units), model/length already contained in name, and identical detail components. Distinct models, conflicting units, grade/coating/packaging remain. Shared formatter applies to displayed drafts, saved copy and current Step2 projection; no AI rerun or stored item edit. Spreadsheet numbers all rows in current source order; footer counts material rows and identifies new unsaved rows separately, never adds incompatible quantities. 22 targeted tests pass, including real React quantity-first/recognition/Save/Undo/add/remove/reload and full actual39-original association/order fixture. Full build/live publication pending at checkpoint.
+
 Objective: display current saved Step 1 materials in the existing supplier comparison, retaining all received quotes and financial history. No bulk AI recognition or supplier reimport.
 
 Implementation: `lib/current-request-comparison.ts` projects active source materials onto stable comparison IDs. Draft/review matrices read current names, quantities and specifications, with the same address-free clean lines used by Step 1. Supplier-derived historical rows are not current requested materials. Missing comparison IDs are reported, never associated by similar names. Sent/accepted/awarded/active-route snapshots are unchanged.

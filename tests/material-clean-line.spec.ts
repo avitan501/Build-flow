@@ -19,3 +19,13 @@ test("material copy excludes delivery data while preserving product specificatio
 test("cleaning retains material grade, coatings, packaging and unknown detail text", () => {
   expect(materialCleanLine({ name: "Nails", quantity: 2, unit: "boxes", fields: [{ id: "grade", label: "Grade", value: "Hot-dip galvanized" }], details: "50 lb per box · Exact model required" })).toContain("Hot-dip galvanized · 50 lb per box · Exact model required")
 })
+test('embedded lumber dimensions appear once without losing units, length or grade',()=>{
+ const fields=[{id:'width',label:'Width',value:'2 in'},{id:'depth',label:'Depth',value:'12 in'},{id:'length',label:'Length',value:'28 ft'},{id:'type',label:'Type',value:'Regular SPF'}]
+ expect(materialCleanLine({name:'2x12',quantity:12,unit:'pc',fields,details:'Regular SPF · Ceiling joists'})).toBe('12 pc · 2x12 in · 28 ft · Regular SPF · Ceiling joists')
+ expect(materialCleanLine({name:'2x12 ft',quantity:12,unit:'pc',fields,details:''})).toContain('2 in · 12 in')
+})
+test('model and length already in the product name are not repeated, distinct models remain',()=>{
+ const fields=[{id:'model',label:'Model',value:'TJI 230 Series'},{id:'depth',label:'Depth',value:'10 in'},{id:'length',label:'Length',value:'26 ft'}]
+ expect(materialCleanLine({name:'TJI 230 I-joist',quantity:12,unit:'pc',fields,details:''})).toBe('12 pc · TJI 230 I-joist · 10 in · 26 ft')
+ expect(materialCleanLine({name:'TJI 230 I-joist',quantity:12,unit:'pc',fields:[{id:'model',label:'Model',value:'TJI 230R'}],details:''})).toContain('TJI 230R')
+})
