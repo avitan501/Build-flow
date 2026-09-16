@@ -40,6 +40,10 @@ test('fresh comparison matrix shows all supplier columns, clean requested text a
     await expect(page.getByTestId('product-price-matrix').locator('thead th')).toHaveCount(5)
     await expect(page.getByTestId('requested-material-line')).toHaveText(view.materialLines.active)
     await expect(page.getByTestId('requested-material-line')).not.toContainText('Woodmere')
+    await expect(page.getByTestId('unverified-price-indicator')).toHaveCount(4)
+    await expect(page.getByRole('list',{name:'Comparison checks'})).toHaveCount(0)
+    await page.getByLabel('Not verified',{exact:true}).first().click()
+    await expect(page.getByTestId('unverified-price-indicator').first().locator('p')).toBeVisible()
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2)).toBe(false)
   }
 })

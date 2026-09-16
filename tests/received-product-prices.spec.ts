@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { receivedProductPriceRows } from "../lib/received-product-prices"
+import { receivedProductPriceRows,sourceComparisonReasons } from "../lib/received-product-prices"
 import type { QuoteComparisonItemRecord } from "../lib/quote-comparison"
 import { readFile, readdir } from "node:fs/promises"
 import React from "react"
@@ -7,6 +7,12 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ReceivedProductPriceMatrix } from "../components/buildflow/received-product-price-matrix"
 const item=(id:string,description:string,specification:string,quantity=10)=>({id,description,specification,quantity,unit:"pieces"} as QuoteComparisonItemRecord)
 const line=(line_number:number,description:string,specification:string,quantity=10)=>({line_number,description,specification,quantity,unit:"pieces",unit_price:12,line_total:120})
+test('no generic problem note is invented when a candidate has no detected difference',()=>{
+ expect(sourceComparisonReasons(item('a','2x6 lumber','16 ft'),line(1,'2x6 lumber','16 ft'))).toEqual([])
+ expect(sourceComparisonReasons(item('a','Face-mount hanger','10 in'),line(1,'Face-mount hanger','10 in'))).toEqual([])
+ const actual=sourceComparisonReasons(item('a','TJI 230 I-joist','10 in · 20 ft',35),{...line(1,'NI-40 I-joist','10 in · 20 ft',30),unit:'lin. ft.'})
+ expect(actual.join(' ')).toContain('Quantity:');expect(actual.join(' ')).toContain('selling unit');expect(actual.join(' ')).toContain('Different joist')
+})
 test("one supplier source cannot imply coverage for two request rows",()=>{
  const rows=receivedProductPriceRows([item("a","2x6 lumber","16 ft"),item("b","2x6 lumber","16 ft")],[{id:"q",fileName:"one",sourceItems:[line(1,"2x6 lumber","16 ft")]}])
  for(const row of rows){expect(row.cells[0].sharedSource).toBe(true);expect(row.cells[0].suggested).toBe(false);expect(row.cells[0].reasons.join(' ')).toContain('assign it once')}

@@ -64,9 +64,7 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
   if (/plywood|\bcdx\b/.test(requested) && /\bosb\b/.test(quoted)) reasons.push("OSB is offered against plywood; material substitution needs a decision.")
   const mount = (v:string) => /top (?:mount|flange)/.test(v) ? "top" : /face mount/.test(v) ? "face" : null
   if (mount(requested) && mount(quoted) && mount(requested) !== mount(quoted)) reasons.push(`Mount differs: requested ${mount(requested)}, quoted ${mount(quoted)}.`)
-  if (family(requested) === "hanger") reasons.push("Confirm hanger compatibility; matching the mount alone is not engineering approval.")
   if (/\btji\b/.test(requested) && !/\btji\b/.test(quoted)) reasons.push("Different joist manufacturer/series; keep as an alternative until approved.")
   if (/pl premium/.test(requested) && !/pl premium/.test(quoted)) reasons.push("Adhesive product differs from requested PL Premium.")
-  if (!reasons.length) reasons.push("Source line located; verify dimensions, grade and specification before approval.")
   return reasons
 }
