@@ -1,5 +1,15 @@
 # Step 1/2 material review — production release and verification
 
+## Step 1 tasks 1–4 — 2026-09-16 21:05 UTC
+
+- Authorized scope: immediate recognized draft with Undo; inline new/editable source rows; relevant per-row/shared questions; identical displayed/saved/copied material lines. Supplier matching/comparison task5 remains separate.
+- Isolated worktree `/tmp/avantia-material-review-20260916`, branch `codex/material-review-workflow-20260916`, based on latest canonical/hook/live `be9f370d`; primary dirty143 files preserved. No overlapping publisher observed.
+- Added `lib/material-spreadsheet-draft.ts`, `spreadsheet-row-actions.ts`; updated spreadsheet, row-recognition action and atomic item-edit action. New row uses authenticated staff/session RLS and stable ID insert with exact duplicate verification, never upsert. Edited recognition text is separate from immutable received source. Existing full item/source CAS and receipts retained. Strict field/details bounds reject rather than silently truncate. Legacy saved dimensions bridge to separate inputs; no refilling intentionally cleared values. Copy blocked while rows unsaved; last acknowledged revision used during refresh lag. Browser close/reload warns on unsaved rows.
+- Questions: filter unrelated address/delivery/section, generic named-TJI brand/grade/width and nonexistent box packaging questions; retain real missing dimensions/package questions. Shared 10-inch convention only asked when present, no unapproved defaults.
+- **24/24 tests passed**, including actual add server action under a mocked database (not production persistence), real React browser fixture recognition/new row/Undo/save/copy/remount/failure/stale revision. TypeScript/lint passed. Full Next16.3.4 webpack build passed153 routes. Existing9222Chrome owned local fixture:62 rows, widths1440/390/320 no document overflow; narrow table scroll only. Owned tab closed.
+- Edge `material-row-recognition` version3 ACTIVE, bundle `417465f341b7b733f28e6b0e51ed367d1a34cb2ae01b1aa5edd893cdb133f045`; custom exact configured-key auth unchanged; unauthenticated POST401. Target verified by canonical `/api/release` production/npr before mutation. No schema/credentials changes.
+- Frontend publication and final authenticated live checks still pending at this checkpoint. Existing QA request `ebc5830c-fc75-46fb-9814-6c9a46e06f0a` explicitly named QA/no sends or orders, draft,4 existing items; use it for actual new-row Save/edit/reload proof, not customer Framing. No outbound messages or business approvals.
+
 ## Current status — 2026-09-16 20:25 UTC (supersedes historical notes below)
 
 - Frontend **LIVE** at `083deaf6665e288d39b536d52c328a684045bcd1`, verified through canonical `/api/release`; production binding `nprfhspwdflpqlopydmp`. Official release workflow `35144813836` succeeded including regression, full build/type/lint and live binding guards. Vercel deployment `dpl_8d7fdUqojuLrK6kMGpR8m9GAXTbd`.

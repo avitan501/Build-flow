@@ -6,6 +6,8 @@ test('asks six bounded relevant questions and never preselects an answer', () =>
   expect(materialListClarifications(source)).toHaveLength(6)
   expect(materialListClarifications('White paint 5 gallons')).toHaveLength(0)
   expect(clarificationFields(source, {})).toEqual([])
+  expect(materialListClarifications('12 pc 9.5 inch TJI 230 26ft')).toHaveLength(0)
+  expect(materialListClarifications('12 sheets OSB 4x8 3/4')).toHaveLength(0)
 })
 test('TJI normalization cannot silently authorize LVL or engineering substitution', () => {
   const q = materialListClarifications(source)[0]
