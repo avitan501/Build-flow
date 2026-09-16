@@ -9,6 +9,8 @@ import { productChoiceFingerprint, restoreProductChoices, type ProductChoiceDraf
 import { loadProductMatchConfirmations } from "@/lib/product-match-server";
 import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
 import type { ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table";
+import { currentRequestComparison } from "@/lib/current-request-comparison";
+import type { ReviewableMaterialItem } from "@/lib/client-material-review";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -59,6 +61,17 @@ export default async function QuoteComparisonDetailPage({
 
   if (comparisonResult.error || !comparisonResult.data) notFound();
   if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
+  let requestedMaterialLines:Record<string,string>={};
+  let requestedComparisonItems:QuoteComparisonItemRecord[]|undefined;
+  let missingRequestMaterials=0;
+  if(comparisonResult.data.request_id && ['draft','review'].includes(comparisonResult.data.status) && !comparisonResult.data.active_route_id && !comparisonResult.data.awarded_bid_id && !['sent','accepted'].includes(comparisonResult.data.client_quote_status)){
+    const sourceResult=await supabase.from('quote_request_items').select('id,name,quantity,unit,department,metadata,qualification_status').eq('request_id',comparisonResult.data.request_id).order('created_at').returns<ReviewableMaterialItem[]>();
+    if(sourceResult.error)throw new Error('Could not load the saved request list.');
+    const current=currentRequestComparison(sourceResult.data??[],itemsResult.data??[]);
+    requestedComparisonItems=current.items;
+    requestedMaterialLines=current.materialLines;
+    missingRequestMaterials=current.missingSourceIds.length;
+  }
   bidsResult.data = await loadProductMatchConfirmations(supabase,bidsResult.data ?? []);
   const choiceFingerprint = await productChoiceFingerprint(itemsResult.data ?? [], bidsResult.data ?? []);
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
@@ -105,6 +118,9 @@ export default async function QuoteComparisonDetailPage({
       procurementRoute={finalized.route}
       routeError={finalized.error}
       items={itemsResult.data ?? []}
+      requestedMaterialLines={requestedMaterialLines}
+      requestedComparisonItems={requestedComparisonItems}
+      missingRequestMaterials={missingRequestMaterials}
       bids={bidsResult.data ?? []}
       receivedSupplierQuotes={(receivedQuotes.data ?? []).map(quote => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, sourceItems: quote.supplier_quote_items ?? [], inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
       suppliers={suppliers}

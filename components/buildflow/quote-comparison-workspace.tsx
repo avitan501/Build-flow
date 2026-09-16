@@ -118,6 +118,9 @@ export function QuoteComparisonWorkspace({
   clientQuoteAttachments,
   requestClientQuoteSources = [],
   receivedSupplierQuotes = [],
+  requestedMaterialLines = {},
+  requestedComparisonItems,
+  missingRequestMaterials = 0,
   previewMode = false,
   choiceActorId = "sample",
   initialProductSelections = {},
@@ -137,6 +140,9 @@ export function QuoteComparisonWorkspace({
   clientQuoteAttachments: ClientQuoteAttachmentRecord[];
   requestClientQuoteSources?: RequestClientQuoteSource[];
   receivedSupplierQuotes?: import("@/components/buildflow/received-supplier-quote-table").ReceivedSupplierQuote[];
+  requestedMaterialLines?: Record<string,string>;
+  requestedComparisonItems?: QuoteComparisonItemRecord[];
+  missingRequestMaterials?: number;
   previewMode?: boolean;
   choiceActorId?: string;
   initialProductSelections?: Record<string, string>;
@@ -526,7 +532,7 @@ export function QuoteComparisonWorkspace({
           </div> : null}
           <header className="flex flex-wrap items-center justify-between gap-3 pb-2">
             <div className="min-w-0 flex-1"><p className="mb-2 flex min-w-0 items-center gap-2 text-xs text-slate-500"><span className="shrink-0 font-medium uppercase tracking-wider">Step 2</span><span aria-hidden="true">·</span><span className="truncate" title={comparison.title}>{comparison.title}</span></p><h1 id="product-comparison-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">Supplier quotes</h1>
-            <p className="mt-2 text-sm text-slate-500">{items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")).length} to review</p></div>
+            <p className="mt-2 text-sm text-slate-500">{requestedComparisonItems?.length??items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")&&(!requestedComparisonItems||requestedComparisonItems.some(item=>item.id===row.item.id))).length} to review</p></div>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" aria-label="Add quote" onClick={()=>setActiveStep(2)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-sky-500 bg-white px-3 text-xs font-semibold text-sky-800"><Plus className="h-4 w-4"/><span className="hidden sm:inline">Add quote</span></button>
               <button type="button" aria-expanded={workspaceToolsOpen} aria-controls="product-workspace-tools" onClick={()=>setWorkspaceToolsOpen(value=>!value)} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-slate-500">{workspaceToolsOpen ? "Less" : "More"}</button>
@@ -545,7 +551,8 @@ export function QuoteComparisonWorkspace({
             <details className="mt-1"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Preview details and ordering checks</summary><p className="text-xs leading-5 text-sky-900">{previewMode ? "Resets on reload." : "Product choices save automatically; supplier price edits use Save prices."} Does not place an order, select a final route, or contact suppliers. Splitting products can add delivery fees, minimum-order requirements, or change quoted prices. Prices use the current request-row units; no unit conversion is performed here. Confirm units, availability and final charges before ordering. This is not a lowest delivered-order total.</p></details>
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>}
-          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={liveItems} quotes={receivedSupplierQuotes} bids={liveBids} /> : null}
+          {missingRequestMaterials&&comparison.request_id?<p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">{missingRequestMaterials} new saved material(s) need a comparison row. <a className="font-semibold text-sky-800" href={`/owner/materials/requests/${comparison.request_id}#request-supplier-quotes`}>Open the request and choose Compare supplier quotes to synchronize.</a> Existing quotes and prices are retained.</p>:null}
+          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} /> : null}
           {!receivedSupplierQuotes.length || liveBids.length ? <div className="grid gap-2">{productPreview.rows.map((row) => <ProductQuoteCard key={row.item.id} row={row} finalized={Boolean(procurementRoute && !routeError)} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} beforeConfirm={previewMode ? undefined : choiceAutosave.flush} />)}</div> : null}
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
           <div hidden={!workspaceToolsOpen} className="order-3 rounded-lg bg-slate-50 p-3"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="grid grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>

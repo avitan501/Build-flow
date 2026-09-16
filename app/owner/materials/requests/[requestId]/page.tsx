@@ -42,6 +42,7 @@ import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import { effectiveRequestComparisonItems, isSupplierDerivedRequestRow } from "@/lib/supplier-quote-routing";
 import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage";
+import { currentRequestComparison } from "@/lib/current-request-comparison";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
@@ -587,9 +588,12 @@ export default async function OwnerMaterialRequestPage({
   const supplierComparisonTables: RequestWorktableComparison[] = (
     comparisons ?? []
   ).map((comparison) => {
-    const comparisonItems = (comparisonItemsResult.data ?? []).filter(
+    const savedComparisonItems = (comparisonItemsResult.data ?? []).filter(
       (item) => item.comparison_id === comparison.id && !(items ?? []).some(source => source.id === item.source_request_item_id && isSupplierDerivedRequestRow(source)),
     );
+    const currentComparison=['draft','review'].includes(comparison.status)&&!comparison.active_route_id&&!comparison.awarded_bid_id&&!['sent','accepted'].includes(comparison.client_quote_status)
+      ?currentRequestComparison(items??[],savedComparisonItems):null;
+    const comparisonItems=currentComparison?.items??savedComparisonItems;
     const comparisonBids = (comparisonBidsResult.data ?? []).filter(
       (bid) => bid.comparison_id === comparison.id,
     );
@@ -613,6 +617,7 @@ export default async function OwnerMaterialRequestPage({
         }] : [];
       }),
     });
+    if(currentComparison)for(const item of mapped.items)item.specification=currentComparison.materialSpecifications[item.id]||null;
     return {
       id: comparison.id,
       title: comparison.title,
