@@ -9,7 +9,8 @@ test("recognition accepts only configured server keys, modern or legacy", () => 
   const env = (name: string) => keys[name]
   expect(authorizedRecognitionServer(new Headers({ apikey: "sb_secret_example" }), env)).toBe(true)
   expect(authorizedRecognitionServer(new Headers({ authorization: "Bearer legacy-test-key" }), env)).toBe(true)
-  for (const headers of [{}, { apikey: "anon" }, { apikey: "sb_secret_wrong" }, { authorization: "Bearer forged-role-admin" }]) {
+  const rejected: Record<string, string>[] = [{}, { apikey: "anon" }, { apikey: "sb_secret_wrong" }, { authorization: "Bearer forged-role-admin" }]
+  for (const headers of rejected) {
     expect(authorizedRecognitionServer(new Headers(headers), env)).toBe(false)
   }
 })

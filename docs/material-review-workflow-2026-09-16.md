@@ -11,6 +11,10 @@
 
 ## Historical pre-release assessment (retained for traceability)
 
+## Follow-up clean-line UX correction — 2026-09-16
+
+Reported screenshot: legacy fields do not contain a separated TJI depth until a recognition proposal is applied; right column displayed old saved data above a large yellow proposal. Updated right column to display the actual recognized line immediately with a preview label and `Use recognized line`; questions are collapsed and the duplicate yellow panel removed. Existing explicit Apply/Save behavior and revision guards remain. A shared clean-line formatter now excludes structured address/shipping/price requirements from displayed and copied material lines, retains floor/specifications and preserves metadata. No production request data edited. TJI10 inches continues to be depth, never width. Seven focused clean-line/recognition tests passed; TypeScript/lint checked. Source auth-test typing corrected after full type check exposed a pre-existing union issue. Publication/live UI verification recorded in master context when complete.
+
 ## Scope and ownership
 
 Worktree `/tmp/avantia-material-review-20260916`, branch `codex/material-review-workflow-20260916`, based on verified production `d1e29f20ad5a41157bf754a2c9bf2e06e095bfc1`. Canonical site `https://avantiabuild.com`; production ref `nprfhspwdflpqlopydmp`. No other active implementation/publisher observed. Primary dirty worktree preserved.
