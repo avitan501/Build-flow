@@ -1,5 +1,14 @@
 # Step 1/2 material review — production release and verification
 
+## Step 1 tasks 1–4 LIVE verified — 2026-09-16 21:14 UTC
+
+- Frontend commit **9581ad9628f5eada5c1d477bd4300658af6f9270** now canonical/hook main and exact canonical `/api/release`, production/npr binding. Official workflow **35150463248 SUCCESS** (job104977175412,15 successful steps); Vercel **dpl_6WgpWLXqxoMJYiHUSrM4uHESaK55 READY/production/exactSHA**.
+- Actual authenticated existing9222Chrome Framing:39clean saved rows, actual Copy handler39 without address, three supplier names retained, real recognition directly fills draft (no additional apply), Width empty/Depth10in, actual Undo succeeds,390 no document overflow. No Framing Save or customer data edit.
+- Actual authenticated QA638412: created exactly one new row **a483dc3d-8c54-4a66-bab7-a2b08884444e**, Recognize succeeded, Save succeeded; edited inline source and quantity22→23 using existing atomic save. Fresh reload shows `23 pc 10 inch TJI 230 — 16 ft`, quantity23, clean `23 pc · TJI 230 · 10 in · 16 ft`; actual Copy contains the identical line. Independent readonly production query confirms immutable source_text22 vs recognition_text23 and correct saved depth10in/length16ft/modelTJI230. QA row retained as test evidence; no new request, sends/orders/payment/award/schema/credential changes.
+- Two QA verification harness issues corrected: waiting for pending transition before typing after Save; assertion had wrongly required unit `pieces` although valid original unit `pc` was retained. No additional row or repeated paid recognition created; resumed exact own saved ID. Final verify-only browser reload/copy PASS. Screenshot `/tmp/avantia-new-row-saved-live.png`, current Framing screenshots `/tmp/avantia-step1-live-desktop.png`, `/tmp/avantia-step1-live-phone.png`, `/tmp/avantia-recognition-applied-live.png`. Own tabs closed; owned dev3995 stopped.
+- Broader regression:35 passed,2 preexisting private-fixture skips,1 stale historical test failure in request-item-fields expecting removed Save draft/Save & organize strings. Baselinebe9f370d demonstrably lacks those strings too; original editor unchanged in this release. New targeted24/24PASS. Do not describe the full historical suite as all passing.
+- User-authorized Step1 tasks1–4 implemented/published/live checked. Task5 supplier matching/price comparison, full sequential3PDF re-import, other historical backlog remain separate and are not certified by this release.
+
 ## Step 1 tasks 1–4 — 2026-09-16 21:05 UTC
 
 - Authorized scope: immediate recognized draft with Undo; inline new/editable source rows; relevant per-row/shared questions; identical displayed/saved/copied material lines. Supplier matching/comparison task5 remains separate.
