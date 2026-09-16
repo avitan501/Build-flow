@@ -22,7 +22,6 @@ import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identi
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
 import { normalizeCommunicationCallPhone, normalizeCommunicationThread } from "@/lib/aura/phone-links"
 import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
-import { buildClientLinkMessage } from "@/lib/client-link-message"
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { formatSiteDate, formatSiteDateTime, formatSiteTime, siteBusinessDateKey } from "@/lib/site-date-time"
@@ -61,12 +60,14 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<
   AuraWhatsAppUtilityTemplateName,
   {
     label: string
+    buttonLabel: string
     fields: Array<{ label: string; placeholder: string }>
     render: (values: string[]) => string
   }
 > = {
   quote_request_received: {
     label: "Material request received",
+    buttonLabel: "Ask a question",
     fields: [
       { label: "Customer first name", placeholder: "John" },
       { label: "Request reference", placeholder: "MR-1042" },
@@ -75,6 +76,7 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<
   },
   service_request_received: {
     label: "Service request received",
+    buttonLabel: "Add details",
     fields: [
       { label: "Customer first name", placeholder: "John" },
       { label: "Service requested", placeholder: "material pricing" },
@@ -83,6 +85,7 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<
   },
   quote_ready: {
     label: "Quote ready",
+    buttonLabel: "Ask about quote",
     fields: [
       { label: "Customer first name", placeholder: "John" },
       { label: "Quote number", placeholder: "Q-1042" },
@@ -92,16 +95,11 @@ const WHATSAPP_UTILITY_TEMPLATES: Record<
       },
     ],
     render: ([name, quote, url]) =>
-      url?.trim()
-        ? buildClientLinkMessage({
-            messageText: `Hi ${name}, your Avantia Build quote ${quote} is ready. Reply here if you have any questions.`,
-            url,
-            fallbackMessage: "Your Avantia Build quote is ready.",
-          })
-        : `Hi ${name || "there"}, your Avantia Build quote ${quote || ""} is ready.\n\nAdd the secure quote link.`,
+      `Hi ${name}, your Avantia Build quote ${quote} is ready. Review the details here: ${url}. Reply here if you have any questions.`,
   },
   order_received: {
     label: "Order received",
+    buttonLabel: "Ask about order",
     fields: [
       { label: "Customer first name", placeholder: "John" },
       { label: "Order number", placeholder: "O-1042" },
@@ -2088,7 +2086,11 @@ export function UnifiedCommunicationInbox({ draftScope = "preview", communicatio
                           </label>
                         ))}
                       </div>
-                      <p className="rounded-md bg-white p-2 text-[10px] leading-4 text-slate-600">{WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].render(utilityTemplateValues)}</p>
+                      <div aria-label="WhatsApp template preview" className="rounded-md bg-white p-2 text-[10px] leading-4 text-slate-600">
+                        <p className="break-words">{WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].render(utilityTemplateValues)}</p>
+                        <p className="mt-1 text-slate-400">Avantia Build</p>
+                        <p className="mt-2 border-t border-slate-100 pt-2 text-center text-sky-700">{WHATSAPP_UTILITY_TEMPLATES[utilityTemplateName].buttonLabel}</p>
+                      </div>
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-[9px] leading-4 text-emerald-800">Meta approval is checked immediately before sending.</p>
                         <button type="button" onClick={sendUtilityTemplate} disabled={pending || !selectedChannelReady || !recipient.trim() || utilityTemplateValues.some((value) => !value.trim())} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-[10px] font-black text-white disabled:bg-slate-300">

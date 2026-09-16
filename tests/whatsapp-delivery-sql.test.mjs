@@ -8,7 +8,7 @@ import vm from "node:vm";
 import ts from "typescript";
 import { whatsappDeliveryDiagnostic } from "../supabase/functions/_shared/whatsapp-delivery-diagnostic.ts";
 
-const container = "avantia-wa-diagnostic-test-20260915";
+const container = process.env.WHATSAPP_TEST_CONTAINER || "avantia-wa-diagnostic-test-20260915";
 function query(sql) {
   return execFileSync("docker", ["exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres", "-XAtq", "-v", "ON_ERROR_STOP=1"], { input: sql, encoding: "utf8" }).trim();
 }
