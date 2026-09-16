@@ -13,6 +13,8 @@ import { MaterialOrganizationStatus } from "@/components/buildflow/material-orga
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { RequestMaterialIdentity } from "@/components/buildflow/request-material-identity"
 import { RequestItemReviewList } from "@/components/buildflow/request-item-review-list"
+import { MaterialListClarifications } from "@/components/buildflow/material-list-clarifications"
+import { RequestMaterialSpreadsheet } from "@/components/buildflow/request-material-spreadsheet"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
 import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader"
@@ -136,6 +138,7 @@ export function RequestMaterialWorktable({
   stepCompleted = false,
   actorId,
   reviewProducts,
+  originalRevisions,
 }: {
   requestId: string
   originalItems: ReviewableMaterialItem[]
@@ -149,9 +152,11 @@ export function RequestMaterialWorktable({
   attachments: RequestWorktableAttachment[]
   stepCompleted?: boolean
   actorId?: string
+  originalRevisions?: Record<string, string>
   reviewProducts?: Array<{ item: ReviewableMaterialItem; source: ReviewableMaterialItem | null; revision: string }>
 }) {
   const router = useRouter()
+  const [spreadsheet, setSpreadsheet] = useState(true)
   const [savedItems, setSavedItems] = useState<Record<string, ReviewableMaterialItem>>({})
   const [dirtyRoutes, setDirtyRoutes] = useState<Record<string, boolean>>({})
   const routingBusy = Object.values(dirtyRoutes).some(Boolean)
@@ -379,12 +384,14 @@ export function RequestMaterialWorktable({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">{organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : !aiItems.length || draftChanged || organizationStatus === "failed" ? <><p className="text-xs text-slate-600">{organizationStatus === "failed" ? "Your original is safe. Splitting did not finish." : "Split into products, quantities and sizes."}</p><OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} compact /></> : <p className="text-xs font-semibold text-emerald-700">{aiItems.length} products extracted</p>}</div>
       </OriginalSourceContainer> : null}
 
+      {rawDraft && originalRevisions?.[rawDraft.id] ? <MaterialListClarifications key={`${rawDraft.id}:${originalRevisions[rawDraft.id]}`} requestId={requestId} itemId={rawDraft.id} revision={originalRevisions[rawDraft.id]} source={String(rawDraft.metadata?.request_details || rawDraft.name)} saved={rawDraft.metadata?.material_clarifications} /> : null}
+
       {!rawDraft && sourceItems.length ? <details className="group border-b border-slate-200 bg-slate-50/70">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 sm:px-4"><div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[.1em] text-slate-500">Original list · {sourceItems.length} items</p><p className="truncate text-[10px] text-slate-500">Open to compare with the AI-organized version.</p></div><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" /></summary>
         <div className="grid gap-1 border-t border-slate-200 px-3 py-2 sm:px-4">{sourceItems.map((sourceItem, index) => <OriginalRequestItemEditor actorId={actorId} key={sourceItem.id} requestId={requestId} item={sourceItem} trigger="content"><div className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1"><span className="w-5 shrink-0 text-[9px] font-bold text-slate-400">#{index + 1}</span><span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{sourceItem.name}</span><span className="shrink-0 text-[10px] font-semibold text-slate-500">{materialQuantity(sourceItem)} {materialSalesUnit(sourceItem)}</span></div></OriginalRequestItemEditor>)}</div>
       </details> : null}
 
-      {reviewProducts && actorId ? <RequestItemReviewList key={`${actorId}:${requestId}`} actorId={actorId} requestId={requestId} products={reviewProducts} defaultZipCode={defaultZipCode} /> : <>
+      {reviewProducts && actorId ? <><div className="flex gap-2 px-3 pt-3" role="group" aria-label="Material list view"><button type="button" aria-pressed={spreadsheet} onClick={()=>setSpreadsheet(true)} className="min-h-10 rounded-lg border px-3 text-xs font-semibold">Spreadsheet</button><button type="button" aria-pressed={!spreadsheet} onClick={()=>setSpreadsheet(false)} className="min-h-10 rounded-lg border px-3 text-xs font-semibold">Focused review</button></div><div hidden={!spreadsheet}><RequestMaterialSpreadsheet requestId={requestId} products={reviewProducts}/></div><div hidden={spreadsheet}><RequestItemReviewList key={`${actorId}:${requestId}`} actorId={actorId} requestId={requestId} products={reviewProducts} defaultZipCode={defaultZipCode} /></div></> : <>
       {organizationCompletedLabel && aiItems.length > 0 && !organizationInProgress ? <p className="border-b border-slate-100 px-4 py-1.5 text-[10px] font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}
       {aiItems.length ? <div className="flex flex-col gap-2 border-b border-sky-100 bg-sky-50/55 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div className="flex min-w-0 items-center gap-2.5"><Sparkles className="h-4 w-4 shrink-0 text-[#b8860b]" /><div className="min-w-0"><p className="text-xs font-extrabold text-slate-900">AI split {aiItems.length} items{missingItemCount ? <span className="text-amber-700"> · {missingItemCount} missing details</span> : <span className="text-emerald-700"> · ready to route</span>}</p><p className="truncate text-[10px] text-slate-500">Review, edit, then send each group to the right supplier.</p></div></div>

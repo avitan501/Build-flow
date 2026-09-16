@@ -7,6 +7,15 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ReceivedProductPriceMatrix } from "../components/buildflow/received-product-price-matrix"
 const item=(id:string,description:string,specification:string,quantity=10)=>({id,description,specification,quantity,unit:"pieces"} as QuoteComparisonItemRecord)
 const line=(line_number:number,description:string,specification:string,quantity=10)=>({line_number,description,specification,quantity,unit:"pieces",unit_price:12,line_total:120})
+test("one supplier source cannot imply coverage for two request rows",()=>{
+ const rows=receivedProductPriceRows([item("a","2x6 lumber","16 ft"),item("b","2x6 lumber","16 ft")],[{id:"q",fileName:"one",sourceItems:[line(1,"2x6 lumber","16 ft")]}])
+ for(const row of rows){expect(row.cells[0].sharedSource).toBe(true);expect(row.cells[0].suggested).toBe(false);expect(row.cells[0].reasons.join(' ')).toContain('assign it once')}
+})
+test("quantity and material differences are explicit, not generic review labels",()=>{
+ const rows=receivedProductPriceRows([item("a","plywood","3/4 4x8",77)],[{id:"q",fileName:"one",sourceItems:[line(1,"OSB","3/4 4x8",70)]}])
+ expect(rows[0].cells[0].reasons.join(' ')).toContain('requested 77')
+ expect(rows[0].cells[0].reasons.join(' ')).toContain('OSB')
+})
 test("all received quotes are columns before approved bids exist",()=>{
  const rows=receivedProductPriceRows([item("a","Dimensional lumber","2 x 6 in · Length: 16 ft")],[{id:"q1",fileName:"one",sourceItems:[line(1,"2x6 lumber","16 ft")]},{id:"q2",fileName:"two",sourceItems:[line(1,"SPF lumber","2x6 · 16 ft")]},{id:"q3",fileName:"three",sourceItems:[]}])
  expect(rows[0].cells).toHaveLength(3);expect(rows[0].cells[0].lines).toHaveLength(1);expect(rows[0].cells[1].lines).toHaveLength(1);expect(rows[0].cells[2].lines).toHaveLength(0)
@@ -22,7 +31,7 @@ test("ambiguous source rows remain visible and unapproved",()=>{
 })
 test("price matrix has no approval writes and ranks only verified offers",async()=>{
  const source=await readFile("components/buildflow/received-product-price-matrix.tsx","utf8")
- expect(source).toContain('data-testid="product-price-matrix"');expect(source).toContain('offer?.eligible');expect(source).toContain('Match / selling unit needs review');expect(source).not.toContain('Action(')
+ expect(source).toContain('data-testid="product-price-matrix"');expect(source).toContain('offer?.eligible');expect(source).toContain('cell.reasons.map');expect(source).not.toContain('Action(')
 })
 test("actual Framing source data populates product prices",async()=>{
  test.skip(!process.env.PRICE_MATRIX_FIXTURE_FILE,"Private local source fixture only")

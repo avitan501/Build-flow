@@ -1,4 +1,4 @@
-import { requestItemFieldSummary } from "@/lib/request-item-fields"
+import { requestItemFieldSummary, requestItemFieldsFromMetadata } from "@/lib/request-item-fields"
 import { isRequestIntakePlaceholder } from "@/lib/request-intake-placeholder"
 
 type DirectorySupplier = { id: string; name: string }
@@ -26,6 +26,12 @@ type RequestSourceItem = {
 
 function isRawFreeTextContainer(item: RequestSourceItem) {
   return isRequestIntakePlaceholder(item)
+}
+
+/** Historical supplier-derived rows stay available for quote/audit history,
+ * but are not client-request lines. The marker is additive and reversible. */
+export function isSupplierDerivedRequestRow(item: RequestSourceItem) {
+  return item.metadata?.excluded_from_client_request === true || item.metadata?.request_item_origin === "supplier_attachment"
 }
 
 type RequestComparisonSourceItem = RequestSourceItem & {
@@ -59,7 +65,12 @@ export function requestItemSpecification(
   metadata: Record<string, unknown> | null | undefined,
   fallbackDepartment: string,
 ) {
+  const fields=requestItemFieldsFromMetadata(metadata)
+  const width=fields.find(field=>field.id==="width")?.value.match(/^\s*(\d+(?:\.\d+)?)\s*(in|ft)\s*$/i)
+  const depth=fields.find(field=>field.id==="depth")?.value.match(/^\s*(\d+(?:\.\d+)?)\s*(in|ft)\s*$/i)
+  const dimensions=width && depth && width[2].toLowerCase()===depth[2].toLowerCase() && !fields.some(field=>field.id==="dimensions") ? `${width[1]} x ${depth[1]} ${width[2]}` : ""
   const values = [
+    dimensions,
     ...requestItemFieldSummary(metadata),
     clean(metadata?.request_details, 1000),
   ].filter(Boolean)
@@ -67,11 +78,12 @@ export function requestItemSpecification(
 }
 
 export function effectiveRequestComparisonItems<T extends RequestSourceItem>(items: T[]) {
-  const organizedItems = items.filter((item) => item.metadata?.ai_organized === true)
+  const visible = items.filter((item) => !isSupplierDerivedRequestRow(item))
+  const organizedItems = visible.filter((item) => item.metadata?.ai_organized === true)
   if (!organizedItems.length) {
     // This row stores the client's whole message while AI organization is in
     // progress. It is not a material and must never become a priced line.
-    return items.filter(
+    return visible.filter(
       (item) => item.metadata?.ai_organized !== true && !isRawFreeTextContainer(item),
     )
   }
@@ -85,7 +97,7 @@ export function effectiveRequestComparisonItems<T extends RequestSourceItem>(ite
   )
   return [
     ...organizedItems,
-    ...items.filter(
+    ...visible.filter(
       (item) =>
         item.metadata?.ai_organized !== true &&
         !isRawFreeTextContainer(item) &&

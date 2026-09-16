@@ -40,7 +40,7 @@ import { requestStep1CompletionError, requestStep2CompletionError } from "@/lib/
 import { REQUEST_WORKFLOW_SUBSTEPS, requestWorkflowSubstep, requestWorkflowSubstepLabel, type RequestWorkflowSubstepId } from "@/lib/request-workflow-substeps";
 import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
-import { effectiveRequestComparisonItems } from "@/lib/supplier-quote-routing";
+import { effectiveRequestComparisonItems, isSupplierDerivedRequestRow } from "@/lib/supplier-quote-routing";
 import { requestDeliveryCoverage } from "@/lib/request-delivery-coverage";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
@@ -407,10 +407,10 @@ export default async function OwnerMaterialRequestPage({
     managerSettings?.state?.qualificationSettings?.suppliers ?? [],
   );
   const organizedItems = (items ?? []).filter(
-    (item) => item.metadata?.ai_organized === true,
+    (item) => item.metadata?.ai_organized === true && !isSupplierDerivedRequestRow(item),
   );
   const originalItems = (items ?? []).filter(
-    (item) => item.metadata?.ai_organized !== true,
+    (item) => item.metadata?.ai_organized !== true && !isSupplierDerivedRequestRow(item),
   );
   const representedOriginalIds = new Set(organizedItems.map((item) => item.metadata?.source_item_id));
   const reviewDisplayItems = [...organizedItems, ...originalItems.filter((item) => !representedOriginalIds.has(item.id) && !isRequestIntakePlaceholder(item))];
@@ -739,6 +739,7 @@ export default async function OwnerMaterialRequestPage({
         </header>
         <RequestMaterialWorktable
           actorId={user.id}
+          originalRevisions={Object.fromEntries(originalItems.map(item => [item.id, requestItemRevision(item, null)]))}
           reviewProducts={reviewDisplayItems.length ? reviewDisplayItems.map((item) => {
             const source = originalItems.find((entry) => entry.id === item.metadata?.source_item_id) ?? null;
             return { item, source, revision: requestItemRevision(item, source) };

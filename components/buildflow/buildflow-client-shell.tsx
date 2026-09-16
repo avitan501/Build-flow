@@ -22,7 +22,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isAiFlow = Boolean(pathname?.startsWith("/ai"));
   const isOwnerWorkspace = Boolean(pathname?.startsWith("/owner"));
   const isManagerPreview = Boolean(pathname?.startsWith("/preview-admin"));
-  const isQuoteComparisonPreview = Boolean(pathname?.startsWith("/preview/quote-comparison"));
+  const isQuoteComparisonPreview = Boolean(pathname?.startsWith("/preview/quote-comparison") || pathname === "/preview/request-items");
   const isAuthFlow = pathname === "/login" || pathname === "/signup" || pathname === "/reset-password";
 
   if (!useAppShell) {

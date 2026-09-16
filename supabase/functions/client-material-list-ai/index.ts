@@ -197,7 +197,12 @@ function savedRequestItemFields(metadata: Record<string, unknown> | null) {
   if (!Array.isArray(metadata?.request_item_fields)) return ""
   return metadata.request_item_fields.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return []
-    const candidate = entry as { label?: unknown; value?: unknown }
+    const candidate = entry as { id?: unknown; label?: unknown; value?: unknown }
+    // Shared answers belong to an exact original revision, not to later edited text.
+    if (String(candidate.id || "").startsWith("clarify-")) {
+      const shared = metadata.material_clarifications as { source?: unknown } | undefined
+      if (!shared || shared.source !== metadata.request_details) return []
+    }
     const label = clean(candidate.label, 80)
     const value = clean(candidate.value, 300)
     return label && value ? [`${label}: ${value}`] : []
