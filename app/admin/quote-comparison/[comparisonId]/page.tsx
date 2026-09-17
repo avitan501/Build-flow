@@ -13,6 +13,7 @@ import { currentRequestComparison } from "@/lib/current-request-comparison";
 import type { ReviewableMaterialItem } from "@/lib/client-material-review";
 import { matrixChoiceFingerprint,restoreMatrixChoices } from '@/lib/matrix-choice-draft';
 import { quoteDuplicateKey } from '@/lib/comparison-quote-columns';
+import { supplierProposalTotal } from '@/lib/supplier-proposal-total';
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -136,7 +137,7 @@ export default async function QuoteComparisonDetailPage({
       requestedComparisonItems={requestedComparisonItems}
       missingRequestMaterials={missingRequestMaterials}
       bids={bidsResult.data ?? []}
-      receivedSupplierQuotes={(receivedQuotes.data ?? []).map((quote,index) => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, duplicateKey:duplicateKeys[index],sourceItems: quote.supplier_quote_items ?? [], inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
+      receivedSupplierQuotes={(receivedQuotes.data ?? []).map((quote,index) => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, duplicateKey:duplicateKeys[index],sourceItems: quote.supplier_quote_items ?? [], proposalTotal:supplierProposalTotal(quote.raw_text,quote.supplier_quote_items??[]), inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
       suppliers={suppliers}
       projects={projectsResult.data ?? []}
       departments={departments}

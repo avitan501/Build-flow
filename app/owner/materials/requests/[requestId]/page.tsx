@@ -3,6 +3,7 @@ import { CustomerRequestStatus } from "@/components/buildflow/customer-request-s
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestLiveSync } from "@/components/buildflow/request-live-sync";
+import { supplierProposalTotal } from '@/lib/supplier-proposal-total';
 import { RequestInlineNameEditor } from "@/components/buildflow/request-inline-name-editor";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
@@ -86,6 +87,7 @@ type SupplierPackage = {
   status: string;
 };
 type LinkedSupplierQuote = {
+  raw_text: string;
   id: string;
   comparison_id: string | null;
   supplier_id: string | null;
@@ -362,7 +364,7 @@ export default async function OwnerMaterialRequestPage({
           .returns<QuoteComparisonBidRecord[]>(),
         supabase
           .from("supplier_quotes")
-          .select("id,comparison_id,supplier_id,supplier_name,status,quote_number,quote_date,file_name,file_path,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total)")
+          .select("id,comparison_id,supplier_id,supplier_name,status,quote_number,quote_date,file_name,file_path,raw_text,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total)")
           .in("comparison_id", comparisonIds)
           .returns<LinkedSupplierQuote[]>(),
       ])
@@ -519,6 +521,7 @@ export default async function OwnerMaterialRequestPage({
         supplierName: document.supplier_name,
         reviewStatus: document.status,
         sourceItems: document.supplier_quote_items ?? [],
+        proposalTotal: supplierProposalTotal(document.raw_text,document.supplier_quote_items??[]),
       })),
     };
   });

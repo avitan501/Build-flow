@@ -11,6 +11,17 @@ import type {QuoteComparisonItemRecord} from '../lib/quote-comparison'
 import {productMatchSnapshot,type QuoteComparisonBidRecord} from '../lib/quote-comparison'
 const item={id:'item',description:'Dimensional lumber',specification:'2 x 6 in · 10 ft',quantity:10,unit:'pieces'} as QuoteComparisonItemRecord
 const quote=(id:string,price:number)=>({id,supplierName:id,fileName:id+'.pdf',sourceItems:[{line_number:1,description:'2x6 lumber 10 ft',specification:'',quantity:10,unit:'each',unit_price:price,line_total:price*10}]})
+test('proposal footer retains supplier quantities separately from requested subtotal and clear mixed summary',async({page})=>{
+ Object.assign(globalThis,{React})
+ const source={...quote('source',100),sourceItems:[{...quote('source',100).sourceItems[0],quantity:600,line_total:60000}],proposalTotal:{amount:60000,basis:'document-subtotal' as const,discrepancy:false}}
+ const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[item],quotes:[source],bids:[],baselineQuoteId:'source'})))
+ await page.setContent(html)
+ await expect(page.getByTestId('supplier-proposal-total')).toContainText('$60,000.00')
+ await expect(page.getByTestId('supplier-proposal-total')).toContainText('From original proposal')
+ await expect(page.getByTestId('supplier-material-total')).toContainText('$1,000.00')
+ await expect(page.getByTestId('supplier-column-totals')).toContainText('Requested quantity subtotal')
+ await expect(page.getByTestId('mixed-basket-summary')).toContainText('not a full-request savings figure')
+});
 function restore(value:unknown):React.ReactNode {
  if(Array.isArray(value))return value.map((c,i)=>React.createElement(React.Fragment,{key:i},restore(c)))
  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const n=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const {children,...props}=n.props;const type=typeof n.type==='function'?function RestoredComponent(p:Record<string,unknown>){return restore((n.type as (p:Record<string,unknown>)=>unknown)(p))}:n.type;return React.createElement((typeof type==='object'?React.Fragment:type) as React.ElementType,{...props,key:n.key},restore(children))}
