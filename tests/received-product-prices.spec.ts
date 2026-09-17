@@ -37,6 +37,19 @@ test('sheet dimensions accept equivalent notation and keep size, thickness and m
  const wrong=line(1,'CDX plywood','4 ft x 10 ft · 3/4"',77),correct=line(2,'CDX plywood','4\' x 8\' · 3/4"',77)
  expect(receivedProductPriceRows([target],[{id:'q',fileName:'q',sourceItems:[wrong,correct]}])[0].cells[0].lines.map(l=>l.line_number)).toEqual([2])
 })
+test('compact sheet notation keeps thickness separate from sheet length without hiding real conflicts',()=>{
+ const target=item('sheet','Deck plywood','3/4 in · 4 ft x 8 ft',77)
+ for(const spec of ['4 x 8 3/4" CDX *YP*','4\' x 8 3/4" CDX, YP','4×8 3/4 in CDX']){
+  const source=line(6,spec,spec,77)
+  expect(comparisonIndicators(target,[source],sourceComparisonReasons(target,source)).some(i=>i.kind==='measurement')).toBe(false)
+ }
+ for(const spec of ['4 x 8 5/8" CDX','4 x 8 8-3/4" CDX','4 x 10 3/4" CDX']){
+  const source=line(6,spec,spec,77)
+  expect(comparisonIndicators(target,[source],sourceComparisonReasons(target,source)).some(i=>i.kind==='measurement')).toBe(true)
+ }
+ const lvl=item('lvl','LVL beam','1-3/4 in · 9.5 in · 20 ft')
+ expect(comparisonIndicators(lvl,[line(1,'LVL beam','1 3/4" · 9-1/2" · 20 ft')],[]).some(i=>i.kind==='measurement')).toBe(false)
+})
 test('supplier abbreviations and sheet dimensions recover candidates without approving them',()=>{
  for(const [target,supplier] of [
   [item('a','Deck plywood','Size: 4 x 8 ft · Thickness: 3/4 in',77),line(1,'4 x 8 3/4" CDX','4\' x 8 3/4" CDX',77)],
@@ -70,6 +83,8 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  await expect(page.getByTestId('comparison-status-guide').locator('details')).toHaveCount(6)
  const quantity=page.locator('[data-kind="quantity"]')
  await expect(quantity.locator('summary span.bg-rose-600')).toHaveCount(2)
+ await expect(quantity.locator('summary')).not.toHaveClass(/\bborder\b/)
+ await expect(page.getByTestId('comparison-status-guide').locator('summary').first()).not.toHaveClass(/\bborder\b/)
  await expect(page.locator('[data-kind="measurement"] summary span.bg-red-600')).toHaveCount(1)
  await expect(page.locator('[data-kind="unverified"] summary span.bg-yellow-400')).toHaveCount(1)
  await expect(quantity.locator('div')).not.toBeVisible()

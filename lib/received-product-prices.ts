@@ -112,8 +112,11 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
 
 export type ComparisonIndicator = {kind:"quantity"|"measurement"|"alternative"|"packaging"|"unverified";label:string;notes:string[]}
 const sellingUnit=(value:string)=>value.trim().toLowerCase().replace(/^(?:pc|pcs|piece|pieces|ea)$/, "each")
-function inches(value:string) {
-  const fractions=value.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
+function inches(value:string, sheet=false) {
+  // In plywood notation "4 x 8 3/4\"", 8 is the sheet length,
+  // not the whole-number portion of an 8-3/4-inch thickness.
+  const dimensionless=sheet?value.replace(/\b\d+(?:\.\d+)?\s*(?:['′]|ft|feet)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:['′]|ft|feet)?(?=\s|$)/gi,' '):value
+  const fractions=dimensionless.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
   return [...text(fractions).matchAll(/\b(\d+(?:\.\d+)?)\s*in\b/g)].map(m=>Number(m[1]))
 }
 /** UI classification does not change source prices, approvals or matching eligibility. */
@@ -129,7 +132,7 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
     const a=lengths(text(`${item.description} ${item.specification||''}`)),b=lengths(text(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`))
     if(family(`${item.description} ${item.specification||''}`)!=='plywood'&&a.length&&b.length&&!a.some(n=>b.includes(n)))measurements.push(`Length differs: requested ${a.join('/')} ft; quoted ${b.join('/')} ft.`)
     const category=family(`${item.description} ${item.specification||''}`)
-    const requested=inches(`${item.description} ${item.specification||''}`),quoted=inches(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`)
+    const requested=inches(`${item.description} ${item.specification||''}`,category==='plywood'),quoted=inches(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`,category==='plywood')
     if(['joist','lvl','plywood'].includes(category||'')&&requested.length&&quoted.length){
       // David's explicit TJI convention: written 10-inch joist means 9.5-inch depth.
       // Never generalize that convention to LVL, plywood or unknown measurements.

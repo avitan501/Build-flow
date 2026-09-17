@@ -1,5 +1,9 @@
 # Approved comparison display release
 
+## Additional user-reported corrections
+
+Compact plywood notation `4 x 8 3/4"` previously became 8.75-inch thickness. The inch reader now removes sheet dimensions only for plywood before parsing remaining thickness; real 5/8-inch conflicts, wrong sheet lengths and genuine mixed-number LVL dimensions remain flagged. Issue/verified/guide dot summaries no longer have visible borders; keyboard focus and 44px touch targets remain. 35 targeted PASS / 2 older private-fixture SKIP. Publication and final live proof pending. No universal LVL 10-to-9.5 assumption added: manufacturer sizing alone does not establish the intent of a nominal source request. Existing explicitly approved TJI rule unchanged.
+
 Owned isolated worktree /tmp/avantia-material-review-20260916, based verified live ef4c56c0; primary143 unrelated files untouched. No concurrent publisher observed.
 
 Includes blue packaging dots (no inferred conversion), pink comparable quantity differences, section-conflict candidate fallback with yellow unresolved allocation, unchanged exact measurement safety, English guide and dot-only expandable cells containing request versus supplier wording, savings column based on two or more eligible manually confirmed normalized prices (highest minus lowest times requested quantity; tax/delivery excluded), shared Step1 clean-line stable field ordering and section last. Unknown specification details retained rather than silently destroyed. Original requests unchanged. Legacy financial-choice controls retained in closed Reviewed quote selections, suppressing empty no-quote duplicate cards.
