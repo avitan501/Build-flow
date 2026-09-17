@@ -23,7 +23,7 @@ export function receivedPriceSummary(items:QuoteComparisonItemRecord[],quotes:Re
   const price=verified?offer!.unitPrice:comparable&&validPrice(single!.unit_price)?Number(single!.unit_price):null
   const requestedTotal=price!==null&&Number.isFinite(Number(row.item.quantity))&&Number(row.item.quantity)>0?money(price*Number(row.item.quantity)):null
   const alternative=indicators.some(i=>i.kind==='alternative')
-  const problem=cell.sharedSource||cell.lines.length!==1||indicators.some(i=>['quantity','measurement','packaging','alternative'].includes(i.kind))||cell.reasons.some(r=>/Section differs|exceeds quoted|already assigned/.test(r))
+  const problem=cell.sharedSource||cell.lines.length!==1||indicators.some(i=>['quantity','measurement','packaging','alternative'].includes(i.kind))||(!verified&&indicators.some(i=>i.notes.some(note=>note.startsWith('Measurement missing:'))))||cell.reasons.some(r=>/Section differs|exceeds quoted|already assigned/.test(r))
   return {quoteId:cell.quote.id,unitPrice:price,requestedTotal,verified,alternative,problem,missing:!cell.lines.length&&!cell.blockedLines.length,ambiguous:cell.lines.length>1,allocatedElsewhere:!cell.lines.length&&cell.blockedLines.length>0,indicative:requestedTotal!==null&&!cell.sharedSource,source:single}
  }))
  const suppliers=quotes.map((quote,index)=>{

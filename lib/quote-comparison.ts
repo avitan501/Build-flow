@@ -1,4 +1,5 @@
 import type { SupplierTrustLevel } from "@/lib/shop-qualification";
+import { normalizeMeasurementText } from '@/lib/material-measurement-text';
 
 export type QuoteComparisonStatus = "draft" | "review" | "awarded" | "archived";
 export type ClientQuoteStatus = "draft" | "ready" | "sent" | "accepted" | "declined";
@@ -579,7 +580,7 @@ export function buildQuoteBuyingOptions(
 }
 
 function normalizedMatchText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return normalizeMeasurementText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 export function quoteLineMatchStatus(item: Pick<QuoteComparisonItemRecord, "description" | "specification">, supplierDescription: string): QuoteLineMatchStatus {

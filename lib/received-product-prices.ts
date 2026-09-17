@@ -1,8 +1,9 @@
 import type { ReceivedSupplierQuote, ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table"
 import type { QuoteComparisonItemRecord } from "@/lib/quote-comparison"
 import { comparisonDepthInches } from "@/lib/material-nominal-dimensions"
+import { normalizeMeasurementText } from '@/lib/material-measurement-text'
 
-function text(value: string) { return value.toLowerCase().replace(/×/g,"x").replace(/\b2\s*x\s*(\d+)\s*(?:x|-)\s*(\d+)\b/g,"2 x $1 $2 ft").replace(/(\d)x(?=\d)/g,"$1 x ").replace(/['′]/g," ft ").replace(/["″]/g," in ").replace(/\b(?:feet|foot)\b/g,"ft").replace(/\b(?:inch|inches)\b/g,"in").replace(/[^a-z0-9./]+/g," ").trim() }
+function text(value: string) { return normalizeMeasurementText(value).toLowerCase().replace(/×/g,"x").replace(/\b2\s*x\s*(\d+)\s*(?:x|-)\s*(\d+)\b/g,"2 x $1 $2 ft").replace(/(\d)x(?=\d)/g,"$1 x ").replace(/['′]/g," ft ").replace(/["″]/g," in ").replace(/\b(?:feet|foot)\b/g,"ft").replace(/\b(?:inch|inches)\b/g,"in").replace(/[^a-z0-9./]+/g," ").trim() }
 function section(value: string) { return text(value).replace(/\b1st\b/g,"first").replace(/\b2nd\b/g,"second").replace(/\b3rd\b/g,"third").match(/\b(first floor|second floor|third floor|ceiling joists?)\b/)?.[0]?.replace(/joists$/, "joist") }
 type CandidateLine = ReceivedSupplierQuoteLine & { allocationKey?: string }
 
@@ -140,6 +141,7 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
   if(comparable&&quantity.length)indicators.push({kind:'quantity',label:'Qty · כמות',notes:quantity})
   if(packageQuestion)indicators.push({kind:'packaging',label:'Units · אריזה',notes:[...quantity,...reasons.filter(r=>r.startsWith('Confirm selling unit'))]})
   const measurements:string[]=[]
+  const missingMeasurements:string[]=[]
   if(lines.length===1){
     const a=lengths(text(`${item.description} ${item.specification||''}`)),b=lengths(text(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`))
     if(family(`${item.description} ${item.specification||''}`)!=='plywood'&&a.length&&b.length&&!a.some(n=>b.includes(n)))measurements.push(`Length differs: requested ${a.join('/')} ft; quoted ${b.join('/')} ft.`)
@@ -148,7 +150,11 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
     if(['joist','lvl','plywood'].includes(category||'')&&requested.length&&quoted.length){
       const requestContext=`${item.description} ${item.specification||''}`,quoteContext=`${lines[0].description} ${lines[0].specification||''}`
       const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(comparisonDepthInches(category,n,requestContext)-comparisonDepthInches(category,q,quoteContext))<0.001))
-      if(unmatched.length)measurements.push(`Measurement differs: requested ${unmatched.join('/')} in; quoted ${[...new Set(quoted)].join('/')} in. Verify the source dimensions.`)
+      if(unmatched.length){
+        const matched=requested.some(n=>quoted.some(q=>Math.abs(comparisonDepthInches(category,n,requestContext)-comparisonDepthInches(category,q,quoteContext))<0.001))
+        if(matched&&new Set(quoted).size<new Set(requested).size)missingMeasurements.push(`Measurement missing: requested ${unmatched.join('/')} in is not specified in the supplier line. Confirm the omitted dimensions; matching notation is not a complete product verification.`)
+        else measurements.push(`Measurement differs: requested ${unmatched.join('/')} in; quoted ${[...new Set(quoted)].join('/')} in. Verify the source dimensions.`)
+      }
     }
     if(category==='plywood'){
       const requestedSheet=sheetDimensions(`${item.description} ${item.specification||''}`),quotedSheet=sheetDimensions(`${lines[0].description} ${lines[0].specification||''}`)
@@ -159,6 +165,6 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
   const alternatives=reasons.filter(r=>/substitution|Different joist|Mount differs|Adhesive product differs/.test(r))
   if(alternatives.length)indicators.push({kind:'alternative',label:'Alternative · חלופה',notes:alternatives})
   const unresolved=reasons.filter(r=>!alternatives.includes(r)&&!r.startsWith('Confirm selling unit')&&!((comparable||packageQuestion)&&quantity.includes(r)))
-  indicators.push({kind:'unverified',label:'Unverified · לא אומת',notes:['Not fully manually verified. Check specifications, selling units and compatibility before approval.',...unresolved]})
+  indicators.push({kind:'unverified',label:'Unverified · לא אומת',notes:['Not fully manually verified. Check specifications, selling units and compatibility before approval.',...missingMeasurements,...unresolved]})
   return indicators
 }
