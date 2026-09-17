@@ -64,6 +64,7 @@ export default async function QuoteComparisonDetailPage({
   if (comparisonResult.error || !comparisonResult.data) notFound();
   if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
   let requestedMaterialLines:Record<string,string>={};
+  let originalRequestLines:Record<string,string>={};
   let requestedComparisonItems:QuoteComparisonItemRecord[]|undefined;
   let missingRequestMaterials=0;
   if(comparisonResult.data.request_id && ['draft','review'].includes(comparisonResult.data.status) && !comparisonResult.data.active_route_id && !comparisonResult.data.awarded_bid_id && !['sent','accepted'].includes(comparisonResult.data.client_quote_status)){
@@ -72,6 +73,7 @@ export default async function QuoteComparisonDetailPage({
     const current=currentRequestComparison(sourceResult.data??[],itemsResult.data??[]);
     requestedComparisonItems=current.items;
     requestedMaterialLines=current.materialLines;
+    originalRequestLines=current.originalLines;
     missingRequestMaterials=current.missingSourceIds.length;
   }
   bidsResult.data = await loadProductMatchConfirmations(supabase,bidsResult.data ?? []);
@@ -128,6 +130,7 @@ export default async function QuoteComparisonDetailPage({
       routeError={finalized.error}
       items={itemsResult.data ?? []}
       requestedMaterialLines={requestedMaterialLines}
+      originalRequestLines={originalRequestLines}
       requestedComparisonItems={requestedComparisonItems}
       missingRequestMaterials={missingRequestMaterials}
       bids={bidsResult.data ?? []}

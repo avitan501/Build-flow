@@ -119,6 +119,7 @@ export function QuoteComparisonWorkspace({
   requestClientQuoteSources = [],
   receivedSupplierQuotes = [],
   requestedMaterialLines = {},
+  originalRequestLines = {},
   requestedComparisonItems,
   missingRequestMaterials = 0,
   previewMode = false,
@@ -144,6 +145,7 @@ export function QuoteComparisonWorkspace({
   requestClientQuoteSources?: RequestClientQuoteSource[];
   receivedSupplierQuotes?: import("@/components/buildflow/received-supplier-quote-table").ReceivedSupplierQuote[];
   requestedMaterialLines?: Record<string,string>;
+  originalRequestLines?: Record<string,string>;
   requestedComparisonItems?: QuoteComparisonItemRecord[];
   missingRequestMaterials?: number;
   previewMode?: boolean;
@@ -561,7 +563,7 @@ export function QuoteComparisonWorkspace({
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>}
           {missingRequestMaterials&&comparison.request_id?<p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">{missingRequestMaterials} new saved material(s) need a comparison row. <a className="font-semibold text-sky-800" href={`/owner/materials/requests/${comparison.request_id}#request-supplier-quotes`}>Open the request and choose Compare supplier quotes to synchronize.</a> Existing quotes and prices are retained.</p>:null}
-          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} selections={productSelections} draftSelections={matrixSelections} baselineQuoteId={baselineQuoteId} onBaselineChange={setBaselineQuoteId} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onDraftChoose={(itemId,quoteId)=>setMatrixSelections(current=>({...current,[itemId]:quoteId}))} /> : null}
+          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} originalRequestLines={originalRequestLines} selections={productSelections} draftSelections={matrixSelections} baselineQuoteId={baselineQuoteId} onBaselineChange={setBaselineQuoteId} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onDraftChoose={(itemId,quoteId)=>setMatrixSelections(current=>({...current,[itemId]:quoteId}))} /> : null}
           {!receivedSupplierQuotes.length || liveBids.length ? <details open={!receivedSupplierQuotes.length} className="rounded-xl border border-slate-200 p-3"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Reviewed quote selections</summary><div className="grid gap-2">{productPreview.rows.filter(row=>!receivedSupplierQuotes.length||row.offers.some(offer=>offer.unitPrice!==null)).map((row) => <ProductQuoteCard key={row.item.id} row={row} finalized={Boolean(procurementRoute && !routeError)} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} beforeConfirm={previewMode ? undefined : choiceAutosave.flush} />)}</div></details> : null}
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
           <div hidden={!workspaceToolsOpen} className="order-3 rounded-lg bg-slate-50 p-3"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="grid grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>

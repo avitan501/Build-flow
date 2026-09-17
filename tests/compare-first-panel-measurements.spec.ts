@@ -26,6 +26,12 @@ test('fraction normalization and true measurement checks apply outside LVL and p
  expect(comparisonIndicators(hanger,[sourceHanger],sourceComparisonReasons(hanger,sourceHanger)).some(i=>i.kind==='measurement')).toBe(false)
  const compactHanger=line('MTK 2-1/2"X9-1/2" INV MNT HGR')
  expect(comparisonIndicators(hanger,[compactHanger],sourceComparisonReasons(hanger,compactHanger)).some(i=>i.kind==='measurement')).toBe(false)
+ const joist={...item('10 in · 26 ft','TJI 230 I-joist'),quantity:30}
+ const ni={...line('NI-40 2-1/2X9-1/2" · Length: 26 ft'),quantity:30}
+ const checks=comparisonIndicators(joist,[ni],sourceComparisonReasons(joist,ni))
+ expect(checks.some(i=>i.kind==='measurement'||i.kind==='quantity')).toBe(false)
+ expect(checks.some(i=>i.kind==='alternative')).toBe(true)
+ expect(comparisonIndicators(joist,[{...ni,description:'NI-40 2-1/2X11-7/8" · Length: 26 ft',specification:'NI-40 2-1/2X11-7/8" · Length: 26 ft'}],[]).some(i=>i.kind==='measurement')).toBe(true)
  expect(comparisonIndicators(item('actual width 10 in','Hanger'),[line('Hanger width 9.5 in')],[]).some(i=>i.kind==='measurement')).toBe(true)
 })
 test('lowest source price is visible separately from comparable suggestion without weakening duplicate allocation',()=>{

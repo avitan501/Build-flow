@@ -105,7 +105,7 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  await expect(quantity.locator('summary')).not.toHaveClass(/\bborder\b/)
  await expect(page.getByTestId('comparison-status-guide').locator('summary').first()).not.toHaveClass(/\bborder\b/)
  await expect(page.locator('[data-kind="measurement"] summary span.bg-red-600')).toHaveCount(1)
- await expect(page.locator('[data-kind="unverified"] summary span.bg-yellow-400')).toHaveCount(1)
+ await expect(page.locator('[data-kind="unverified"] summary span.bg-yellow-400')).toHaveCount(0)
  await expect(quantity.locator(':scope > div')).not.toBeVisible()
  await quantity.locator('summary').click()
  await expect(quantity.locator(':scope > div')).toBeVisible()
