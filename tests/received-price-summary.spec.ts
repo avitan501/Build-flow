@@ -17,6 +17,7 @@ test('source prices remain indicative and unequal partial subtotals never select
  const before=JSON.stringify({inputs,quotes}),result=receivedPriceSummary(inputs,quotes,[])
  expect(result.suppliers[0].pricedCount).toBe(2);expect(result.suppliers[1].pricedCount).toBe(1)
  expect(result.suppliers[1].missingCount).toBe(1);expect(result.commonCount).toBe(0)
+ expect(result.suppliers[1].excludedCount).toBe(0)
  expect(result.suppliers.every(s=>s.verifiedTotal===null)).toBe(true)
  expect(JSON.stringify({inputs,quotes})).toBe(before)
 })
@@ -26,6 +27,16 @@ test('ambiguous, packaging and reused-source candidates cannot inflate indicativ
  expect(receivedPriceSummary([item('a',2,'box')],[{id:'q',fileName:'q',sourceItems:[source]}],[]).suppliers[0].indicativeTotal).toBeNull()
  const reused=receivedPriceSummary([target,{...target,id:'b'}],[{id:'q',fileName:'q',sourceItems:[source]}],[])
  expect(reused.suppliers[0].pricedCount).toBe(0);expect(reused.suppliers[0].indicativeTotal).toBeNull()
+ expect(reused.suppliers[0].missingCount).toBe(0);expect(reused.suppliers[0].excludedCount).toBe(2)
+ expect(receivedPriceSummary([item('a',2,'box')],[{id:'q',fileName:'q',sourceItems:[source]}],[]).suppliers[0].excludedCount).toBe(1)
+})
+test('included, missing and excluded counts partition the request without changing source prices',()=>{
+ const inputs=[item('a'),{...item('b'),description:'LVL beam',specification:'9.5 in · 24 ft'},item('duplicate')]
+ const quotes=[{id:'q',fileName:'q',sourceItems:[line(176,12)]}]
+ const before=JSON.stringify(quotes),summary=receivedPriceSummary(inputs,quotes,[]),supplier=summary.suppliers[0]
+ expect(supplier.missingCount).toBe(1);expect(supplier.excludedCount).toBe(2);expect(supplier.pricedCount).toBe(0)
+ expect(supplier.pricedCount+supplier.missingCount+supplier.excludedCount).toBe(inputs.length)
+ expect(JSON.stringify(quotes)).toBe(before)
 })
 test('LF requested totals are computed once and source rate/footage remain unchanged',()=>{
  const target={...item('a',6),description:'LVL beam',specification:'9.5 in · 20 ft'},source={...line(5.2,380,'lf'),description:'LVL beam',specification:'9.5 in'}

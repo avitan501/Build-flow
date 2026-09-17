@@ -68,9 +68,24 @@ test('five supplier columns fit together on desktop and mixed totals exclude una
   await expect(page.getByTestId('item-savings')).toContainText('$200.00 savings')
   await expect(page.getByTestId('item-savings')).toContainText('Cheapest mix · line cost')
   await expect(page.getByTestId('savings-mode-total')).toContainText('$1,000.00')
-  await expect(page.getByTestId('supplier-material-total').last()).toContainText('Partial · 1 unpriced')
+  await expect(page.getByTestId('supplier-material-total').last()).toContainText('Partial · 1 not included')
+  await expect(page.getByTestId('supplier-material-total').last()).toContainText('1 not available')
   await expect(page.getByLabel('Select supplier for item 1')).toHaveValue('third')
  }
+})
+
+test('an excluded priced source is not mislabeled missing; known mixed totals are partial not unavailable',async({page})=>{
+ Object.assign(globalThis,{React})
+ const second={...item,id:'second'}
+ const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[item,second],quotes:[quote('reused',100)],bids:[],initialSavingsMode:'mixed',baselineQuoteId:'reused'})))
+ await page.setContent(html)
+ await expect(page.getByTestId('supplier-material-total')).toContainText('2 source matches need review before totaling')
+ await expect(page.getByTestId('supplier-material-total')).not.toContainText('not available')
+ const conflict=quote('conflict',100);conflict.sourceItems[0].quantity=2
+ const partial=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[item],quotes:[conflict],bids:[],baselineQuoteId:'conflict'})))
+ await page.setContent(partial)
+ await expect(page.getByTestId('baseline-material-total')).toHaveText('Partial')
+ await expect(page.getByTestId('supplier-material-total')).toContainText('$1,000.00')
 })
 
 test('native mode switching calculates the cheapest mix without writing supplier choices',async({page})=>{

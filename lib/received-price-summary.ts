@@ -28,7 +28,7 @@ export function receivedPriceSummary(items:QuoteComparisonItemRecord[],quotes:Re
  }))
  const suppliers=quotes.map((quote,index)=>{
   const values=cells.map(row=>row[index]),verified=values.filter(v=>v.verified&&v.requestedTotal!==null),indicative=values.filter(v=>v.indicative)
-  return{quote,verifiedCount:verified.length,verifiedTotal:verified.length?money(verified.reduce((n,v)=>n+v.requestedTotal!,0)):null,pricedCount:indicative.length,indicativeTotal:indicative.length?money(indicative.reduce((n,v)=>n+v.requestedTotal!,0)):null,missingCount:values.filter(v=>v.missing).length,alternativeCount:values.filter(v=>v.alternative).length,reviewCount:values.filter(v=>!v.verified||v.problem).length,ambiguousCount:values.filter(v=>v.ambiguous||v.allocatedElsewhere).length}
+  return{quote,verifiedCount:verified.length,verifiedTotal:verified.length?money(verified.reduce((n,v)=>n+v.requestedTotal!,0)):null,pricedCount:indicative.length,indicativeTotal:indicative.length?money(indicative.reduce((n,v)=>n+v.requestedTotal!,0)):null,missingCount:values.filter(v=>v.missing).length,excludedCount:values.filter(v=>!v.missing&&!v.indicative).length,alternativeCount:values.filter(v=>v.alternative).length,reviewCount:values.filter(v=>!v.verified||v.problem).length,ambiguousCount:values.filter(v=>v.ambiguous||v.allocatedElsewhere).length}
  })
  // Compare identical rows across all suppliers, never rank unequal partial orders.
  const common=quotes.length>=2?cells.filter(row=>row.every(v=>v.verified&&!v.problem&&v.requestedTotal!==null)):[]
