@@ -39,12 +39,22 @@ function requestedLinearPrice(line:CandidateLine,item:QuoteComparisonItemRecord)
  if(length.length!==1||Number(length[0])<=0||Number(item.quantity)<=0||line.unit_price===null||!Number.isFinite(Number(line.unit_price))||Number(line.unit_price)<0)return line
  return {...line,unit:item.unit,quantity:item.quantity,unit_price:Number(line.unit_price)*Number(length[0]),line_total:Number(line.unit_price)*Number(length[0])*Number(item.quantity),calculatedRate:Number(line.unit_price),requestedFeet:Number(length[0])*Number(item.quantity),originalFeet:Number(line.quantity),allocationKey:`${line.line_number}:rate:${item.id}`}
 }
+/** Explicit supplier replacement note, not a guessed cross-family equivalence. */
+function declaredLumberReplacement(line:ReceivedSupplierQuoteLine,item:QuoteComparisonItemRecord){
+ const a=text(`${line.description} ${line.specification||''}`),b=text(`${item.description} ${item.specification||''}`)
+ if(family(a)!=='lvl'||family(b)!=='lumber')return false
+ const dimension=b.match(/\b2\s*x\s*(\d+)\b/)
+ if(!dimension)return false
+ const note=a.match(/\blongest\s+2\s*x\s*(\d+)\s+(?:we\s+)?stock\s+is\s+(\d+(?:\.\d+)?)\s*ft\b/)
+ const requested=lengths(b),quoted=lengths(text(line.description))
+ return Boolean(note&&note[1]===dimension[1]&&requested.length===1&&quoted.includes(requested[0])&&Number(requested[0])>Number(note[2])&&Number(line.quantity)===Number(item.quantity))
+}
 function candidateScore(line: ReceivedSupplierQuoteLine, item: QuoteComparisonItemRecord) {
   const sourceSpec=(line.specification||"").split(" · Source pricing:")[0].split(" · Printed Sale/Un:")[0]
   // A bulk LF rate without a balanced printed cut schedule is not a piece price.
   if (/^(?:lin\.?\s*ft\.?|lf|lft|linear feet)$/i.test(line.unit.trim()) && !/^(?:lin\.?\s*ft\.?|lf|lft|linear feet)$/i.test(item.unit.trim())) return 0
   const a=text(`${line.description} ${sourceSpec}`), b=text(`${item.description} ${item.specification||""}`)
-  const fa=family(a),fb=family(b);if(!fa||fa!==fb)return 0
+  const fa=family(a),fb=family(b);if(!fa||fa!==fb)return declaredLumberReplacement(line,item)?10:0
   if(fa==="lumber") {
     const dimension=(v:string)=>v.match(/\b2\s*x\s*(\d+)\b/)?.[1]
     if(dimension(a)&&dimension(b)&&dimension(a)!==dimension(b))return 0
@@ -91,7 +101,7 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
     if (sharedSource) reasons.unshift("This source line also appears against another requested row; assign it once.")
     if (cell.lines.length > 1) reasons.unshift("More than one supplier line could fit; choose the correct source line.")
     for(const line of cell.lines)if(line.calculatedRate!==undefined){reasons.push('Calculated from linear-foot rate; confirm requested cut lengths, availability and any cutting charges before approval.');if((feetUsed.get(`${cell.quote.id}:${line.line_number}`)||0)>(line.originalFeet||0))reasons.push('Requested linear footage across candidate rows exceeds quoted footage; confirm additional supply before approval.')}
-    return { ...cell, suggested: cell.suggested && !sharedSource && !reasons.some(r=>r.startsWith('Section differs:')), reasons, sharedSource }
+    return { ...cell, suggested: cell.suggested && !sharedSource && !reasons.some(r=>r.startsWith('Section differs:')||r.startsWith('Explicit supplier substitution:')), reasons, sharedSource }
   }) }))
 }
 
@@ -108,6 +118,7 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
   if (mount(requested) && mount(quoted) && mount(requested) !== mount(quoted)) reasons.push(`Mount differs: requested ${mount(requested)}, quoted ${mount(quoted)}.`)
   if (family(requested)==="joist" && /\btji\b/.test(requested) && !/\btji\b/.test(quoted)) reasons.push("Different joist manufacturer/series; keep as an alternative until approved.")
   if (family(requested)==="adhesive" && /\bpl\b.*(?:strong )?premium/.test(requested) && !/pl premium/.test(quoted)) reasons.push("Adhesive product differs from requested PL Premium.")
+  if(declaredLumberReplacement(line,item))reasons.push('Explicit supplier substitution: LVL offered instead of requested dimensional lumber. Supplier states the requested stock length is unavailable; approval is required.')
   return reasons
 }
 

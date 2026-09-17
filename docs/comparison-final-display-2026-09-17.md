@@ -1,5 +1,9 @@
 # Approved comparison display release
 
+## Final LIVE verification
+
+Production 8c13017a184c68b5dbe72e0a15220dfab3cdc01a verified canonical release/Supabase nprfhspwdflpqlopydmp; officialworkflow35250486198/job105301335078SUCCESS15steps; Verceldpl_2sFywV3wFYmxtYHFdt5GnRvjh7YqREADY. Local36targetedPASS/2privateSKIP;153-routewebpack/TSC/lint/diffPASS. Owned9222GET-only live proof: plywood source line6 has nofalse8.75thickness/measurement indicator; dot summary frames absent; six nominal10LVLrequestrows nofalse10vs9.5warning; real other dimensions retained; legacy details opened noemptycards;39originalverbatim/order/Copy/quantity-first/count/current numbered matching options; sixquote columns227priced cells; savings39; LF6.05x120726;390+1440 nooverflowPASS. Final draft dedup/Undo uses existingReactonChange handler after flaky raw syntheticinput-only dispatch; no Save/POST orbusinessmutation. Own tabsclosed. Seven unmatched cells remain unverified against PDFs; no100%coverage/engineeringequivalenceclaim. Catalog book committed; reference-only SKU examples not automatically enabled.
+
 ## Additional user-reported corrections
 
 Subsequent explicit approval enables a category-scoped Home Depot-style LVL nominal10-inch depth /9.5-inch catalog-depth naming alias. Does not normalize labeled width/thickness or explicit Actual dimensions;9.25 and differing lengths remain issues. No manual approval, prices or source values changed. Book docs/material-catalog-rules.md records source URLs, scope, exclusions and reference-only SKU-specific lumber/plywood examples. 36targetedPASS/2privateSKIP, finalbuild/publish pending.

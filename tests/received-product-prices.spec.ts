@@ -13,6 +13,16 @@ test('bulk linear-foot rates calculate requested costs without claiming quoted c
  expect(cell.lines[0].unit_price).toBe(104);expect(cell.lines[0].line_total).toBe(624);expect(cell.lines[0].requestedFeet).toBe(120)
  expect(cell.reasons.join(' ')).toContain('confirm requested cut lengths');expect(JSON.stringify(original)).toBe(snapshot)
 })
+test('explicit unavailable-stock replacement is visible as an alternative, never a guessed exact match',()=>{
+ const target=item('long','Dimensional lumber','2 x 12 in · 28 ft · Ceiling joists',12)
+ const replacement=line(38,'LVL 11 1/4" x 28\'','LVL 11 1/4" x 28\' (note: longest 2x12 we stock is 24\')',12)
+ const cell=receivedProductPriceRows([target],[{id:'us',fileName:'source.pdf',sourceItems:[replacement]}])[0].cells[0]
+ expect(cell.lines.map(l=>l.line_number)).toEqual([38]);expect(cell.suggested).toBe(false)
+ expect(comparisonIndicators(target,cell.lines,cell.reasons).map(i=>i.kind)).toContain('alternative')
+ for(const source of [{...replacement,specification:'LVL 11 1/4" x 28\''},{...replacement,quantity:2},{...replacement,description:'LVL 11 1/4" x 26\''},{...replacement,specification:'longest 2x10 we stock is 24\''}]){
+  expect(receivedProductPriceRows([target],[{id:'us',fileName:'source.pdf',sourceItems:[source]}])[0].cells[0].lines).toHaveLength(0)
+ }
+})
 test('saved supplier row assignment survives refresh and cannot cover another requested item',()=>{
  const original={...line(1,'HU310 hanger','',170),comparison_item_id:'a'}
  const rows=receivedProductPriceRows([item('a','Face mount hanger','',170),item('b','Top mount hanger','',170)],[{id:'q',fileName:'q',sourceItems:[original]}])
