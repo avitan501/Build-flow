@@ -22,6 +22,9 @@ test('fraction normalization and true measurement checks apply outside LVL and p
  const target=item('1.5 in · 8 ft','Blade'),source=line('Blade 1½ inches 8 feet')
  expect(comparisonIndicators(target,[source],[]).some(i=>i.kind==='measurement')).toBe(false)
  expect(comparisonIndicators(target,[line('Blade 2 inches 8 ft')],[]).some(i=>i.kind==='measurement')).toBe(true)
+ const hanger=item('For 10 in TJI · First floor','Face-mount hanger'),sourceHanger=line('IUS2.56/9-1/2" FACE MOUNT HANGER')
+ expect(comparisonIndicators(hanger,[sourceHanger],sourceComparisonReasons(hanger,sourceHanger)).some(i=>i.kind==='measurement')).toBe(false)
+ expect(comparisonIndicators(item('actual width 10 in','Hanger'),[line('Hanger width 9.5 in')],[]).some(i=>i.kind==='measurement')).toBe(true)
 })
 test('lowest source price is visible separately from comparable suggestion without weakening duplicate allocation',()=>{
  const target=item('3/4 in · 4 ft · 8 ft'),other={...target,id:'other'}

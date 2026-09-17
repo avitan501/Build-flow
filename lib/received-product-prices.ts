@@ -132,8 +132,9 @@ function inches(value:string, sheet=false) {
   // not the whole-number portion of an 8-3/4-inch thickness.
   const normalized=normalizeMeasurementText(value)
   const dimensionless=sheet?normalized.replace(/\b\d+(?:\.\d+)?\s*(?:ft)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:ft)?(?=\s|$)/gi,' '):normalized
-  const fractions=dimensionless.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
-  return [...text(fractions).matchAll(/\b(\d+(?:\.\d+)?)\s*in\b/g)].map(m=>Number(m[1]))
+  // Shared normalization handles dimension fractions before this point.
+  // Re-parsing arbitrary slashes would corrupt identifiers such as IUS2.56/9.5.
+  return [...text(dimensionless).matchAll(/\b(\d+(?:\.\d+)?)\s*in\b/g)].map(m=>Number(m[1]))
 }
 /** UI classification does not change source prices, approvals or matching eligibility. */
 export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:ReceivedSupplierQuoteLine[],reasons:string[]):ComparisonIndicator[] {
