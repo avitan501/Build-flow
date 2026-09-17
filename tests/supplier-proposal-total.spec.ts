@@ -10,6 +10,15 @@ test('Midwood MERCHANDISE is the original material subtotal, never tax-inclusive
  expect(supplierProposalTotal('MERCHANDISE 49038.51\nMERCHANDISE 100.00',source).basis).toBe('source-lines')
  expect(supplierProposalTotal('MERCHANDISE PLYWOOD 49038.51',[]).amount).toBeNull()
 })
+test('Midwood reordered PDF footer is confirmed only with reconciled document evidence',()=>{
+ const text='MIDWOOD LUMBER AND MILLWORK INC.\nMERCHANDISE\nOTHER\nTAX\nFREIGHT\nTOTAL\n8.875%\nQUOTE\nSeptember 17, 2026 10:23:2 OT:GM 49038.51\n********* 0.00\n* QUOTE * 0\n********* PAGE 4 OF 4 4352.17\n0.00\n53390.68'
+ const source=[{...lines[0],line_total:49038.51}]
+ expect(supplierProposalTotal(text,source)).toEqual({amount:49038.51,basis:'document-subtotal',discrepancy:false})
+ expect(supplierProposalTotal(text.replace('53390.68','53300.68'),source).basis).toBe('source-lines')
+ expect(supplierProposalTotal(text.replace('8.875%','7%'),source).basis).toBe('source-lines')
+ expect(supplierProposalTotal(text,lines).basis).toBe('source-lines')
+ expect(supplierProposalTotal(text.replace('MIDWOOD LUMBER AND MILLWORK INC.','Another supplier'),source).basis).toBe('source-lines')
+})
 test('original proposal total never shrinks to requested quantities or match approval',()=>{
  expect(supplierProposalTotal('Subtotal 6000.00\nTax 500.00\nTotal 6500.00',lines)).toEqual({amount:6000,basis:'document-subtotal',discrepancy:false})
  expect(supplierProposalTotal('',lines).amount).toBe(6000)

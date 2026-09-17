@@ -14,7 +14,14 @@ export function supplierProposalTotal(rawText:string,lines:ReceivedSupplierQuote
  // alongside the label or on the next PDF text-layer line. Blank page footers
  // and multiple conflicting merchandise totals are not confirmed subtotals.
  const merchandise=[...new Set([...rawText.matchAll(/\bMERCHANDISE[ \t]*:?[ \t]*(?:\n[ \t]*)?\$?([0-9][0-9,]*\.[0-9]{2})[ \t]*$/gim)].map(m=>Number(m[1].replace(/,/g,''))))]
- const subtotal=combined?sourceSum:metadata.subtotal??(merchandise.length===1?merchandise[0]:null)
+ // Midwood's PDF text layer can emit the five footer labels before their
+ // values, with timestamp/page text between them. Confirm that layout only
+ // when all five amounts reconcile, the tax rate agrees, and rows corroborate.
+ const footer=rawText.slice(rawText.toUpperCase().lastIndexOf('MERCHANDISE'))
+ const values=[...footer.matchAll(/(?:^|[ \t])\$?([0-9][0-9,]*\.[0-9]{2})[ \t]*$/gm)].map(m=>Number(m[1].replace(/,/g,'')))
+ const rate=Number(footer.match(/\b([0-9]+(?:\.[0-9]+)?)%/)?.[1])
+ const reordered=/MIDWOOD LUMBER AND MILLWORK/i.test(rawText)&&/^MERCHANDISE\s+OTHER\s+TAX\s+FREIGHT\s+TOTAL\b/i.test(footer)&&values.length===5&&sourceSum!==null&&Math.abs(values[0]-sourceSum)<=0.01&&Math.abs(values[0]+values[1]+values[2]+values[3]-values[4])<=0.01&&Number.isFinite(rate)&&Math.abs(Math.round((values[0]+values[1])*rate)/100-values[2])<=0.01
+ const subtotal=combined?sourceSum:metadata.subtotal??(merchandise.length===1?merchandise[0]:reordered?values[0]:null)
  // Subtotals can include an explicitly printed delivery charge. Only remove it
  // when the document subtotal reconciles exactly with material rows + delivery.
  const includesDelivery=subtotal!==null&&sourceSum!==null&&metadata.deliveryCharge!==null&&metadata.deliveryCharge>0&&Math.abs(subtotal-sourceSum-metadata.deliveryCharge)<=0.01
