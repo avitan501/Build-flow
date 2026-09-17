@@ -57,6 +57,11 @@ test('missing saved rows are reported rather than invented or associated by a si
   const view=currentRequestComparison([source('new')],[stored('unrelated','old')])
   expect(view.items).toEqual([]);expect(view.missingSourceIds).toEqual(['new'])
 })
+test('received source matrix does not duplicate empty legacy quote cards',async()=>{
+ const code=await readFile('components/buildflow/quote-comparison-workspace.tsx','utf8')
+ expect(code).toContain('row.offers.some(offer=>offer.unitPrice!==null)')
+ expect(code).not.toContain('row.offers.length>0')
+})
 test('historical duplicates no longer cause a supplier line reuse warning in the active matrix',()=>{
   const row=source('client');const historical=source('historical',{excluded_from_client_request:true})
   const all=[{...stored('active','client'),description:row.name,specification:'10 in × 16 ft',quantity:22},{...stored('history','historical'),description:row.name,specification:'10 in × 16 ft',quantity:22}]
