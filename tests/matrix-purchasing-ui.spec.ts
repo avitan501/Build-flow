@@ -27,6 +27,18 @@ test('rightmost savings header, real source choices, extra cost and full request
   await expect(page.getByTestId('item-savings').getByLabel('Select supplier for item 1')).toHaveValue(chosen)
   await expect(page.getByTestId('product-price-matrix').locator('tbody th select')).toHaveCount(0)
   expect(await page.getByTestId('product-price-matrix').locator('tbody th').first().evaluate(el=>getComputedStyle(el).position)).toBe('static')
+  expect(await page.getByTestId('item-savings').evaluate(el=>getComputedStyle(el).position)).toBe('sticky')
+  for(const scroll of [0,10000]){
+   await page.getByTestId('product-price-matrix').evaluate((el,left)=>{el.parentElement!.scrollLeft=left},scroll)
+   expect(await page.getByTestId('item-savings').evaluate(el=>{const r=el.getBoundingClientRect(),c=el.closest('table')!.parentElement!.getBoundingClientRect();return r.left>=c.left&&r.right<=c.right+2})).toBe(true)
+  }
+  for(let index=1;index<=3;index++){
+   const supplier=page.getByTestId('product-price-matrix').locator('thead th').nth(index)
+   await supplier.evaluate(el=>{const c=el.closest('table')!.parentElement!;c.scrollLeft+=el.getBoundingClientRect().left-c.getBoundingClientRect().left-1})
+   expect(await supplier.evaluate(el=>{const r=el.getBoundingClientRect(),c=el.closest('table')!.parentElement!.getBoundingClientRect(),s=el.closest('table')!.querySelector('[data-testid=item-savings]')!.getBoundingClientRect();return r.left>=c.left-2&&r.right<=s.left+2})).toBe(true)
+  }
+  await expect(page.getByTestId('source-price-details')).toHaveCount(3)
+  await expect(page.getByTestId('source-price-details').first()).not.toHaveAttribute('open','')
   await page.getByTestId('product-price-matrix').evaluate(el=>{el.parentElement!.scrollLeft=el.parentElement!.scrollWidth})
   const visible=await page.getByTestId('item-savings').evaluate(el=>{const r=el.getBoundingClientRect(),c=el.closest('table')!.parentElement!.getBoundingClientRect();return r.left>=c.left&&r.right<=c.right+2})
   expect(visible).toBe(true)
