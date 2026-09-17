@@ -10,7 +10,11 @@ export function supplierProposalTotal(rawText:string,lines:ReceivedSupplierQuote
  const printedSubtotals=[...rawText.matchAll(/^\s*(?:materials?\s+)?sub[ \t]*total[ \t]*:?[ \t]+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/gim)].map(m=>Number(m[1].replace(/,/g,'')))
  const distinct=[...new Set(printedSubtotals)]
  const combined=distinct.length>1&&sourceSum!==null&&Math.abs(distinct.reduce((n,v)=>n+v,0)-sourceSum)<=0.01
- const subtotal=combined?sourceSum:metadata.subtotal
+ // Midwood prints MERCHANDISE instead of SUBTOTAL, with its amount either
+ // alongside the label or on the next PDF text-layer line. Blank page footers
+ // and multiple conflicting merchandise totals are not confirmed subtotals.
+ const merchandise=[...new Set([...rawText.matchAll(/\bMERCHANDISE[ \t]*:?[ \t]*(?:\n[ \t]*)?\$?([0-9][0-9,]*\.[0-9]{2})[ \t]*$/gim)].map(m=>Number(m[1].replace(/,/g,''))))]
+ const subtotal=combined?sourceSum:metadata.subtotal??(merchandise.length===1?merchandise[0]:null)
  // Subtotals can include an explicitly printed delivery charge. Only remove it
  // when the document subtotal reconciles exactly with material rows + delivery.
  const includesDelivery=subtotal!==null&&sourceSum!==null&&metadata.deliveryCharge!==null&&metadata.deliveryCharge>0&&Math.abs(subtotal-sourceSum-metadata.deliveryCharge)<=0.01

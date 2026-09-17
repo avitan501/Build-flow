@@ -2,6 +2,14 @@ import {test,expect} from '@playwright/test'
 import {supplierProposalTotal} from '../lib/supplier-proposal-total'
 import {receivedPriceSummary} from '../lib/received-price-summary'
 const lines=[{line_number:1,description:'Lumber',specification:'2x6 10 ft',quantity:600,unit:'each',unit_price:10,line_total:6000}]
+test('Midwood MERCHANDISE is the original material subtotal, never tax-inclusive TOTAL',()=>{
+ const source=[{...lines[0],line_total:49038.51}]
+ for(const text of ['MERCHANDISE 49038.51\nOTHER 0.00\nTAX 4352.17\nFREIGHT 0.00\nTOTAL 53390.68','MERCHANDISE\n49,038.51\nOTHER\n0.00\nTOTAL\n53,390.68','MERCHANDISE\nOTHER\nTAX\nMERCHANDISE 49038.51']){
+  expect(supplierProposalTotal(text,source)).toEqual({amount:49038.51,basis:'document-subtotal',discrepancy:false})
+ }
+ expect(supplierProposalTotal('MERCHANDISE 49038.51\nMERCHANDISE 100.00',source).basis).toBe('source-lines')
+ expect(supplierProposalTotal('MERCHANDISE PLYWOOD 49038.51',[]).amount).toBeNull()
+})
 test('original proposal total never shrinks to requested quantities or match approval',()=>{
  expect(supplierProposalTotal('Subtotal 6000.00\nTax 500.00\nTotal 6500.00',lines)).toEqual({amount:6000,basis:'document-subtotal',discrepancy:false})
  expect(supplierProposalTotal('',lines).amount).toBe(6000)
