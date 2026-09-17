@@ -24,6 +24,7 @@ test('rightmost savings header, real source choices, extra cost and full request
   await expect(page.getByTestId('item-savings')).toContainText(expected)
   await expect(page.getByTestId('item-savings')).toContainText('$1,200.00')
   await expect(page.getByTestId('lowest-comparable-price')).toHaveCount(1)
+  expect(await page.getByTestId('product-price-matrix').locator('tbody th').first().evaluate(el=>getComputedStyle(el).position)).toBe(width<640?'static':'sticky')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2)).toBe(false)
  }
 })
