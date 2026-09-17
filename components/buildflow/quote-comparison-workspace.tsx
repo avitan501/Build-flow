@@ -124,6 +124,9 @@ export function QuoteComparisonWorkspace({
   previewMode = false,
   choiceActorId = "sample",
   initialProductSelections = {},
+  initialMatrixSelections = {},
+  initialBaselineQuoteId = '',
+  matrixSourceFingerprint = '',
   productChoiceRevision = 0,
   productChoiceFingerprint = "",
   productChoiceWarning = "",
@@ -146,6 +149,9 @@ export function QuoteComparisonWorkspace({
   previewMode?: boolean;
   choiceActorId?: string;
   initialProductSelections?: Record<string, string>;
+  initialMatrixSelections?: Record<string,string>;
+  initialBaselineQuoteId?:string;
+  matrixSourceFingerprint?:string;
   productChoiceRevision?: number;
   productChoiceFingerprint?: string;
   productChoiceWarning?: string;
@@ -161,11 +167,14 @@ export function QuoteComparisonWorkspace({
   const [activeStep, setActiveStep] = useState<0 | 1 | 2 | 3 | 4>(() => procurementRoute && !routeError ? 4 : items.length === 0 ? 1 : bids.length === 0 && receivedSupplierQuotes.length === 0 ? 2 : 0);
   const [finalizeKey] = useState(() => crypto.randomUUID());
   const [productSelections, setProductSelections] = useState<Record<string, string>>(procurementRoute ? Object.fromEntries(procurementRoute.items.map((item) => [item.item_id, item.bid_id])) : initialProductSelections);
+  const [matrixSelections,setMatrixSelections]=useState(initialMatrixSelections);
+  const [baselineQuoteId,setBaselineQuoteId]=useState(initialBaselineQuoteId);
+  const matrixDraft=matrixSourceFingerprint?{baselineQuoteId,selections:matrixSelections,sourceFingerprint:matrixSourceFingerprint}:undefined;
   const [choiceSourceReviewed, setChoiceSourceReviewed] = useState(!productChoiceWarning);
-  const [initialChoiceSnapshot] = useState({ version: 1, selections: productSelections });
+  const [initialChoiceSnapshot] = useState({ version: 1, selections: productSelections,...(matrixDraft?{matrix:matrixDraft}:{}) });
   const choiceAutosave = useQuoteAutosave({
     scopeKey: `${choiceActorId}:${comparison.id}:${productChoiceFingerprint}`,
-    snapshot: { version: 1, selections: productSelections }, initialSnapshot: initialChoiceSnapshot,
+    snapshot: { version: 1, selections: productSelections,...(matrixDraft?{matrix:matrixDraft}:{}) }, initialSnapshot: initialChoiceSnapshot,
     initialRevision: productChoiceRevision,
     persist: async (snapshot, expectedRevision) => {
       const result = previewMode ? {ok:true as const, revision:expectedRevision+1}
@@ -527,7 +536,7 @@ export function QuoteComparisonWorkspace({
           {!locked && !previewMode && productPreview.selectedCount > 0 ? <div className="order-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"><p className="text-xs text-slate-500">{productPreview.selectedCount} of {items.length} products chosen · draft</p><button type="button" aria-label="Finalize product choices · Continue to client" onClick={finalizeChoices} disabled={pending || pricesNeedSaving || choiceAutosave.conflict || !choiceSourceReviewed || productPreview.selectedCount !== items.length || items.length === 0} className="min-h-11 rounded-lg bg-sky-700 px-4 text-sm font-bold text-white disabled:opacity-40">Continue to client</button></div> : null}
           {!previewMode ? <div className="order-5 border-t border-slate-100 pt-3 text-xs" role="status" aria-live="polite">
             {!choiceSourceReviewed ? <p className="mb-2 text-amber-800">{productChoiceWarning}</p> : null}
-            <p className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (!choiceSourceReviewed && choiceAutosave.status === "saved" ? "Product choices need review" : choiceAutosave.status === "saved" ? "Product choices saved · not an order" : choiceAutosave.status === "saving" ? "Saving product choices…" : "Product choices not saved yet")}</p>
+            <p data-testid="purchasing-draft-save-status" className={choiceAutosave.error ? "text-rose-700" : "text-slate-600"}>{pricesNeedSaving ? "Price edits are not saved. Save prices before changing product choices." : choiceAutosave.error || (!choiceSourceReviewed && choiceAutosave.status === "saved" ? "Purchasing draft needs review" : choiceAutosave.status === "saved" ? "Purchasing draft saved · not match verification or an order" : choiceAutosave.status === "saving" ? "Saving purchasing draft…" : "Purchasing draft not saved yet")}</p>
             {choiceAutosave.error ? choiceAutosave.conflict ? <button type="button" onClick={()=>window.location.reload()} className="min-h-11 font-semibold underline">Reload and review</button> : <button type="button" onClick={()=>void choiceAutosave.retry()} className="min-h-11 font-semibold underline">Retry saving choices</button> : null}
           </div> : null}
           <header className="flex flex-wrap items-center justify-between gap-3 pb-2">
@@ -552,7 +561,7 @@ export function QuoteComparisonWorkspace({
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>}
           {missingRequestMaterials&&comparison.request_id?<p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">{missingRequestMaterials} new saved material(s) need a comparison row. <a className="font-semibold text-sky-800" href={`/owner/materials/requests/${comparison.request_id}#request-supplier-quotes`}>Open the request and choose Compare supplier quotes to synchronize.</a> Existing quotes and prices are retained.</p>:null}
-          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} selections={productSelections} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onChoose={(itemId,bidId)=>setProductSelections(current=>({...current,[itemId]:bidId}))} /> : null}
+          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} selections={productSelections} draftSelections={matrixSelections} baselineQuoteId={baselineQuoteId} onBaselineChange={setBaselineQuoteId} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onDraftChoose={(itemId,quoteId)=>setMatrixSelections(current=>({...current,[itemId]:quoteId}))} /> : null}
           {!receivedSupplierQuotes.length || liveBids.length ? <details open={!receivedSupplierQuotes.length} className="rounded-xl border border-slate-200 p-3"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Reviewed quote selections</summary><div className="grid gap-2">{productPreview.rows.filter(row=>!receivedSupplierQuotes.length||row.offers.some(offer=>offer.unitPrice!==null)).map((row) => <ProductQuoteCard key={row.item.id} row={row} finalized={Boolean(procurementRoute && !routeError)} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} beforeConfirm={previewMode ? undefined : choiceAutosave.flush} />)}</div></details> : null}
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
           <div hidden={!workspaceToolsOpen} className="order-3 rounded-lg bg-slate-50 p-3"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="grid grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>

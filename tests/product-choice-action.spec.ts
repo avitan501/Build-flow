@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import * as helpers from "../lib/product-choice-draft";
+import * as matrixHelpers from '../lib/matrix-choice-draft';
 import type { saveProductChoicesAction } from "../app/admin/quote-comparison/product-choice-actions";
 import type { QuoteComparisonItemRecord, QuoteComparisonBidRecord } from "../lib/quote-comparison";
 
@@ -18,7 +19,7 @@ function actionHarness(options:{status?:string;revision?:number;race?:boolean;de
     let update:Record<string,unknown>|null=null;
     const filters=new Map<string,unknown>();
     const query={
-      select(){return query},eq(field:string,value:unknown){filters.set(field,value);return query},in(field:string,value:unknown){filters.set(field,value);return query},
+      select(){return query},order(){return query},eq(field:string,value:unknown){filters.set(field,value);return query},in(field:string,value:unknown){filters.set(field,value);return query},
       update(value:Record<string,unknown>){update=value;return query},
       async returns(){return {data:table==="quote_comparison_items"?[item]:[options.bid??bid],error:null}},
       async maybeSingle(){
@@ -35,6 +36,8 @@ function actionHarness(options:{status?:string;revision?:number;race?:boolean;de
   const exported={} as {saveProductChoicesAction:typeof saveProductChoicesAction};
   new Function("exports","require",compiled)(exported,(id:string)=>{
     if(id==="@/lib/product-choice-draft")return helpers;
+    if(id==='@/lib/matrix-choice-draft')return matrixHelpers;
+    if(id==='@/lib/matrix-choice-server')return {loadMatrixChoiceSource:async()=>({items:[item],quotes:[{id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[]}]})};
     if(id==="@/lib/product-match-server")return {loadProductMatchConfirmations:async(_client:unknown,rows:QuoteComparisonBidRecord[])=>rows};
     if(id==="@/lib/auth")return {requireStaffProfile:async(capability:string)=>{expect(capability).toBe("suppliers");if(options.deny)throw new Error("Unauthorized");return {supabase}}};
     throw new Error(`Unexpected runtime dependency ${id}`);
@@ -42,6 +45,19 @@ function actionHarness(options:{status?:string;revision?:number;race?:boolean;de
   return {action:exported.saveProductChoicesAction,state:()=>({writes,revision,snapshot})};
 }
 async function payload(){return {comparisonId,expectedRevision:0,sourceFingerprint:await helpers.productChoiceFingerprint([item],[bid]),snapshot:{version:1,selections:{item:"bid"}}};}
+
+test('unreviewed purchasing intentions persist separately and reject foreign or stale source quotes',async()=>{
+ const fingerprint=await matrixHelpers.matrixChoiceFingerprint([item],[{id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[]}]);
+ const matrix={baselineQuoteId:'quote',selections:{item:'quote'},sourceFingerprint:fingerprint};
+ const success=actionHarness();
+ expect(await success.action({...await payload(),snapshot:{version:1,selections:{},matrix}})).toEqual({ok:true,revision:1});
+ expect(success.state().snapshot).toEqual({version:1,selections:{},matrix});
+ for(const changed of [{...matrix,baselineQuoteId:'foreign'},{...matrix,selections:{other:'quote'}},{...matrix,sourceFingerprint:'a'.repeat(64)}]){
+  const blocked=actionHarness();
+  expect(await blocked.action({...await payload(),snapshot:{version:1,selections:{},matrix:changed}})).toMatchObject({ok:false,conflict:true});
+  expect(blocked.state().writes).toBe(0);
+ }
+});
 
 test("action saves only eligible current choices and returns acknowledged revision",async()=>{
   const harness=actionHarness();

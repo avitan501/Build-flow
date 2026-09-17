@@ -1,0 +1,20 @@
+# Purchasing draft and savings — approved full-page follow-up
+
+User approves all five recommendations and production publication: rightmost Savings header selects comparison supplier, each item Select supplier selects where to buy, actual selected-vs-baseline savings (not forced cheapest), extra-cost/zero states, requested-line quantities, bottom totals, separate tax/freight, persistent baseline and choices, cheapest safe suggestion only. Draft intent is NOT manual match verification or order approval. Preserve source-order/clean Step1/LVL/plywood/source prices/PDF review.
+
+Owned worktree /tmp/avantia-material-review-20260916, codex/material-review-workflow-20260916, based on live0090bc47. Primary dirty worktree preserved. Only Website fix active, command center idle. Serialized official workflow publication, canonical avantiabuild.com/nprfhspwdflpqlopydmp, no schema or credentials changed.
+
+## Changes
+
+- Source-quote purchasing intentions and comparison supplier are nested in existing version1 product_choice_draft JSONB under matrix. Existing reviewed-bid selections remain separate and finalization guards remain unchanged. Shared existing conflict-aware autosave/CAS owns persistence, no competing browser-only store. Server authenticates suppliers capability, validates actual comparison membership, source fingerprint, current request canonical rows, and locked/revision/source guards. Old version1 drafts remain accepted. Page restoration and remount key include matrix source fingerprint; source-price/request changes invalidate source intentions without approving anything.
+- Savings rightmost header includes comparison dropdown; each row has usable Select supplier options including non-reviewed source quotes. No automatic supplier selection. Actual selected requested-line cost vs baseline computes signed savings; detected quantity/unit/measurement/alternative/allocation conflicts cannot become savings. Requested-line values remain indicative, not supplier availability commitments. Full request totals withheld for missing/unchosen/unresolved rows, partial known costs clearly labeled, same-row savings counted. Suggestions Lowest comparable price are indicative only. Delivery/tax grouped separately, unknown not free, same physical supplier multiple quotes never duplicates freight.
+- Show has explicit selected/unselected/differences/global-no-price definitions, visible row count and empty state, filters don't alter project totals.
+- Display-only identical-entry grouping uses hash of original extracted document text plus supplier, quote number/date, filename/size/type AND exact sorted source-row content. Reviewed bids are not collapsed. Originals and approvals never deleted/merged. Real read-only npr audit confirms two Midwood records950cc075/d7fa4546 both quote12022/date2026-09-17/QUOTE(002).pdf/18455bytes/same raw digest; earlier actual PDF hash identical. Grouping intended to yield one Midwood column, retain both originals.
+
+## Verification
+
+63 local targeted PASS,2older private-fixture SKIP: selected-not-cheapest arithmetic, positive/zero/extra, unresolved exclusion, draft parsing/restoration/fingerprint/scope, actual mocked authenticated server action CAS/source/foreign/locked safety, existing source/units/LF/nominal aliases/plywood/order/copy/quantity-first regressions, desktop1440/phone390 static matrix with savings header rightmost and all usable source options. TSC and changed-file lint passed before final count-label addition. Full build and final serialized publication/live interactions/persistence verification pending. No current completion claim.
+
+## External actions
+
+Read-only production Supabase document identities and comparison state: current comparison c8984e52 review revision400, product_choice_draft null, no final route/award. Prior live tests GET-only. Final persistence proof must use a bounded draft-save/reload and restore original state with revision guards; do not overwrite concurrent user changes, prices, source assignments, approval or order.

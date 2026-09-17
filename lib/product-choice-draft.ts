@@ -1,7 +1,8 @@
 import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord } from "@/lib/quote-comparison";
 import { buildProductQuotePreview } from "@/lib/product-quote-preview";
+import { parseMatrixChoiceDraft,type MatrixChoiceDraft } from './matrix-choice-draft';
 
-export type ProductChoiceDraft = { version: 1; selections: Record<string, string> };
+export type ProductChoiceDraft = { version: 1; selections: Record<string, string>; matrix?:MatrixChoiceDraft };
 export type ProductChoiceDraftColumns = {
   product_choice_draft?: unknown;
   product_choice_draft_revision?: number;
@@ -14,7 +15,9 @@ export function parseProductChoiceDraft(value: unknown): ProductChoiceDraft | nu
   if (raw.version !== 1 || !raw.selections || typeof raw.selections !== "object" || Array.isArray(raw.selections)) return null;
   const entries = Object.entries(raw.selections);
   if (entries.length > 1000 || entries.some(([id, bid]) => !/^[a-z0-9-]{1,100}$/i.test(id) || typeof bid !== "string" || !/^[a-z0-9-]{0,100}$/i.test(bid))) return null;
-  return { version: 1, selections: Object.fromEntries(entries) };
+  const matrix=raw.matrix===undefined?undefined:parseMatrixChoiceDraft(raw.matrix);
+  if(raw.matrix!==undefined&&!matrix)return null;
+  return { version: 1, selections: Object.fromEntries(entries),...(matrix?{matrix}:{}) };
 }
 
 export function productChoiceScopeError(draft: ProductChoiceDraft, items: QuoteComparisonItemRecord[], bids: QuoteComparisonBidRecord[]) {

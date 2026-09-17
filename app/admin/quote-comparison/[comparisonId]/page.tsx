@@ -11,6 +11,8 @@ import { loadFinalizedProcurementRoute } from "@/lib/finalized-route-server";
 import type { ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table";
 import { currentRequestComparison } from "@/lib/current-request-comparison";
 import type { ReviewableMaterialItem } from "@/lib/client-material-review";
+import { matrixChoiceFingerprint,restoreMatrixChoices } from '@/lib/matrix-choice-draft';
+import { quoteDuplicateKey } from '@/lib/comparison-quote-columns';
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type RequestClientQuoteSource = {
@@ -77,10 +79,14 @@ export default async function QuoteComparisonDetailPage({
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
   const finalized = await loadFinalizedProcurementRoute(supabase, comparisonId, comparisonResult.data.active_route_id);
   const receivedQuotes = await supabase.from("supplier_quotes")
-    .select("id,supplier_name,file_name,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total,comparison_item_id)")
+    .select("id,supplier_name,quote_number,quote_date,file_name,file_size,mime_type,raw_text,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total,comparison_item_id)")
     .eq("comparison_id", comparisonId).order("created_at")
-    .returns<Array<{ id: string; supplier_name: string; file_name: string; supplier_quote_items: ReceivedSupplierQuoteLine[] }>>();
+    .returns<Array<{ id: string; supplier_name: string; quote_number:string;quote_date:string|null;file_name: string;file_size:number;mime_type:string;raw_text:string; supplier_quote_items: ReceivedSupplierQuoteLine[] }>>();
   if (receivedQuotes.error) throw new Error("Could not load received supplier quotes.");
+  const sourceQuotes=(receivedQuotes.data??[]).map(q=>({id:q.id,supplierName:q.supplier_name,fileName:q.file_name,sourceItems:q.supplier_quote_items??[]}));
+  const matrixFingerprint=await matrixChoiceFingerprint(requestedComparisonItems??itemsResult.data??[],sourceQuotes);
+  const matrixState=restoreMatrixChoices(comparisonResult.data.product_choice_draft,matrixFingerprint);
+  const duplicateKeys=await Promise.all((receivedQuotes.data??[]).map(quoteDuplicateKey));
 
   const requestClientQuoteSourcesResult = comparisonResult.data.request_id
     ? await supabase
@@ -108,12 +114,15 @@ export default async function QuoteComparisonDetailPage({
 
   return (
     <QuoteComparisonWorkspace
-      key={`${user.id}:${comparisonId}:${choiceFingerprint}:${comparisonResult.data.status}`}
+      key={`${user.id}:${comparisonId}:${choiceFingerprint}:${matrixFingerprint}:${comparisonResult.data.status}`}
       choiceActorId={user.id}
       initialProductSelections={choiceState.selections}
+      initialMatrixSelections={matrixState.selections}
+      initialBaselineQuoteId={matrixState.baselineQuoteId}
+      matrixSourceFingerprint={matrixFingerprint}
       productChoiceRevision={comparisonResult.data.product_choice_draft_revision ?? 0}
       productChoiceFingerprint={choiceFingerprint}
-      productChoiceWarning={choiceState.warning}
+      productChoiceWarning={choiceState.warning||matrixState.warning}
       comparison={comparisonResult.data}
       procurementRoute={finalized.route}
       routeError={finalized.error}
@@ -122,7 +131,7 @@ export default async function QuoteComparisonDetailPage({
       requestedComparisonItems={requestedComparisonItems}
       missingRequestMaterials={missingRequestMaterials}
       bids={bidsResult.data ?? []}
-      receivedSupplierQuotes={(receivedQuotes.data ?? []).map(quote => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, sourceItems: quote.supplier_quote_items ?? [], inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
+      receivedSupplierQuotes={(receivedQuotes.data ?? []).map((quote,index) => ({ id: quote.id, supplierName: quote.supplier_name, fileName: quote.file_name, duplicateKey:duplicateKeys[index],sourceItems: quote.supplier_quote_items ?? [], inComparison: (bidsResult.data ?? []).some(bid => bid.source_supplier_quote_id === quote.id) }))}
       suppliers={suppliers}
       projects={projectsResult.data ?? []}
       departments={departments}

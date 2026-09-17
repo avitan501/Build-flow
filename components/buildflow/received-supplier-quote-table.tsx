@@ -1,5 +1,5 @@
 export type ReceivedSupplierQuoteLine = { line_number: number; description: string; specification: string | null; quantity: number; unit: string; unit_price: number; line_total: number; comparison_item_id?:string|null; calculatedRate?:number; requestedFeet?:number; originalFeet?:number }
-export type ReceivedSupplierQuote = { id: string; supplierName?: string; fileName: string; sourceUrl?: string | null; sourceItems?: ReceivedSupplierQuoteLine[]; inComparison?: boolean }
+export type ReceivedSupplierQuote = { id: string; supplierName?: string; fileName: string; sourceUrl?: string | null; sourceItems?: ReceivedSupplierQuoteLine[]; inComparison?: boolean; duplicateKey?:string }
 const money = (value: number) => Number.isFinite(Number(value)) ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value)) : "—"
 
 export function ReceivedSupplierQuoteTable({ quotes }: { quotes: ReceivedSupplierQuote[] }) {
