@@ -2,6 +2,8 @@
 
 ## Additional user-reported corrections
 
+Subsequent explicit approval enables a category-scoped Home Depot-style LVL nominal10-inch depth /9.5-inch catalog-depth naming alias. Does not normalize labeled width/thickness or explicit Actual dimensions;9.25 and differing lengths remain issues. No manual approval, prices or source values changed. Book docs/material-catalog-rules.md records source URLs, scope, exclusions and reference-only SKU-specific lumber/plywood examples. 36targetedPASS/2privateSKIP, finalbuild/publish pending.
+
 Compact plywood notation `4 x 8 3/4"` previously became 8.75-inch thickness. The inch reader now removes sheet dimensions only for plywood before parsing remaining thickness; real 5/8-inch conflicts, wrong sheet lengths and genuine mixed-number LVL dimensions remain flagged. Issue/verified/guide dot summaries no longer have visible borders; keyboard focus and 44px touch targets remain. 35 targeted PASS / 2 older private-fixture SKIP. Publication and final live proof pending. No universal LVL 10-to-9.5 assumption added: manufacturer sizing alone does not establish the intent of a nominal source request. Existing explicitly approved TJI rule unchanged.
 
 Owned isolated worktree /tmp/avantia-material-review-20260916, based verified live ef4c56c0; primary143 unrelated files untouched. No concurrent publisher observed.

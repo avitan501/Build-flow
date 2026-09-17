@@ -1,5 +1,6 @@
 import type { ReceivedSupplierQuote, ReceivedSupplierQuoteLine } from "@/components/buildflow/received-supplier-quote-table"
 import type { QuoteComparisonItemRecord } from "@/lib/quote-comparison"
+import { comparisonDepthInches } from "@/lib/material-nominal-dimensions"
 
 function text(value: string) { return value.toLowerCase().replace(/×/g,"x").replace(/\b2\s*x\s*(\d+)\s*(?:x|-)\s*(\d+)\b/g,"2 x $1 $2 ft").replace(/(\d)x(?=\d)/g,"$1 x ").replace(/['′]/g," ft ").replace(/["″]/g," in ").replace(/\b(?:feet|foot)\b/g,"ft").replace(/\b(?:inch|inches)\b/g,"in").replace(/[^a-z0-9./]+/g," ").trim() }
 function section(value: string) { return text(value).replace(/\b1st\b/g,"first").replace(/\b2nd\b/g,"second").replace(/\b3rd\b/g,"third").match(/\b(first floor|second floor|third floor|ceiling joists?)\b/)?.[0]?.replace(/joists$/, "joist") }
@@ -134,10 +135,8 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
     const category=family(`${item.description} ${item.specification||''}`)
     const requested=inches(`${item.description} ${item.specification||''}`,category==='plywood'),quoted=inches(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`,category==='plywood')
     if(['joist','lvl','plywood'].includes(category||'')&&requested.length&&quoted.length){
-      // David's explicit TJI convention: written 10-inch joist means 9.5-inch depth.
-      // Never generalize that convention to LVL, plywood or unknown measurements.
-      const normalize=(n:number)=>category==='joist'&&/\btji\b/i.test(item.description)&&n===10?9.5:n
-      const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(normalize(n)-normalize(q))<0.001))
+      const requestContext=`${item.description} ${item.specification||''}`,quoteContext=`${lines[0].description} ${lines[0].specification||''}`
+      const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(comparisonDepthInches(category,n,requestContext)-comparisonDepthInches(category,q,quoteContext))<0.001))
       if(unmatched.length)measurements.push(`Measurement differs: requested ${unmatched.join('/')} in; quoted ${[...new Set(quoted)].join('/')} in. Verify the source dimensions.`)
     }
     if(category==='plywood'){

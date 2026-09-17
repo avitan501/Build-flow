@@ -59,8 +59,17 @@ test('supplier abbreviations and sheet dimensions recover candidates without app
  ] as const){const cell=receivedProductPriceRows([target],[{id:'q',fileName:'q',sourceItems:[supplier]}])[0].cells[0];expect(cell.lines).toHaveLength(1);expect(comparisonIndicators(target,cell.lines,cell.reasons).some(i=>i.kind==='unverified')).toBe(true)}
  expect(sourceComparisonReasons(item('a','Face-mount joist hanger','For TJI 230',170),line(1,'HU310 hanger','',170)).join(' ')).not.toContain('Different joist')
 })
+test('approved LVL nominal depth alias removes only the false measurement issue',()=>{
+ const target=item('a','LVL beam','1-3/4 in · 10 in · 20 ft',10),quoted=line(1,'LVL beam','1-3/4" · 9-1/2" · 20 ft',8)
+ expect(comparisonIndicators(target,[quoted],sourceComparisonReasons(target,quoted)).map(i=>i.kind)).toEqual(['quantity','unverified'])
+ for(const spec of ['Actual depth: 10 in · 20 ft','Width: 10 in · 20 ft','10 in · 24 ft']){
+  const exact={...target,specification:spec}
+  expect(comparisonIndicators(exact,[quoted],sourceComparisonReasons(exact,quoted)).some(i=>i.kind==='measurement')).toBe(true)
+ }
+ expect(comparisonIndicators(target,[line(1,'LVL beam','1-3/4 in · 9.25 in · 20 ft',10)],[]).some(i=>i.kind==='measurement')).toBe(true)
+})
 test('quantity, measurements and substitutions remain separate and simultaneous',()=>{
- const target=item('a','LVL beam','10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
+ const target=item('a','LVL beam','Actual depth: 10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
  const indicators=comparisonIndicators(target,[quoted],sourceComparisonReasons(target,quoted))
  expect(indicators.map(i=>i.kind)).toEqual(['quantity','measurement','unverified'])
  const joist=item('j','TJI 230 I-joist','10 in · 20 ft',35),alternative=line(1,'NI-60 I-joist','9-1/2" · 20 ft',30)
@@ -73,7 +82,7 @@ test('quantity, measurements and substitutions remain separate and simultaneous'
  expect(comparisonIndicators(packageTarget,[boxes],sourceComparisonReasons(packageTarget,boxes)).some(i=>i.kind==='quantity')).toBe(false)
 })
 test('colored comparison guide uses separate dots with expandable notes and review links',async({page})=>{
- const target=item('a','LVL beam','10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
+ const target=item('a','LVL beam','Actual depth: 10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
  const restore=(value:unknown):React.ReactNode=>{
   if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
   if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;return React.createElement(typeof node.type==='object'?React.Fragment:node.type,{...props,key:node.key},restore(children))}
