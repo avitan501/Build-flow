@@ -64,6 +64,7 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
   const rows = items.map(item=>({item,cells:quotes.map((quote,index)=>{
     // Rank all candidates by the same evidence rules; a routing hint must not
     // override a stronger dimensional, quantity or section match.
+    const blockedLines=candidates[index].filter(line=>line.comparison_item_id!==item.id&&items.some(target=>target.id===line.comparison_item_id)&&candidateScore(requestedLinearPrice(line,item),item)>0)
     const available=candidates[index].filter(line=>!line.comparison_item_id||!items.some(target=>target.id===line.comparison_item_id)||line.comparison_item_id===item.id).map(line=>requestedLinearPrice(line,item)).map(line=>({line,score:candidateScore(line,item)})).filter(x=>x.score>0)
     const assigned=available.filter(x=>x.line.comparison_item_id===item.id)
     const sectionConflict=(line:ReceivedSupplierQuoteLine)=>{const a=section(`${line.description} ${line.specification||''}`),b=section(`${item.description} ${item.specification||''}`);return Boolean(a&&b&&a!==b)}
@@ -71,7 +72,7 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
     const ranked=(assigned.length?assigned:sameSection.length?sameSection:available).sort((a,b)=>b.score-a.score)
     // Ties are visible, not broken by PDF order or silently approved.
     const lines=ranked.filter(x=>x.score===ranked[0]?.score).map(x=>x.line)
-    return {quote,lines,suggested:lines.length===1}
+    return {quote,lines,blockedLines,suggested:lines.length===1}
   })}))
   // A candidate can remain visible in multiple places, but must never masquerade
   // as coverage of two separate requested rows. Resolve the source allocation first.
@@ -85,6 +86,7 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
   return rows.map(row => ({ ...row, cells: row.cells.map(cell => {
     const sharedSource = cell.lines.some(line => (uses.get(`${cell.quote.id}:${line.allocationKey || line.line_number}`) || 0) > 1)
     const reasons = cell.lines.length === 1 ? sourceComparisonReasons(row.item, cell.lines[0]) : []
+    if(!cell.lines.length&&cell.blockedLines.length)reasons.push('A possible supplier line is already assigned to another requested item. No offer is allocated here; do not count the same supply twice.')
     if (sharedSource) reasons.unshift("This source line also appears against another requested row; assign it once.")
     if (cell.lines.length > 1) reasons.unshift("More than one supplier line could fit; choose the correct source line.")
     for(const line of cell.lines)if(line.calculatedRate!==undefined){reasons.push('Calculated from linear-foot rate; confirm requested cut lengths, availability and any cutting charges before approval.');if((feetUsed.get(`${cell.quote.id}:${line.line_number}`)||0)>(line.originalFeet||0))reasons.push('Requested linear footage across candidate rows exceeds quoted footage; confirm additional supply before approval.')}

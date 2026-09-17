@@ -35,3 +35,6 @@ test('model and length already in the product name are not repeated, distinct mo
  expect(materialCleanLine({name:'TJI 230 I-joist',quantity:12,unit:'pc',fields,details:''})).toBe('12 pc · TJI 230 I-joist · 10 in · 26 ft')
  expect(materialCleanLine({name:'TJI 230 I-joist',quantity:12,unit:'pc',fields:[{id:'model',label:'Model',value:'TJI 230R'}],details:''})).toContain('TJI 230R')
 })
+test('equivalent fractional dimensions and repeated generic material are exported once',()=>{
+ expect(materialCleanLine({name:'LVL beam',quantity:4,unit:'pieces',fields:[{id:'dimensions',label:'Dimensions',value:'1-3/4 in'},{id:'width',label:'Width',value:'1.75 in'},{id:'depth',label:'Depth',value:'11.25 in'},{id:'length',label:'Length',value:'24 ft'},{id:'type',label:'Type',value:'LVL'}],details:'Ceiling joists'})).toBe('4 pieces · LVL beam · 1.75 in · 11.25 in · 24 ft · Ceiling joists')
+})

@@ -17,6 +17,8 @@ test('saved supplier row assignment survives refresh and cannot cover another re
  const original={...line(1,'HU310 hanger','',170),comparison_item_id:'a'}
  const rows=receivedProductPriceRows([item('a','Face mount hanger','',170),item('b','Top mount hanger','',170)],[{id:'q',fileName:'q',sourceItems:[original]}])
  expect(rows[0].cells[0].lines).toHaveLength(1);expect(rows[1].cells[0].lines).toHaveLength(0)
+ expect(rows[1].cells[0].blockedLines).toHaveLength(1)
+ expect(rows[1].cells[0].reasons.join(' ')).toContain('already assigned')
 })
 test('sheet dimensions accept equivalent notation and keep size, thickness and material conflicts visible',()=>{
  const target=item('sheet','CDX plywood','4 x 8 ft · 3/4 in',77)
