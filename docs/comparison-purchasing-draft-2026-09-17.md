@@ -13,6 +13,8 @@ Owned worktree /tmp/avantia-material-review-20260916, codex/material-review-work
 
 ## Verification
 
+Follow-up readonly audit caught different extracted description/specification paraphrases between the two identical original Midwood documents. First release f363d02a/run35259042659 explicitly canceled before deploy hook to avoid publishing a candidate that would retain duplicate columns. Display identity now uses exact original text/document metadata plus identical per-line quantity/unit/price/total/allocation; extracted paraphrases do not create a second supplier. Financial/unit/allocation changes and reviewed bids still prevent grouping. Both originals remain accessible. Must rerun bounded tests/build and publish final exact follow-up, not claim the canceled candidate live.
+
 63 local targeted PASS,2older private-fixture SKIP: selected-not-cheapest arithmetic, positive/zero/extra, unresolved exclusion, draft parsing/restoration/fingerprint/scope, actual mocked authenticated server action CAS/source/foreign/locked safety, existing source/units/LF/nominal aliases/plywood/order/copy/quantity-first regressions, desktop1440/phone390 static matrix with savings header rightmost and all usable source options. TSC and changed-file lint passed before final count-label addition. Full build and final serialized publication/live interactions/persistence verification pending. No current completion claim.
 
 ## External actions

@@ -6,7 +6,9 @@ export function comparisonQuoteColumns(quotes:ReceivedSupplierQuote[],bids:Quote
  const columns:ReceivedSupplierQuote[]=[],aliases:Record<string,string>={},seen=new Map<string,string>()
  for(const quote of quotes){
   const hasReviewedBid=bids.some(b=>b.source_supplier_quote_id===quote.id&&(b.quote_comparison_prices??[]).some(p=>(p.quote_product_match_confirmations??[]).length))
-  const key=quote.duplicateKey&&!hasReviewedBid?JSON.stringify([quote.duplicateKey,[...(quote.sourceItems??[])].sort((a,b)=>a.line_number-b.line_number)]):''
+  // Repeated extraction can paraphrase descriptions. Original text identity plus identical
+  // line quantities/prices/units/allocations identifies the same offer, not a new supplier.
+  const key=quote.duplicateKey&&!hasReviewedBid?JSON.stringify([quote.duplicateKey,[...(quote.sourceItems??[])].sort((a,b)=>a.line_number-b.line_number).map(l=>[l.line_number,l.quantity,l.unit,l.unit_price,l.line_total,l.comparison_item_id??null])]):''
   const previous=key?seen.get(key):undefined
   if(previous){aliases[quote.id]=previous;continue}
   columns.push(quote);aliases[quote.id]=quote.id;if(key)seen.set(key,quote.id)

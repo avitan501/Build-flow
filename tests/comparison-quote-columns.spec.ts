@@ -7,6 +7,7 @@ test('identical source entries share a display column without removing their ori
  expect(result.columns.map(q=>q.id)).toEqual(['a']);expect(result.aliases.b).toBe('a');expect(JSON.stringify(quotes)).toBe(before)
  expect(comparisonQuoteColumns([{...quotes[0],duplicateKey:undefined},quotes[1]],[]).columns.length).toBe(2)
  expect(comparisonQuoteColumns([quotes[0],{...quotes[1],sourceItems:[{...line,unit_price:11}]}],[]).columns.length).toBe(2)
+ expect(comparisonQuoteColumns([quotes[0],{...quotes[1],sourceItems:[{...line,description:'LUMBER',specification:'Rephrased extraction'}]}],[]).columns.length).toBe(1)
  expect(comparisonQuoteColumns([quotes[0],{...quotes[1],sourceItems:[{...line,comparison_item_id:'different'}]}],[]).columns.length).toBe(2)
 })
 test('different source document identity never collapses under the same supplier name',async()=>{
