@@ -18,4 +18,8 @@ Initial 27 arithmetic/action tests passed after fixing packaging detection to in
 
 ## Remaining business review
 
+First production5a661aab verified live: actual blue adhesive review141.88 full source total, consent disabled by default, original/organized wording/save status; five supplier sums and mixed49164.18 for36/39 reconcile; basket split22373.23US +12942.05Builders +4387.20Midwood +5447.50KSJ +4014.20Certified. Certified excludeditems7/12/14/18/33, mixed unresolveditems12/14/33. Native modes, source39/order/copy/panel/NI/PDF-links/phone checks passed. Screenshot review passed. No real purchasing/source/approval writes. Diagnostic initially looked for literal role attribute on a native dialog; corrected to dialog[open], rerun passed, no app defect.
+
+Final audit follow-up: old header said0review while source matrix had3unresolved; corrected to source-aware need-review-or-price count. Accepted costing uses chosen source unit price and line only, not an older manually reviewed bid's distinct price. Accepted indicators show green; original differences remain within Review match, not erased. Added regression covering accepted source100 vs reviewed bid110 to ensure display/total consistency. Final follow-up tests/build/publication/live pending at this record.
+
 The application enables the owner's informed acceptance; it does not approve real differences automatically. Actual source absence, unresolved shared/combined source allocation, and existing stale AI request dimensions remain issues requiring source-backed correction or explicit item-level decisions. Production cannot be called a complete 39-item cost until all lines have a valid cost basis. The original-source 26-in/26-ft LVL legacy concern remains separate from this acceptance work.

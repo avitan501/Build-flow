@@ -2,6 +2,7 @@
 import { ReceivedSupplierQuoteTable } from "@/components/buildflow/received-supplier-quote-table";
 import { ProductMatchReview } from '@/components/buildflow/product-match-review';
 import {MatrixAcceptanceControl} from './matrix-acceptance-control';
+import {receivedPriceSummary} from '@/lib/received-price-summary';
 import { ReceivedProductPriceMatrix } from "@/components/buildflow/received-product-price-matrix";
 
 import {
@@ -551,7 +552,7 @@ export function QuoteComparisonWorkspace({
           </div> : null}
           <header className="flex flex-wrap items-center justify-between gap-3 pb-2">
             <div className="min-w-0 flex-1"><p className="mb-2 flex min-w-0 items-center gap-2 text-xs text-slate-500"><span className="shrink-0 font-medium uppercase tracking-wider">Step 2</span><span aria-hidden="true">·</span><span className="truncate" title={comparison.title}>{comparison.title}</span></p><h1 id="product-comparison-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">Supplier quotes</h1>
-            <p className="mt-2 text-sm text-slate-500">{requestedComparisonItems?.length??items.length} products · {productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")&&(!requestedComparisonItems||requestedComparisonItems.some(item=>item.id===row.item.id))).length} to review</p></div>
+            <p className="mt-2 text-sm text-slate-500">{requestedComparisonItems?.length??items.length} products · {receivedSupplierQuotes.length?receivedPriceSummary(requestedComparisonItems??liveItems,receivedSupplierQuotes,liveBids,matrixAcceptances).cells.filter(cells=>!cells.some(cell=>cell.indicative&&!cell.problem)).length:productPreview.rows.filter(row=>row.offers.some(offer=>offer.status==="review")).length} need review or price</p></div>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" aria-label="Add quote" onClick={()=>setActiveStep(2)} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-sky-500 bg-white px-3 text-xs font-semibold text-sky-800"><Plus className="h-4 w-4"/><span className="hidden sm:inline">Add quote</span></button>
               <button type="button" aria-expanded={workspaceToolsOpen} aria-controls="product-workspace-tools" onClick={()=>setWorkspaceToolsOpen(value=>!value)} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-slate-500">{workspaceToolsOpen ? "Less" : "More"}</button>

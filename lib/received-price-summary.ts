@@ -24,12 +24,13 @@ export function receivedPriceSummary(items:QuoteComparisonItemRecord[],quotes:Re
   const comparable=single&&unit(single.unit)===unit(row.item.unit)&&!indicators.some(i=>i.kind==='packaging')
   const price=verified?offer!.unitPrice:comparable&&validPrice(single!.unit_price)?Number(single!.unit_price):null
   const acceptance=acceptances.find(a=>a.itemId===row.item.id&&a.quoteId===cell.quote.id)
+  const acceptedSource=acceptance?cell.lines.find(l=>l.line_number===acceptance.lineNumber)??null:null
   const acceptedTotal=acceptance?matrixAcceptanceCost(acceptance,items,quotes):null
   const reservedElsewhere=!acceptance&&cell.lines.some(line=>acceptances.some(a=>a.quoteId===cell.quote.id&&a.lineNumber===line.line_number&&a.itemId!==row.item.id))
   const requestedTotal=acceptedTotal??(price!==null&&Number.isFinite(Number(row.item.quantity))&&Number(row.item.quantity)>0?money(price*Number(row.item.quantity)):null)
   const alternative=indicators.some(i=>i.kind==='alternative')
   const problem=reservedElsewhere||(!acceptance&&(cell.sharedSource||cell.lines.length!==1||indicators.some(i=>['quantity','measurement','packaging','alternative'].includes(i.kind))||(!verified&&indicators.some(i=>i.notes.some(note=>note.startsWith('Measurement missing:'))))||cell.reasons.some(r=>/Section differs|exceeds quoted|already assigned/.test(r))))
-  return {quoteId:cell.quote.id,unitPrice:price,requestedTotal,verified,acceptance,alternative,problem,missing:!cell.lines.length&&!cell.blockedLines.length,ambiguous:!acceptance&&cell.lines.length>1,allocatedElsewhere:reservedElsewhere||(!cell.lines.length&&cell.blockedLines.length>0),indicative:requestedTotal!==null&&!reservedElsewhere&&(!cell.sharedSource||Boolean(acceptance)),source:acceptance?cell.lines.find(l=>l.line_number===acceptance.lineNumber)??null:single}
+  return {quoteId:cell.quote.id,unitPrice:acceptance?(acceptance.basis==='requested-quantity'&&acceptedSource?Number(acceptedSource.unit_price):null):price,requestedTotal,verified,acceptance,alternative,problem,missing:!cell.lines.length&&!cell.blockedLines.length,ambiguous:!acceptance&&cell.lines.length>1,allocatedElsewhere:reservedElsewhere||(!cell.lines.length&&cell.blockedLines.length>0),indicative:requestedTotal!==null&&!reservedElsewhere&&(!cell.sharedSource||Boolean(acceptance)),source:acceptance?acceptedSource:single}
  }))
  const suppliers=quotes.map((quote,index)=>{
   const values=cells.map(row=>row[index]),verified=values.filter(v=>v.verified&&v.requestedTotal!==null),indicative=values.filter(v=>v.indicative)

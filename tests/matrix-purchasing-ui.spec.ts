@@ -8,6 +8,7 @@ import {resolve} from 'node:path'
 import ts from 'typescript'
 import {ReceivedProductPriceMatrix} from '../components/buildflow/received-product-price-matrix'
 import type {QuoteComparisonItemRecord} from '../lib/quote-comparison'
+import {productMatchSnapshot,type QuoteComparisonBidRecord} from '../lib/quote-comparison'
 const item={id:'item',description:'Dimensional lumber',specification:'2 x 6 in · 10 ft',quantity:10,unit:'pieces'} as QuoteComparisonItemRecord
 const quote=(id:string,price:number)=>({id,supplierName:id,fileName:id+'.pdf',sourceItems:[{line_number:1,description:'2x6 lumber 10 ft',specification:'',quantity:10,unit:'each',unit_price:price,line_total:price*10}]})
 function restore(value:unknown):React.ReactNode {
@@ -24,6 +25,20 @@ test('baseline supplies unchanged basket rows without requiring a choice on each
  await expect(page.getByTestId('savings-mode-total')).toContainText('$1,200.00')
  await expect(page.getByTestId('basket-supplier-breakdown')).toContainText('baseline')
  await expect(page.getByTestId('basket-supplier-breakdown')).toContainText('$1,200.00')
+});
+test('cost acceptance displays chosen source price rather than an older reviewed bid price',async({page})=>{
+ Object.assign(globalThis,{React})
+ const source=quote('source',100)
+ const bid={id:'bid',source_supplier_quote_id:'source',supplier_id:'supplier',trust_level_snapshot:'verified',status:'received',quote_comparison_prices:[{item_id:'item',bid_id:'bid',unit_price:110,is_available:true,notes:'Dimensional lumber 2 x 6 in 10 ft'}]} as QuoteComparisonBidRecord
+ const price=bid.quote_comparison_prices![0]
+ price.quote_product_match_confirmations=[{id:'review',actor_id:'actor',actor_label:'Owner',created_at:'2026-09-17',source_fingerprint:'a'.repeat(64),source_snapshot:productMatchSnapshot(item,bid,price),selling_unit:'pieces'}]
+ const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[item],quotes:[source],bids:[bid],baselineQuoteId:'source',acceptances:[{itemId:'item',quoteId:'source',lineNumber:1,basis:'requested-quantity'}]})))
+ await page.setContent(html)
+ await expect(page.getByTestId('source-product-price')).toContainText('$100.00 / each')
+ await expect(page.getByTestId('source-product-price')).not.toContainText('$110.00')
+ await expect(page.getByTestId('requested-line-total')).toContainText('$1,000.00')
+ await expect(page.getByTestId('verified-price-indicator')).toHaveCount(1)
+ await expect(page.getByTestId('comparison-issue-indicator')).toHaveCount(0)
 });
 test('rightmost savings header, real source choices, extra cost and full requested-line arithmetic render on desktop and phone',async({page})=>{
  Object.assign(globalThis,{React})
