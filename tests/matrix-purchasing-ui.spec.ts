@@ -24,7 +24,12 @@ test('rightmost savings header, real source choices, extra cost and full request
   await expect(page.getByTestId('item-savings')).toContainText(expected)
   await expect(page.getByTestId('item-savings')).toContainText('$1,200.00')
   await expect(page.getByTestId('lowest-comparable-price')).toHaveCount(1)
-  expect(await page.getByTestId('product-price-matrix').locator('tbody th').first().evaluate(el=>getComputedStyle(el).position)).toBe(width<640?'static':'sticky')
+  await expect(page.getByTestId('item-savings').getByLabel('Select supplier for item 1')).toHaveValue(chosen)
+  await expect(page.getByTestId('product-price-matrix').locator('tbody th select')).toHaveCount(0)
+  expect(await page.getByTestId('product-price-matrix').locator('tbody th').first().evaluate(el=>getComputedStyle(el).position)).toBe('static')
+  await page.getByTestId('product-price-matrix').evaluate(el=>{el.parentElement!.scrollLeft=el.parentElement!.scrollWidth})
+  const visible=await page.getByTestId('item-savings').evaluate(el=>{const r=el.getBoundingClientRect(),c=el.closest('table')!.parentElement!.getBoundingClientRect();return r.left>=c.left&&r.right<=c.right+2})
+  expect(visible).toBe(true)
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2)).toBe(false)
  }
 })
