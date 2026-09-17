@@ -24,6 +24,8 @@ test('fraction normalization and true measurement checks apply outside LVL and p
  expect(comparisonIndicators(target,[line('Blade 2 inches 8 ft')],[]).some(i=>i.kind==='measurement')).toBe(true)
  const hanger=item('For 10 in TJI · First floor','Face-mount hanger'),sourceHanger=line('IUS2.56/9-1/2" FACE MOUNT HANGER')
  expect(comparisonIndicators(hanger,[sourceHanger],sourceComparisonReasons(hanger,sourceHanger)).some(i=>i.kind==='measurement')).toBe(false)
+ const compactHanger=line('MTK 2-1/2"X9-1/2" INV MNT HGR')
+ expect(comparisonIndicators(hanger,[compactHanger],sourceComparisonReasons(hanger,compactHanger)).some(i=>i.kind==='measurement')).toBe(false)
  expect(comparisonIndicators(item('actual width 10 in','Hanger'),[line('Hanger width 9.5 in')],[]).some(i=>i.kind==='measurement')).toBe(true)
 })
 test('lowest source price is visible separately from comparable suggestion without weakening duplicate allocation',()=>{

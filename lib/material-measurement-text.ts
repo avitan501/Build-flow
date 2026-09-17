@@ -9,6 +9,9 @@ export function measurementNumber(value:string):number|null {
 }
 /** Normalize notation, never nominal sizes. Original uploaded wording remains untouched. */
 export function normalizeMeasurementText(value:string):string {
+ // Quoted compact dimensions need a boundary before the next mixed fraction.
+ // Do not split arbitrary model identifiers containing X or a slash.
+ value=value.replace(/(["″'′])\s*[x×](?=\d)/gi,'$1 × ')
  // Compact sheet notation: 4 x 8 3/4" means an 8-foot sheet, 3/4-inch thick.
  if(/\b(?:plywood|cdx|osb|sheet|plyscord|deck)\b/i.test(value))value=value.replace(/(\b\d+\s*(?:['′]|ft)?\s*[x×]\s*\d+\s*(?:['′]|ft)?)\s+(\d+\s*\/\s*\d+\s*(?:["″]|in\b|inch\b|inches\b))/gi,'$1 · $2')
  const tokens=/(?:\b\d+[ -]+\d+\s*\/\s*\d+|\b\d+\s*\/\s*\d+|\b\d+\s*[¼½¾⅛⅜⅝⅞⅓⅔]|[¼½¾⅛⅜⅝⅞⅓⅔])(?=\s*(?:["″'′]|inches\b|inch\b|in\b|feet\b|foot\b|ft\b|[x×]\s*\d))/gi
