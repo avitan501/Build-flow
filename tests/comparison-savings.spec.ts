@@ -9,6 +9,8 @@ test('chosen supplier versus cheapest: requested line costs, zero savings, and u
  expect(comparisonSavings(summary,'chosen').rows[0].savings).toBe(200)
  expect(comparisonSavings(summary,'chosen').baselineTotal).toBe(1200)
  expect(comparisonSavings(summary,'chosen').cheapestTotal).toBe(1000)
+ expect(comparisonSavings(summary,'chosen').baselineComplete).toBe(true)
+ expect(comparisonSavings(summary,'chosen').cheapestComplete).toBe(true)
  expect(comparisonSavings(summary,'cheap').rows[0].savings).toBe(0)
  expect(comparisonSavings(summary,'').savingsTotal).toBeNull()
 })
@@ -16,12 +18,15 @@ test('missing at one supplier is not missing across the request; no false saving
  const summary=receivedPriceSummary([item],[quote('cheap',100),{id:'absent',fileName:'absent',sourceItems:[]}],[])
  const result=comparisonSavings(summary,'absent')
  expect(result.missingCount).toBe(0);expect(result.baselineTotal).toBeNull();expect(result.savingsTotal).toBeNull()
+ expect(result.baselineComplete).toBe(false);expect(result.cheapestComplete).toBe(true)
  expect(comparisonSavings(receivedPriceSummary([item],[],[]),'').missingCount).toBe(1)
 })
 test('quantity conflicts and ambiguous matches cannot become cheapest savings',()=>{
  const conflicting=quote('wrong',1);conflicting.sourceItems[0].quantity=2
  const result=comparisonSavings(receivedPriceSummary([item],[quote('good',100),conflicting],[]),'wrong')
  expect(result.rows[0].cheapest?.quoteId).toBe('good');expect(result.rows[0].savings).toBeNull()
+ expect(result.baselineComplete).toBe(false)
+ expect(comparisonSavings(receivedPriceSummary([item],[conflicting],[]),'wrong').cheapestComplete).toBe(false)
 })
 test('selected costs preserve existing saved bid choices; unknown freight is not free',()=>{
  const bid={id:'bid',supplier_id:'supplier:quote',supplier_name_snapshot:'Supplier',source_supplier_quote_id:'q',trust_level_snapshot:'verified',status:'received',delivery_charge:100,tax_percent:10,quote_comparison_prices:[{item_id:'a',bid_id:'bid',unit_price:100,is_available:true,notes:'2 x 6 in · 10 ft dimensional lumber'}]} as QuoteComparisonBidRecord

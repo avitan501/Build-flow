@@ -13,7 +13,7 @@ export function comparisonSavings(summary:Summary, baselineId:string) {
     return {baseline,cheapest,savings,missing:cells.every(cell=>cell.missing),review:cells.some(cell=>!cell.missing)&&!cheapest}
   })
   const sum=(values:(number|null|undefined)[])=>values.some(value=>value!=null)?cents(values.reduce<number>((n,value)=>n+(value??0),0)):null
-  return {rows,baselineTotal:sum(rows.map(row=>row.baseline?.indicative?row.baseline.requestedTotal:null)),cheapestTotal:sum(rows.map(row=>row.cheapest?.requestedTotal)),savingsTotal:sum(rows.map(row=>row.savings)),comparedCount:rows.filter(row=>row.savings!==null).length,missingCount:rows.filter(row=>row.missing).length,reviewCount:rows.filter(row=>row.review).length}
+  return {rows,baselineComplete:rows.length>0&&rows.every(row=>row.baseline?.indicative&&!row.baseline.problem),cheapestComplete:rows.length>0&&rows.every(row=>row.cheapest!==null),baselineTotal:sum(rows.map(row=>row.baseline?.indicative?row.baseline.requestedTotal:null)),cheapestTotal:sum(rows.map(row=>row.cheapest?.requestedTotal)),savingsTotal:sum(rows.map(row=>row.savings)),comparedCount:rows.filter(row=>row.savings!==null).length,missingCount:rows.filter(row=>row.missing).length,reviewCount:rows.filter(row=>row.review).length}
 }
 
 export function selectedSupplierCosts(summary:Summary,bids:QuoteComparisonBidRecord[],selections:Record<string,string>){
