@@ -31,12 +31,18 @@ function family(value: string) {
   for(const [name,pattern] of [["nails",/nails?\b|\bnl\b|coil.*wire|wire.*coil|jst.*h(?:ng)?r.*(?:33deg|3m)/],["hanger",/hanger|face mount|top mount|\bhgr\b|\b(?:hu|huc|ius|iut)\d/],["joist",/tji|ni.?40|pwi|pwt|i.?joist/],["lvl",/\blvl\b|laminated veneer/],["plywood",/plywood|plyscord|\bcdx\b|\bosb\b|edge gold/],["blade",/blades?\b|\bbld\b|sawzall|recip/],["adhesive",/glue|adhes(?:ive)?\b|provan/],["lumber",/lumber|douglas fir|\bspf\b|\b2\s*x\s*\d+/]] as const) if(pattern.test(v))return name
   return null
 }
+function requestedLinearPrice(line:CandidateLine,item:QuoteComparisonItemRecord):CandidateLine {
+ if(!/^(?:lin\.?\s*ft\.?|lf|lft|linear feet)$/i.test(line.unit.trim())||!['each','ea','pc','pcs','piece','pieces'].includes(item.unit.toLowerCase()))return line
+ const length=lengths(text(`${item.description} ${item.specification||''}`))
+ if(!Number.isFinite(Number(line.quantity))||Number(line.quantity)<=0||!Number.isFinite(Number(line.line_total))||Math.abs(Number(line.quantity)*Number(line.unit_price)-Number(line.line_total))>0.05)return line
+ if(length.length!==1||Number(length[0])<=0||Number(item.quantity)<=0||line.unit_price===null||!Number.isFinite(Number(line.unit_price))||Number(line.unit_price)<0)return line
+ return {...line,unit:item.unit,quantity:item.quantity,unit_price:Number(line.unit_price)*Number(length[0]),line_total:Number(line.unit_price)*Number(length[0])*Number(item.quantity),calculatedRate:Number(line.unit_price),requestedFeet:Number(length[0])*Number(item.quantity),originalFeet:Number(line.quantity),allocationKey:`${line.line_number}:rate:${item.id}`}
+}
 function candidateScore(line: ReceivedSupplierQuoteLine, item: QuoteComparisonItemRecord) {
   const sourceSpec=(line.specification||"").split(" · Source pricing:")[0].split(" · Printed Sale/Un:")[0]
   // A bulk LF rate without a balanced printed cut schedule is not a piece price.
   if (/^(?:lin\.?\s*ft\.?|lf|lft|linear feet)$/i.test(line.unit.trim()) && !/^(?:lin\.?\s*ft\.?|lf|lft|linear feet)$/i.test(item.unit.trim())) return 0
   const a=text(`${line.description} ${sourceSpec}`), b=text(`${item.description} ${item.specification||""}`)
-  if(section(a)&&section(b)&&section(a)!==section(b))return 0
   const fa=family(a),fb=family(b);if(!fa||fa!==fb)return 0
   if(fa==="lumber") {
     const dimension=(v:string)=>v.match(/\b2\s*x\s*(\d+)\b/)?.[1]
@@ -47,7 +53,7 @@ function candidateScore(line: ReceivedSupplierQuoteLine, item: QuoteComparisonIt
   if(fa!=="plywood"&&al.length&&bl.length&&!al.some(n=>bl.includes(n)))return 0
   const numbers=(v:string)=>new Set(v.match(/\b\d+(?:\.\d+)?\b/g)||[])
   const an=numbers(a),bn=numbers(b),shared=[...an].filter(n=>bn.has(n)).length
-  if(!shared&&!["adhesive","blade","nails","hanger"].includes(fa))return 0
+  if(!shared&&line.calculatedRate===undefined&&!["adhesive","blade","nails","hanger"].includes(fa))return 0
   const sa=fa==='plywood'?sheetDimensions(a):null,sb=fa==='plywood'?sheetDimensions(b):null
   return 1+shared + (sa&&sb&&sa.join('x')===sb.join('x')?4:0)+(fa!=="plywood"&&al.some(n=>bl.includes(n))?4:0)+(Number(line.quantity)===Number(item.quantity)?4:0)+(section(a)&&section(a)===section(b)?4:0)
 }
@@ -58,7 +64,11 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
   const rows = items.map(item=>({item,cells:quotes.map((quote,index)=>{
     // Rank all candidates by the same evidence rules; a routing hint must not
     // override a stronger dimensional, quantity or section match.
-    const ranked=candidates[index].map(line=>({line,score:candidateScore(line,item)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score)
+    const available=candidates[index].filter(line=>!line.comparison_item_id||!items.some(target=>target.id===line.comparison_item_id)||line.comparison_item_id===item.id).map(line=>requestedLinearPrice(line,item)).map(line=>({line,score:candidateScore(line,item)})).filter(x=>x.score>0)
+    const assigned=available.filter(x=>x.line.comparison_item_id===item.id)
+    const sectionConflict=(line:ReceivedSupplierQuoteLine)=>{const a=section(`${line.description} ${line.specification||''}`),b=section(`${item.description} ${item.specification||''}`);return Boolean(a&&b&&a!==b)}
+    const sameSection=available.filter(x=>!sectionConflict(x.line))
+    const ranked=(assigned.length?assigned:sameSection.length?sameSection:available).sort((a,b)=>b.score-a.score)
     // Ties are visible, not broken by PDF order or silently approved.
     const lines=ranked.filter(x=>x.score===ranked[0]?.score).map(x=>x.line)
     return {quote,lines,suggested:lines.length===1}
@@ -66,16 +76,19 @@ export function receivedProductPriceRows(items: QuoteComparisonItemRecord[], quo
   // A candidate can remain visible in multiple places, but must never masquerade
   // as coverage of two separate requested rows. Resolve the source allocation first.
   const uses = new Map<string, number>()
+  const feetUsed=new Map<string,number>()
   for (const row of rows) for (const cell of row.cells) for (const line of cell.lines) {
     const key = `${cell.quote.id}:${line.allocationKey || line.line_number}`
     uses.set(key, (uses.get(key) || 0) + 1)
+    if(line.calculatedRate!==undefined){const rateKey=`${cell.quote.id}:${line.line_number}`;feetUsed.set(rateKey,(feetUsed.get(rateKey)||0)+(line.requestedFeet||0))}
   }
   return rows.map(row => ({ ...row, cells: row.cells.map(cell => {
     const sharedSource = cell.lines.some(line => (uses.get(`${cell.quote.id}:${line.allocationKey || line.line_number}`) || 0) > 1)
     const reasons = cell.lines.length === 1 ? sourceComparisonReasons(row.item, cell.lines[0]) : []
     if (sharedSource) reasons.unshift("This source line also appears against another requested row; assign it once.")
     if (cell.lines.length > 1) reasons.unshift("More than one supplier line could fit; choose the correct source line.")
-    return { ...cell, suggested: cell.suggested && !sharedSource, reasons, sharedSource }
+    for(const line of cell.lines)if(line.calculatedRate!==undefined){reasons.push('Calculated from linear-foot rate; confirm requested cut lengths, availability and any cutting charges before approval.');if((feetUsed.get(`${cell.quote.id}:${line.line_number}`)||0)>(line.originalFeet||0))reasons.push('Requested linear footage across candidate rows exceeds quoted footage; confirm additional supply before approval.')}
+    return { ...cell, suggested: cell.suggested && !sharedSource && !reasons.some(r=>r.startsWith('Section differs:')), reasons, sharedSource }
   }) }))
 }
 
@@ -83,6 +96,7 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
   const reasons: string[] = []
   const requested = text(`${item.description} ${item.specification || ""}`)
   const quoted = text(`${line.description} ${line.specification || ""}`)
+  if(section(requested)&&section(quoted)&&section(requested)!==section(quoted))reasons.push(`Section differs: requested ${section(requested)}; quoted ${section(quoted)}. Confirm allocation; not an approved match.`)
   if (Number(item.quantity) !== Number(line.quantity)) reasons.push(`Quantity: requested ${item.quantity} ${item.unit}; quoted ${line.quantity} ${line.unit}.`)
   const unit = (v:string) => v.toLowerCase().replace(/^(?:pc|pcs|piece|pieces|ea)$/, "each")
   if (unit(item.unit || "") !== unit(line.unit || "") || /box|pack|carton|bundle/i.test(`${item.unit} ${line.unit}`)) reasons.push("Confirm selling unit and package contents before calculating the requested quantity.")
@@ -94,7 +108,7 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
   return reasons
 }
 
-export type ComparisonIndicator = {kind:"quantity"|"measurement"|"alternative"|"unverified";label:string;notes:string[]}
+export type ComparisonIndicator = {kind:"quantity"|"measurement"|"alternative"|"packaging"|"unverified";label:string;notes:string[]}
 const sellingUnit=(value:string)=>value.trim().toLowerCase().replace(/^(?:pc|pcs|piece|pieces|ea)$/, "each")
 function inches(value:string) {
   const fractions=value.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
@@ -103,9 +117,11 @@ function inches(value:string) {
 /** UI classification does not change source prices, approvals or matching eligibility. */
 export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:ReceivedSupplierQuoteLine[],reasons:string[]):ComparisonIndicator[] {
   const indicators:ComparisonIndicator[]=[]
-  const comparable=lines.length===1&&sellingUnit(item.unit)===sellingUnit(lines[0].unit)
+  const packageQuestion=reasons.some(r=>r.startsWith('Confirm selling unit'))
+  const comparable=lines.length===1&&sellingUnit(item.unit)===sellingUnit(lines[0].unit)&&!packageQuestion
   const quantity=reasons.filter(r=>r.startsWith('Quantity:'))
   if(comparable&&quantity.length)indicators.push({kind:'quantity',label:'Qty · כמות',notes:quantity})
+  if(packageQuestion)indicators.push({kind:'packaging',label:'Units · אריזה',notes:[...quantity,...reasons.filter(r=>r.startsWith('Confirm selling unit'))]})
   const measurements:string[]=[]
   if(lines.length===1){
     const a=lengths(text(`${item.description} ${item.specification||''}`)),b=lengths(text(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`))
@@ -127,7 +143,7 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
   if(measurements.length)indicators.push({kind:'measurement',label:'Size · מידה',notes:measurements})
   const alternatives=reasons.filter(r=>/substitution|Different joist|Mount differs|Adhesive product differs/.test(r))
   if(alternatives.length)indicators.push({kind:'alternative',label:'Alternative · חלופה',notes:alternatives})
-  const unresolved=reasons.filter(r=>!alternatives.includes(r)&&!(comparable&&quantity.includes(r)))
+  const unresolved=reasons.filter(r=>!alternatives.includes(r)&&!r.startsWith('Confirm selling unit')&&!((comparable||packageQuestion)&&quantity.includes(r)))
   indicators.push({kind:'unverified',label:'Unverified · לא אומת',notes:['Not fully manually verified. Check specifications, selling units and compatibility before approval.',...unresolved]})
   return indicators
 }

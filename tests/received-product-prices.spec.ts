@@ -7,6 +7,17 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ReceivedProductPriceMatrix } from "../components/buildflow/received-product-price-matrix"
 const item=(id:string,description:string,specification:string,quantity=10)=>({id,description,specification,quantity,unit:"pieces"} as QuoteComparisonItemRecord)
 const line=(line_number:number,description:string,specification:string,quantity=10)=>({line_number,description,specification,quantity,unit:"pieces",unit_price:12,line_total:120})
+test('bulk linear-foot rates calculate requested costs without claiming quoted cuts or changing originals',()=>{
+ const original={...line(1,'LVL beam','9.5 in',380),unit:'lf',unit_price:5.2,line_total:1976},snapshot=JSON.stringify(original)
+ const cell=receivedProductPriceRows([item('a','LVL beam','9.5 in · 20 ft',6)],[{id:'q',fileName:'q',sourceItems:[original]}])[0].cells[0]
+ expect(cell.lines[0].unit_price).toBe(104);expect(cell.lines[0].line_total).toBe(624);expect(cell.lines[0].requestedFeet).toBe(120)
+ expect(cell.reasons.join(' ')).toContain('confirm requested cut lengths');expect(JSON.stringify(original)).toBe(snapshot)
+})
+test('saved supplier row assignment survives refresh and cannot cover another requested item',()=>{
+ const original={...line(1,'HU310 hanger','',170),comparison_item_id:'a'}
+ const rows=receivedProductPriceRows([item('a','Face mount hanger','',170),item('b','Top mount hanger','',170)],[{id:'q',fileName:'q',sourceItems:[original]}])
+ expect(rows[0].cells[0].lines).toHaveLength(1);expect(rows[1].cells[0].lines).toHaveLength(0)
+})
 test('sheet dimensions accept equivalent notation and keep size, thickness and material conflicts visible',()=>{
  const target=item('sheet','CDX plywood','4 x 8 ft · 3/4 in',77)
  for(const dimensions of ['4\' x 8\'','4 ft × 8 ft','8 x 4 ft','4×8']){
@@ -42,7 +53,9 @@ test('quantity, measurements and substitutions remain separate and simultaneous'
  const packageTarget={...target,unit:'box',quantity:2},packageQuote={...quoted,quantity:24,unit:'each'}
  const packageIndicators=comparisonIndicators(packageTarget,[packageQuote],sourceComparisonReasons(packageTarget,packageQuote))
  expect(packageIndicators.some(i=>i.kind==='quantity')).toBe(false)
- expect(packageIndicators.find(i=>i.kind==='unverified')?.notes.join(' ')).toContain('selling unit')
+ expect(packageIndicators.find(i=>i.kind==='packaging')?.notes.join(' ')).toContain('selling unit')
+ const boxes={...quoted,unit:'box',quantity:3}
+ expect(comparisonIndicators(packageTarget,[boxes],sourceComparisonReasons(packageTarget,boxes)).some(i=>i.kind==='quantity')).toBe(false)
 })
 test('colored comparison guide uses separate dots with expandable notes and review links',async({page})=>{
  const target=item('a','LVL beam','10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
@@ -52,7 +65,7 @@ test('colored comparison guide uses separate dots with expandable notes and revi
   return value as React.ReactNode
  }
  await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[target],quotes:[{id:'q',fileName:'Supplier',sourceItems:[quoted]}],bids:[]}))))
- await expect(page.getByTestId('comparison-status-guide').locator('details')).toHaveCount(5)
+ await expect(page.getByTestId('comparison-status-guide').locator('details')).toHaveCount(6)
  const quantity=page.locator('[data-kind="quantity"]')
  await expect(quantity.locator('summary span.bg-rose-600')).toHaveCount(2)
  await expect(page.locator('[data-kind="measurement"] summary span.bg-red-600')).toHaveCount(1)
@@ -62,6 +75,12 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  await expect(quantity.locator('div')).toBeVisible()
  await expect(quantity.getByRole('link')).toHaveAttribute('href','/admin/supplier-quotes/q')
  await expect(page.getByTestId('verified-price-indicator')).toHaveCount(0)
+ const boxes={...item('b','Construction adhesive','28 oz',2),unit:'box'},tubes={...line(1,'Construction adhesive','28 oz',24),unit:'each'}
+ await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[boxes],quotes:[{id:'q',fileName:'Supplier',sourceItems:[tubes]}],bids:[]}))))
+ await expect(page.locator('[data-kind="packaging"] summary span.bg-blue-600')).toHaveCount(1)
+ await expect(page.locator('[data-kind="quantity"]')).toHaveCount(0)
+ await page.locator('[data-kind="packaging"] summary').click()
+ await expect(page.locator('[data-kind="packaging"] div')).toContainText('requested 2 box; quoted 24 each')
 })
 test('private current six quotes recover known sheet, hanger and abbreviation lines',async()=>{
  let raw:string
@@ -76,6 +95,14 @@ test('private current six quotes recover known sheet, hanger and abbreviation li
  expect(rows[2].cells[0].lines.map(l=>l.line_number)).toEqual([12,34])
  expect(rows[3].cells[0].lines.map(l=>l.line_number)).toEqual([11])
  expect(rows[4].cells[0].lines.map(l=>l.line_number)).toEqual([32])
+ const certified=quotes.find(q=>q.supplier_name.startsWith('CERTIFIED'))!
+ const ceiling=item('ceiling','2x12 lumber','28 ft · Section: Ceiling joists',12)
+ const candidate=receivedProductPriceRows([ceiling],[{id:certified.id,fileName:'certified',sourceItems:certified.lines}])[0].cells[0]
+ expect(candidate.lines.map(l=>l.line_number)).toEqual([39]);expect(candidate.suggested).toBe(false)
+ expect(candidate.reasons.join(' ')).toContain('Section differs:');expect(candidate.reasons.join(' ')).toContain('quoted 28')
+ const units=item('glue','Construction adhesive','PL Premium · 28 oz',2);units.unit='box'
+ const adhesive=rows[3].cells[0].lines[0]
+ expect(comparisonIndicators(units,[adhesive],sourceComparisonReasons(units,adhesive)).map(i=>i.kind)).toEqual(['packaging','alternative','unverified'])
 })
 test('ordinal floor notation and encoded lumber lengths prevent wrong lower-row matches',()=>{
  const rows=receivedProductPriceRows([item('a','2x12 lumber','24 ft · Section: First floor',40)],[{id:'q',fileName:'q',sourceItems:[line(1,'2X12X16 DF WOOD','Section: 1ST FLOOR',40),line(2,'2x12-24 Lumber','Section: 2ND FLOOR',40),line(3,'2X12X24 DF WOOD','Section: 1ST FLOOR',40)]}])
@@ -95,7 +122,8 @@ test('unbalanced, duplicate, missing and inconsistent LF schedules cannot invent
  for(const specification of ['sizes listed: 35/20 30/26','sizes listed: 35/20 35/20','LVL beam']){
  const bulk={...line(1,'LVL Beam',specification,2092),unit:'lin. ft.',unit_price:3.44,line_total:7196.48}
  expect(expandPrintedCuts(bulk)).toEqual([bulk])
- expect(receivedProductPriceRows([item('a','LVL Beam','20 ft',35)],[{id:'q',fileName:'q',sourceItems:[bulk]}])[0].cells[0].lines).toHaveLength(0)
+ const cell=receivedProductPriceRows([item('a','LVL Beam','20 ft',35)],[{id:'q',fileName:'q',sourceItems:[bulk]}])[0].cells[0]
+ expect(cell.lines[0].calculatedRate).toBe(3.44);expect(cell.reasons.join(' ')).toContain('confirm requested cut lengths')
  }
  const bad={...line(1,'NI-60 I-JOIST','sizes listed: 35/20',700),unit:'lin. ft.',unit_price:3.44,line_total:1}
  expect(expandPrintedCuts(bad)).toEqual([bad])
@@ -139,7 +167,9 @@ test("all received quotes are columns before approved bids exist",()=>{
 })
 test("floor, length and lumber dimension conflicts do not become suggested matches",()=>{
  const q={id:"q",fileName:"one",sourceItems:[line(1,"2x4 lumber","Length: 16 ft · Section: First floor")]}
- for(const target of [item("a","2x6 lumber","Length: 16 ft · Section: First floor"),item("b","2x4 lumber","Length: 24 ft · Section: First floor"),item("c","2x4 lumber","Length: 16 ft · Section: Second floor")])expect(receivedProductPriceRows([target],[q])[0].cells[0].lines).toHaveLength(0)
+ for(const target of [item("a","2x6 lumber","Length: 16 ft · Section: First floor"),item("b","2x4 lumber","Length: 24 ft · Section: First floor")])expect(receivedProductPriceRows([target],[q])[0].cells[0].lines).toHaveLength(0)
+ const cell=receivedProductPriceRows([item("c","2x4 lumber","Length: 16 ft · Section: Second floor")],[q])[0].cells[0]
+ expect(cell.lines).toHaveLength(1);expect(cell.suggested).toBe(false);expect(cell.reasons.join(' ')).toContain('Section differs:')
 })
 test("ambiguous source rows remain visible and unapproved",()=>{
  const q={id:"q",fileName:"one",sourceItems:[line(1,"2x6 lumber","16 ft"),line(2,"2x6 lumber","16 ft")]}

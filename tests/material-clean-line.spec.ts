@@ -1,5 +1,11 @@
 import { test, expect } from "@playwright/test"
 import { materialCleanLine } from "../lib/material-clean-line"
+test('field input order never changes the canonical exported order',()=>{
+ const fields=[{id:'section',label:'Section',value:'First floor'},{id:'length',label:'Length',value:'10 ft'},{id:'type',label:'Type',value:'Regular SPF'},{id:'depth',label:'Depth',value:'6 in'},{id:'width',label:'Width',value:'2 in'}]
+ const input={name:'Dimensional lumber',quantity:250,unit:'pieces',fields,details:''}
+ expect(materialCleanLine(input)).toBe('250 pieces · Dimensional lumber · 2 in · 6 in · 10 ft · Regular SPF · First floor')
+ expect(materialCleanLine({...input,fields:[...fields].reverse()})).toBe(materialCleanLine(input))
+})
 
 test("material copy excludes delivery data while preserving product specifications and floor", () => {
   const fields = [
@@ -12,7 +18,7 @@ test("material copy excludes delivery data while preserving product specificatio
   ]
   const original = JSON.stringify(fields)
   const line = materialCleanLine({ name: "TJI 230 I-joist", quantity: 12, unit: "pieces", fields, details: "28 Woodmere S, Woodmere, NY · Top mount required" })
-  expect(line).toBe("12 pieces · TJI 230 I-joist · 10 in · 26 ft · Second floor · Top mount required")
+  expect(line).toBe("12 pieces · TJI 230 I-joist · 10 in · 26 ft · Top mount required · Second floor")
   expect(JSON.stringify(fields)).toBe(original)
 })
 

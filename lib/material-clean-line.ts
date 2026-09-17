@@ -16,10 +16,13 @@ export function materialCleanLine(input: { name: string; quantity: string | numb
   if(dimensionsCovered&&!embedded![1])name=name.replace(pair!,match=>`${match} ${width![2]}`)
   const canonical=(text:string)=>text.toLowerCase().replace(/(\d)\s*(ft|inches|inch|in)\b/g,'$1 $2').replace(/\b(?:series)\b/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')
   const nameKey=` ${canonical(name)} `
-  const fields=input.fields.filter(f=>!f.id.startsWith('clarify-')&&!omitted.includes(f)&&!(dimensionsCovered&&['width','depth'].includes(f.id))&&!(['model','length'].includes(f.id)&&canonical(f.value)&&nameKey.includes(` ${canonical(f.value)} `)))
+  const order=['model','thickness','width','depth','length','dimensions','size','type','material','grade','section']
+  const fields=input.fields.filter(f=>!f.id.startsWith('clarify-')&&!omitted.includes(f)&&!(dimensionsCovered&&['width','depth'].includes(f.id))&&!(['model','length'].includes(f.id)&&canonical(f.value)&&nameKey.includes(` ${canonical(f.value)} `))).sort((a,b)=>(order.includes(a.id)?order.indexOf(a.id):8)-(order.includes(b.id)?order.indexOf(b.id):8))
+  const location=(v:string)=>/^(?:first floor|second floor|third floor|ceiling joists?)$/i.test(v.trim())
+  const values=[...fields.map(f=>f.value),...details]
   return [...new Set([
     `${input.quantity} ${input.unit}`.trim(), name,
-    ...fields.map(f => f.value),
-    ...details,
+    ...values.filter(v=>!location(v)),
+    ...values.filter(location),
   ].filter(Boolean))].join(" · ")
 }

@@ -37,13 +37,13 @@ test('fresh comparison matrix shows all supplier columns, clean requested text a
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:900});await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><main style="padding:12px">${html}</main>`)
     await expect(page.getByTestId('product-price-matrix').locator('tbody tr')).toHaveCount(1)
-    await expect(page.getByTestId('product-price-matrix').locator('thead th')).toHaveCount(5)
+    await expect(page.getByTestId('product-price-matrix').locator('thead th')).toHaveCount(6)
     await expect(page.getByTestId('requested-material-line')).toHaveText(view.materialLines.active)
     await expect(page.getByTestId('requested-material-line')).not.toContainText('Woodmere')
     await expect(page.getByTestId('unverified-price-indicator')).toHaveCount(4)
     await expect(page.getByRole('list',{name:'Comparison checks'})).toHaveCount(0)
     await page.getByLabel('Not verified',{exact:true}).first().click()
-    await expect(page.getByTestId('unverified-price-indicator').first().locator('p')).toBeVisible()
+    await expect(page.getByTestId('unverified-price-indicator').first().locator('p').first()).toBeVisible()
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2)).toBe(false)
   }
 })

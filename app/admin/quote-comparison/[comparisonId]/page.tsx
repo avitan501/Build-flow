@@ -77,7 +77,7 @@ export default async function QuoteComparisonDetailPage({
   const choiceState = restoreProductChoices(comparisonResult.data, choiceFingerprint);
   const finalized = await loadFinalizedProcurementRoute(supabase, comparisonId, comparisonResult.data.active_route_id);
   const receivedQuotes = await supabase.from("supplier_quotes")
-    .select("id,supplier_name,file_name,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total)")
+    .select("id,supplier_name,file_name,supplier_quote_items(line_number,description,specification,quantity,unit,unit_price,line_total,comparison_item_id)")
     .eq("comparison_id", comparisonId).order("created_at")
     .returns<Array<{ id: string; supplier_name: string; file_name: string; supplier_quote_items: ReceivedSupplierQuoteLine[] }>>();
   if (receivedQuotes.error) throw new Error("Could not load received supplier quotes.");
