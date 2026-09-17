@@ -25,8 +25,10 @@ function lengths(value:string) {
   return [...new Set([...explicit,...encoded])]
 }
 function sheetDimensions(value:string) {
-  const match=text(value).match(/\b(\d+(?:\.\d+)?)\s*(?:ft)?\s*x\s*(\d+(?:\.\d+)?)\s*(?:ft)?\b/)
-  return match?match.slice(1,3).map(Number).sort((a,b)=>a-b):null
+  const v=text(value),match=v.match(/\b(\d+(?:\.\d+)?)\s*(ft|in)?\s*x\s*(\d+(?:\.\d+)?)\s*(ft|in)?\b/)
+  if(match){const unit=match[4]||match[2]||'ft';return [Number(match[1])/(match[2]==='in'||!match[2]&&unit==='in'?12:1),Number(match[3])/(unit==='in'?12:1)].sort((a,b)=>a-b)}
+  const explicit=[...v.matchAll(/\b(\d+(?:\.\d+)?)\s*ft\b/g)].map(m=>Number(m[1]))
+  return explicit.length===2?explicit.sort((a,b)=>a-b):null
 }
 function family(value: string) {
   const v=text(value)
@@ -128,7 +130,8 @@ const sellingUnit=(value:string)=>value.trim().toLowerCase().replace(/^(?:pc|pcs
 function inches(value:string, sheet=false) {
   // In plywood notation "4 x 8 3/4\"", 8 is the sheet length,
   // not the whole-number portion of an 8-3/4-inch thickness.
-  const dimensionless=sheet?value.replace(/\b\d+(?:\.\d+)?\s*(?:['′]|ft|feet)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:['′]|ft|feet)?(?=\s|$)/gi,' '):value
+  const normalized=normalizeMeasurementText(value)
+  const dimensionless=sheet?normalized.replace(/\b\d+(?:\.\d+)?\s*(?:ft)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:ft)?(?=\s|$)/gi,' '):normalized
   const fractions=dimensionless.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
   return [...text(fractions).matchAll(/\b(\d+(?:\.\d+)?)\s*in\b/g)].map(m=>Number(m[1]))
 }
@@ -147,11 +150,13 @@ export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:Receiv
     if(family(`${item.description} ${item.specification||''}`)!=='plywood'&&a.length&&b.length&&!a.some(n=>b.includes(n)))measurements.push(`Length differs: requested ${a.join('/')} ft; quoted ${b.join('/')} ft.`)
     const category=family(`${item.description} ${item.specification||''}`)
     const requested=inches(`${item.description} ${item.specification||''}`,category==='plywood'),quoted=inches(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`,category==='plywood')
-    if(['joist','lvl','plywood'].includes(category||'')&&requested.length&&quoted.length){
+    if(requested.length&&quoted.length){
       const requestContext=`${item.description} ${item.specification||''}`,quoteContext=`${lines[0].description} ${lines[0].specification||''}`
-      const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(comparisonDepthInches(category,n,requestContext)-comparisonDepthInches(category,q,quoteContext))<0.001))
+      const exactPanel=category==='plywood'&&/\b(?:actual|exact|minimum)\b/i.test(`${requestContext} ${quoteContext}`)
+      const dimension=(n:number,context:string)=>exactPanel?n:comparisonDepthInches(category,n,context)
+      const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(dimension(n,requestContext)-dimension(q,quoteContext))<0.001))
       if(unmatched.length){
-        const matched=requested.some(n=>quoted.some(q=>Math.abs(comparisonDepthInches(category,n,requestContext)-comparisonDepthInches(category,q,quoteContext))<0.001))
+        const matched=requested.some(n=>quoted.some(q=>Math.abs(dimension(n,requestContext)-dimension(q,quoteContext))<0.001))
         if(matched&&new Set(quoted).size<new Set(requested).size)missingMeasurements.push(`Measurement missing: requested ${unmatched.join('/')} in is not specified in the supplier line. Confirm the omitted dimensions; matching notation is not a complete product verification.`)
         else measurements.push(`Measurement differs: requested ${unmatched.join('/')} in; quoted ${[...new Set(quoted)].join('/')} in. Verify the source dimensions.`)
       }

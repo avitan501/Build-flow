@@ -8,10 +8,12 @@ export function comparisonSavings(summary:Summary, baselineId:string, selections
   const rows=summary.cells.map((cells,index)=>{
     const comparable=cells.filter(cell=>cell.indicative&&!cell.problem&&cell.requestedTotal!==null)
     const cheapest=comparable.length?comparable.reduce((a,b)=>a.requestedTotal!<=b.requestedTotal!?a:b):null
+    const priced=cells.filter(cell=>cell.requestedTotal!==null&&!cell.missing)
+    const lowestQuoted=priced.length?priced.reduce((a,b)=>a.requestedTotal!<=b.requestedTotal!?a:b):null
     const baseline=cells.find(cell=>cell.quoteId===baselineId)??null
     const selected=selections===undefined?cheapest:cells.find(c=>c.quoteId===selections[summary.rows[index].item.id])??null
     const savings=baseline&&selected&&comparable.includes(baseline)&&comparable.includes(selected)?cents(baseline.requestedTotal!-selected.requestedTotal!):null
-    return {baseline,cheapest,selected,savings,missing:cells.every(cell=>cell.missing),review:cells.some(cell=>!cell.missing)&&!cheapest}
+    return {baseline,cheapest,lowestQuoted,selected,savings,missing:cells.every(cell=>cell.missing),review:cells.some(cell=>!cell.missing)&&!cheapest}
   })
   const sum=(values:(number|null|undefined)[])=>values.some(value=>value!=null)?cents(values.reduce<number>((n,value)=>n+(value??0),0)):null
   return {rows,selectedCount:rows.filter(row=>row.selected!==null).length,selectedComplete:rows.length>0&&rows.every(row=>row.selected?.indicative&&!row.selected.problem),selectedTotal:sum(rows.map(row=>row.selected?.indicative?row.selected.requestedTotal:null)),baselineComplete:rows.length>0&&rows.every(row=>row.baseline?.indicative&&!row.baseline.problem),cheapestComplete:rows.length>0&&rows.every(row=>row.cheapest!==null),baselineTotal:sum(rows.map(row=>row.baseline?.indicative?row.baseline.requestedTotal:null)),cheapestTotal:sum(rows.map(row=>row.cheapest?.requestedTotal)),savingsTotal:sum(rows.map(row=>row.savings)),comparedCount:rows.filter(row=>row.savings!==null).length,missingCount:rows.filter(row=>row.missing).length,reviewCount:rows.filter(row=>row.review).length}
