@@ -1,0 +1,13 @@
+# Original-document match review window
+
+Objective: Review match opens a window beside the comparison without losing the request, showing the original uploaded quote PDF and extracted candidate wording, with identified comparison differences highlighted.
+
+Owned worktree /tmp/avantia-material-review-20260916. Parent cost-summary release9a640c41 is publishing through official workflow35252486331; this follow-up must wait for its completion and exact canonical verification before another publication.
+
+Files: components/buildflow/quote-match-review.tsx, received-product-price-matrix.tsx; lib/quote-wording-differences.ts; authenticated GET app/api/admin/supplier-quotes/[quoteId]/document/route.ts; associated tests. Endpoint uses existing suppliers staff authorization and RLS, reads exact quote record and existing storage bucket, issues a five-minute signed redirect with private/no-store caching. No secrets are logged. Document embeds only while the window is open, never preloads all table cells. Escape/Close close the native modal, with focus restoration.
+
+Source line numbers are extraction identifiers, not inferred PDF page numbers. No fabricated bounding boxes or PDF page highlighting. Original uploaded file remains untouched, filename is shown, explicit original-document fallback is available, assignment/approval retains existing supplier workspace. No approval saved merely by opening a document.
+
+Numeric comparison values are marked only from actual quantity/length/measurement/sheet checks, excluding numbers shared with the request. Fractions and decimal equivalents supported; nominal aliases without a real error do not highlight. Alternative checks retain orange; generic manual verification remains neutral. This is not a generic text diff, so stylistic supplier abbreviations are not automatically treated as errors.
+
+Local34PASS/2existing private-fixtureSKIP (source rules, cost summary, highlight test and canonical-list rendering); full153 static-page webpack build passes, TypeScript and lint pass. Test JSX restoration updated for nested client components, no application workaround. First cost-summary release9a640c41 completed15stepsSUCCESS, Verceldpl_8a6hJaeT6DuhFyWivgsjxiWRifwaREADY, canonicalexact+nprverified. GET-only live test confirms sixcards/requested totals/precision/sidebar but found explicit U.S.alternative note stored as "stocked" not "stock". Follow-up lib/received-product-prices.ts accepts only this exact stock/stocked wording variation; real six-supplier fixture now asserts source line38 as orange/unapproved. Final deployed-window interaction, exact quote identity/document authorization and desktop/phone verification pending. No production business writes/messages/AI or schema/credential changes.

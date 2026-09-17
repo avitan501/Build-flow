@@ -95,7 +95,7 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  const target=item('a','LVL beam','Actual depth: 10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
  const restore=(value:unknown):React.ReactNode=>{
   if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
-  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;return React.createElement(typeof node.type==='object'?React.Fragment:node.type,{...props,key:node.key},restore(children))}
+  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==='object'?React.Fragment:renderedType,{...props,key:node.key},restore(children))}
   return value as React.ReactNode
  }
  await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[target],quotes:[{id:'q',fileName:'Supplier',sourceItems:[quoted]}],bids:[]}))))
@@ -106,17 +106,17 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  await expect(page.getByTestId('comparison-status-guide').locator('summary').first()).not.toHaveClass(/\bborder\b/)
  await expect(page.locator('[data-kind="measurement"] summary span.bg-red-600')).toHaveCount(1)
  await expect(page.locator('[data-kind="unverified"] summary span.bg-yellow-400')).toHaveCount(1)
- await expect(quantity.locator('div')).not.toBeVisible()
+ await expect(quantity.locator(':scope > div')).not.toBeVisible()
  await quantity.locator('summary').click()
- await expect(quantity.locator('div')).toBeVisible()
- await expect(quantity.getByRole('link')).toHaveAttribute('href','/admin/supplier-quotes/q')
+ await expect(quantity.locator(':scope > div')).toBeVisible()
+ await expect(quantity.getByRole('button', { name: 'Review match', exact: true })).toBeVisible()
  await expect(page.getByTestId('verified-price-indicator')).toHaveCount(0)
  const boxes={...item('b','Construction adhesive','28 oz',2),unit:'box'},tubes={...line(1,'Construction adhesive','28 oz',24),unit:'each'}
  await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[boxes],quotes:[{id:'q',fileName:'Supplier',sourceItems:[tubes]}],bids:[]}))))
  await expect(page.locator('[data-kind="packaging"] summary span.bg-blue-600')).toHaveCount(1)
  await expect(page.locator('[data-kind="quantity"]')).toHaveCount(0)
  await page.locator('[data-kind="packaging"] summary').click()
- await expect(page.locator('[data-kind="packaging"] div')).toContainText('requested 2 box; quoted 24 each')
+ await expect(page.locator('[data-kind="packaging"] > div')).toContainText('requested 2 box; quoted 24 each')
 })
 test('private current six quotes recover known sheet, hanger and abbreviation lines',async()=>{
  let raw:string
@@ -133,6 +133,9 @@ test('private current six quotes recover known sheet, hanger and abbreviation li
  expect(rows[4].cells[0].lines.map(l=>l.line_number)).toEqual([32])
  const certified=quotes.find(q=>q.supplier_name.startsWith('CERTIFIED'))!
  const ceiling=item('ceiling','2x12 lumber','28 ft · Section: Ceiling joists',12)
+ const usCeiling=receivedProductPriceRows([ceiling],[{id:us.id,fileName:'us',sourceItems:us.lines}])[0].cells[0]
+ expect(usCeiling.lines.map(l=>l.line_number)).toEqual([38]);expect(usCeiling.suggested).toBe(false)
+ expect(comparisonIndicators(ceiling,usCeiling.lines,usCeiling.reasons).map(i=>i.kind)).toContain('alternative')
  const candidate=receivedProductPriceRows([ceiling],[{id:certified.id,fileName:'certified',sourceItems:certified.lines}])[0].cells[0]
  expect(candidate.lines.map(l=>l.line_number)).toEqual([39]);expect(candidate.suggested).toBe(false)
  expect(candidate.reasons.join(' ')).toContain('Section differs:');expect(candidate.reasons.join(' ')).toContain('quoted 28')
@@ -236,7 +239,7 @@ test("actual matrix renders prices and all supplier columns on desktop and phone
   if(value&&typeof value==="object"&&"__pw_type" in value&&"type" in value){
    const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string}
    const {children,...props}=node.props
-   return React.createElement(typeof node.type==="object"?React.Fragment:node.type,{...props,key:node.key},restore(children))
+   const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==="object"?React.Fragment:renderedType,{...props,key:node.key},restore(children))
   }
   return value as React.ReactNode
  }

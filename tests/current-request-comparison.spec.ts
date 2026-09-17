@@ -29,7 +29,7 @@ test('fresh comparison matrix shows all supplier columns, clean requested text a
   Object.assign(globalThis,{React})
   const restore=(value:unknown):React.ReactNode=>{
     if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
-    if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;return React.createElement(typeof node.type==='object'?React.Fragment:node.type,{...props,key:node.key},restore(children))}
+    if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==='object'?React.Fragment:renderedType,{...props,key:node.key},restore(children))}
     return value as React.ReactNode
   }
   const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:view.items,quotes,bids:[],requestedMaterialLines:view.materialLines})))

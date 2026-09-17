@@ -45,7 +45,7 @@ function declaredLumberReplacement(line:ReceivedSupplierQuoteLine,item:QuoteComp
  if(family(a)!=='lvl'||family(b)!=='lumber')return false
  const dimension=b.match(/\b2\s*x\s*(\d+)\b/)
  if(!dimension)return false
- const note=a.match(/\blongest\s+2\s*x\s*(\d+)\s+(?:we\s+)?stock\s+is\s+(\d+(?:\.\d+)?)\s*ft\b/)
+ const note=a.match(/\blongest\s+2\s*x\s*(\d+)\s+(?:we\s+)?stock(?:ed)?\s+is\s+(\d+(?:\.\d+)?)\s*ft\b/)
  const requested=lengths(b),quoted=lengths(text(line.description))
  return Boolean(note&&note[1]===dimension[1]&&requested.length===1&&quoted.includes(requested[0])&&Number(requested[0])>Number(note[2])&&Number(line.quantity)===Number(item.quantity))
 }
