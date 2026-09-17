@@ -95,7 +95,7 @@ test('colored comparison guide uses separate dots with expandable notes and revi
  const target=item('a','LVL beam','Actual depth: 10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
  const restore=(value:unknown):React.ReactNode=>{
   if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
-  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==='object'?React.Fragment:renderedType,{...props,key:node.key},restore(children))}
+  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement((typeof renderedType==='object'?React.Fragment:renderedType) as React.ElementType,{...props,key:node.key},restore(children))}
   return value as React.ReactNode
  }
  await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[target],quotes:[{id:'q',fileName:'Supplier',sourceItems:[quoted]}],bids:[]}))))
@@ -239,7 +239,7 @@ test("actual matrix renders prices and all supplier columns on desktop and phone
   if(value&&typeof value==="object"&&"__pw_type" in value&&"type" in value){
    const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string}
    const {children,...props}=node.props
-   const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==="object"?React.Fragment:renderedType,{...props,key:node.key},restore(children))
+   const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement((typeof renderedType==="object"?React.Fragment:renderedType) as React.ElementType,{...props,key:node.key},restore(children))
   }
   return value as React.ReactNode
  }

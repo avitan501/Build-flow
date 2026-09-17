@@ -29,7 +29,7 @@ test('fresh comparison matrix shows all supplier columns, clean requested text a
   Object.assign(globalThis,{React})
   const restore=(value:unknown):React.ReactNode=>{
     if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
-    if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement(typeof renderedType==='object'?React.Fragment:renderedType,{...props,key:node.key},restore(children))}
+    if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;const renderedType = typeof node.type === 'function' ? function RestoredComponent(p:Record<string,unknown>){ return restore((node.type as (props:Record<string,unknown>)=>unknown)(p)) } : node.type; return React.createElement((typeof renderedType==='object'?React.Fragment:renderedType) as React.ElementType,{...props,key:node.key},restore(children))}
     return value as React.ReactNode
   }
   const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:view.items,quotes,bids:[],requestedMaterialLines:view.materialLines})))
@@ -41,9 +41,9 @@ test('fresh comparison matrix shows all supplier columns, clean requested text a
     await expect(page.getByTestId('requested-material-line')).toHaveText(view.materialLines.active)
     await expect(page.getByTestId('requested-material-line')).not.toContainText('Woodmere')
     await expect(page.getByTestId('unverified-price-indicator')).toHaveCount(4)
-    await expect(page.getByTestId('supplier-summary-row')).toHaveCount(4)
-    await expect(page.getByTestId('supplier-summary-row').first()).toContainText('1/1 priced rows')
-    await expect(page.getByTestId('supplier-verified-total').first()).toHaveText('— · 0/1')
+    await expect(page.getByTestId('supplier-cost-summary')).toHaveCount(0)
+    await expect(page.getByTestId('comparison-project-totals')).toHaveCount(1)
+    await expect(page.getByLabel('Compare savings against')).toBeVisible()
     await expect(page.getByTestId('requested-line-total').first()).toContainText('$957.00')
     await expect(page.getByRole('list',{name:'Comparison checks'})).toHaveCount(0)
     await page.getByLabel('Not verified',{exact:true}).first().click()
