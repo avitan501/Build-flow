@@ -22,9 +22,13 @@ function lengths(value:string) {
   const encoded=[...value.matchAll(/\b2\s*x\s*\d+\s*(?:x|-)\s*(\d+)\b/g)].map(m=>m[1])
   return [...new Set([...explicit,...encoded])]
 }
+function sheetDimensions(value:string) {
+  const match=text(value).match(/\b(\d+(?:\.\d+)?)\s*(?:ft)?\s*x\s*(\d+(?:\.\d+)?)\s*(?:ft)?\b/)
+  return match?match.slice(1,3).map(Number).sort((a,b)=>a-b):null
+}
 function family(value: string) {
   const v=text(value)
-  for(const [name,pattern] of [["nails",/nails?\b/],["hanger",/hanger|face mount|top mount/],["joist",/tji|ni.?40|pwi|pwt|i.?joist/],["lvl",/\blvl\b|laminated veneer/],["plywood",/plywood|\bcdx\b|\bosb\b|edge gold/],["blade",/blades?\b|sawzall/],["adhesive",/glue|adhesive|provan/],["lumber",/lumber|douglas fir|\bspf\b|\b2\s*x\s*\d+/]] as const) if(pattern.test(v))return name
+  for(const [name,pattern] of [["nails",/nails?\b|\bnl\b|coil.*wire|wire.*coil|jst.*h(?:ng)?r.*(?:33deg|3m)/],["hanger",/hanger|face mount|top mount|\bhgr\b|\b(?:hu|huc|ius|iut)\d/],["joist",/tji|ni.?40|pwi|pwt|i.?joist/],["lvl",/\blvl\b|laminated veneer/],["plywood",/plywood|plyscord|\bcdx\b|\bosb\b|edge gold/],["blade",/blades?\b|\bbld\b|sawzall|recip/],["adhesive",/glue|adhes(?:ive)?\b|provan/],["lumber",/lumber|douglas fir|\bspf\b|\b2\s*x\s*\d+/]] as const) if(pattern.test(v))return name
   return null
 }
 function candidateScore(line: ReceivedSupplierQuoteLine, item: QuoteComparisonItemRecord) {
@@ -39,11 +43,13 @@ function candidateScore(line: ReceivedSupplierQuoteLine, item: QuoteComparisonIt
     if(dimension(a)&&dimension(b)&&dimension(a)!==dimension(b))return 0
   }
   const al=lengths(a),bl=lengths(b)
-  if(al.length&&bl.length&&!al.some(n=>bl.includes(n)))return 0
+  // Sheet width/height are not linear-stock lengths (4' x 8 versus 4 x 8 ft).
+  if(fa!=="plywood"&&al.length&&bl.length&&!al.some(n=>bl.includes(n)))return 0
   const numbers=(v:string)=>new Set(v.match(/\b\d+(?:\.\d+)?\b/g)||[])
   const an=numbers(a),bn=numbers(b),shared=[...an].filter(n=>bn.has(n)).length
-  if(!shared&&fa!=="adhesive"&&fa!=="blade"&&fa!=="nails")return 0
-  return shared + (al.some(n=>bl.includes(n))?4:0)+(Number(line.quantity)===Number(item.quantity)?4:0)+(section(a)&&section(a)===section(b)?4:0)
+  if(!shared&&!["adhesive","blade","nails","hanger"].includes(fa))return 0
+  const sa=fa==='plywood'?sheetDimensions(a):null,sb=fa==='plywood'?sheetDimensions(b):null
+  return 1+shared + (sa&&sb&&sa.join('x')===sb.join('x')?4:0)+(fa!=="plywood"&&al.some(n=>bl.includes(n))?4:0)+(Number(line.quantity)===Number(item.quantity)?4:0)+(section(a)&&section(a)===section(b)?4:0)
 }
 
 /** Display-only candidates, never approved matches, bids, availability or selections. */
@@ -83,7 +89,45 @@ export function sourceComparisonReasons(item: QuoteComparisonItemRecord, line: R
   if (/plywood|\bcdx\b/.test(requested) && /\bosb\b/.test(quoted)) reasons.push("OSB is offered against plywood; material substitution needs a decision.")
   const mount = (v:string) => /top (?:mount|flange)/.test(v) ? "top" : /face mount/.test(v) ? "face" : null
   if (mount(requested) && mount(quoted) && mount(requested) !== mount(quoted)) reasons.push(`Mount differs: requested ${mount(requested)}, quoted ${mount(quoted)}.`)
-  if (/\btji\b/.test(requested) && !/\btji\b/.test(quoted)) reasons.push("Different joist manufacturer/series; keep as an alternative until approved.")
-  if (/pl premium/.test(requested) && !/pl premium/.test(quoted)) reasons.push("Adhesive product differs from requested PL Premium.")
+  if (family(requested)==="joist" && /\btji\b/.test(requested) && !/\btji\b/.test(quoted)) reasons.push("Different joist manufacturer/series; keep as an alternative until approved.")
+  if (family(requested)==="adhesive" && /\bpl\b.*(?:strong )?premium/.test(requested) && !/pl premium/.test(quoted)) reasons.push("Adhesive product differs from requested PL Premium.")
   return reasons
+}
+
+export type ComparisonIndicator = {kind:"quantity"|"measurement"|"alternative"|"unverified";label:string;notes:string[]}
+const sellingUnit=(value:string)=>value.trim().toLowerCase().replace(/^(?:pc|pcs|piece|pieces|ea)$/, "each")
+function inches(value:string) {
+  const fractions=value.toLowerCase().replace(/(\d+)[ -]+(\d+)\/(\d+)/g,(_,whole,n,d)=>String(Number(whole)+Number(n)/Number(d))).replace(/\b(\d+)\/(\d+)\b/g,(_,n,d)=>String(Number(n)/Number(d)))
+  return [...text(fractions).matchAll(/\b(\d+(?:\.\d+)?)\s*in\b/g)].map(m=>Number(m[1]))
+}
+/** UI classification does not change source prices, approvals or matching eligibility. */
+export function comparisonIndicators(item:QuoteComparisonItemRecord,lines:ReceivedSupplierQuoteLine[],reasons:string[]):ComparisonIndicator[] {
+  const indicators:ComparisonIndicator[]=[]
+  const comparable=lines.length===1&&sellingUnit(item.unit)===sellingUnit(lines[0].unit)
+  const quantity=reasons.filter(r=>r.startsWith('Quantity:'))
+  if(comparable&&quantity.length)indicators.push({kind:'quantity',label:'Qty · כמות',notes:quantity})
+  const measurements:string[]=[]
+  if(lines.length===1){
+    const a=lengths(text(`${item.description} ${item.specification||''}`)),b=lengths(text(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`))
+    if(family(`${item.description} ${item.specification||''}`)!=='plywood'&&a.length&&b.length&&!a.some(n=>b.includes(n)))measurements.push(`Length differs: requested ${a.join('/')} ft; quoted ${b.join('/')} ft.`)
+    const category=family(`${item.description} ${item.specification||''}`)
+    const requested=inches(`${item.description} ${item.specification||''}`),quoted=inches(`${lines[0].description} ${(lines[0].specification||'').split(' · Source pricing:')[0]}`)
+    if(['joist','lvl','plywood'].includes(category||'')&&requested.length&&quoted.length){
+      // David's explicit TJI convention: written 10-inch joist means 9.5-inch depth.
+      // Never generalize that convention to LVL, plywood or unknown measurements.
+      const normalize=(n:number)=>category==='joist'&&/\btji\b/i.test(item.description)&&n===10?9.5:n
+      const unmatched=[...new Set(requested)].filter(n=>!quoted.some(q=>Math.abs(normalize(n)-normalize(q))<0.001))
+      if(unmatched.length)measurements.push(`Measurement differs: requested ${unmatched.join('/')} in; quoted ${[...new Set(quoted)].join('/')} in. Verify the source dimensions.`)
+    }
+    if(category==='plywood'){
+      const requestedSheet=sheetDimensions(`${item.description} ${item.specification||''}`),quotedSheet=sheetDimensions(`${lines[0].description} ${lines[0].specification||''}`)
+      if(requestedSheet&&quotedSheet&&requestedSheet.join('x')!==quotedSheet.join('x'))measurements.push(`Sheet dimensions differ: requested ${requestedSheet.join(' × ')}; quoted ${quotedSheet.join(' × ')}. Verify units in the source.`)
+    }
+  }
+  if(measurements.length)indicators.push({kind:'measurement',label:'Size · מידה',notes:measurements})
+  const alternatives=reasons.filter(r=>/substitution|Different joist|Mount differs|Adhesive product differs/.test(r))
+  if(alternatives.length)indicators.push({kind:'alternative',label:'Alternative · חלופה',notes:alternatives})
+  const unresolved=reasons.filter(r=>!alternatives.includes(r)&&!(comparable&&quantity.includes(r)))
+  indicators.push({kind:'unverified',label:'Unverified · לא אומת',notes:['Not fully manually verified. Check specifications, selling units and compatibility before approval.',...unresolved]})
+  return indicators
 }

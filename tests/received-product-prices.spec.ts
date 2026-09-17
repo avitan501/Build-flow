@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { receivedProductPriceRows,sourceComparisonReasons,expandPrintedCuts } from "../lib/received-product-prices"
+import { receivedProductPriceRows,sourceComparisonReasons,expandPrintedCuts,comparisonIndicators } from "../lib/received-product-prices"
 import type { QuoteComparisonItemRecord } from "../lib/quote-comparison"
 import { readFile, readdir } from "node:fs/promises"
 import React from "react"
@@ -7,6 +7,76 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { ReceivedProductPriceMatrix } from "../components/buildflow/received-product-price-matrix"
 const item=(id:string,description:string,specification:string,quantity=10)=>({id,description,specification,quantity,unit:"pieces"} as QuoteComparisonItemRecord)
 const line=(line_number:number,description:string,specification:string,quantity=10)=>({line_number,description,specification,quantity,unit:"pieces",unit_price:12,line_total:120})
+test('sheet dimensions accept equivalent notation and keep size, thickness and material conflicts visible',()=>{
+ const target=item('sheet','CDX plywood','4 x 8 ft · 3/4 in',77)
+ for(const dimensions of ['4\' x 8\'','4 ft × 8 ft','8 x 4 ft','4×8']){
+  const source=line(1,'CDX plywood',`${dimensions} · 3/4"`,77)
+  const cell=receivedProductPriceRows([target],[{id:'q',fileName:'q',sourceItems:[source]}])[0].cells[0]
+  expect(cell.lines).toHaveLength(1)
+  expect(comparisonIndicators(target,cell.lines,cell.reasons).some(i=>i.kind==='measurement')).toBe(false)
+ }
+ for(const spec of ['4 ft x 10 ft · 3/4"','4 x 8 ft · 5/8"']){
+  const source=line(1,'CDX plywood',spec,77)
+  expect(comparisonIndicators(target,[source],sourceComparisonReasons(target,source)).some(i=>i.kind==='measurement')).toBe(true)
+ }
+ const osb=line(1,'OSB','4 x 8 ft · 3/4"',77)
+ expect(comparisonIndicators(target,[osb],sourceComparisonReasons(target,osb)).some(i=>i.kind==='alternative')).toBe(true)
+ const wrong=line(1,'CDX plywood','4 ft x 10 ft · 3/4"',77),correct=line(2,'CDX plywood','4\' x 8\' · 3/4"',77)
+ expect(receivedProductPriceRows([target],[{id:'q',fileName:'q',sourceItems:[wrong,correct]}])[0].cells[0].lines.map(l=>l.line_number)).toEqual([2])
+})
+test('supplier abbreviations and sheet dimensions recover candidates without approving them',()=>{
+ for(const [target,supplier] of [
+  [item('a','Deck plywood','Size: 4 x 8 ft · Thickness: 3/4 in',77),line(1,'4 x 8 3/4" CDX','4\' x 8 3/4" CDX',77)],
+  [item('b','Face-mount joist hanger','For 10 in TJI',170),line(1,'Simpson HU310 heavy duty','HU310',170)],
+  [item('c','Wood saw blade','9 in',25),line(1,'RECIP BLD','9IN',25)],
+  [item('d','Construction adhesive','28 oz',24),line(1,'PL400 ADHES','28oz',24)],
+ ] as const){const cell=receivedProductPriceRows([target],[{id:'q',fileName:'q',sourceItems:[supplier]}])[0].cells[0];expect(cell.lines).toHaveLength(1);expect(comparisonIndicators(target,cell.lines,cell.reasons).some(i=>i.kind==='unverified')).toBe(true)}
+ expect(sourceComparisonReasons(item('a','Face-mount joist hanger','For TJI 230',170),line(1,'HU310 hanger','',170)).join(' ')).not.toContain('Different joist')
+})
+test('quantity, measurements and substitutions remain separate and simultaneous',()=>{
+ const target=item('a','LVL beam','10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
+ const indicators=comparisonIndicators(target,[quoted],sourceComparisonReasons(target,quoted))
+ expect(indicators.map(i=>i.kind)).toEqual(['quantity','measurement','unverified'])
+ const joist=item('j','TJI 230 I-joist','10 in · 20 ft',35),alternative=line(1,'NI-60 I-joist','9-1/2" · 20 ft',30)
+ expect(comparisonIndicators(joist,[alternative],sourceComparisonReasons(joist,alternative)).map(i=>i.kind)).toEqual(['quantity','alternative','unverified'])
+ const packageTarget={...target,unit:'box',quantity:2},packageQuote={...quoted,quantity:24,unit:'each'}
+ const packageIndicators=comparisonIndicators(packageTarget,[packageQuote],sourceComparisonReasons(packageTarget,packageQuote))
+ expect(packageIndicators.some(i=>i.kind==='quantity')).toBe(false)
+ expect(packageIndicators.find(i=>i.kind==='unverified')?.notes.join(' ')).toContain('selling unit')
+})
+test('colored comparison guide uses separate dots with expandable notes and review links',async({page})=>{
+ const target=item('a','LVL beam','10 in · 20 ft',10),quoted=line(1,'LVL beam','9-1/2" · 20 ft',8)
+ const restore=(value:unknown):React.ReactNode=>{
+  if(Array.isArray(value))return value.map((child,index)=>React.createElement(React.Fragment,{key:index},restore(child)))
+  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const node=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const{children,...props}=node.props;return React.createElement(typeof node.type==='object'?React.Fragment:node.type,{...props,key:node.key},restore(children))}
+  return value as React.ReactNode
+ }
+ await page.setContent(renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[target],quotes:[{id:'q',fileName:'Supplier',sourceItems:[quoted]}],bids:[]}))))
+ await expect(page.getByTestId('comparison-status-guide').locator('details')).toHaveCount(5)
+ const quantity=page.locator('[data-kind="quantity"]')
+ await expect(quantity.locator('summary span.bg-rose-600')).toHaveCount(2)
+ await expect(page.locator('[data-kind="measurement"] summary span.bg-red-600')).toHaveCount(1)
+ await expect(page.locator('[data-kind="unverified"] summary span.bg-yellow-400')).toHaveCount(1)
+ await expect(quantity.locator('div')).not.toBeVisible()
+ await quantity.locator('summary').click()
+ await expect(quantity.locator('div')).toBeVisible()
+ await expect(quantity.getByRole('link')).toHaveAttribute('href','/admin/supplier-quotes/q')
+ await expect(page.getByTestId('verified-price-indicator')).toHaveCount(0)
+})
+test('private current six quotes recover known sheet, hanger and abbreviation lines',async()=>{
+ let raw:string
+ try {raw=await readFile('/tmp/avantia-six-supplier-lines-20260917.json','utf8')} catch {test.skip(true,'Private production readonly source unavailable');return}
+ const quotes=JSON.parse(raw) as Array<{id:string;supplier_name:string;lines:Parameters<typeof expandPrintedCuts>[0][]}>
+ expect(quotes).toHaveLength(6)
+ const us=quotes.find(q=>q.supplier_name.startsWith('U.S.'))!,bfs=quotes.find(q=>q.supplier_name==='Builders FirstSource')!
+ const targets=[item('a','Deck plywood','4 x 8 ft · 3/4 in',77),item('b','CDX plywood','4 x 8 ft · 5/8 in',60),item('c','Face-mount hanger','For 10 in TJI',170),item('d','Construction adhesive','28 oz',24),item('e','Coil framing nails','3 in',10)]
+ const rows=receivedProductPriceRows(targets,[{id:us.id,fileName:'us',sourceItems:us.lines},{id:bfs.id,fileName:'bfs',sourceItems:bfs.lines}])
+ expect(rows[0].cells[0].lines.map(l=>l.line_number)).toEqual([6])
+ expect(rows[1].cells[0].lines.map(l=>l.line_number)).toEqual([17])
+ expect(rows[2].cells[0].lines.map(l=>l.line_number)).toEqual([12,34])
+ expect(rows[3].cells[0].lines.map(l=>l.line_number)).toEqual([11])
+ expect(rows[4].cells[0].lines.map(l=>l.line_number)).toEqual([32])
+})
 test('ordinal floor notation and encoded lumber lengths prevent wrong lower-row matches',()=>{
  const rows=receivedProductPriceRows([item('a','2x12 lumber','24 ft · Section: First floor',40)],[{id:'q',fileName:'q',sourceItems:[line(1,'2X12X16 DF WOOD','Section: 1ST FLOOR',40),line(2,'2x12-24 Lumber','Section: 2ND FLOOR',40),line(3,'2X12X24 DF WOOD','Section: 1ST FLOOR',40)]}])
  expect(rows[0].cells[0].lines.map(l=>l.line_number)).toEqual([3])
@@ -78,7 +148,7 @@ test("ambiguous source rows remain visible and unapproved",()=>{
 })
 test("price matrix has no approval writes and ranks only verified offers",async()=>{
  const source=await readFile("components/buildflow/received-product-price-matrix.tsx","utf8")
- expect(source).toContain('data-testid="product-price-matrix"');expect(source).toContain('offer?.eligible');expect(source).toContain('cell.reasons.map');expect(source).not.toContain('Action(')
+ expect(source).toContain('data-testid="product-price-matrix"');expect(source).toContain('offer?.eligible');expect(source).toContain('comparisonIndicators');expect(source).not.toContain('Action(')
 })
 test("actual Framing source data populates product prices",async()=>{
  test.skip(!process.env.PRICE_MATRIX_FIXTURE_FILE,"Private local source fixture only")
