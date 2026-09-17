@@ -9,15 +9,15 @@ import { loadMatrixChoiceSource } from '@/lib/matrix-choice-server';
 import { matrixChoiceFingerprint,matrixChoiceScopeError } from '@/lib/matrix-choice-draft';
 
 export async function saveProductChoicesAction(input: { comparisonId: string; expectedRevision: number; sourceFingerprint: string; snapshot: unknown }): Promise<AutosaveResult> {
-  const { supabase } = await requireStaffProfile("suppliers");
+  const { supabase, user } = await requireStaffProfile("suppliers");
   if (!input || !/^[0-9a-f-]{36}$/i.test(input.comparisonId) || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0
     || input.expectedRevision >= 2147483647 || !/^[a-f0-9]{64}$/.test(input.sourceFingerprint)) return { ok:false,error:"Reload before saving product choices." };
   const draft = parseProductChoiceDraft(input.snapshot);
   if (!draft) return { ok:false,error:"The product choices could not be read." };
   try {
     // Read revision first; child-change triggers invalidate any racing snapshot CAS.
-    const parent = await supabase.from("quote_comparisons").select("status,product_choice_draft_revision").eq("id",input.comparisonId)
-      .maybeSingle<{status:string;product_choice_draft_revision:number}>();
+    const parent = await supabase.from("quote_comparisons").select("status,product_choice_draft_revision,product_choice_draft").eq("id",input.comparisonId)
+      .maybeSingle<{status:string;product_choice_draft_revision:number;product_choice_draft:unknown}>();
     if (parent.error || !parent.data) return {ok:false,error:"Product choices could not be loaded. Keep this page open and retry."};
     if (!["draft","review"].includes(parent.data.status)) return {ok:false,conflict:true,error:"This comparison is locked. Reload to review its final route."};
     if (parent.data.product_choice_draft_revision !== input.expectedRevision) return {ok:false,conflict:true,error:"Choices changed elsewhere. Reload to avoid overwriting them."};
@@ -35,6 +35,14 @@ export async function saveProductChoicesAction(input: { comparisonId: string; ex
       if(await matrixChoiceFingerprint(source.items,source.quotes)!==draft.matrix.sourceFingerprint)return {ok:false,conflict:true,error:'Request or source quotes changed. Reload and review before saving.'};
       const matrixError=matrixChoiceScopeError(draft.matrix,source.items,source.quotes);
       if(matrixError)return {ok:false,conflict:true,error:matrixError};
+      if(draft.matrix.acceptances?.length){
+        if(!user?.id)return {ok:false,error:'Sign in before accepting a supplier difference.'};
+        const previous=parseProductChoiceDraft(parent.data.product_choice_draft)?.matrix;
+        draft.matrix.acceptances=draft.matrix.acceptances.map(a=>{
+          const prior=previous?.sourceFingerprint===draft.matrix!.sourceFingerprint?previous.acceptances?.find(p=>p.itemId===a.itemId&&p.quoteId===a.quoteId&&p.lineNumber===a.lineNumber&&p.basis===a.basis):undefined;
+          return {...a,actorId:prior?.actorId??user.id,acceptedAt:prior?.acceptedAt??new Date().toISOString()};
+        });
+      }
     }
     const result = await supabase.from("quote_comparisons").update({product_choice_draft:draft,product_choice_draft_revision:input.expectedRevision+1,product_choice_draft_source_fingerprint:input.sourceFingerprint})
       .eq("id",input.comparisonId).eq("product_choice_draft_revision",input.expectedRevision).in("status",["draft","review"])

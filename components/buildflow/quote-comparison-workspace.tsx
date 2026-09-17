@@ -1,5 +1,7 @@
 "use client";
 import { ReceivedSupplierQuoteTable } from "@/components/buildflow/received-supplier-quote-table";
+import { ProductMatchReview } from '@/components/buildflow/product-match-review';
+import {MatrixAcceptanceControl} from './matrix-acceptance-control';
 import { ReceivedProductPriceMatrix } from "@/components/buildflow/received-product-price-matrix";
 
 import {
@@ -126,6 +128,8 @@ export function QuoteComparisonWorkspace({
   choiceActorId = "sample",
   initialProductSelections = {},
   initialMatrixSelections = {},
+  initialMatrixAcceptances = [],
+  initialCalculationMode = 'mixed',
   initialBaselineQuoteId = '',
   matrixSourceFingerprint = '',
   productChoiceRevision = 0,
@@ -152,6 +156,8 @@ export function QuoteComparisonWorkspace({
   choiceActorId?: string;
   initialProductSelections?: Record<string, string>;
   initialMatrixSelections?: Record<string,string>;
+  initialMatrixAcceptances?: import('@/lib/matrix-match-acceptance').MatrixAcceptance[];
+  initialCalculationMode?:'mixed'|'selected';
   initialBaselineQuoteId?:string;
   matrixSourceFingerprint?:string;
   productChoiceRevision?: number;
@@ -170,8 +176,10 @@ export function QuoteComparisonWorkspace({
   const [finalizeKey] = useState(() => crypto.randomUUID());
   const [productSelections, setProductSelections] = useState<Record<string, string>>(procurementRoute ? Object.fromEntries(procurementRoute.items.map((item) => [item.item_id, item.bid_id])) : initialProductSelections);
   const [matrixSelections,setMatrixSelections]=useState(initialMatrixSelections);
+  const [matrixAcceptances,setMatrixAcceptances]=useState(initialMatrixAcceptances);
+  const [calculationMode,setCalculationMode]=useState(initialCalculationMode);
   const [baselineQuoteId,setBaselineQuoteId]=useState(initialBaselineQuoteId);
-  const matrixDraft=matrixSourceFingerprint?{baselineQuoteId,selections:matrixSelections,sourceFingerprint:matrixSourceFingerprint}:undefined;
+  const matrixDraft=matrixSourceFingerprint?{baselineQuoteId,selections:matrixSelections,sourceFingerprint:matrixSourceFingerprint,calculationMode,...(matrixAcceptances.length?{acceptances:matrixAcceptances}:{})}:undefined;
   const [choiceSourceReviewed, setChoiceSourceReviewed] = useState(!productChoiceWarning);
   const [initialChoiceSnapshot] = useState({ version: 1, selections: productSelections,...(matrixDraft?{matrix:matrixDraft}:{}) });
   const choiceAutosave = useQuoteAutosave({
@@ -563,7 +571,7 @@ export function QuoteComparisonWorkspace({
             {productPreview.suppliers.length ? <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-sky-950">Draft subtotal by supplier</summary><ul className="space-y-2 border-t border-sky-200 pt-3">{productPreview.suppliers.map((supplier) => <li key={supplier.supplierId} className="flex justify-between gap-3 text-xs"><span className="min-w-0 break-words font-semibold">{supplier.supplierName} · {supplier.itemCount} products</span><span className="shrink-0 tabular-nums">{formatComparisonMoney(supplier.subtotal)}</span></li>)}</ul></details> : null}
           </div></details>}
           {missingRequestMaterials&&comparison.request_id?<p role="alert" className="rounded-lg border border-amber-200 p-3 text-sm">{missingRequestMaterials} new saved material(s) need a comparison row. <a className="font-semibold text-sky-800" href={`/owner/materials/requests/${comparison.request_id}#request-supplier-quotes`}>Open the request and choose Compare supplier quotes to synchronize.</a> Existing quotes and prices are retained.</p>:null}
-          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} requestedMaterialLines={requestedMaterialLines} originalRequestLines={originalRequestLines} selections={productSelections} draftSelections={matrixSelections} baselineQuoteId={baselineQuoteId} onBaselineChange={setBaselineQuoteId} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onDraftChoose={(itemId,quoteId)=>setMatrixSelections(current=>({...current,[itemId]:quoteId}))} /> : null}
+          {receivedSupplierQuotes.length ? <ReceivedProductPriceMatrix items={requestedComparisonItems??liveItems} quotes={receivedSupplierQuotes} bids={liveBids} initialSavingsMode={calculationMode} onSavingsModeChange={setCalculationMode} acceptances={matrixAcceptances} renderMatchApproval={(item,quoteId)=>{const bid=liveBids.find(value=>value.source_supplier_quote_id===quoteId&&value.quote_comparison_prices?.some(price=>price.item_id===item.id));const quote=receivedSupplierQuotes.find(q=>q.id===quoteId);return quote&&!previewMode?<MatrixAcceptanceControl saveStatus={choiceAutosave.status} saveError={choiceAutosave.error} items={requestedComparisonItems??liveItems} item={item} quote={quote} acceptances={matrixAcceptances} disabled={locked||pricesNeedSaving||choiceAutosave.conflict} onAccept={(value,itemId,sourceQuoteId)=>setMatrixAcceptances(current=>[...current.filter(a=>a.itemId!==itemId||a.quoteId!==sourceQuoteId),...(value?[value]:[])])}/>:bid&&!previewMode?<ProductMatchReview item={item} bid={bid} disabled={locked||pricesNeedSaving||choiceAutosave.conflict} beforeConfirm={choiceAutosave.flush} initialOpen/>:<p className="mt-2 text-sm">Save an assigned supplier price for this item first. Approval is unavailable until the exact source and price are saved.</p>}} requestedMaterialLines={requestedMaterialLines} originalRequestLines={originalRequestLines} selections={productSelections} draftSelections={matrixSelections} baselineQuoteId={baselineQuoteId} onBaselineChange={setBaselineQuoteId} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onDraftChoose={(itemId,quoteId)=>setMatrixSelections(current=>({...current,[itemId]:quoteId}))} /> : null}
           {!receivedSupplierQuotes.length || liveBids.length ? <details open={!receivedSupplierQuotes.length} className="rounded-xl border border-slate-200 p-3"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Reviewed quote selections</summary><div className="grid gap-2">{productPreview.rows.filter(row=>!receivedSupplierQuotes.length||row.offers.some(offer=>offer.unitPrice!==null)).map((row) => <ProductQuoteCard key={row.item.id} row={row} finalized={Boolean(procurementRoute && !routeError)} choiceDisabled={locked || pricesNeedSaving || choiceAutosave.conflict} onSelect={(bidId) => setProductSelections((current) => ({ ...current, [row.item.id]: bidId }))} onClear={() => setProductSelections((current) => ({ ...current, [row.item.id]: "" }))} onReview={()=>setActiveStep(2)} beforeConfirm={previewMode ? undefined : choiceAutosave.flush} />)}</div></details> : null}
           {!items.length ? <p className="rounded-xl border border-slate-200 bg-white p-5 text-sm">Add materials to compare products.</p> : null}
           <div hidden={!workspaceToolsOpen} className="order-3 rounded-lg bg-slate-50 p-3"><dl aria-live="polite" aria-label="Live temporary product selection totals" className="grid grid-cols-[1fr_1fr_auto] gap-3"><div><dt className="text-[10px] font-semibold text-slate-500">Draft products</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.selectedCount}/{items.length}</dd></div><div><dt className="text-[10px] font-semibold text-slate-500">Suppliers</dt><dd className="mt-0.5 text-sm font-bold">{productPreview.suppliers.length}</dd></div><div className="text-right"><dt className="text-[10px] font-semibold text-slate-500">Materials · before delivery/tax</dt><dd className="mt-0.5 text-base font-bold tabular-nums">{formatComparisonMoney(productPreview.materialSubtotal)}</dd></div></dl></div>

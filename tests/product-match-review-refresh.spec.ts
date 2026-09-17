@@ -58,3 +58,18 @@ test("source removal does not crash or leave an approval button", async ({ page 
   await expect(page.getByRole("button")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('explicit reviewed consent submits the exact source and selling unit; open review mode is usable',async({page})=>{
+ await fixture(page)
+ await expect(page.getByRole('button',{name:'Confirm reviewed match'})).toBeDisabled()
+ await page.getByRole('checkbox').check()
+ await expect(page.getByRole('button',{name:'Confirm reviewed match'})).toBeDisabled()
+ await page.getByRole('textbox').fill('each')
+ await page.getByRole('button',{name:'Confirm reviewed match'}).click()
+ const calls=await page.evaluate(()=>(window as unknown as {calls:Array<{confirmed:boolean;sellingUnit:string;expectedSource:string;itemId:string}>}).calls)
+ expect(calls).toHaveLength(1)
+ expect(calls[0].confirmed).toBe(true)
+ expect(calls[0].sellingUnit).toBe('each')
+ expect(calls[0].expectedSource).toContain('Supplier valve 4 inch')
+ expect(calls[0].itemId).toBe('item')
+})

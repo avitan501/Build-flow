@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { confirmProductMatchAction } from "@/app/admin/quote-comparison/product-match-actions";
 import { canonicalProductMatch, productMatchSnapshot, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison";
 
-type ReviewProps = {item:QuoteComparisonItemRecord;bid:QuoteComparisonBidRecord;disabled:boolean;beforeConfirm:()=>Promise<boolean>};
+type ReviewProps = {item:QuoteComparisonItemRecord;bid:QuoteComparisonBidRecord;disabled:boolean;beforeConfirm:()=>Promise<boolean>;initialOpen?:boolean};
 
 export function ProductMatchReview(props: ReviewProps) {
   const price = props.bid.quote_comparison_prices?.find(row => row.item_id === props.item.id);
@@ -16,13 +16,13 @@ export function ProductMatchReview(props: ReviewProps) {
   return <ProductMatchReviewForm key={source} {...props}/>;
 }
 
-function ProductMatchReviewForm({item,bid,disabled,beforeConfirm}: ReviewProps) {
+function ProductMatchReviewForm({item,bid,disabled,beforeConfirm,initialOpen=false}: ReviewProps) {
   const router=useRouter();
   const [checked,setChecked]=useState(false),[unit,setUnit]=useState(""),[error,setError]=useState("");
   const [pending,startTransition]=useTransition();
   const price=bid.quote_comparison_prices?.find(row=>row.item_id===item.id);
   if(!price?.notes?.trim())return null;
-  return <details className="border-t border-amber-100 bg-amber-50/50 px-3 text-xs">
+  return <details open={initialOpen||undefined} className="border-t border-amber-100 bg-amber-50/50 px-3 text-xs">
     <summary className="min-h-11 cursor-pointer py-3 font-bold text-sky-800">Review this match</summary>
     <div className="grid gap-3 pb-3">
       <div><p className="font-bold">Requested</p><p>{item.description} · {item.specification} · {item.quantity} {item.unit}</p></div>

@@ -11,7 +11,7 @@ const item={id:"item",description:"Valve",specification:"",quantity:1,unit:"each
 const bid={id:"bid",supplier_id:"supplier",supplier_name_snapshot:"Supplier",status:"received",trust_level_snapshot:"verified",quote_comparison_prices:[{bid_id:"bid",item_id:"item",unit_price:12,is_available:true,notes:"Valve"}]} as QuoteComparisonBidRecord;
 const compiled=ts.transpileModule(readFileSync("app/admin/quote-comparison/product-choice-actions.ts","utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 
-function actionHarness(options:{status?:string;revision?:number;race?:boolean;deny?:boolean;bid?:QuoteComparisonBidRecord}={}) {
+function actionHarness(options:{status?:string;revision?:number;race?:boolean;deny?:boolean;bid?:QuoteComparisonBidRecord;matrixSource?:{items:QuoteComparisonItemRecord[];quotes:import('../components/buildflow/received-supplier-quote-table').ReceivedSupplierQuote[]}}={}) {
   let writes=0;
   let revision=options.revision??0;
   let snapshot:unknown=null;
@@ -37,14 +37,33 @@ function actionHarness(options:{status?:string;revision?:number;race?:boolean;de
   new Function("exports","require",compiled)(exported,(id:string)=>{
     if(id==="@/lib/product-choice-draft")return helpers;
     if(id==='@/lib/matrix-choice-draft')return matrixHelpers;
-    if(id==='@/lib/matrix-choice-server')return {loadMatrixChoiceSource:async()=>({items:[item],quotes:[{id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[]}]})};
+    if(id==='@/lib/matrix-choice-server')return {loadMatrixChoiceSource:async()=>options.matrixSource??({items:[item],quotes:[{id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[]}]})};
     if(id==="@/lib/product-match-server")return {loadProductMatchConfirmations:async(_client:unknown,rows:QuoteComparisonBidRecord[])=>rows};
-    if(id==="@/lib/auth")return {requireStaffProfile:async(capability:string)=>{expect(capability).toBe("suppliers");if(options.deny)throw new Error("Unauthorized");return {supabase}}};
+    if(id==="@/lib/auth")return {requireStaffProfile:async(capability:string)=>{expect(capability).toBe("suppliers");if(options.deny)throw new Error("Unauthorized");return {supabase,user:{id:'authenticated-staff'}}}};
     throw new Error(`Unexpected runtime dependency ${id}`);
   });
   return {action:exported.saveProductChoicesAction,state:()=>({writes,revision,snapshot})};
 }
 async function payload(){return {comparisonId,expectedRevision:0,sourceFingerprint:await helpers.productChoiceFingerprint([item],[bid]),snapshot:{version:1,selections:{item:"bid"}}};}
+
+test('acceptance persists with authenticated actor, rejects fake source and duplicate allocation',async()=>{
+ const material={...item,id:'material',description:'Construction adhesive',specification:'28 oz',quantity:2,unit:'box'};
+ const quote={id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[{line_number:1,description:'Construction adhesive',specification:'28 oz',quantity:24,unit:'each',unit_price:5,line_total:120}]};
+ const matrixSource={items:[material,{...material,id:'second'}],quotes:[quote]};
+ const fingerprint=await matrixHelpers.matrixChoiceFingerprint(matrixSource.items,matrixSource.quotes);
+ const acceptance={itemId:'material',quoteId:'quote',lineNumber:1,basis:'quoted-line',actorId:'forged-actor',acceptedAt:'forged-time'};
+ const matrix={baselineQuoteId:'quote',selections:{material:'quote'},sourceFingerprint:fingerprint,calculationMode:'selected',acceptances:[acceptance]};
+ const successful=actionHarness({matrixSource});
+ expect(await successful.action({...await payload(),snapshot:{version:1,selections:{},matrix}})).toEqual({ok:true,revision:1});
+ const saved=helpers.parseProductChoiceDraft(successful.state().snapshot)!;
+ expect(saved.matrix?.acceptances?.[0].actorId).toBe('authenticated-staff');
+ expect(saved.matrix?.acceptances?.[0].acceptedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+ for(const acceptances of [[{...acceptance,lineNumber:999}],[acceptance,{...acceptance,itemId:'second'}]]){
+  const blocked=actionHarness({matrixSource});
+  expect(await blocked.action({...await payload(),snapshot:{version:1,selections:{},matrix:{...matrix,acceptances}}})).toMatchObject({ok:false,conflict:true});
+  expect(blocked.state().writes).toBe(0);
+ }
+});
 
 test('unreviewed purchasing intentions persist separately and reject foreign or stale source quotes',async()=>{
  const fingerprint=await matrixHelpers.matrixChoiceFingerprint([item],[{id:'quote',supplierName:'Supplier',fileName:'source.pdf',sourceItems:[]}]);

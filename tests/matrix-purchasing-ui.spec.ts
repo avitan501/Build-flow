@@ -15,6 +15,16 @@ function restore(value:unknown):React.ReactNode {
  if(value&&typeof value==='object'&&'__pw_type' in value&&'type' in value){const n=value as unknown as {type:React.ElementType;props:Record<string,unknown>;key?:string};const {children,...props}=n.props;const type=typeof n.type==='function'?function RestoredComponent(p:Record<string,unknown>){return restore((n.type as (p:Record<string,unknown>)=>unknown)(p))}:n.type;return React.createElement((typeof type==='object'?React.Fragment:type) as React.ElementType,{...props,key:n.key},restore(children))}
  return value as React.ReactNode
 }
+test('baseline supplies unchanged basket rows without requiring a choice on each line',async({page})=>{
+ Object.assign(globalThis,{React})
+ const html=renderToStaticMarkup(restore(ReceivedProductPriceMatrix({items:[item],quotes:[quote('cheap',100),quote('baseline',120)],bids:[],baselineQuoteId:'baseline',draftSelections:{},onDraftChoose:()=>{},initialSavingsMode:'selected'})))
+ await page.setContent(html)
+ await expect(page.getByLabel('Select supplier for item 1')).toHaveValue('baseline')
+ await expect(page.getByTestId('item-savings')).toContainText('$0.00 savings')
+ await expect(page.getByTestId('savings-mode-total')).toContainText('$1,200.00')
+ await expect(page.getByTestId('basket-supplier-breakdown')).toContainText('baseline')
+ await expect(page.getByTestId('basket-supplier-breakdown')).toContainText('$1,200.00')
+});
 test('rightmost savings header, real source choices, extra cost and full requested-line arithmetic render on desktop and phone',async({page})=>{
  Object.assign(globalThis,{React})
  const files=await readdir('.next/static/css'),css=(await Promise.all(files.filter(f=>f.endsWith('.css')).map(f=>readFile('.next/static/css/'+f,'utf8')))).join('\n')
@@ -100,6 +110,8 @@ test('default comparison needs no purchasing choice and distinguishes lower unal
  await expect(page.getByTestId('lowest-quoted-price')).toHaveCount(2)
  await expect(page.getByTestId('lowest-quoted-price').first()).toHaveText('Lowest quoted price · needs review')
  await expect(page.getByTestId('lowest-comparable-price')).toHaveCount(1)
+ await expect(page.getByTestId('excluded-supplier-items').first()).toContainText('Review 2 excluded items')
+ await expect(page.getByTestId('excluded-supplier-items').first()).toContainText('Allocate its quantity once')
 })
 
 test('native mode switching calculates the cheapest mix without writing supplier choices',async({page})=>{
@@ -115,7 +127,7 @@ test('native mode switching calculates the cheapest mix without writing supplier
  }
  const react=bundle(require.resolve('react')),dom=bundle(require.resolve('react-dom/client')),component=bundle(resolve('components/buildflow/received-product-price-matrix.tsx'))
  await page.setContent('<div id="root"></div>')
- await page.addScriptTag({content:`(()=>{const process={env:{NODE_ENV:'production'}},modules=[${modules.map(code=>`function(module,exports,require){${code}}`).join(',')}],cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](m,m.exports,require);return m.exports}const R=require(${react}),C=require(${component});window.choiceCalls=[];require(${dom}).createRoot(document.getElementById('root')).render(R.createElement(C.ReceivedProductPriceMatrix,{items:${JSON.stringify([item])},quotes:${JSON.stringify([quote('cheap',100),quote('baseline',120),quote('expensive',130)])},bids:[],requestedMaterialLines:{item:'10 pieces · Dimensional lumber · 2 in · 6 in · 10 ft'},originalRequestLines:{item:'10 pc 2x6 by 10 ft'},draftSelections:{item:'expensive'},baselineQuoteId:'baseline',initialSavingsMode:'selected',onDraftChoose:(...args)=>window.choiceCalls.push(args)}))})()`})
+ await page.addScriptTag({content:`(()=>{const process={env:{NODE_ENV:'production'}},modules=[${modules.map(code=>`function(module,exports,require){${code}}`).join(',')}],cache={};function require(id){if(cache[id])return cache[id].exports;const m=cache[id]={exports:{}};modules[id](m,m.exports,require);return m.exports}const R=require(${react}),C=require(${component});window.choiceCalls=[];require(${dom}).createRoot(document.getElementById('root')).render(R.createElement(C.ReceivedProductPriceMatrix,{items:${JSON.stringify([item])},quotes:${JSON.stringify([quote('cheap',100),quote('baseline',120),quote('expensive',130)])},bids:[],renderMatchApproval:()=>R.createElement('p',{'data-testid':'approval-form-fixture'},'Review approval controls'),requestedMaterialLines:{item:'10 pieces · Dimensional lumber · 2 in · 6 in · 10 ft'},originalRequestLines:{item:'10 pc 2x6 by 10 ft'},draftSelections:{item:'expensive'},baselineQuoteId:'baseline',initialSavingsMode:'selected',onDraftChoose:(...args)=>window.choiceCalls.push(args)}))})()`})
  await expect(page.getByTestId('item-savings')).toContainText('+$100.00 extra')
  await expect(page.getByTestId('unverified-price-indicator')).toHaveCount(0)
  await page.getByTestId('toggle-unverified-dots').click()
@@ -126,6 +138,7 @@ test('native mode switching calculates the cheapest mix without writing supplier
  await expect(page.getByRole('dialog').filter({has:page.getByTestId('review-original-request')})).toBeVisible()
  await expect(page.getByTestId('review-original-request')).toHaveText('10 pc 2x6 by 10 ft')
  await expect(page.getByTestId('review-organized-request')).toContainText('10 pieces')
+ await expect(page.getByTestId('approval-form-fixture')).toHaveText('Review approval controls')
  await page.getByRole('button',{name:'Close',exact:true}).click()
  await page.getByLabel('Savings calculation mode').selectOption('mixed')
  await expect(page.getByTestId('item-savings')).toContainText('$200.00 savings')

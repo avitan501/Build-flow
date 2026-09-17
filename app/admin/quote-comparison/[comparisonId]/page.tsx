@@ -120,6 +120,8 @@ export default async function QuoteComparisonDetailPage({
       choiceActorId={user.id}
       initialProductSelections={choiceState.selections}
       initialMatrixSelections={matrixState.selections}
+      initialMatrixAcceptances={matrixState.acceptances}
+      initialCalculationMode={matrixState.calculationMode}
       initialBaselineQuoteId={matrixState.baselineQuoteId}
       matrixSourceFingerprint={matrixFingerprint}
       productChoiceRevision={comparisonResult.data.product_choice_draft_revision ?? 0}
