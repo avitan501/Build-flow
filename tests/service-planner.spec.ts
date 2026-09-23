@@ -24,6 +24,7 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
         const incoming = route.request().postDataJSON();
         if (incoming.revision !== revision) return route.fulfill({ status: 409, json: {} });
         history.unshift({ state, revision, savedAt: new Date().toISOString() });
+        expect(incoming.state.rows[0].solutionIds).toEqual(seed.rows[0].solutionIds);
         state = incoming.state; revision++;
         return route.fulfill({ json: { revision } });
       }
@@ -33,20 +34,23 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   });
   await page.goto("http://planner.test/owner/service-planner");
   await expect(page.locator("tbody tr")).toHaveCount(17);
+  await expect(page.getByRole("checkbox", { name: /solution — .*?(One supplier contact|Reorder through WhatsApp|Compare quotes)/ })).toHaveCount(0);
   await page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true }).fill("$50 internal fee");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   const row = page.locator("#av-body tr").nth(5);
   await row.getByText("Choose pains", { exact: true }).click();
   await row.getByRole("checkbox", { name: "Framing — pain — 📦 Missing materials / documents", exact: true }).check();
   await row.getByText("Choose solutions", { exact: true }).click();
-  await row.getByRole("checkbox", { name: "Framing — solution — 🔁 Reorder through WhatsApp", exact: true }).check();
+  await row.getByRole("checkbox", { name: "Framing — solution — 🛒 Place approved orders", exact: true }).check();
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true })).toHaveValue("$50 internal fee");
   await expect(page.locator("#av-body tr").nth(5).locator(".picked").first()).toContainText("Missing materials");
   await page.getByRole("button", { name: "Customer preview", exact: true }).click();
   await expect(page.locator(".fees")).toBeHidden();
-  await expect(page.locator("#customer")).toContainText("Reorder through WhatsApp");
+  await expect(page.locator("#customer")).toContainText("Place approved orders");
+  await expect(page.locator("#customer")).not.toContainText("One supplier contact");
+  await expect(page.locator(".benefits")).toContainText("Reorder through WhatsApp");
   await expect(page.locator("#customer")).not.toContainText("$50");
   await page.emulateMedia({ media: "print" });
   await expect(page.locator(".fees")).toBeHidden();
