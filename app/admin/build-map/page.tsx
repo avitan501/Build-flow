@@ -699,6 +699,11 @@ export default async function AdminDashboardPage({
                       {section.title === "Manager Tools" ? (
                         <GoogleMeetLauncher variant="row" />
                       ) : null}
+                      {section.title === "Manager Tools" && access.owner ? (
+                        <a href="/owner/service-planner" className="flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#0066cc]">
+                          <span>Service &amp; fee planner</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />
+                        </a>
+                      ) : null}
                       {section.links.map((item) => {
                         const external = item.href.startsWith("https://");
                         return (

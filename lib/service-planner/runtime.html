@@ -1,0 +1,62 @@
+<style>
+html{color-scheme:light}body{margin:0;background:#fff;color:#173d33;font-family:Arial,sans-serif}
+#avantia-checklist .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid #d8e5df}
+#avantia-checklist button,#avantia-checklist .toolbar a{font:inherit;padding:10px 12px;border:1px solid #c6d8cf;border-radius:5px;background:#fff;color:#173d33;cursor:pointer;text-decoration:none}
+#avantia-checklist .whatsapp{font-size:18px;font-weight:600;color:#145e43;display:block;text-underline-offset:4px}
+#avantia-checklist #recovery,#avantia-checklist #versions{padding:16px;background:#fff3e5}
+#avantia-checklist #versions button{margin:5px}
+#avantia-checklist #customer table{min-width:800px;table-layout:fixed}
+#avantia-checklist #customer th:nth-child(1){width:10%}
+#avantia-checklist #customer th:nth-child(2){width:20%}
+#avantia-checklist #customer th:nth-child(3){width:22%}
+#avantia-checklist #customer th:nth-child(4){width:22%}
+#avantia-checklist #customer th:nth-child(5){width:26%}
+#avantia-checklist #customer{overflow:auto}
+#avantia-checklist #customer td{white-space:pre-line;overflow-wrap:anywhere}
+#avantia-checklist #customer p{padding:0 16px}
+#avantia-checklist.preview .sheet,#avantia-checklist.preview .legend{display:none}
+@page{size:letter landscape;margin:0.25in}
+@media print{
+  #avantia-checklist .toolbar,#avantia-checklist .sheet,#avantia-checklist .legend,#avantia-checklist #av-save,#avantia-checklist #versions,#avantia-checklist #recovery{display:none!important}
+  #avantia-checklist #customer{display:block!important;overflow:visible}
+  #avantia-checklist #customer table{min-width:0;width:100%;font-size:8px;line-height:1.1}
+  #avantia-checklist #customer th{font-size:8px;padding:3px}
+  #avantia-checklist #customer td{padding:2px 3px}
+  #avantia-checklist header{padding:4px}#avantia-checklist h2{font-size:16px;margin:0}
+  #avantia-checklist .offer{padding:4px;font-size:9px}#avantia-checklist .whatsapp{font-size:12px}
+  #avantia-checklist .offer p{margin:3px 0}#avantia-checklist .benefits{gap:4px 12px}
+  #avantia-checklist #customer p{font-size:8px;margin:4px}
+  #avantia-checklist tr{break-inside:avoid}
+}
+</style>
+<script>
+(()=>{
+const root=document.getElementById('avantia-checklist'),recovery=root.querySelector('#recovery'),versions=root.querySelector('#versions');
+const endpoint='/api/owner/service-planner';let revision=window.plannerInitial.revision,blocked=false,inFlight=false;
+function backup(){const blob=new Blob([JSON.stringify(window.plannerSnapshot(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='avantia-service-planner-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+root.querySelector('#download').onclick=backup;
+function failure(message,conflict){recovery.hidden=false;recovery.replaceChildren();const p=document.createElement('p');p.textContent=message;recovery.append(p);const download=document.createElement('button');download.textContent='Download my edits';download.onclick=backup;recovery.append(download);const next=document.createElement('button');next.textContent=conflict?'Reload saved version':'Retry saving';next.onclick=()=>{if(conflict){if(confirm('Download your edits first if you want to keep them. Reload the saved version?')){window.plannerDirty=false;location.reload();}}else{blocked=false;window.plannerRestore(window.plannerSnapshot());}};recovery.append(next);}
+window.openai={setWidgetState:async snapshot=>{
+ if(blocked)throw new Error('Save paused');
+ inFlight=true;
+ try{
+ const response=await fetch(endpoint,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,state:snapshot.modelContent})});
+ if(!response.ok){blocked=true;failure(response.status===409?'Another tab saved a newer version. Your edits are still here; download them before reloading.':'Your edits are not saved yet. Keep this page open and retry.',response.status===409);throw new Error('Save failed');}
+ const saved=await response.json();revision=saved.revision;recovery.hidden=true;
+ }catch(error){if(!blocked){blocked=true;failure('Could not confirm the save. Keep your edits here and retry; a newer saved version will never be overwritten automatically.',false);}throw error;}finally{inFlight=false;}
+}};
+window.addEventListener('beforeunload',e=>{if(window.plannerDirty||inFlight){e.preventDefault();e.returnValue='';}});
+const serviceNames=['Takeoff','Compare prices','Order at Website Price','Book / schedule','Reorders & shortages','Subcontractor scope check','Material Cost Review'];
+const painNames={reorders:'Frequent reorders',missing:'Missing materials / documents',pricing:'Overpaying / unclear pricing',calls:'Too many supplier calls',chasing:'Chasing bookings / deliveries',stores:'Shopping at several stores',quantities:'Unclear quantities',scope:'Unclear subcontractor inclusions',approvals:'Waiting for selections / approvals'};
+const solutionNames={contact:'One supplier contact',reorders:'Reorder through WhatsApp',compare:'Compare quotes / negotiate bulk pricing',takeoff:'Prepare takeoff for trade approval',scope:'Check what the subcontractor supplies',gaps:'Source materials the trade excludes',complete:'Gather the installer’s complete supply list',order:'Place approved orders',book:'Book services / appointments',confirm:'Chase confirmations / reports',approve:'Handle supplier questions / approvals'};
+function customerPreview(){const target=root.querySelector('#customer');target.replaceChildren();const table=document.createElement('table'),head=document.createElement('thead'),hr=document.createElement('tr');['Department','Materials','Services','GC’s pain','Avantia’s solution'].forEach(name=>{const th=document.createElement('th');th.textContent=name;hr.append(th);});head.append(hr);table.append(head);const body=document.createElement('tbody');window.plannerSnapshot().rows.forEach(r=>{const tr=document.createElement('tr');const labels=(key,names)=>r[key+'Ids'].map(id=>id==='other'?r[key+'Other']:names[id]).filter(Boolean).map(v=>'✓ '+v).join('\n');[r.department,r.items,r.services.map((v,i)=>v===true?'✓ '+serviceNames[i]:null).filter(Boolean).join('\n'),labels('pain',painNames),labels('solution',solutionNames)].forEach(value=>{const td=document.createElement('td');td.textContent=value;tr.append(td);});body.append(tr);});table.append(body);target.append(table);const foot=document.createElement('p');foot.textContent='Avantia · WhatsApp (516) 990-1990 · avantiabuild.com';target.append(foot);}
+root.querySelector('#preview').onclick=()=>{const preview=!root.classList.contains('preview');customerPreview();root.classList.toggle('preview',preview);root.querySelector('#customer').hidden=!preview;root.querySelector('#preview').textContent=preview?'Back to editing':'Customer preview';};
+root.querySelector('#print').onclick=()=>{customerPreview();window.print();};window.addEventListener('beforeprint',customerPreview);
+root.querySelector('#history').onclick=async()=>{
+ if(!versions.hidden){versions.hidden=true;return;}versions.hidden=false;versions.textContent='Loading saved versions…';
+ try{const response=await fetch(endpoint,{cache:'no-store'});if(!response.ok)throw new Error();const saved=await response.json();versions.replaceChildren();const title=document.createElement('p');title.textContent='Last 20 saved versions. Restoring creates a new version.';versions.append(title);if(!saved.history.length)versions.append(document.createTextNode('No earlier saved versions yet.'));
+ saved.history.forEach(v=>{const button=document.createElement('button');button.textContent='Restore version '+v.revision+' · '+new Date(v.savedAt).toLocaleString();button.onclick=()=>{if(blocked||inFlight||window.plannerDirty){alert('Save or download your current edits before restoring a version.');return;}if(revision!==saved.revision){alert('The version list changed. Close it and open it again.');return;}if(confirm('Restore this version? Your current saved version remains in history.')){window.plannerRestore(v.state);versions.hidden=true;}};versions.append(button);});
+ }catch{versions.textContent='Could not load saved versions. Close this panel and try again.';}
+};
+})();
+</script>

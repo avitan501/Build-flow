@@ -1,0 +1,354 @@
+{
+  "type": "avantia-checklist-v5-fees",
+  "rows": [
+    {
+      "id": 0,
+      "department": "Plans",
+      "items": "Blueprints, designer plans, survey copies",
+      "services": [
+        false,
+        false,
+        null,
+        false,
+        true,
+        false,
+        false
+      ],
+      "pain": "Repeat printing; missing copies.",
+      "solution": "One contact. Reorder the same documents by WhatsApp.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 1,
+      "department": "Site setup",
+      "items": "Fencing, security, storage, temporary power, toilets, generator & fuel",
+      "services": [
+        false,
+        false,
+        null,
+        false,
+        true,
+        false,
+        false
+      ],
+      "pain": "Too many separate providers.",
+      "solution": "One place for site essentials and repeat requests.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 2,
+      "department": "Waste",
+      "items": "Dumpsters, bags & gloves",
+      "services": [
+        false,
+        false,
+        null,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Separate orders and recurring needs.",
+      "solution": "One contact for dumpster bookings and repeat supplies.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 3,
+      "department": "Surveys",
+      "items": "Stakeout, benchmark, foundation, framing & final surveys",
+      "services": [
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Repeat visits; chasing reports.",
+      "solution": "Book milestones and chase reports through one contact.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 4,
+      "department": "Foundations",
+      "items": "Sump pumps, piping & insulation",
+      "services": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "pain": "Unclear trade inclusions; missing items.",
+      "solution": "Check the sub\u2019s material scope and source agreed gaps.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 5,
+      "department": "Framing",
+      "items": "Lumber, beams, steel, sheathing & hardware",
+      "services": [
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "pain": "Price changes; repeated shortages.",
+      "solution": "Takeoff, quote comparison and one contact for top-ups.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 6,
+      "department": "Roofing",
+      "items": "Roofing package, membranes, flashing & vents",
+      "services": [
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "pain": "Missing accessories; changing prices.",
+      "solution": "Check scope, prepare quantities and compare complete quotes.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 7,
+      "department": "Openings",
+      "items": "Windows, garage doors & exterior doors",
+      "services": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pain": "Sizes and supplier quotes vary.",
+      "solution": "Prepare quantities and compare approved specifications.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 8,
+      "department": "Exterior",
+      "items": "Siding, trim, stucco/stone & gutters",
+      "services": [
+        true,
+        true,
+        false,
+        true,
+        null,
+        null,
+        false
+      ],
+      "pain": "Several trades and material packages.",
+      "solution": "Prepare quantities, compare prices and arrange bookings.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 9,
+      "department": "Plumbing, Electrical & HVAC",
+      "items": "Boilers, plumbing fixtures, lights & thermostats",
+      "services": [
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        false
+      ],
+      "pain": "The trade leaves purchases to you.",
+      "solution": "Identify supply gaps; source and price approved extras.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 10,
+      "department": "Sheetrock",
+      "items": "Boards, screws, tape & compound; boom delivery",
+      "services": [
+        true,
+        true,
+        null,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Quantities and special delivery.",
+      "solution": "Prepare quantities, compare quotes and arrange delivery.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 11,
+      "department": "Tile prep",
+      "items": "Waterproofing, thinset, cement, sand & mesh",
+      "services": [
+        false,
+        true,
+        null,
+        true,
+        true,
+        true,
+        false
+      ],
+      "pain": "Supplies come from several stores.",
+      "solution": "Gather the installer\u2019s list; one contact for reorders.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 12,
+      "department": "Flooring",
+      "items": "Wood flooring & installation supplies",
+      "services": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Quantities and complete order needed.",
+      "solution": "Takeoff, quote comparison and approved material purchases.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 13,
+      "department": "Doors & trim",
+      "items": "Interior doors, locks, hardware & millwork",
+      "services": [
+        false,
+        true,
+        false,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Measurements and separate purchases.",
+      "solution": "Book measurements; compare and organize approved orders.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 14,
+      "department": "Paint",
+      "items": "Paint & preparation supplies",
+      "services": [
+        false,
+        true,
+        null,
+        true,
+        true,
+        false,
+        false
+      ],
+      "pain": "Repeat purchases; product matching.",
+      "solution": "Price the painter\u2019s list; reorder the same products.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 15,
+      "department": "Appliances",
+      "items": "Kitchen & laundry appliances",
+      "services": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pain": "Different prices for the same model.",
+      "solution": "Compare supplier quotes for your selected models.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    },
+    {
+      "id": 16,
+      "department": "Outdoor",
+      "items": "Pavers, sand, decking, concrete & pump",
+      "services": [
+        true,
+        true,
+        null,
+        true,
+        true,
+        true,
+        false
+      ],
+      "pain": "Several suppliers and delivery needs.",
+      "solution": "Quantities, prices and bookings through one contact.",
+      "painIds": [],
+      "solutionIds": [],
+      "painOther": "",
+      "solutionOther": ""
+    }
+  ],
+  "fees": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]
+}
