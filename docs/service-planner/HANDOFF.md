@@ -34,3 +34,7 @@ Authenticated Vercel read confirms `build-flow-wfl3`, project `prj_9YPQLnJQT8ud6
 **Publishing held:** authenticated GitHub GET reports `.github/workflows/vercel-owner-release.yml` is `disabled_manually`. Earlier Sept 17 exception was scoped to another task and is not reused. Existing Vercel hook named `Avantia primary production`, bound to main, is available but has NOT been triggered. No alternate route, GitHub setting, billing change or new credentials authorized. No push, migration, deploy or external message performed.
 
 Next: obtain David's explicit approval for this candidate's existing Vercel hook (or restoration of the approved workflow). Then recheck live/main/no overlapping publication, apply only the new additive migration to confirmed `nprfhspwdflpqlopydmp`, verify grants, push exact candidate to canonical and hook-bound mirror, trigger once, verify READY and exact `/api/release`, then authenticated private page/authorized save-reload and anonymous denial. Do not alter existing business data. No customer or supplier messaging.
+
+## Current release approval
+
+David explicitly approved the existing Vercel release hook for this task on Sep 23. Latest received v5 state adds Plans pains reorders/missing/pricing and solutions contact/reorders; included in seed before release. All other selections and seven blank fee fields preserved. Codex sole publisher; release in progress, prior hold above is historical.

@@ -16,8 +16,15 @@
       ],
       "pain": "Repeat printing; missing copies.",
       "solution": "One contact. Reorder the same documents by WhatsApp.",
-      "painIds": [],
-      "solutionIds": [],
+      "painIds": [
+        "reorders",
+        "missing",
+        "pricing"
+      ],
+      "solutionIds": [
+        "contact",
+        "reorders"
+      ],
       "painOther": "",
       "solutionOther": ""
     },
