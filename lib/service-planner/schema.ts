@@ -7,11 +7,14 @@ export const plannerSchema = z.object({
   rows: z.array(z.object({
     id: z.number().int().min(0).max(16),
     department: z.string().max(450), items: z.string().max(450),
+    outcome: z.string().max(450).optional(),
+    communicateWithSubs: z.boolean().optional(),
     services: z.array(z.boolean().nullable()).length(7),
     pain: z.string().max(450), solution: z.string().max(450),
     painIds: z.array(z.enum(painIds)).max(10), solutionIds: z.array(z.enum(solutionIds)).max(12),
     painOther: z.string().max(250), solutionOther: z.string().max(250),
   }).strict()).length(17).refine(rows => rows.every((row, i) => row.id === i), "Invalid department order"),
+  communicationFee: z.string().max(180).optional(),
   fees: z.array(z.string().max(180)).length(7),
 }).strict();
 export type PlannerState = z.infer<typeof plannerSchema>;

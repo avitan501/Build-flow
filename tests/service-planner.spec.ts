@@ -33,22 +33,21 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>window.plannerInitial=${JSON.stringify({ state, revision })}</script>${editor}${runtime}</body></html>` });
   });
   await page.goto("http://planner.test/owner/service-planner");
-  await expect(page.locator("tbody tr")).toHaveCount(17);
+  await expect(page.locator("#av-body tr[data-row-id]")).toHaveCount(17);
   await expect(page.getByRole("checkbox", { name: /solution — .*?(One supplier contact|Reorder through WhatsApp|Compare quotes)/ })).toHaveCount(0);
   await page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true }).fill("$50 internal fee");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
-  const row = page.locator("#av-body tr").nth(5);
+  const row = page.locator('#av-body tr[data-row-id="5"]');
   await row.getByText("Choose pains", { exact: true }).click();
   await row.getByRole("checkbox", { name: "Framing — pain — 📦 Missing materials / documents", exact: true }).check();
-  await row.getByText("Choose solutions", { exact: true }).click();
-  await row.getByRole("checkbox", { name: "Framing — solution — 🛒 Place approved orders", exact: true }).check();
+  await row.getByRole("textbox", { name: "What this takes off your plate — Framing", exact: true }).fill("My framer sends the list directly to Avantia.");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true })).toHaveValue("$50 internal fee");
-  await expect(page.locator("#av-body tr").nth(5).locator(".picked").first()).toContainText("Missing materials");
+  await expect(page.locator('#av-body tr[data-row-id="5"]').locator(".picked").first()).toContainText("Missing materials");
   await page.getByRole("button", { name: "Customer preview", exact: true }).click();
   await expect(page.locator(".fees")).toBeHidden();
-  await expect(page.locator("#customer")).toContainText("Place approved orders");
+  await expect(page.locator("#customer")).toContainText("My framer sends the list directly to Avantia.");
   await expect(page.locator("#customer")).not.toContainText("One supplier contact");
   await expect(page.locator(".benefits")).toContainText("Reorder through WhatsApp");
   await expect(page.locator("#customer")).not.toContainText("$50");
@@ -102,8 +101,8 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state, revision: 6 })}</script>${editor}${runtime}` });
   });
   await page.goto("http://planner.test/owner/service-planner");
-  await expect(page.locator(".sheet thead tr:first-child th")).toHaveCount(10);
-  await expect(page.locator(".checklabel input")).toHaveCount(102);
+  await expect(page.locator(".sheet thead tr:first-child th")).toHaveCount(11);
+  await expect(page.locator(".checklabel input")).toHaveCount(119);
   await expect(page.getByRole("columnheader", { name: /Material Cost Review/ })).toHaveCount(0);
   const merged = page.getByRole("checkbox", { name: "Plans — Subcontractor check", exact: true });
   await expect(merged).toBeChecked();
@@ -126,4 +125,37 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
   await expect(page.locator(".benefits")).toContainText("Store doesn’t deliver? We arrange delivery.");
   await expect(page.locator(".benefits")).toContainText("Urgent material needs?");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("sub communication saves independently and surveys stay editable at the bottom", async ({ page }) => {
+  let state = plannerSchema.parse(structuredClone(seed)), revision = 1;
+  await page.route("http://planner.test/**", async route => {
+    if (route.request().url().includes("/api/")) {
+      const incoming = route.request().postDataJSON();
+      state = plannerSchema.parse(incoming.state);
+      return route.fulfill({ json: { revision: ++revision } });
+    }
+    return route.fulfill({ contentType: "text/html", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state, revision })}</script>${editor}${runtime}` });
+  });
+  await page.goto("http://planner.test/owner/service-planner");
+  await expect(page.locator("#av-body tr[data-row-id]").last()).toHaveAttribute("data-row-id", "3");
+  await expect(page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true })).not.toBeChecked();
+  await page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true }).check();
+  await page.getByRole("textbox", { name: "Internal fee — Talk to your subs", exact: true }).fill("$30 internal");
+  await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
+  expect(state.rows[5].services).toEqual(seed.rows[5].services);
+  expect(state.rows[5].communicateWithSubs).toBe(true);
+  expect(state.fees).toEqual(seed.fees);
+  expect(state.communicationFee).toBe("$30 internal");
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true })).toBeChecked();
+  await page.getByRole("textbox", { name: "Items — Surveys", exact: true }).fill("My optional surveys");
+  await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
+  expect(state.rows[3].items).toBe("My optional surveys");
+  expect(state.rows.map(row => row.id)).toEqual(seed.rows.map(row => row.id));
+  await page.getByRole("button", { name: "Customer preview", exact: true }).click();
+  await expect(page.locator("#customer tbody tr").last()).toContainText("My optional surveys");
+  await expect(page.locator("#customer")).toContainText("Additional services / packages");
+  await expect(page.locator("#customer")).toContainText("Talk to your subs");
+  await expect(page.locator("#customer")).not.toContainText("$30 internal");
 });
