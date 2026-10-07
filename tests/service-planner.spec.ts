@@ -35,7 +35,7 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   await page.goto("http://planner.test/owner/service-planner");
   await expect(page.locator("#av-body tr[data-row-id]")).toHaveCount(17);
   await expect(page.getByRole("checkbox", { name: /solution — .*?(One supplier contact|Reorder through WhatsApp|Compare quotes)/ })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true }).fill("$50 internal fee");
+  await page.getByRole("textbox", { name: "Price — service 1", exact: true }).fill("Starting at $149");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   const row = page.locator('#av-body tr[data-row-id="5"]');
   await row.getByText("Choose pains", { exact: true }).click();
@@ -43,18 +43,18 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   await row.getByRole("textbox", { name: "What this takes off your plate — Framing", exact: true }).fill("My framer sends the list directly to Avantia.");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("$50 internal fee");
+  await expect(page.getByRole("textbox", { name: "Price — service 1", exact: true })).toHaveValue("Starting at $149");
   await expect(page.locator('#av-body tr[data-row-id="5"]').locator(".picked").first()).toContainText("Missing materials");
   await page.getByRole("button", { name: "Customer preview", exact: true }).click();
   await expect(page.locator(".fees")).toBeHidden();
-  await expect(page.locator(".service-offer")).toContainText("Starting at $99");
+  await expect(page.locator(".service-offer")).toContainText("Starting at $149");
   await expect(page.locator(".service-offer")).toContainText("Free");
   await expect(page.locator(".service-offer")).toContainText("Our price or 5% of the purchase");
   await expect(page.locator(".service-offer")).toContainText("Flat $75");
   await expect(page.locator("#customer")).toContainText("My framer sends the list directly to Avantia.");
   await expect(page.locator("#customer")).not.toContainText("One supplier contact");
   await expect(page.locator(".benefits")).toContainText("Reorder through WhatsApp");
-  await expect(page.locator("#customer")).not.toContainText("$50");
+  await expect(page.locator(".service-offer")).toContainText("Starting at $149");
   await page.emulateMedia({ media: "print" });
   await expect(page.locator(".fees")).toBeHidden();
   await page.emulateMedia({ media: "screen" });
@@ -64,7 +64,7 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   page.once("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: /Restore version 0/ }).click();
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
-  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "Price — service 1", exact: true })).toHaveValue("Starting at $99");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -76,7 +76,7 @@ test("conflicting and failed saves keep edits and never claim success", async ({
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state: seed, revision: 0 })}</script>${editor}${runtime}` });
   });
   await page.goto("http://planner.test/owner/service-planner");
-  const fee = page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true });
+  const fee = page.getByRole("textbox", { name: "Price — service 1", exact: true });
   await fee.fill("$20");
   await expect(page.getByRole("status")).toContainText("Not saved");
   await expect(fee).toHaveValue("$20");
@@ -119,7 +119,8 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
   await expect(page.getByRole("checkbox", { name: "Plans — Shortages & reorders", exact: true })).toBeChecked();
   const merged = page.getByRole("checkbox", { name: "Plans — Takeoff & material cost check", exact: true });
   await expect(merged).toBeChecked();
-  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("$40 previous review fee");
+  await page.getByText("Earlier private fee notes", { exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Earlier private fee — Material cost review", exact: true })).toHaveValue("$40 previous review fee");
   await page.getByRole("textbox", { name: "Items — Plans", exact: true }).fill("My saved printing list");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   expect(saved.rows[0].services).toEqual(state.rows[0].services);
@@ -156,11 +157,12 @@ test("merged shortages save without shifting arrays and surveys stay editable", 
   await expect(page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true })).toBeChecked();
   await page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true }).uncheck();
   await page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true }).check();
-  await page.getByRole("textbox", { name: "Internal fee — Shortages & reorders", exact: true }).fill("$30 internal");
+  await page.getByRole("textbox", { name: "Price — service 4", exact: true }).fill("$30 internal");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   expect(state.rows[5].services).toEqual(seed.rows[5].services);
   expect(state.rows[5].communicateWithSubs).toBe(true);
-  expect(state.fees[4]).toBe("$30 internal");
+  expect(state.serviceOffers?.[3].price).toBe("$30 internal");
+  expect(state.fees).toEqual(seed.fees);
   await page.reload();
   await expect(page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true })).toBeChecked();
   await page.getByRole("textbox", { name: "Items — Surveys", exact: true }).fill("My optional surveys");
@@ -171,29 +173,39 @@ test("merged shortages save without shifting arrays and surveys stay editable", 
   await expect(page.locator("#customer tbody tr").last()).toContainText("My optional surveys");
   await expect(page.locator("#customer")).toContainText("Additional services / packages");
   await expect(page.locator("#customer")).toContainText("Shortages & reorders");
-  await expect(page.locator("#customer")).not.toContainText("$30 internal");
+  await expect(page.locator("#customer")).not.toContainText("Earlier private fee");
 });
 
 
-test("service explanations work on tap, keyboard and desktop hover", async ({ page }, testInfo) => {
-  await page.route("http://planner.test/**", route => route.fulfill({ contentType: "text/html", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state: seed, revision: 0 })}</script>${editor}${runtime}` }));
+test("editable offer names, descriptions and prices save, reload and appear on customer flyer", async ({ page }) => {
+  let state = plannerSchema.parse(structuredClone(seed)), revision = 1;
+  await page.route("http://planner.test/**", async route => {
+    if (route.request().url().includes("/api/")) {
+      state = plannerSchema.parse(route.request().postDataJSON().state);
+      return route.fulfill({ json: { revision: ++revision } });
+    }
+    return route.fulfill({ contentType: "text/html", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state, revision })}</script>${editor}${runtime}` });
+  });
   await page.goto("http://planner.test/owner/service-planner");
-  const info = page.getByRole("button", { name: "About Takeoff & material cost check", exact: true });
-  await info.click();
-  await expect(page.getByRole("tooltip")).toContainText("materials you’re buying");
-  const box = await page.getByRole("tooltip").boundingBox();
-  expect(box!.x).toBeGreaterThanOrEqual(0);
-  expect(box!.x + box!.width).toBeLessThanOrEqual((await page.viewportSize())!.width);
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("tooltip")).toBeHidden();
-  await page.getByRole("button", { name: "About Compare prices", exact: true }).click();
-  await expect(page.getByRole("tooltip")).toContainText("negotiate bulk pricing");
-  await page.locator("h2").click();
-  await expect(page.getByRole("tooltip")).toBeHidden();
-  if (testInfo.project.name === "chromium-desktop") {
-    await info.hover();
-    await expect(page.getByRole("tooltip")).toBeVisible();
-    await page.keyboard.press("Escape");
-  }
-  await expect(page.getByRole("button", { name: /About Book/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^About / })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Service name — service 2", exact: true })).toHaveValue("Get supplier quotes");
+  await expect(page.getByRole("textbox", { name: "Service name — service 3", exact: true })).toHaveValue("Order through Avantia");
+  await page.getByRole("textbox", { name: "Service name — service 1", exact: true }).fill("My takeoff service");
+  await page.getByRole("textbox", { name: "Price — service 1", exact: true }).fill("From $199");
+  await page.getByRole("textbox", { name: "Description — service 1", exact: true }).fill("My quantities and cost review.");
+  await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
+  expect(state.fees).toEqual(seed.fees);
+  expect(state.rows).toEqual(seed.rows);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Price — service 1", exact: true })).toHaveValue("From $199");
+  await expect(page.getByRole("checkbox", { name: "Framing — My takeoff service", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Customer preview", exact: true }).click();
+  await expect(page.locator(".service-planning")).toBeHidden();
+  await expect(page.locator(".service-offer")).toContainText("My takeoff service");
+  await expect(page.locator(".service-offer")).toContainText("From $199");
+  await expect(page.locator(".service-offer")).toContainText("My quantities and cost review.");
+  await expect(page.locator("#customer")).toContainText("My takeoff service");
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".service-offer")).toBeVisible();
+  await expect(page.locator(".fees")).toBeHidden();
 });

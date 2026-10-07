@@ -14,6 +14,9 @@ export const plannerSchema = z.object({
     painIds: z.array(z.enum(painIds)).max(10), solutionIds: z.array(z.enum(solutionIds)).max(12),
     painOther: z.string().max(250), solutionOther: z.string().max(250),
   }).strict()).length(17).refine(rows => rows.every((row, i) => row.id === i), "Invalid department order"),
+  serviceOffers: z.array(z.object({
+    name: z.string().max(90), price: z.string().max(180), description: z.string().max(450),
+  }).strict()).length(4).optional(),
   communicationFee: z.string().max(180).optional(),
   fees: z.array(z.string().max(180)).length(7),
 }).strict();
