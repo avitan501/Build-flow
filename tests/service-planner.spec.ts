@@ -35,7 +35,7 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   await page.goto("http://planner.test/owner/service-planner");
   await expect(page.locator("#av-body tr[data-row-id]")).toHaveCount(17);
   await expect(page.getByRole("checkbox", { name: /solution — .*?(One supplier contact|Reorder through WhatsApp|Compare quotes)/ })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true }).fill("$50 internal fee");
+  await page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true }).fill("$50 internal fee");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   const row = page.locator('#av-body tr[data-row-id="5"]');
   await row.getByText("Choose pains", { exact: true }).click();
@@ -43,10 +43,14 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   await row.getByRole("textbox", { name: "What this takes off your plate — Framing", exact: true }).fill("My framer sends the list directly to Avantia.");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true })).toHaveValue("$50 internal fee");
+  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("$50 internal fee");
   await expect(page.locator('#av-body tr[data-row-id="5"]').locator(".picked").first()).toContainText("Missing materials");
   await page.getByRole("button", { name: "Customer preview", exact: true }).click();
   await expect(page.locator(".fees")).toBeHidden();
+  await expect(page.locator(".service-offer")).toContainText("Starting at $99");
+  await expect(page.locator(".service-offer")).toContainText("Free");
+  await expect(page.locator(".service-offer")).toContainText("Our price or 5% of the purchase");
+  await expect(page.locator(".service-offer")).toContainText("Flat $75");
   await expect(page.locator("#customer")).toContainText("My framer sends the list directly to Avantia.");
   await expect(page.locator("#customer")).not.toContainText("One supplier contact");
   await expect(page.locator(".benefits")).toContainText("Reorder through WhatsApp");
@@ -60,7 +64,7 @@ test("server saves, reload, selections, history, print privacy, and mobile fit",
   page.once("dialog", dialog => dialog.accept());
   await page.getByRole("button", { name: /Restore version 0/ }).click();
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
-  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true })).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -72,7 +76,7 @@ test("conflicting and failed saves keep edits and never claim success", async ({
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state: seed, revision: 0 })}</script>${editor}${runtime}` });
   });
   await page.goto("http://planner.test/owner/service-planner");
-  const fee = page.getByRole("textbox", { name: "Internal fee — Takeoff", exact: true });
+  const fee = page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true });
   await fee.fill("$20");
   await expect(page.getByRole("status")).toContainText("Not saved");
   await expect(fee).toHaveValue("$20");
@@ -92,6 +96,10 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
   state.rows[0].services[5] = false;
   state.rows[0].services[6] = true;
   state.fees[6] = "$40 previous review fee";
+  state.fees[3] = "$75 hidden booking fee";
+  state.rows[0].services[3] = true;
+  state.rows[0].services[4] = false;
+  Object.assign(state.rows[0], { communicateWithSubs: true });
   let saved = structuredClone(state);
   await page.route("http://planner.test/**", async route => {
     if (route.request().url().includes("/api/")) {
@@ -101,12 +109,17 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
     return route.fulfill({ contentType: "text/html; charset=utf-8", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state, revision: 6 })}</script>${editor}${runtime}` });
   });
   await page.goto("http://planner.test/owner/service-planner");
-  await expect(page.locator(".sheet thead tr:first-child th")).toHaveCount(11);
-  await expect(page.locator(".checklabel input")).toHaveCount(119);
+  await expect(page.locator(".sheet thead .column-headings th")).toHaveCount(8);
+  await expect(page.locator(".checklabel input")).toHaveCount(68);
+  await expect(page.getByRole("checkbox", { name: /Book \/ schedule/ })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: /Internal fee — Book/ })).toHaveCount(0);
+  await expect(page.locator(".service-groups")).toContainText("MAIN SERVICES");
+  await expect(page.locator(".service-groups")).toContainText("SUPPORT");
   await expect(page.getByRole("columnheader", { name: /Material Cost Review/ })).toHaveCount(0);
-  const merged = page.getByRole("checkbox", { name: "Plans — Subcontractor check", exact: true });
+  await expect(page.getByRole("checkbox", { name: "Plans — Shortages & reorders", exact: true })).toBeChecked();
+  const merged = page.getByRole("checkbox", { name: "Plans — Takeoff & material cost check", exact: true });
   await expect(merged).toBeChecked();
-  await expect(page.getByRole("textbox", { name: "Internal fee — Subcontractor check", exact: true })).toHaveValue("$40 previous review fee");
+  await expect(page.getByRole("textbox", { name: "Internal fee — Takeoff & material cost check", exact: true })).toHaveValue("$40 previous review fee");
   await page.getByRole("textbox", { name: "Items — Plans", exact: true }).fill("My saved printing list");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   expect(saved.rows[0].services).toEqual(state.rows[0].services);
@@ -118,8 +131,9 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
   await sheet.scrollIntoViewIfNeeded();
   await sheet.evaluate(el => { el.scrollTop = 500; el.scrollLeft = 400; });
   const top = await sheet.boundingBox();
-  const heading = await page.locator(".sheet thead th").first().boundingBox();
-  expect(Math.abs(heading!.y - top!.y)).toBeLessThan(2);
+  const heading = await page.locator(".sheet .column-headings th").first().boundingBox();
+  const groupHeight = await page.locator(".service-groups").evaluate(el => el.getBoundingClientRect().height);
+  expect(Math.abs(heading!.y - top!.y - groupHeight)).toBeLessThan(2);
   expect(Math.abs(heading!.x - top!.x)).toBeLessThan(2);
   await expect(page.locator(".benefits")).toContainText("One payment to Avantia. We pay your suppliers.");
   await expect(page.locator(".benefits")).toContainText("Store doesn’t deliver? We arrange delivery.");
@@ -127,7 +141,7 @@ test("merged subcontractor column preserves legacy saved choices and pinned head
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("sub communication saves independently and surveys stay editable at the bottom", async ({ page }) => {
+test("merged shortages save without shifting arrays and surveys stay editable", async ({ page }) => {
   let state = plannerSchema.parse(structuredClone(seed)), revision = 1;
   await page.route("http://planner.test/**", async route => {
     if (route.request().url().includes("/api/")) {
@@ -139,16 +153,16 @@ test("sub communication saves independently and surveys stay editable at the bot
   });
   await page.goto("http://planner.test/owner/service-planner");
   await expect(page.locator("#av-body tr[data-row-id]").last()).toHaveAttribute("data-row-id", "3");
-  await expect(page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true })).not.toBeChecked();
-  await page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true }).check();
-  await page.getByRole("textbox", { name: "Internal fee — Talk to your subs", exact: true }).fill("$30 internal");
+  await expect(page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true })).toBeChecked();
+  await page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true }).check();
+  await page.getByRole("textbox", { name: "Internal fee — Shortages & reorders", exact: true }).fill("$30 internal");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   expect(state.rows[5].services).toEqual(seed.rows[5].services);
   expect(state.rows[5].communicateWithSubs).toBe(true);
-  expect(state.fees).toEqual(seed.fees);
-  expect(state.communicationFee).toBe("$30 internal");
+  expect(state.fees[4]).toBe("$30 internal");
   await page.reload();
-  await expect(page.getByRole("checkbox", { name: "Framing — Talk to your subs", exact: true })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Framing — Shortages & reorders", exact: true })).toBeChecked();
   await page.getByRole("textbox", { name: "Items — Surveys", exact: true }).fill("My optional surveys");
   await expect(page.getByRole("status")).toHaveText("Saved to Avantia");
   expect(state.rows[3].items).toBe("My optional surveys");
@@ -156,6 +170,30 @@ test("sub communication saves independently and surveys stay editable at the bot
   await page.getByRole("button", { name: "Customer preview", exact: true }).click();
   await expect(page.locator("#customer tbody tr").last()).toContainText("My optional surveys");
   await expect(page.locator("#customer")).toContainText("Additional services / packages");
-  await expect(page.locator("#customer")).toContainText("Talk to your subs");
+  await expect(page.locator("#customer")).toContainText("Shortages & reorders");
   await expect(page.locator("#customer")).not.toContainText("$30 internal");
+});
+
+
+test("service explanations work on tap, keyboard and desktop hover", async ({ page }, testInfo) => {
+  await page.route("http://planner.test/**", route => route.fulfill({ contentType: "text/html", body: `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.plannerInitial=${JSON.stringify({ state: seed, revision: 0 })}</script>${editor}${runtime}` }));
+  await page.goto("http://planner.test/owner/service-planner");
+  const info = page.getByRole("button", { name: "About Takeoff & material cost check", exact: true });
+  await info.click();
+  await expect(page.getByRole("tooltip")).toContainText("materials you’re buying");
+  const box = await page.getByRole("tooltip").boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual((await page.viewportSize())!.width);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toBeHidden();
+  await page.getByRole("button", { name: "About Compare prices", exact: true }).click();
+  await expect(page.getByRole("tooltip")).toContainText("negotiate bulk pricing");
+  await page.locator("h2").click();
+  await expect(page.getByRole("tooltip")).toBeHidden();
+  if (testInfo.project.name === "chromium-desktop") {
+    await info.hover();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+  await expect(page.getByRole("button", { name: /About Book/ })).toHaveCount(0);
 });
