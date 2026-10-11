@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "title": "Contractor discovery · 30 minutes",
+  "opening": "I’d like to understand how material purchasing works on your jobs, where it gets difficult, and what you would actually want help with. We’ll use a recent order, then agree on one useful next step.",
+  "sections": [
+    {"title":"Your business","time":"0–3 min","questions":[
+      {"id":"projects","text":"What projects are you running now, and what stage is each one at?","hint":"Project type, number of active jobs, next material package. Capture facts, not an assumed contractor profile."},
+      {"id":"ownership","text":"Who currently prepares material lists, chooses suppliers and places orders?","hint":"GC, office staff, homeowner, designer, subs or a mix. What already works well?"}
+    ]},
+    {"title":"One real order","time":"3–10 min","questions":[
+      {"id":"recent_order","text":"Walk me through your most recent material order, from the first list to arrival on site.","hint":"Which material, supplier and people were involved? Ask for the sequence before naming our services."},
+      {"id":"friction","text":"Which part took the most effort or did not go as expected?","hint":"Ask what happened, who fixed it and how. If nothing went wrong, record that too."},
+      {"id":"effort","text":"Roughly how much of your time did that order take, and who did you have to contact?","hint":"Separate supplier, homeowner/designer and subcontractor calls. Include messages and store trips. Record an estimate or unknown; do not invent a count."}
+    ]},
+    {"title":"Where it repeats","time":"10–17 min","questions":[
+      {"id":"departments","text":"Which one or two material packages cause the most repeated work for you?","hint":"Use the department selector below. Explore the relevant packages; do not interview all 17 departments in one call."},
+      {"id":"frequency","text":"How often does that happen, and what does it affect when it does?","hint":"One recent example, events per week/month, GC time, crew waiting or documented extra cost. Distinguish his estimate from verified records."},
+      {"id":"workarounds","text":"What have you tried to make this easier, and what still falls back on you?","hint":"Existing supplier rep, employee, software, sub or another service. What should we preserve?"}
+    ]},
+    {"title":"Agree the handoff","time":"17–22 min","questions":[
+      {"id":"approvals","text":"Who should confirm quantities and specifications, approve spending, and check the delivery on site?","hint":"Name each role. Avantia coordinates approved purchases; the contractor/team receives and checks the materials."},
+      {"id":"subs","text":"When your sub needs materials, how would you want the request and approval to reach us?","hint":"Direct contact or through GC; who supplies the approved list, who may approve a reorder, preferred channel and spending limit if any."},
+      {"id":"boundaries","text":"What would you hand over, and what would you prefer to keep handling yourself?","hint":"Ask about supplier relationships, homeowner selections and urgent requests. Record concerns and excluded work; do not promise everything."}
+    ]},
+    {"title":"Choose useful help","time":"22–27 min","questions":[
+      {"id":"priorities","text":"If we could take only one or two recurring tasks off your plate, which would you choose?","hint":"Repeat his words before showing matching Avantia services. Confirm what matters most to him."},
+      {"id":"success","text":"What would make the first order feel successful enough to use us again?","hint":"Choose an observable result: fewer GC calls, less GC time, a complete approved order or a like-for-like price comparison. No guaranteed savings."}
+    ]},
+    {"title":"Recap & next step","time":"27–30 min","questions":[
+      {"id":"recap","text":"Have I understood the problem and the work you want us to take over correctly?","hint":"Read back: problem, department, Avantia action, GC responsibility and success measure. Correct the summary together."},
+      {"id":"next_step","text":"What is the next real order we could start with, and what would you need before proceeding?","hint":"List/plan/quote needed, person responsible, due date, expected service scope and fee agreement. An interview is not approval to buy."}
+    ]}
+  ],
+  "serviceIds": ["takeoff","quotes","orders","reorders"],
+  "services": [
+    {"id":"takeoff","name":"Takeoff & material cost check","when":"Unclear quantities or the material portion of a subcontractor quote.","question":"Who produces and verifies the list today, and which quantity or subcontractor inclusion was unclear on the last job?","action":"Prepare or review quantities and estimated material costs for trade/GC approval."},
+    {"id":"quotes","name":"Get supplier quotes","when":"Time spent comparing suppliers or uncertainty about matching prices.","question":"How did you compare the last quotes, including matching specifications, delivery and terms?","action":"Compare like-for-like supplier quotes and negotiate approved material pricing."},
+    {"id":"orders","name":"Order through Avantia","when":"Repeated supplier calls, payments or delivery arrangements.","question":"Which supplier conversations, payments or arrangements did you personally handle on the last order?","action":"Arrange approved purchases, supplier payments and delivery coordination."},
+    {"id":"reorders","name":"Shortages & reorders","when":"Missing items and repeated calls from subs.","question":"Tell me about the last missing item: who identified it, approved it and arranged the reorder?","action":"Receive a confirmed shortage list from the GC/sub and coordinate the approved reorder."}
+  ],
+  "pains": [
+    {"id":"quantities","label":"Unclear quantities","services":["takeoff"]},
+    {"id":"scope","label":"Unclear subcontractor material scope","services":["takeoff"]},
+    {"id":"pricing","label":"Unclear or hard-to-compare pricing","services":["quotes"]},
+    {"id":"calls","label":"Too many supplier calls","services":["orders"]},
+    {"id":"stores","label":"Purchases spread across suppliers","services":["quotes","orders"]},
+    {"id":"chasing","label":"Chasing bookings or deliveries","services":["orders"]},
+    {"id":"missing","label":"Missing materials","services":["reorders"]},
+    {"id":"reorders","label":"Frequent reorders","services":["reorders"]},
+    {"id":"approvals","label":"Waiting for selections or approvals","services":[]},
+    {"id":"other","label":"Other / needs a different solution","services":[]}
+  ]
+}
