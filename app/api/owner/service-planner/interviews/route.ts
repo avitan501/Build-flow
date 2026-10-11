@@ -25,7 +25,7 @@ export async function PUT(request: Request) {
   const reader = request.body?.getReader();
   if (!reader) return json({error:"Body required"},400);
   const chunks: Uint8Array[] = []; let bytes=0;
-  while (true) { const { value, done } = await reader.read(); if (done) break; bytes += value.length; if (bytes>100000) { await reader.cancel(); return json({error:"Interview is too large"},413); } chunks.push(value); }
+  while (true) { const { value, done } = await reader.read(); if (done) break; bytes += value.length; if (bytes>1000000) { await reader.cancel(); return json({error:"Interview is too large"},413); } chunks.push(value); }
   let parsed;
   try { parsed = interviewSaveSchema.safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8"))); } catch { return json({error:"Invalid JSON"},400); }
   if (!parsed.success) return json({error:"Check company name and interview entries."},400);

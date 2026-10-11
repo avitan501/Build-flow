@@ -45,3 +45,30 @@ test('failed and conflicting saves preserve notes without claiming success or ov
 test('unsupported pain is not forced into a service and customer text is rendered literally',async({page})=>{
  await harness(page);await start(page,'<img src=x onerror=alert(1)>');await expect(page.locator('#interview-title img')).toHaveCount(0);await page.getByRole('button',{name:/^5\. Choose useful help/}).click();await page.getByRole('button',{name:'Add priority'}).click();await page.getByLabel('Priority 1 problem').selectOption('approvals');await expect(page.locator('#extras')).toContainText('Some problems may need a different solution');await expect(page.locator('#extras input:checked')).toHaveCount(0);
 });
+
+test('optional question bank persists asked markers and notes per contractor without changing legacy answers or sharing private notes',async({page},testInfo)=>{
+ const {records}=await harness(page);await start(page,'Bank GC');
+ const record=[...records.values()][0];delete record.state.bankAnswers;delete record.state.askedQuestions;record.state.answers.projects='Existing interview answer';
+ await page.reload();await page.getByRole('button',{name:/Bank GC/}).click();
+ await expect(page.getByRole('textbox',{name:/What projects are you running/})).toHaveValue('Existing interview answer');
+ await expect(page.locator('#bank-panel')).not.toHaveAttribute('open','');
+ await page.locator('#bank-panel > summary').click();
+ const question=questions.sections[0].bank[0];const item=page.locator('[data-question-id="'+question.id+'"]');
+ await item.locator('summary').click();await expect(item).toContainText(question.followups[0]);
+ await item.getByRole('checkbox',{name:'Asked: '+question.text,exact:true}).check();
+ await item.getByRole('textbox',{name:'Notes: '+question.text,exact:false}).fill('PRIVATE BANK: Framing next week; approved list from the framer.');
+ await expect(page.locator('#save-status')).toContainText('Saved to Avantia');
+ await page.screenshot({path:'docs/contractor-question-bank/'+testInfo.project.name+'.png',fullPage:true});
+ await page.getByRole('button',{name:/^2\. One real order/}).click();
+ await expect(page.locator('#bank-panel .bank-question')).toHaveCount(10);
+ await page.reload();await page.getByRole('button',{name:/Bank GC/}).click();await page.locator('#bank-panel > summary').click();await item.locator('summary').click();
+ await expect(item.getByRole('checkbox',{name:'Asked: '+question.text,exact:true})).toBeChecked();
+ await expect(item.getByRole('textbox',{name:'Notes: '+question.text,exact:false})).toHaveValue(/PRIVATE BANK/);
+ await item.getByRole('checkbox',{name:'Asked: '+question.text,exact:true}).uncheck();await expect(page.locator('#save-status')).toContainText('Saved to Avantia');
+ expect([...records.values()][0].state.bankAnswers?.[question.id]).toContain('PRIVATE BANK');
+ await page.locator('#preview').click();await expect(page.locator('#preview-body')).not.toContainText('PRIVATE BANK');
+ await page.getByRole('button',{name:'← Back to interview'}).click();await page.getByRole('button',{name:'← All interviews'}).click();await start(page,'Different GC');
+ await page.locator('#bank-panel > summary').click();await item.locator('summary').click();
+ await expect(item.getByRole('textbox',{name:'Notes: '+question.text,exact:false})).toHaveValue('');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

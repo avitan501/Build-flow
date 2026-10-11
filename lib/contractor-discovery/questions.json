@@ -1,53 +1,775 @@
 {
-  "version": 1,
+  "version": 2,
   "title": "Contractor discovery · 30 minutes",
   "opening": "I’d like to understand how material purchasing works on your jobs, where it gets difficult, and what you would actually want help with. We’ll use a recent order, then agree on one useful next step.",
   "sections": [
-    {"title":"Your business","time":"0–3 min","questions":[
-      {"id":"projects","text":"What projects are you running now, and what stage is each one at?","hint":"Project type, number of active jobs, next material package. Capture facts, not an assumed contractor profile."},
-      {"id":"ownership","text":"Who currently prepares material lists, chooses suppliers and places orders?","hint":"GC, office staff, homeowner, designer, subs or a mix. What already works well?"}
-    ]},
-    {"title":"One real order","time":"3–10 min","questions":[
-      {"id":"recent_order","text":"Walk me through your most recent material order, from the first list to arrival on site.","hint":"Which material, supplier and people were involved? Ask for the sequence before naming our services."},
-      {"id":"friction","text":"Which part took the most effort or did not go as expected?","hint":"Ask what happened, who fixed it and how. If nothing went wrong, record that too."},
-      {"id":"effort","text":"Roughly how much of your time did that order take, and who did you have to contact?","hint":"Separate supplier, homeowner/designer and subcontractor calls. Include messages and store trips. Record an estimate or unknown; do not invent a count."}
-    ]},
-    {"title":"Where it repeats","time":"10–17 min","questions":[
-      {"id":"departments","text":"Which one or two material packages cause the most repeated work for you?","hint":"Use the department selector below. Explore the relevant packages; do not interview all 17 departments in one call."},
-      {"id":"frequency","text":"How often does that happen, and what does it affect when it does?","hint":"One recent example, events per week/month, GC time, crew waiting or documented extra cost. Distinguish his estimate from verified records."},
-      {"id":"workarounds","text":"What have you tried to make this easier, and what still falls back on you?","hint":"Existing supplier rep, employee, software, sub or another service. What should we preserve?"}
-    ]},
-    {"title":"Agree the handoff","time":"17–22 min","questions":[
-      {"id":"approvals","text":"Who should confirm quantities and specifications, approve spending, and check the delivery on site?","hint":"Name each role. Avantia coordinates approved purchases; the contractor/team receives and checks the materials."},
-      {"id":"subs","text":"When your sub needs materials, how would you want the request and approval to reach us?","hint":"Direct contact or through GC; who supplies the approved list, who may approve a reorder, preferred channel and spending limit if any."},
-      {"id":"boundaries","text":"What would you hand over, and what would you prefer to keep handling yourself?","hint":"Ask about supplier relationships, homeowner selections and urgent requests. Record concerns and excluded work; do not promise everything."}
-    ]},
-    {"title":"Choose useful help","time":"22–27 min","questions":[
-      {"id":"priorities","text":"If we could take only one or two recurring tasks off your plate, which would you choose?","hint":"Repeat his words before showing matching Avantia services. Confirm what matters most to him."},
-      {"id":"success","text":"What would make the first order feel successful enough to use us again?","hint":"Choose an observable result: fewer GC calls, less GC time, a complete approved order or a like-for-like price comparison. No guaranteed savings."}
-    ]},
-    {"title":"Recap & next step","time":"27–30 min","questions":[
-      {"id":"recap","text":"Have I understood the problem and the work you want us to take over correctly?","hint":"Read back: problem, department, Avantia action, GC responsibility and success measure. Correct the summary together."},
-      {"id":"next_step","text":"What is the next real order we could start with, and what would you need before proceeding?","hint":"List/plan/quote needed, person responsible, due date, expected service scope and fee agreement. An interview is not approval to buy."}
-    ]}
+    {
+      "title": "Your business",
+      "time": "0–3 min",
+      "questions": [
+        {
+          "id": "projects",
+          "text": "What projects are you running now, and what stage is each one at?",
+          "hint": "Project type, number of active jobs, next material package. Capture facts, not an assumed contractor profile.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        },
+        {
+          "id": "ownership",
+          "text": "Who currently prepares material lists, chooses suppliers and places orders?",
+          "hint": "GC, office staff, homeowner, designer, subs or a mix. What already works well?",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_1_pipeline",
+          "text": "What material purchases are coming up over the next month?",
+          "followups": [
+            "Which job needs attention first?",
+            "What is already ordered?"
+          ]
+        },
+        {
+          "id": "bank_1_team",
+          "text": "Who gets pulled away from their main job to handle purchasing?",
+          "followups": [
+            "What do they stop doing?",
+            "Tell me about the last time."
+          ]
+        },
+        {
+          "id": "bank_1_job_mix",
+          "text": "How does purchasing differ between your new builds, renovations or flips?",
+          "followups": [
+            "Which type requires more coordination?",
+            "What changes from job to job?"
+          ]
+        },
+        {
+          "id": "bank_1_suppliers",
+          "text": "Which suppliers do you rely on, and why?",
+          "followups": [
+            "What do they handle well for you?",
+            "Which relationships would you want to keep?"
+          ]
+        },
+        {
+          "id": "bank_1_list_source",
+          "text": "Where do your material lists come from?",
+          "followups": [
+            "Does the sub, plan or supplier provide the quantities?",
+            "Who checks the final version?"
+          ]
+        },
+        {
+          "id": "bank_1_sub_inclusions",
+          "text": "How do you establish which materials each sub provides?",
+          "followups": [
+            "Where is that written down?",
+            "When was an inclusion last unclear?"
+          ]
+        },
+        {
+          "id": "bank_1_budget_owner",
+          "text": "Who keeps track of the material budget as the job progresses?",
+          "followups": [
+            "How do they spot a change?",
+            "What information reaches you too late?"
+          ]
+        },
+        {
+          "id": "bank_1_tools",
+          "text": "Where do you keep quotes, approvals and order details?",
+          "followups": [
+            "How do you find the latest version?",
+            "Who else needs access?"
+          ]
+        },
+        {
+          "id": "bank_1_capacity",
+          "text": "What limits how many jobs you can manage comfortably?",
+          "followups": [
+            "Where does material purchasing fit into that?",
+            "What would another project add to your workload?"
+          ]
+        },
+        {
+          "id": "bank_1_good_order",
+          "text": "Tell me about an order that went smoothly.",
+          "followups": [
+            "What made it work?",
+            "What should an outside service avoid disrupting?"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "One real order",
+      "time": "3–10 min",
+      "questions": [
+        {
+          "id": "recent_order",
+          "text": "Walk me through your most recent material order, from the first list to arrival on site.",
+          "hint": "Which material, supplier and people were involved? Ask for the sequence before naming our services.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        },
+        {
+          "id": "friction",
+          "text": "Which part took the most effort or did not go as expected?",
+          "hint": "Ask what happened, who fixed it and how. If nothing went wrong, record that too.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        },
+        {
+          "id": "effort",
+          "text": "Roughly how much of your time did that order take, and who did you have to contact?",
+          "hint": "Separate supplier, homeowner/designer and subcontractor calls. Include messages and store trips. Record an estimate or unknown; do not invent a count.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_2_first_request",
+          "text": "How did the request for your last order reach you?",
+          "followups": [
+            "Was the list complete?",
+            "What did you have to clarify?"
+          ]
+        },
+        {
+          "id": "bank_2_quote_round",
+          "text": "How did you decide which suppliers to ask for quotes?",
+          "followups": [
+            "How many did you contact?",
+            "Who followed up when a quote did not arrive?"
+          ]
+        },
+        {
+          "id": "bank_2_quote_match",
+          "text": "How did you check that the quotes covered the same materials?",
+          "followups": [
+            "Were brands, quantities and specifications matched?",
+            "How were delivery charges and exclusions handled?"
+          ]
+        },
+        {
+          "id": "bank_2_availability",
+          "text": "When did you confirm stock and lead times?",
+          "followups": [
+            "Did anything change after quoting?",
+            "Who found out and handled it?"
+          ]
+        },
+        {
+          "id": "bank_2_substitutions",
+          "text": "Was an alternative product suggested on the last order?",
+          "followups": [
+            "Who checked whether it would work?",
+            "Who approved the change?"
+          ]
+        },
+        {
+          "id": "bank_2_homeowner",
+          "text": "What homeowner or designer decisions were needed?",
+          "followups": [
+            "Who explained the options?",
+            "What happened while you waited?"
+          ]
+        },
+        {
+          "id": "bank_2_purchase",
+          "text": "Who actually placed and paid for the order?",
+          "followups": [
+            "How many separate transactions were involved?",
+            "What did you still have to check yourself?"
+          ]
+        },
+        {
+          "id": "bank_2_delivery",
+          "text": "How were the delivery date and site arrangements agreed?",
+          "followups": [
+            "Who confirmed access and unloading requirements?",
+            "Who checked the shipment when it arrived?"
+          ]
+        },
+        {
+          "id": "bank_2_interruption",
+          "text": "At what points did this order interrupt your other work?",
+          "followups": [
+            "How long did each interruption take?",
+            "Were there store trips as well as calls?"
+          ]
+        },
+        {
+          "id": "bank_2_outcome",
+          "text": "Did the materials arrive complete and ready for the work?",
+          "followups": [
+            "What, if anything, was missing?",
+            "Who took the next action?"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Where it repeats",
+      "time": "10–17 min",
+      "questions": [
+        {
+          "id": "departments",
+          "text": "Which one or two material packages cause the most repeated work for you?",
+          "hint": "Use the department selector below. Explore the relevant packages; do not interview all 17 departments in one call.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        },
+        {
+          "id": "frequency",
+          "text": "How often does that happen, and what does it affect when it does?",
+          "hint": "One recent example, events per week/month, GC time, crew waiting or documented extra cost. Distinguish his estimate from verified records.",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        },
+        {
+          "id": "workarounds",
+          "text": "What have you tried to make this easier, and what still falls back on you?",
+          "hint": "Existing supplier rep, employee, software, sub or another service. What should we preserve?",
+          "followups": [
+            "Can you give me a recent example?",
+            "Who was involved, and what happened next?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_3_framing",
+          "text": "When buying framing materials, where does the process need the most attention?",
+          "followups": [
+            "Who supplies the approved lumber and hardware list?",
+            "How are additional framer requests handled?"
+          ]
+        },
+        {
+          "id": "bank_3_roofing",
+          "text": "What tends to need clarification on roofing or siding orders?",
+          "followups": [
+            "Are accessories and matching parts on the original list?",
+            "Who confirms the approved product and quantity?"
+          ]
+        },
+        {
+          "id": "bank_3_sheetrock",
+          "text": "How do you organize sheetrock and related installation materials?",
+          "followups": [
+            "Who confirms board types, quantities and accessories?",
+            "What happened on the last incomplete order?"
+          ]
+        },
+        {
+          "id": "bank_3_openings",
+          "text": "How do window and exterior-door specifications become an approved order?",
+          "followups": [
+            "Who resolves supplier questions with the homeowner?",
+            "Who signs off on sizes, options and quantities?"
+          ]
+        },
+        {
+          "id": "bank_3_finishes",
+          "text": "What is involved in ordering flooring, tile materials, doors or trim?",
+          "followups": [
+            "Who confirms selections and compatible installation supplies?",
+            "Which conversations still need you in the middle?"
+          ]
+        },
+        {
+          "id": "bank_3_mep",
+          "text": "What do you need to understand about materials included in plumbing, electrical or HVAC sub quotes?",
+          "followups": [
+            "Which inclusions or exclusions are unclear?",
+            "What information would help you review the material portion?"
+          ]
+        },
+        {
+          "id": "bank_3_site_services",
+          "text": "How do you arrange recurring site needs such as dumpsters or temporary supplies?",
+          "followups": [
+            "Which bookings or replacements repeat?",
+            "Who checks that the next service is needed?"
+          ]
+        },
+        {
+          "id": "bank_3_shortages",
+          "text": "What usually triggers an extra material run?",
+          "followups": [
+            "Was it a changed scope, quantity issue or omitted item?",
+            "Who identifies and confirms what is needed?"
+          ]
+        },
+        {
+          "id": "bank_3_repeat_cost",
+          "text": "Which purchasing problem has had the biggest consequence recently?",
+          "followups": [
+            "What time or cost can you identify?",
+            "Is that from records or an estimate?"
+          ]
+        },
+        {
+          "id": "bank_3_pattern",
+          "text": "Which problems are recurring, and which were one-off events?",
+          "followups": [
+            "How many times did each happen on recent jobs?",
+            "Which are worth changing first?"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Agree the handoff",
+      "time": "17–22 min",
+      "questions": [
+        {
+          "id": "approvals",
+          "text": "Who should confirm quantities and specifications, approve spending, and check the delivery on site?",
+          "hint": "Name each role. Avantia coordinates approved purchases; the contractor/team receives and checks the materials.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        },
+        {
+          "id": "subs",
+          "text": "When your sub needs materials, how would you want the request and approval to reach us?",
+          "hint": "Direct contact or through GC; who supplies the approved list, who may approve a reorder, preferred channel and spending limit if any.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        },
+        {
+          "id": "boundaries",
+          "text": "What would you hand over, and what would you prefer to keep handling yourself?",
+          "hint": "Ask about supplier relationships, homeowner selections and urgent requests. Record concerns and excluded work; do not promise everything.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_4_list_approval",
+          "text": "What would a material list need before you would let someone order from it?",
+          "followups": [
+            "Who gives the final approval?",
+            "How do later changes get recorded?"
+          ]
+        },
+        {
+          "id": "bank_4_sub_contact",
+          "text": "Which subs would you be comfortable having us contact directly?",
+          "followups": [
+            "What should we discuss without involving you?",
+            "What must come back to you for approval?"
+          ]
+        },
+        {
+          "id": "bank_4_spending",
+          "text": "How would you want spending approved?",
+          "followups": [
+            "Is approval needed for each order?",
+            "Who can approve when you are unavailable?"
+          ]
+        },
+        {
+          "id": "bank_4_equivalents",
+          "text": "How should requests for substitutions be handled?",
+          "followups": [
+            "Who checks technical suitability?",
+            "Who approves a different price or appearance?"
+          ]
+        },
+        {
+          "id": "bank_4_existing_accounts",
+          "text": "What supplier-account arrangements need to remain in place?",
+          "followups": [
+            "Are there terms or relationships we need to preserve?",
+            "How would you want orders and payments routed?"
+          ]
+        },
+        {
+          "id": "bank_4_receiving",
+          "text": "Who on your team will receive and check deliveries?",
+          "followups": [
+            "How should they report missing items?",
+            "What information should accompany that report?"
+          ]
+        },
+        {
+          "id": "bank_4_urgent",
+          "text": "How do you want an urgent shortage handled?",
+          "followups": [
+            "Who confirms the item and required timing?",
+            "What should happen if the requested timing cannot be met?"
+          ]
+        },
+        {
+          "id": "bank_4_updates",
+          "text": "What updates do you need, and when?",
+          "followups": [
+            "Would you prefer milestones or each change?",
+            "Who else should receive them?"
+          ]
+        },
+        {
+          "id": "bank_4_decisions",
+          "text": "How should homeowner or designer questions reach the right person?",
+          "followups": [
+            "Which decisions need your involvement?",
+            "What would keep you from being the messenger?"
+          ]
+        },
+        {
+          "id": "bank_4_limits",
+          "text": "What would make this service create more work for you?",
+          "followups": [
+            "Which decisions should we never make for you?",
+            "What response or availability expectations should we agree on?"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Choose useful help",
+      "time": "22–27 min",
+      "questions": [
+        {
+          "id": "priorities",
+          "text": "If we could take only one or two recurring tasks off your plate, which would you choose?",
+          "hint": "Repeat his words before showing matching Avantia services. Confirm what matters most to him.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        },
+        {
+          "id": "success",
+          "text": "What would make the first order feel successful enough to use us again?",
+          "hint": "Choose an observable result: fewer GC calls, less GC time, a complete approved order or a like-for-like price comparison. No guaranteed savings.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_5_first_relief",
+          "text": "Which part of purchasing would you most like to stop handling personally?",
+          "followups": [
+            "What would that free you up to do?",
+            "What would still need your judgment?"
+          ]
+        },
+        {
+          "id": "bank_5_quantity_help",
+          "text": "Where would a takeoff or material-cost review actually help you?",
+          "followups": [
+            "Would it support your own order or review a sub’s material scope?",
+            "Who would verify the quantities before purchase?"
+          ]
+        },
+        {
+          "id": "bank_5_price_help",
+          "text": "When is getting another supplier quote worth your time?",
+          "followups": [
+            "What would make a comparison useful?",
+            "When would you prefer to stay with the current supplier?"
+          ]
+        },
+        {
+          "id": "bank_5_order_help",
+          "text": "Which order tasks would you want handled through one contact?",
+          "followups": [
+            "Calls, purchase arrangements, payments or delivery coordination?",
+            "Which of those do you already handle easily?"
+          ]
+        },
+        {
+          "id": "bank_5_reorder_help",
+          "text": "What would a useful shortage and reorder service look like?",
+          "followups": [
+            "Who sends the confirmed missing-item list?",
+            "What do you want to stop having to chase?"
+          ]
+        },
+        {
+          "id": "bank_5_trust",
+          "text": "What would you need to see before trusting someone with this work?",
+          "followups": [
+            "Would you want to review each step at first?",
+            "What would cause you to stop using the service?"
+          ]
+        },
+        {
+          "id": "bank_5_alternatives",
+          "text": "What other ways have you considered getting this work done?",
+          "followups": [
+            "Could a supplier rep, employee or sub handle it?",
+            "What is missing from those options?"
+          ]
+        },
+        {
+          "id": "bank_5_value",
+          "text": "How would you decide whether this service is worth paying for?",
+          "followups": [
+            "Which result matters most: time, clarity, fewer interruptions or price?",
+            "What would you compare the fee against?"
+          ]
+        },
+        {
+          "id": "bank_5_priority_tradeoff",
+          "text": "If we could help with only one problem first, which would you choose?",
+          "followups": [
+            "Why that one rather than the others?",
+            "What could wait until later?"
+          ]
+        },
+        {
+          "id": "bank_5_success_target",
+          "text": "What result would you want to measure on the first order?",
+          "followups": [
+            "What is your current baseline, if known?",
+            "How would we check the result together?"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Recap & next step",
+      "time": "27–30 min",
+      "questions": [
+        {
+          "id": "recap",
+          "text": "Have I understood the problem and the work you want us to take over correctly?",
+          "hint": "Read back: problem, department, Avantia action, GC responsibility and success measure. Correct the summary together.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        },
+        {
+          "id": "next_step",
+          "text": "What is the next real order we could start with, and what would you need before proceeding?",
+          "hint": "List/plan/quote needed, person responsible, due date, expected service scope and fee agreement. An interview is not approval to buy.",
+          "followups": [
+            "What would that look like on the first order?",
+            "Who needs to confirm that with you?"
+          ]
+        }
+      ],
+      "bank": [
+        {
+          "id": "bank_6_readback",
+          "text": "What have I misunderstood or missed about how you work?",
+          "followups": [
+            "Is this your main problem in your own words?",
+            "What would you change in the proposed help?"
+          ]
+        },
+        {
+          "id": "bank_6_pilot_package",
+          "text": "Which upcoming material package would make a practical first trial?",
+          "followups": [
+            "Is the approved list ready?",
+            "Is the order routine enough to define clearly?"
+          ]
+        },
+        {
+          "id": "bank_6_documents",
+          "text": "What information can you share to start?",
+          "followups": [
+            "Plans, approved lists, supplier quotes or relevant sub scope?",
+            "Which version is current?"
+          ]
+        },
+        {
+          "id": "bank_6_contacts",
+          "text": "Who needs to be involved in the first order?",
+          "followups": [
+            "Who is the sub or supplier contact?",
+            "Who makes the final purchasing decision?"
+          ]
+        },
+        {
+          "id": "bank_6_scope_confirm",
+          "text": "Which tasks are included in this first engagement?",
+          "followups": [
+            "Which tasks stay with your team?",
+            "What should require a separate agreement?"
+          ]
+        },
+        {
+          "id": "bank_6_timing_confirm",
+          "text": "What are the real decision and material-needed dates?",
+          "followups": [
+            "Which dates are fixed and which are flexible?",
+            "What still needs confirmation from the supplier?"
+          ]
+        },
+        {
+          "id": "bank_6_fee_confirm",
+          "text": "How should we agree on the fee before any work begins?",
+          "followups": [
+            "What scope should the quote cover?",
+            "Who needs to approve it?"
+          ]
+        },
+        {
+          "id": "bank_6_open_points",
+          "text": "What is still unresolved before you can proceed?",
+          "followups": [
+            "Who can answer each open question?",
+            "When should we check back?"
+          ]
+        },
+        {
+          "id": "bank_6_review_date",
+          "text": "When should we review whether the trial helped?",
+          "followups": [
+            "What information should each of us bring?",
+            "What would justify another order?"
+          ]
+        },
+        {
+          "id": "bank_6_commitment",
+          "text": "What is the next action, who owns it, and when will it happen?",
+          "followups": [
+            "What will you send us?",
+            "What should we return before you authorize the purchase?"
+          ]
+        }
+      ]
+    }
   ],
-  "serviceIds": ["takeoff","quotes","orders","reorders"],
+  "serviceIds": [
+    "takeoff",
+    "quotes",
+    "orders",
+    "reorders"
+  ],
   "services": [
-    {"id":"takeoff","name":"Takeoff & material cost check","when":"Unclear quantities or the material portion of a subcontractor quote.","question":"Who produces and verifies the list today, and which quantity or subcontractor inclusion was unclear on the last job?","action":"Prepare or review quantities and estimated material costs for trade/GC approval."},
-    {"id":"quotes","name":"Get supplier quotes","when":"Time spent comparing suppliers or uncertainty about matching prices.","question":"How did you compare the last quotes, including matching specifications, delivery and terms?","action":"Compare like-for-like supplier quotes and negotiate approved material pricing."},
-    {"id":"orders","name":"Order through Avantia","when":"Repeated supplier calls, payments or delivery arrangements.","question":"Which supplier conversations, payments or arrangements did you personally handle on the last order?","action":"Arrange approved purchases, supplier payments and delivery coordination."},
-    {"id":"reorders","name":"Shortages & reorders","when":"Missing items and repeated calls from subs.","question":"Tell me about the last missing item: who identified it, approved it and arranged the reorder?","action":"Receive a confirmed shortage list from the GC/sub and coordinate the approved reorder."}
+    {
+      "id": "takeoff",
+      "name": "Takeoff & material cost check",
+      "when": "Unclear quantities or the material portion of a subcontractor quote.",
+      "question": "Who produces and verifies the list today, and which quantity or subcontractor inclusion was unclear on the last job?",
+      "action": "Prepare or review quantities and estimated material costs for trade/GC approval."
+    },
+    {
+      "id": "quotes",
+      "name": "Get supplier quotes",
+      "when": "Time spent comparing suppliers or uncertainty about matching prices.",
+      "question": "How did you compare the last quotes, including matching specifications, delivery and terms?",
+      "action": "Compare like-for-like supplier quotes and negotiate approved material pricing."
+    },
+    {
+      "id": "orders",
+      "name": "Order through Avantia",
+      "when": "Repeated supplier calls, payments or delivery arrangements.",
+      "question": "Which supplier conversations, payments or arrangements did you personally handle on the last order?",
+      "action": "Arrange approved purchases, supplier payments and delivery coordination."
+    },
+    {
+      "id": "reorders",
+      "name": "Shortages & reorders",
+      "when": "Missing items and repeated calls from subs.",
+      "question": "Tell me about the last missing item: who identified it, approved it and arranged the reorder?",
+      "action": "Receive a confirmed shortage list from the GC/sub and coordinate the approved reorder."
+    }
   ],
   "pains": [
-    {"id":"quantities","label":"Unclear quantities","services":["takeoff"]},
-    {"id":"scope","label":"Unclear subcontractor material scope","services":["takeoff"]},
-    {"id":"pricing","label":"Unclear or hard-to-compare pricing","services":["quotes"]},
-    {"id":"calls","label":"Too many supplier calls","services":["orders"]},
-    {"id":"stores","label":"Purchases spread across suppliers","services":["quotes","orders"]},
-    {"id":"chasing","label":"Chasing bookings or deliveries","services":["orders"]},
-    {"id":"missing","label":"Missing materials","services":["reorders"]},
-    {"id":"reorders","label":"Frequent reorders","services":["reorders"]},
-    {"id":"approvals","label":"Waiting for selections or approvals","services":[]},
-    {"id":"other","label":"Other / needs a different solution","services":[]}
+    {
+      "id": "quantities",
+      "label": "Unclear quantities",
+      "services": [
+        "takeoff"
+      ]
+    },
+    {
+      "id": "scope",
+      "label": "Unclear subcontractor material scope",
+      "services": [
+        "takeoff"
+      ]
+    },
+    {
+      "id": "pricing",
+      "label": "Unclear or hard-to-compare pricing",
+      "services": [
+        "quotes"
+      ]
+    },
+    {
+      "id": "calls",
+      "label": "Too many supplier calls",
+      "services": [
+        "orders"
+      ]
+    },
+    {
+      "id": "stores",
+      "label": "Purchases spread across suppliers",
+      "services": [
+        "quotes",
+        "orders"
+      ]
+    },
+    {
+      "id": "chasing",
+      "label": "Chasing bookings or deliveries",
+      "services": [
+        "orders"
+      ]
+    },
+    {
+      "id": "missing",
+      "label": "Missing materials",
+      "services": [
+        "reorders"
+      ]
+    },
+    {
+      "id": "reorders",
+      "label": "Frequent reorders",
+      "services": [
+        "reorders"
+      ]
+    },
+    {
+      "id": "approvals",
+      "label": "Waiting for selections or approvals",
+      "services": []
+    },
+    {
+      "id": "other",
+      "label": "Other / needs a different solution",
+      "services": []
+    }
   ]
 }

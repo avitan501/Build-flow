@@ -31,7 +31,7 @@ test('API owner gate, origin, size, validation, pagination, missing record and C
  assert.equal((await get('')).status,403);assert.equal((await api.PUT(req())).status,403);assert.equal(calls,0);
  owner=true;assert.equal((await api.PUT(req(undefined,'https://other.test'))).status,403);assert.equal(calls,0);
  assert.equal((await get('?id=avantia-service-planner')).status,400);assert.equal((await get('?offset=-1')).status,400);
- assert.equal((await api.PUT(req({id,revision:0,state:{...state(),junk:'x'.repeat(100001)}}))).status,413);
+ assert.equal((await api.PUT(req({id,revision:0,state:{...state(),junk:'x'.repeat(1000001)}}))).status,413);
  assert.equal((await api.PUT(req({id,revision:0,state:{...state(),services:['book']}}))).status,400);
  assert.equal((await api.PUT(req())).status,200);conflict=true;assert.equal((await api.PUT(req())).status,409);
  assert.equal((await get('?id='+id)).status,404);assert.equal((await get('')).headers.get('cache-control'),'private, no-store');
@@ -50,4 +50,19 @@ test('independent records, atomic revision updates, stale saves and bounded hist
 test('page guards access first and escapes user-controlled planner names',async()=>{
  let owner=false,reads=0;const page=load('app/owner/service-planner/interviews/route.ts',{'@/lib/owner-access':{requireOwnerAccess:async()=>{if(!owner)throw Error('redirect')}},'@/lib/service-planner/store':{loadPlanner:async()=>{reads++;return {state:{rows:[{id:0,department:'</script><script>bad()</script>',items:''}]}}}},'@/lib/contractor-discovery/questions.json':questions,'@/lib/contractor-discovery/editor.generated.json':'<main>Interview</main>'});
  await assert.rejects(page.GET());assert.equal(reads,0);owner=true;const response=await page.GET();assert.equal(response.status,200);assert.ok(!(await response.text()).includes('</script><script>bad()'));assert.ok(response.headers.get('content-security-policy').includes("frame-ancestors 'none'"));
+});
+
+test('question bank accepts legacy records, bounds new notes and validates asked question IDs',()=>{
+ const bank=questions.sections.flatMap(s=>s.bank);
+ assert.equal(bank.length,60);assert.equal(new Set(bank.map(q=>q.id)).size,60);
+ assert.ok(bank.every(q=>q.followups.length===2));
+ assert.equal(schema.interviewSchema.safeParse(state()).success,true);
+ const extended={...state(),bankAnswers:{[bank[0].id]:'Supplier called twice'},askedQuestions:[bank[0].id,'projects']};
+ assert.equal(schema.interviewSchema.safeParse(extended).success,true);
+ assert.equal(schema.interviewSchema.safeParse({...extended,bankAnswers:{unknown:'note'}}).success,false);
+ assert.equal(schema.interviewSchema.safeParse({...extended,askedQuestions:['unknown']}).success,false);
+ assert.equal(schema.interviewSchema.safeParse({...extended,askedQuestions:['projects','projects']}).success,false);
+ assert.equal(schema.interviewSchema.safeParse({...extended,bankAnswers:{[bank[0].id]:'x'.repeat(2501)}}).success,false);
+ const maxState={...state(),bankAnswers:Object.fromEntries(bank.map(q=>[q.id,'😀'.repeat(1250)])),answers:Object.fromEntries(questions.sections.flatMap(s=>s.questions).map(q=>[q.id,'😀'.repeat(1250)]))};
+ assert.equal(schema.interviewSchema.safeParse(maxState).success,true);assert.ok(Buffer.byteLength(JSON.stringify(maxState))<1000000);
 });
