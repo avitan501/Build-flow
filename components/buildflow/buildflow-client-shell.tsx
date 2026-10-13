@@ -11,6 +11,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const pathname = usePathname();
   const useAppShell = Boolean(pathname) && !pathname.startsWith("/admin");
   const isHome = pathname === "/";
+  const isConsultation = pathname === "/consultation";
   const isHomepagePreview = pathname === "/homepage-preview";
   const isCinematicStory = pathname === "/how-it-works";
   const isAccount = pathname === "/account";
@@ -30,6 +31,10 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   }
 
   if (isAuthFlow) {
+    return <div className="min-h-screen bg-white">{children}</div>;
+  }
+
+  if (isConsultation) {
     return <div className="min-h-screen bg-white">{children}</div>;
   }
 
