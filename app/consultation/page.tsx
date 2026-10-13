@@ -36,7 +36,7 @@ export default function ConsultationPage() {
             "A practical first step for your project",
           ].map((text) => <li key={text}><Check size={17} aria-hidden="true" /><span>{text}</span></li>)}</ul>
           <p className={styles.prep}>Have a material list or supplier quote? Keep it handy. You can also come with just your questions.</p>
-          <div className={styles.hours}><strong>Hourly start times</strong><span>Monday–Thursday · 12, 1, 2, 3 &amp; 4 PM</span><span>Friday · 12, 1 &amp; 2 PM</span><small>New York time · Each meeting lasts 15 minutes.</small></div>
+          <div className={styles.hours}><strong>Consultation hours</strong><span>Monday–Thursday · 12–5 PM</span><span>Friday · 12–3 PM</span><small>New York time · 15-minute meetings. Choose from the available times below.</small></div>
         </aside>
 
         <div className={styles.calendarCard} id="choose-time">

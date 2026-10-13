@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("public contact bar opens a compact text sheet with WhatsApp hidden", async ({
+test("public chat icon opens a compact text sheet with WhatsApp hidden", async ({
   page,
 }) => {
   await page.goto("/");
@@ -10,13 +10,11 @@ test("public contact bar opens a compact text sheet with WhatsApp hidden", async
   await expect(bar.getByRole("button", { name: "Open chat" })).toBeVisible();
   await expect(
     bar.getByRole("button", { name: "Start by Text" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.getByTestId("cinematic-mobile-action")).toHaveCount(0);
 
-  // The Next.js development toolbar occupies the bottom-left corner on the
-  // mobile test viewport. Production has no such toolbar, so open the same
-  // sheet through the unobstructed primary dock action.
-  await bar.getByRole("button", { name: "Start by Text" }).click();
+  // The single right-side chat icon is the launcher on phone and desktop.
+  await bar.getByRole("button", { name: "Open chat" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await expect(dialog).toBeVisible();
@@ -81,7 +79,7 @@ test("start-by-text sends only the phone, consent, and honeypot to the public en
 
   await page
     .getByTestId("public-contact-bar")
-    .getByRole("button", { name: "Start by Text" })
+    .getByRole("button", { name: "Open chat" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await dialog.getByLabel("Mobile number").fill("+1 516 555 0199");
@@ -117,7 +115,7 @@ test("start-by-text shows a safe server error and remains usable", async ({
 
   await page
     .getByTestId("public-contact-bar")
-    .getByRole("button", { name: "Start by Text" })
+    .getByRole("button", { name: "Open chat" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await dialog.getByLabel("Mobile number").fill("5165550100");
@@ -143,7 +141,7 @@ test("a recent starter request never pretends a second SMS was sent", async ({
 
   await page
     .getByTestId("public-contact-bar")
-    .getByRole("button", { name: "Start by Text" })
+    .getByRole("button", { name: "Open chat" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await dialog.getByLabel("Mobile number").fill("5165550100");
@@ -179,7 +177,7 @@ test("partial delivery checks status with the same key", async ({
   await page.goto("/");
   await page
     .getByTestId("public-contact-bar")
-    .getByRole("button", { name: "Start by Text" })
+    .getByRole("button", { name: "Open chat" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await dialog.getByLabel("Mobile number").fill("5165550100");
@@ -226,7 +224,7 @@ test("the homepage opens a six-video swipeable walkthrough", async ({
 }) => {
   await page.goto("/");
   if ((page.viewportSize()?.width ?? 0) < 640) {
-    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
+    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Open chat" }).click();
     await page.getByRole("button", { name: /Watch how it works/ }).click();
   } else {
     await page.getByRole("button", { name: "Open chat" }).click();
@@ -271,7 +269,7 @@ test("text submission acknowledges the click immediately while delivery finishes
   await page.goto("/");
   await page
     .getByTestId("public-contact-bar")
-    .getByRole("button", { name: "Start by Text" })
+    .getByRole("button", { name: "Open chat" })
     .click();
   const dialog = page.getByRole("dialog", { name: "Send us your material list." });
   await dialog.getByLabel("Mobile number").fill("5165550199");
@@ -290,7 +288,7 @@ test("walkthrough respects reduced motion and closes cleanly when navigation hid
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   if ((page.viewportSize()?.width ?? 0) < 640) {
-    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
+    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Open chat" }).click();
     await page.getByRole("button", { name: /Watch how it works/ }).click();
   } else {
     await page.getByRole("button", { name: "Open chat" }).click();
