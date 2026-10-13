@@ -5,7 +5,7 @@ import styles from "./consultation.module.css";
 
 export const metadata = pageMetadata({
   title: "Free 15-Minute Consultation | Avantia Construction Concierge",
-  description: "Tell us what is taking up your time. Book a free consultation with David to build a plan for your construction material sourcing, orders, deliveries and reorders.",
+  description: "Tell us what is taking up your time. Book a free consultation with Avantia to build a plan for your construction material sourcing, orders, deliveries and reorders.",
   path: "/consultation",
 });
 
@@ -27,7 +27,7 @@ export default function ConsultationPage() {
         <aside className={styles.details} aria-label="About your consultation">
           <span className={styles.tag}>Your first step</span>
           <h2>A conversation.<br />A clear next step.</h2>
-          <p>Meet with David for a free consultation about your business and current projects.</p>
+          <p>Meet with Avantia for a free consultation about your business and current projects.</p>
           <div className={styles.facts}><span><Clock3 size={17} aria-hidden="true" />15 minutes</span><span><Video size={17} aria-hidden="true" />Google Meet</span><span className={styles.free}>Free</span></div>
           <h3>What we’ll cover</h3>
           <ul>{[
