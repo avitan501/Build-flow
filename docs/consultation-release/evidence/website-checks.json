@@ -1,0 +1,36 @@
+[
+  {
+    "viewport": "desktop",
+    "base": "http://localhost:3004",
+    "actions": 5,
+    "footerLogo": [
+      {
+        "src": "/images/avantia/avantia-build-rain-painter-animation.gif",
+        "loaded": true,
+        "filter": "none"
+      }
+    ],
+    "homepageOverflow": false,
+    "consultationOverflow": false,
+    "businessCalendar": true,
+    "formOpened": true,
+    "bookingSubmitted": false
+  },
+  {
+    "viewport": "phone",
+    "base": "http://localhost:3004",
+    "actions": 5,
+    "footerLogo": [
+      {
+        "src": "/images/avantia/avantia-build-rain-painter-animation.gif",
+        "loaded": true,
+        "filter": "none"
+      }
+    ],
+    "homepageOverflow": false,
+    "consultationOverflow": false,
+    "businessCalendar": true,
+    "formOpened": true,
+    "bookingSubmitted": false
+  }
+]

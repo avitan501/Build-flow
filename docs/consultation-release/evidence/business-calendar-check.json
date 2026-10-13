@@ -1,0 +1,37 @@
+{
+  "owner": "buildavantiap@gmail.com",
+  "displayName": "build avantia",
+  "timezone": "America/New_York",
+  "duration": 15,
+  "slots": {
+    "Monday, October 19, 2026": [
+      "12:00pm",
+      "2:00pm",
+      "3:00pm",
+      "4:00pm"
+    ],
+    "Tuesday, October 20, 2026": [
+      "12:00pm",
+      "1:00pm",
+      "2:00pm",
+      "4:00pm"
+    ],
+    "Wednesday, October 21, 2026": [
+      "12:00pm",
+      "1:00pm",
+      "2:00pm",
+      "3:00pm"
+    ],
+    "Thursday, October 22, 2026": [
+      "12:00pm",
+      "2:00pm",
+      "4:00pm"
+    ],
+    "Friday, October 23, 2026": [
+      "12:00pm",
+      "2:00pm"
+    ]
+  },
+  "form": "Avantia — Free Construction Concierge Consultation\nMonday, October 19 · 12:00 – 12:15pm\nNew York Time\nGoogle Meet video conference info added after booking\nYour contact info\nFirst name\n\nLast name\n\nEmail address\n\nBook\nCancel",
+  "appointmentSubmitted": false
+}
