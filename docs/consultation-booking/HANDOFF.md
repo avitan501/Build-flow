@@ -1,5 +1,7 @@
 # Avantia consultation booking — 2026-10-13
 
+Follow-up: [hourly availability and website integration](../consultation-links/HANDOFF.md) supersedes the original open-hours display and integration status below. Current starts are hourly, with 15-minute meetings.
+
 ## Outcome
 
 David requested a real consultation booking calendar. The Google Calendar appointment schedule is saved and publicly accessible. A branded `/consultation` page embeds it and is ready locally; the Avantia website has not been deployed.

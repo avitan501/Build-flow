@@ -98,21 +98,8 @@ export function PublicContactBar() {
   const [errorMessage, setErrorMessage] = useState("");
   const [demoIndex, setDemoIndex] = useState(0);
   const [videoPlaying, setVideoPlaying] = useState(true);
-  const [compactBar, setCompactBar] = useState(false);
   const open = openPanel !== null;
   const phoneIsValid = isValidUsPhone(phone);
-
-  useEffect(() => {
-    const mobile = window.matchMedia("(max-width: 639px)");
-    const syncBarSize = () => setCompactBar(mobile.matches && window.scrollY > 96);
-    syncBarSize();
-    window.addEventListener("scroll", syncBarSize, { passive: true });
-    mobile.addEventListener("change", syncBarSize);
-    return () => {
-      window.removeEventListener("scroll", syncBarSize);
-      mobile.removeEventListener("change", syncBarSize);
-    };
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -248,40 +235,25 @@ export function PublicContactBar() {
 
   return (
     <>
-      <div aria-hidden="true" className="h-[calc(5.5rem+env(safe-area-inset-bottom))] shrink-0" />
       <div
         data-testid="public-contact-bar"
-        data-compact={compactBar ? "true" : "false"}
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] px-3 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-5 sm:pb-4"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[70]"
       >
-        <div className={`pointer-events-auto flex items-center rounded-lg border border-[#d2d2d7] bg-white/95 text-[#1d1d1f] shadow-[0_10px_30px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-[width,padding] duration-150 ${compactBar ? "ml-auto w-10 gap-0 p-0.5" : "mx-auto w-full max-w-[36rem] gap-2 p-2"}`}>
-          <button
-            type="button"
-            onClick={() => openSheet("contact")}
-            className={`inline-flex shrink-0 items-center justify-center rounded-md bg-[#34373d] text-white shadow-sm transition hover:bg-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] ${compactBar ? "h-9 w-9" : "h-10 w-14 sm:h-11"}`}
-            aria-label={compactBar ? "Start by Text" : "Open chat"}
-          >
-            <MessageCircle
-              className="h-[1.1rem] w-[1.1rem]"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            type="button"
-            onClick={() => openSheet("contact")}
-            className={`${compactBar ? "hidden" : "group flex"} min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-md border border-[#c7c7cc] bg-[#f7f7f8] px-3 text-sm font-semibold text-[#34373d] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]`}
-            aria-haspopup="dialog"
-            aria-expanded={open}
-          >
-            <MessageSquareText className="h-4 w-4 text-[#2878ff]" aria-hidden="true" /> Start
-            by Text
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => openSheet("contact")}
+          aria-label="Open chat"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-[#34373d] text-white shadow-[0_8px_28px_rgba(0,0,0,0.22)] transition hover:bg-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+        >
+          <MessageCircle className="h-6 w-6" aria-hidden="true" />
+        </button>
       </div>
 
       {open ? (
         <div
-          className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-5"
+          className={`fixed inset-0 z-[80] flex items-end ${openPanel === "demo" ? "justify-center sm:items-center sm:p-5" : "justify-end p-3 pb-[calc(env(safe-area-inset-bottom)+5.25rem)] sm:p-4 sm:pb-20"}`}
           role="presentation"
         >
           <button
@@ -295,7 +267,7 @@ export function PublicContactBar() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 flex max-h-[94svh] w-full flex-col overflow-hidden rounded-t-[1.6rem] border border-white/80 bg-[#f5f7fa] text-[#071126] shadow-[0_-22px_64px_rgba(7,17,38,0.3)] sm:max-w-[38rem] sm:rounded-[1.6rem]"
+            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[1.6rem] border border-white/80 bg-[#f5f7fa] text-[#071126] shadow-[0_-22px_64px_rgba(7,17,38,0.3)] ${openPanel === "demo" ? "max-h-[94svh] sm:max-w-[38rem]" : "max-h-[calc(100svh-7rem)] max-w-[26rem]"}`}
           >
             <div
               className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-300 sm:hidden"

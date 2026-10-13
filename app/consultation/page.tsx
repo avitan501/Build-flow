@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUpRight, Check, Clock3, Video } from "lucide-react";
 import { pageMetadata } from "@/lib/site-metadata";
+import { CONSULTATION_BOOKING_URL } from "@/lib/consultation";
 import styles from "./consultation.module.css";
 
 export const metadata = pageMetadata({
@@ -9,7 +10,7 @@ export const metadata = pageMetadata({
 });
 
 // Public appointment schedule. Google manages availability, confirmations and Meet links.
-const bookingUrl = "https://calendar.google.com/calendar/appointments/schedules/AcZssZ1V5EbiUaZkRkYM297ilnfyJdHagNcuwLz6nqWtA5Rmu7NvfJracZxVrIPACP8txGy0LtJpAyTb";
+const bookingUrl = CONSULTATION_BOOKING_URL;
 const embedUrl = `${bookingUrl}?gv=true`;
 
 export default function ConsultationPage() {
@@ -35,7 +36,7 @@ export default function ConsultationPage() {
             "A practical first step for your project",
           ].map((text) => <li key={text}><Check size={17} aria-hidden="true" /><span>{text}</span></li>)}</ul>
           <p className={styles.prep}>Have a material list or supplier quote? Keep it handy. You can also come with just your questions.</p>
-          <div className={styles.hours}><strong>Consultation hours</strong><span>Monday–Thursday · 12–5 PM</span><span>Friday · 12–3 PM</span><small>New York time · Available times appear in the calendar.</small></div>
+          <div className={styles.hours}><strong>Hourly start times</strong><span>Monday–Thursday · 12, 1, 2, 3 &amp; 4 PM</span><span>Friday · 12, 1 &amp; 2 PM</span><small>New York time · Each meeting lasts 15 minutes.</small></div>
         </aside>
 
         <div className={styles.calendarCard} id="choose-time">

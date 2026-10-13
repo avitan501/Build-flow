@@ -2,10 +2,11 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight, Check, ChevronDown, MapPin, MessageSquareText, Pause, Play, Send, Upload } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Check, ChevronDown, MapPin, MessageSquareText, Pause, Play, Send, Upload } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
+import { CONSULTATION_PATH } from "@/lib/consultation"
 
 const homepageBrands = [
   ["Andersen", "/images/brands/andersen.svg", "scale-95"],
@@ -20,7 +21,7 @@ const homepageBrands = [
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
-  { id: 2, name: "Light Quote Check", eyebrow: "Compare before you buy", headline: <>One Quote.<br />Better Options.</>, summary: "We compare the supplier, total price, and delivery.", primary: "Check My Quote", secondary: "Send My Material List", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
+  { id: 2, name: "Construction Concierge", eyebrow: "Avantia Construction Concierge", headline: <>Running a<br />construction<br />project?</>, summary: "Tired of chasing suppliers, comparing quotes, and handling material shortages? In a free consultation, we’ll build a plan around the help you need.", primary: "Schedule a Meeting", secondary: "", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
   { id: 3, name: "Crew Moving", eyebrow: "Materials this week?", headline: <>Keep the Crew<br />Moving.</>, summary: "Send the list. We chase the material—not your crew.", primary: "Send My List", secondary: "How It Works", videos: [["/videos/avantia-story/02-contractor-crew-moving.mp4", "/videos/avantia-story/02-contractor-crew-moving-poster.jpg"], ["/videos/avantia-story/09-job-gets-busy.mp4", "/videos/avantia-story/09-job-gets-busy-poster.jpg"]] },
   { id: 4, name: "Supplier Grid", eyebrow: "One request. More reach.", headline: <>Stop Calling<br />Every Supplier.</>, summary: "Avantia organizes the request and checks matching sources.", primary: "Start a Request", secondary: "Text My List", videos: [["/videos/avantia-story/04-supplier-send-products.mp4", "/videos/avantia-story/04-supplier-send-products-poster.jpg"], ["/videos/avantia-story/07-many-calls-one-job.mp4", "/videos/avantia-story/07-many-calls-one-job-poster.jpg"]] },
   { id: 5, name: "Delivery Mission", eyebrow: "From list to jobsite", headline: <>Materials.<br />Handled.</>, summary: "Quote review, supplier follow-up, and delivery coordination.", primary: "Send It to Avantia", secondary: "Upload Quote", videos: [["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"], ["/videos/avantia-story/05-designer-order-coordination.mp4", "/videos/avantia-story/05-designer-order-coordination-poster.jpg"], ["/videos/avantia-story/06-designer-materials-desk.mp4", "/videos/avantia-story/06-designer-materials-desk-poster.jpg"]] },
@@ -34,25 +35,25 @@ const reviewHeroPhotos = [
 
 const reviewServices = [
   {
-    title: "Beat Your Quote",
-    description: "Send an existing quote. We’ll check the material, total, and delivery.",
-    href: "/beat-a-quote",
+    title: "Compare Supplier Quotes",
+    description: "Review your material costs and discuss where Avantia can help you find better options.",
+    href: CONSULTATION_PATH,
     image: "/images/buildflow-homepage/service-beat-quote-v4.webp",
-    action: "Check my quote",
+    action: "Schedule a Meeting",
   },
   {
-    title: "Send Any Material List",
-    description: "A typed list, photo, plan, or file is enough to start.",
-    href: "/request-quote",
+    title: "Materials, Handled",
+    description: "One contact for approved orders, delivery arrangements, shortages and reorders.",
+    href: CONSULTATION_PATH,
     image: "/images/buildflow-homepage/service-send-list-v4.webp",
-    action: "Send my list",
+    action: "Schedule a Meeting",
   },
   {
-    title: "Find a Specific Item",
-    description: "Search the material catalog or send the exact item you need.",
-    href: "/shop",
+    title: "Source What You Need",
+    description: "Tell us what you or your subcontractor needs. We’ll discuss how to take the sourcing work off your plate.",
+    href: CONSULTATION_PATH,
     image: "/images/buildflow-homepage/service-find-item-v5.webp",
-    action: "Find an item",
+    action: "Schedule a Meeting",
   },
 ] as const
 
@@ -63,6 +64,9 @@ const reviewReasons = [
 ] as const
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
+  if (primary === "Schedule a Meeting") {
+    return <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />Schedule a Meeting</Link>
+  }
   const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
   const secondaryHref = secondary.toLowerCase().includes("text")
     ? `sms:${AVANTIA_QUO_CALLER_ID}?body=Hi%20Avantia%20Build%2C%20I%20want%20to%20send%20a%20material%20list.`
@@ -108,9 +112,9 @@ function HomepageReviewSections() {
       <div className="mx-auto grid max-w-6xl items-center gap-9 lg:grid-cols-[0.82fr_1.18fr] lg:gap-16">
         <div className="max-w-lg">
           <h2 id="text-request-heading" className="text-4xl font-semibold leading-[0.94] tracking-[-0.055em] text-balance sm:text-6xl">Tell us what you need.</h2>
-          <p className="mt-5 max-w-md text-sm font-semibold leading-6 text-slate-600 sm:text-base">Send a plan, photo, or material list. Tell us about the project, and we’ll take care of the order.</p>
-          <Link href="/request-quote" className="mt-7 inline-flex min-h-12 items-center gap-2 border-b-2 border-slate-950 text-sm font-black text-slate-950 transition hover:border-[#1677ff] hover:text-[#1677ff]">
-            Send a material request <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          <p className="mt-5 max-w-md text-sm font-semibold leading-6 text-slate-600 sm:text-base">Let’s identify what’s taking up your time and build a plan for what Avantia can handle for you. Start with a free 15-minute consultation.</p>
+          <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-12 items-center gap-2 border-b-2 border-slate-950 text-sm font-black text-slate-950 transition hover:border-[#1677ff] hover:text-[#1677ff]">
+            Schedule a Meeting <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
 
@@ -122,7 +126,7 @@ function HomepageReviewSections() {
             {!videoRequested ? <button type="button" onClick={() => setVideoRequested(true)} className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/80" aria-label="Play material request video"><span className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/50 bg-black/65 px-5 text-sm font-bold backdrop-blur-md"><Play className="h-4 w-4 fill-current" />Play video</span></button> : null}
             <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
               <MessageSquareText className="h-4 w-4 text-[#e7b85d]" aria-hidden="true" />
-              Text or WhatsApp your material list
+              One contact for your material needs
             </div>
           </div>
         </div>
@@ -133,7 +137,7 @@ function HomepageReviewSections() {
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0066cc]">Start with what you have</p>
         <div className="mt-2 flex items-end justify-between gap-6">
-          <h2 id="service-rail-heading" className="max-w-2xl text-4xl font-semibold leading-[0.96] tracking-[-0.055em] text-balance sm:text-6xl">Three direct ways to start.</h2>
+          <h2 id="service-rail-heading" className="max-w-2xl text-4xl font-semibold leading-[0.96] tracking-[-0.055em] text-balance sm:text-6xl">Three ways we can help.</h2>
           <p className="hidden text-xs font-bold uppercase tracking-[0.14em] text-slate-600 sm:block">Swipe to explore →</p>
         </div>
       </div>
@@ -216,7 +220,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
 
   const text = <>
     <p className={`text-[10px] font-bold uppercase tracking-[0.26em] ${conceptId === 2 ? "text-slate-600" : conceptId === 3 ? "text-amber-300" : conceptId === 5 ? "text-blue-700" : "text-white/72"}`}>{concept.eyebrow}</p>
-    <h1 className="mt-3 text-balance text-[clamp(3rem,8.5vw,7rem)] font-semibold leading-[0.9] tracking-[-0.065em]">{concept.headline}</h1>
+    <h1 className={`mt-3 text-balance font-semibold leading-[0.95] tracking-[-0.055em] ${conceptId === 2 ? "text-[clamp(2.7rem,6.1vw,5.7rem)]" : "text-[clamp(3rem,8.5vw,7rem)]"}`}>{concept.headline}</h1>
     <p className="mt-5 max-w-xl text-sm font-semibold leading-6 opacity-85 sm:text-base">{concept.summary}</p>
   </>
 
@@ -242,7 +246,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       </div> : <video key={videoSource} ref={videoRef} src={videoSource} poster={posterSource} autoPlay muted playsInline preload="auto" onEnded={() => setVideoIndex((current) => (current + 1) % concept.videos.length)} className={`absolute object-cover ${conceptId === 2 ? "inset-y-0 right-0 h-full w-full sm:w-[62%]" : conceptId === 4 ? "inset-y-0 right-0 h-full w-full lg:w-[68%]" : conceptId === 5 ? "inset-x-4 bottom-5 top-24 h-[calc(100%-7.25rem)] w-[calc(100%-2rem)] rounded-[2rem] sm:inset-x-[38%] sm:w-[60%]" : "inset-0 h-full w-full scale-[1.015]"}`} aria-hidden="true" />}
 
       {conceptId === 1 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.08)_40%,rgba(0,0,0,.84))]" /><div className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col justify-end px-5 pb-24 pt-24 sm:px-8 lg:px-12"><div className="max-w-3xl drop-shadow-[0_5px_28px_rgba(0,0,0,.65)]">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><p className="mt-3 text-xs font-semibold text-white/65">No account. No obligation.</p></div></div></> : null}
-      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_44%,rgba(244,239,230,.97)_54%,rgba(244,239,230,.68)_67%,rgba(244,239,230,.18)_82%,rgba(244,239,230,.06)_100%)]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 text-slate-950 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl"><p className="mb-3 inline-flex border-b-2 border-slate-950 pb-2 text-xs font-black uppercase tracking-[.2em]">Building materials</p>{text}<Actions primary={concept.primary} secondary={concept.secondary} dark compact={reviewOnly} /><p className="mt-4 text-xs font-semibold text-slate-600">One business day review.</p></div></div></> : null}
+      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#f4efe6_0%,rgba(244,239,230,.97)_40%,rgba(244,239,230,.86)_100%)] sm:bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_44%,rgba(244,239,230,.97)_54%,rgba(244,239,230,.68)_67%,rgba(244,239,230,.18)_82%,rgba(244,239,230,.06)_100%)]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 text-slate-950 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark compact={reviewOnly} /></div></div></> : null}
       {conceptId === 3 ? <><div className="absolute inset-0 bg-black/45" /><div className="absolute inset-x-0 top-[18%] h-3 bg-amber-400" /><div className="relative z-10 flex min-h-[100svh] flex-col items-center justify-center px-5 pt-20 text-center"><div className="max-w-5xl">{text}<div className="flex justify-center"><Actions primary={concept.primary} secondary={concept.secondary} /></div><p className="mt-4 font-mono text-xs uppercase tracking-[.15em] text-amber-300">Fast request intake · Human review</p></div></div></> : null}
       {conceptId === 4 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#061d3b_0%,#061d3b_42%,rgba(6,29,59,.78)_66%,rgba(6,29,59,.18))]" /><div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(78,170,255,.3)_1px,transparent_1px),linear-gradient(90deg,rgba(78,170,255,.3)_1px,transparent_1px)] [background-size:32px_32px]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 sm:px-10 lg:w-1/2 lg:px-16"><div className="max-w-2xl border-l-4 border-sky-400 pl-5 sm:pl-8">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><div className="mt-5 grid max-w-md grid-cols-3 gap-2 text-center text-[10px] font-bold uppercase tracking-wide text-sky-200"><span className="border border-sky-300/25 p-2">Request</span><span className="border border-sky-300/25 p-2">Compare</span><span className="border border-sky-300/25 p-2">Deliver</span></div></div></div></> : null}
       {conceptId === 5 ? <><div className="absolute inset-0 bg-gradient-to-r from-[#edf2f7] via-[#edf2f7] to-transparent sm:w-[58%]" /><div className="relative z-10 flex min-h-[100svh] items-end px-5 pb-20 pt-24 sm:w-[50%] sm:items-center sm:px-10 lg:px-16"><div className="max-w-xl rounded-3xl bg-white/92 p-6 shadow-[0_25px_80px_rgba(15,23,42,.18)] backdrop-blur-xl sm:p-9">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark /><p className="mt-4 text-xs font-bold text-slate-600">Local jobs · Real supplier follow-up</p></div></div></> : null}

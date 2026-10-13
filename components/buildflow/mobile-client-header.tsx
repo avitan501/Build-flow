@@ -13,6 +13,7 @@ import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
 import { SHOP_COMING_SOON_LINKS, SHOP_MENU_MATERIAL_LINKS, SHOP_SERVICE_LINKS } from "@/lib/shop-navigation";
 import { shopSearchSuggestions } from "@/lib/shop-search";
+import { CONSULTATION_PATH } from "@/lib/consultation";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
@@ -96,6 +97,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
+    { href: CONSULTATION_PATH, label: "Schedule a Meeting", description: "Free 15-minute consultation with Avantia" },
     { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
     { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
     { href: "/beat-a-quote", label: "Free Quote Check", description: "Upload a supplier quote for a free review" },
