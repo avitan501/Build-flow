@@ -1,0 +1,77 @@
+{
+  "reviewed_at": "2026-10-14",
+  "scope": "Substantial, started Avantia business work only. No website implementation tasks or automatic execution.",
+  "freshness": "These are unresolved in the latest available Codex handoffs. External supplier responses and offline completion have not been independently reconfirmed.",
+  "tasks": [
+    {
+      "task_key": "codex-avantia-first-profitable-offer",
+      "title": "Define the first profitable offer",
+      "category": "carlos_focus",
+      "status": "open",
+      "assigned_agent": "David",
+      "summary": "The contractor-concierge strategy, fee planner and discovery questionnaire are started. The remaining business decision is a focused offer that covers staff time, follow-up and direct costs.",
+      "next_step": "Choose the first contractor customer type and material package. Define included work, exclusions, pricing, estimated handling time and the minimum profit required to accept a pilot order. Validate it using an actual contractor interview.",
+      "source_chat_title": "Codex Avantia: Customers & Profitability",
+      "source": "AVANTIA_FOCUS_INDEX.md: Customers & Profitability; thread 01a0c969-8059-7191-b7c9-4dd61417fd08; deliverables/avantia-concierge-strategy-2026-09-11.md"
+    },
+    {
+      "task_key": "codex-avantia-lowes-partnership",
+      "title": "Await Lowe's partnership review",
+      "category": "suppliers_pricing",
+      "status": "blocked",
+      "assigned_agent": "David",
+      "summary": "Follow-up milestone for the existing Lowe's supplier-partnership record. The MNDA, process flow and inquiry were submitted September 20. The last confirmed next step is Lowe's review; approval and a launch date are not confirmed.",
+      "next_step": "Check the existing Lowe's API Connection Request correspondence for a response or requested information, then record the agreed next step. Do not resend the application. Any supplier contact or account change needs a separate instruction.",
+      "source_chat_title": "Codex Avantia: Lowe's partnership handoff",
+      "source": "AVANTIA_MASTER_CONTEXT.md: Lowe's API inquiry submission completed — 2026-09-20"
+    },
+    {
+      "task_key": "codex-avantia-quote-burton-water-service",
+      "title": "Confirm Burton water-service quote",
+      "category": "requests_quotes",
+      "status": "open",
+      "assigned_agent": "David",
+      "summary": "Quote 042252 for 207 Lawrence Ave has unresolved meter, valve, test-tee and backflow-support details in the Suppliers & Quotes handoff. No substitution or purchase is approved.",
+      "next_step": "Review the latest quote: OS&Y meter inlet/outlet valves; exact 4-inch Neptune MACH 10 with 14-inch lay length; test tee with 2-inch valve and cap; 18-inch NYS-approved BFP support versus two 6-inch stands. Confirm the scope before approval.",
+      "source_chat_title": "Codex Avantia: Suppliers & Quotes",
+      "source": "AVANTIA_FOCUS_INDEX.md: Suppliers and quotes; source thread 01a09151-7c33-7fd0-b086-898aaceaca57"
+    },
+    {
+      "task_key": "codex-avantia-quote-dandy-partitions",
+      "title": "Reconcile Dandy partition quote",
+      "category": "requests_quotes",
+      "status": "open",
+      "assigned_agent": "David",
+      "summary": "The saved comparison has a scope and total mismatch: three client partitions versus four quoted partitions, differing glass and door specifications, and conflicting displayed/extracted prices. A like-for-like quote is still needed.",
+      "next_step": "Review the latest revision against the client's three partitions and 359.5 sq ft. Confirm glass thickness, door/transom heights, framing, installation scope and final total before approval. Do not assume the scope difference explains the full price gap.",
+      "source_chat_title": "Codex Avantia: Suppliers & Quotes",
+      "source": "AVANTIA_FOCUS_INDEX.md: Suppliers and quotes; source thread 01a09151-7c33-7fd0-b086-898aaceaca57"
+    },
+    {
+      "task_key": "codex-avantia-quote-west-park-roofing",
+      "title": "Finalize West Park roofing scope",
+      "category": "requests_quotes",
+      "status": "open",
+      "assigned_agent": "David",
+      "summary": "The 367 W Park Ave roofing RFQ and plan review were prepared, but the roofing system, insulation and drain quantities remain unresolved in the latest handoff. The material list is not approved for ordering.",
+      "next_step": "Reconcile the plans and 62-item RFQ: confirm TPO versus EPDM, insulation specification, drain quantities and included work. Capture the contractor's approved scope before seeking a final comparable quote or purchasing.",
+      "source_chat_title": "Codex Avantia: Roofing RFQ handoff",
+      "source": "AVANTIA_FOCUS_INDEX.md: Suppliers and quotes; deliverables/367-west-park-rfq-with-plans-2026-09-11.pdf; deliverables/367-west-park-roofing-review-v2-2026-09-11.pdf"
+    }
+  ],
+  "deduplicated_existing": [
+    "Contact New Clients",
+    "Build Supplier Relationships",
+    "API, Affiliate & Partnership",
+    "Prepare ABC Demo",
+    "ABC Supply private pricing",
+    "WhatsApp Coexistence"
+  ],
+  "excluded": [
+    "Completed campaign sends and completed Lowe's application submission",
+    "Completed website, questionnaire, calendar and marketing-copy implementation",
+    "Software test queues, deployment chores, archived helper conversations",
+    "Unrelated flights, personal accounts and construction engineering discussions",
+    "Tasks whose completion or current relevance cannot be established beyond old speculative notes"
+  ]
+}

@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { isWorkspaceTask } from "@/lib/dashboard-workspace";
 
 import {
   createDavidDashboardItemAction,
@@ -210,8 +211,10 @@ function PrivateItemRow({
 
 export function DavidDashboardBoard({
   items,
+  showTasks = true,
 }: {
   items: DavidDashboardItem[];
+  showTasks?: boolean;
 }) {
   const router = useRouter();
   const [taskTitle, setTaskTitle] = useState("");
@@ -245,7 +248,7 @@ export function DavidDashboardBoard({
       carlosFixedTaskKeys.has(item.task_key) ||
       item.source_chat_title === "David Dashboard",
   );
-  const aiTasks = tasks.filter((item) => !davidTasks.includes(item));
+  const aiTasks = tasks.filter((item) => !davidTasks.includes(item) && !isWorkspaceTask(item));
 
   function run(
     action: () => Promise<{ ok: true } | { ok: false; error: string }>,
@@ -342,7 +345,7 @@ export function DavidDashboardBoard({
 
   return (
     <div className="grid gap-5">
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {showTasks && <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <CheckSquare className="h-4 w-4 text-[#0066cc]" />
           <div className="min-w-0 flex-1">
@@ -424,7 +427,7 @@ export function DavidDashboardBoard({
             </p>
           ) : null}
         </div>
-      </section>
+      </section>}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">

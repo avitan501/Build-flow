@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { setFixedManagerGoalStatusAction } from "@/app/admin/goals-progress/goal-actions";
+import { CARLOS_FIXED_GOALS, type CarlosFixedGoalKey } from "@/lib/manager-goal-status";
 import {
   createWebsiteWorkToken,
   WEBSITE_WORK_COOKIE,
@@ -89,7 +91,7 @@ export async function createDavidDashboardItemAction(input: {
   const { error } = await supabase.from("website_work_items").insert({
     task_key: `david-${input.kind}-${crypto.randomUUID()}`,
     title,
-    category: "website_ux",
+    category: input.kind === "task" ? "carlos_focus" : "website_ux",
     status: "open",
     assigned_agent: "David",
     progress_percent: 0,
@@ -109,6 +111,68 @@ export async function createDavidDashboardItemAction(input: {
       input.kind === "task" && input.publishedToCarlos === true,
   });
   if (error) return { ok: false, error: "The item could not be added." };
+  refreshDashboards();
+  return { ok: true };
+}
+
+export async function saveDashboardTaskAction(input: {
+  id: string;
+  title: string;
+  summary: string;
+  nextStep: string;
+  updatedAt: string;
+}): Promise<DavidDashboardResult> {
+  const context = await unlockedDavidDashboard();
+  if (!context) return { ok: false, error: "Unlock David Dashboard first." };
+  if (!validUuid(input.id)) return { ok: false, error: "Choose a valid task." };
+  const title = String(input.title).trim().replace(/\s+/g, " ");
+  const summary = String(input.summary).trim();
+  const nextStep = String(input.nextStep).trim();
+  if (title.length < 2 || title.length > 160 || summary.length > 500 || nextStep.length > 500) {
+    return { ok: false, error: "Use 2–160 characters for the title and up to 500 for each note." };
+  }
+  const { data, error } = await context.supabase.from("website_work_items")
+    .update({ title, summary, next_step: nextStep })
+    .eq("id", input.id).eq("item_kind", "task").eq("updated_at", input.updatedAt)
+    .not("task_key", "like", "blueprint-%")
+    .select("id").maybeSingle<{ id: string }>();
+  if (error || !data) return { ok: false, error: "The task could not be saved. Refresh to check for newer changes." };
+  refreshDashboards();
+  return { ok: true };
+}
+
+export async function setDashboardTaskStatusAction(input: {
+  id: string;
+  status: "open" | "completed" | "archived";
+  updatedAt: string;
+}): Promise<DavidDashboardResult> {
+  const context = await unlockedDavidDashboard();
+  if (!context) return { ok: false, error: "Unlock David Dashboard first." };
+  if (!validUuid(input.id) || !["open", "completed", "archived"].includes(input.status)) {
+    return { ok: false, error: "Choose a valid task and status." };
+  }
+  const { data: task, error: readError } = await context.supabase.from("website_work_items")
+    .select("id,task_key,status").eq("id", input.id).eq("item_kind", "task")
+    .eq("updated_at", input.updatedAt).not("task_key", "like", "blueprint-%")
+    .maybeSingle<{ id: string; task_key: string; status: string }>();
+  if (readError || !task) return { ok: false, error: "The task changed or is no longer available. Refresh and try again." };
+
+  // Fixed team goals already have a status workflow. Keep that as their source
+  // of truth; archiving/restoring a circle only changes its board visibility.
+  const fixedKey = task.task_key.replace(/^carlos-fixed-/, "") as CarlosFixedGoalKey;
+  if (task.task_key.startsWith("carlos-fixed-") && fixedKey in CARLOS_FIXED_GOALS && input.status !== "archived" && task.status !== "archived") {
+    const result = await setFixedManagerGoalStatusAction({ key: fixedKey, status: input.status });
+    if (!result.ok) return result;
+    refreshDashboards();
+    return { ok: true };
+  }
+  const changes = input.status === "archived" || task.status === "archived"
+    ? { status: input.status }
+    : { status: input.status, progress_percent: input.status === "completed" ? 100 : 0 };
+  const { data, error } = await context.supabase.from("website_work_items")
+    .update(changes).eq("id", input.id).eq("item_kind", "task").eq("updated_at", input.updatedAt)
+    .select("id").maybeSingle<{ id: string }>();
+  if (error || !data) return { ok: false, error: "The task could not be updated. Refresh and try again." };
   refreshDashboards();
   return { ok: true };
 }

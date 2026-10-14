@@ -14,6 +14,8 @@ import {
   type DavidDashboardItem,
 } from "@/components/buildflow/david-dashboard-board";
 import { WebsiteWorkPinForm } from "@/components/buildflow/website-work-pin-form";
+import { DashboardTaskWorkspace } from "@/components/buildflow/dashboard-task-workspace";
+import { fixedGoalKey } from "@/lib/manager-goal-status";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { TRUSTED_OWNER_SMS_PHONES } from "@/lib/aura/trusted-owner-phones";
 import { createClient } from "@/lib/supabase/server";
@@ -69,7 +71,7 @@ function PhoneIntakeList({ intakes }: { intakes: PhoneIntake[] }) {
 }
 
 export default async function DavidDashboardPage() {
-  const { user, access } = await requireManagerPortalProfile();
+  const { user, profile, access } = await requireManagerPortalProfile();
   if (!access.owner) redirect("/admin/goals-progress");
   const cookieStore = await cookies();
   const unlocked = verifyWebsiteWorkToken(
@@ -86,11 +88,11 @@ export default async function DavidDashboardPage() {
   }
 
   const supabase = await createClient();
-  const [{ data, error }, { data: intakeData, error: intakeError }] = await Promise.all([
+  const [{ data, error }, { data: intakeData, error: intakeError }, { data: fixedGoals, error: goalError }] = await Promise.all([
     supabase
       .from("website_work_items")
       .select("id,task_key,title,category,status,assigned_agent,progress_percent,summary,next_step,resolution_cost,updated_at,source_chat_title,item_kind,published_to_carlos")
-      .not("status", "in", "(completed,superseded,archived)")
+      .neq("status", "superseded")
       .not("task_key", "like", "blueprint-%")
       .order("priority")
       .order("sort_order")
@@ -105,9 +107,17 @@ export default async function DavidDashboardPage() {
       .order("created_at", { ascending: false })
       .limit(30)
       .returns<PhoneIntake[]>(),
+    supabase.from("manager_goals").select("details,status").eq("assignee", "carlos")
+      .like("details", "system_goal_status:%")
+      .returns<Array<{ details: string | null; status: string }>>(),
   ]);
   if (error) throw new Error("David Dashboard could not load.");
+  if (goalError) throw new Error("Team task statuses could not load.");
   if (intakeError) console.error("david_phone_intake_load_failed", { code: intakeError.code });
+  const statuses = new Map((fixedGoals ?? []).map((goal) => [`carlos-fixed-${fixedGoalKey(goal.details)}`, goal.status]));
+  const items = (data ?? []).map((item) => item.status !== "archived" && statuses.has(item.task_key)
+    ? { ...item, status: statuses.get(item.task_key)! } : item);
+  const activeItems = items.filter((item) => !["completed", "archived", "superseded"].includes(item.status));
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 py-5 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
@@ -142,7 +152,11 @@ export default async function DavidDashboardPage() {
             </button>
           </form>
         </header>
-        <div className="mt-5 grid gap-5">
+        <div className="mt-5 grid min-w-0 gap-5">
+          <DashboardTaskWorkspace items={items} userName={profile?.full_name || "My workspace"} userId={user.id} />
+          <details className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold">More tools: quote challenge, phone intake, pains &amp; ideas</summary>
+            <div className="mt-4 grid min-w-0 gap-5">
           <Link
             href="/admin/goals-progress/website-work/quote-challenge"
             className="group grid gap-3 rounded-xl border border-sky-200 bg-white p-4 shadow-sm transition hover:border-sky-300 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
@@ -157,7 +171,9 @@ export default async function DavidDashboardPage() {
             <span className="inline-flex items-center gap-1 text-xs font-bold text-[#0066cc]">Open tracker <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
           </Link>
           <PhoneIntakeList intakes={intakeData ?? []} />
-          <DavidDashboardBoard items={data ?? []} />
+          <DavidDashboardBoard items={activeItems} showTasks={false} />
+            </div>
+          </details>
         </div>
       </div>
     </main>
