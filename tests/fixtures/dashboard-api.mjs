@@ -3,14 +3,14 @@ import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 const port = Number(process.env.DASHBOARD_FIXTURE_PORT || 3117);
 const ownerId = '11111111-1111-4111-8111-111111111111';
-let tasks, goals, failNext = false;
+let tasks, goals, leads, failNext = false, failLeadRead = false;
 function reset() {
   tasks = ['Framing supplier review', 'First profitable offer', 'Roofing quote review', 'Supplier partnership', 'Customer interviews', 'Material delivery plan'].map((title,i)=>({
     id:`11111111-1111-4111-8111-${String(i+2).padStart(12,'0')}`,task_key:`david-task-fixture-${i}`,
     title,category:'suppliers_pricing',status:'open',assigned_agent:'David',progress_percent:0,
     summary:'Local test fixture only.',next_step:'Review the next step.',updated_at:`2026-10-14T10:00:0${i}.000Z`,
     source_chat_title:'David Dashboard',item_kind:'task',published_to_carlos:false,resolution_cost:null,priority:1,sort_order:i,
-  }));goals=[];failNext=false;
+  }));goals=[];leads=[];failNext=false;failLeadRead=false;
 }
 reset();
 function matches(row,params) {
@@ -31,7 +31,9 @@ http.createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk;
   let body={};try{body=JSON.parse(raw||'{}')}catch{}
   if(url.pathname==='/__qa/reset'){reset();return respond({ok:true});}
-  if(url.pathname==='/__qa/state')return respond({tasks,goals});
+  if(url.pathname==='/__qa/state')return respond({tasks,goals,leads});
+  if(url.pathname==='/__qa/leads'){leads=body.leads;return respond({ok:true});}
+  if(url.pathname==='/__qa/fail-lead-read'){failLeadRead=body.enabled!==false;return respond({ok:true});}
   if(url.pathname==='/__qa/fail-next'){failNext=true;return respond({ok:true});}
   let claims={};try{claims=JSON.parse(Buffer.from((req.headers.authorization||'').split('.')[1]||'','base64url').toString())}catch{}
   const isStaff=claims.testRole==='staff',isClient=claims.testRole==='client';
@@ -39,9 +41,15 @@ http.createServer(async(req,res)=>{
   if(url.pathname==='/auth/v1/user')return respond({id:ownerId,email:profile.email,aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
   if(url.pathname.includes('/.well-known/'))return respond({keys:[]});
   const table=url.pathname.split('/rest/v1/')[1];
-  let rows=table==='profiles'?[profile]:table==='website_work_items'?tasks:table==='manager_goals'?goals:[];
+  let rows=table==='profiles'?[profile]:table==='website_work_items'?tasks:table==='manager_goals'?goals:table==='manager_outreach_leads'?leads:[];
+  if(table==='manager_outreach_leads'&&failLeadRead)return respond({message:'Simulated lead read failure',code:'QA_FAILURE'},500);
   if(['POST','PATCH','DELETE'].includes(req.method)&&failNext){failNext=false;return respond({message:'Simulated persistence failure',code:'QA_FAILURE'},500);}
   let result=rows.filter(row=>matches(row,url.searchParams));
+  if(table==='manager_outreach_leads'){
+    result.sort((a,b)=>a.full_name.localeCompare(b.full_name)||a.id.localeCompare(b.id));
+    const offset=Number(url.searchParams.get('offset')||0),limit=Number(url.searchParams.get('limit')||result.length);
+    result=result.slice(offset,offset+limit);
+  }
   if(req.method==='POST'&&['website_work_items','manager_goals'].includes(table)){
     result=(Array.isArray(body)?body:[body]).map(row=>({id:randomUUID(),updated_at:new Date().toISOString(),priority:1,sort_order:0,...row}));rows.push(...result);
   }

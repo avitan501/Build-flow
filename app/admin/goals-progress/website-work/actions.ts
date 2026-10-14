@@ -8,6 +8,7 @@ import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setFixedManagerGoalStatusAction } from "@/app/admin/goals-progress/goal-actions";
 import { CARLOS_FIXED_GOALS, type CarlosFixedGoalKey } from "@/lib/manager-goal-status";
+import { isInternalOutreachLead, type DashboardOutreachLead, type DashboardOutreachResult } from "@/lib/dashboard-outreach";
 import {
   createWebsiteWorkToken,
   WEBSITE_WORK_COOKIE,
@@ -54,6 +55,27 @@ async function unlockedDavidDashboard() {
     context.user.id,
   );
   return unlocked ? context : null;
+}
+
+export async function getDashboardOutreachLeadsAction(): Promise<DashboardOutreachResult> {
+  const context = await unlockedDavidDashboard();
+  if (!context) return { ok: false, error: "Unlock David Dashboard to see your leads." };
+  const leads: DashboardOutreachLead[] = [];
+  const pageSize = 500;
+  // Fetch every page so the task never silently omits contacts at the API row limit.
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await context.supabase.from("manager_outreach_leads")
+      .select("id,full_name,company_name,phone,email,notes,status,preferred_language,relationship_level")
+      .order("full_name").order("id")
+      .range(offset, offset + pageSize - 1)
+      .returns<DashboardOutreachLead[]>();
+    if (error) return { ok: false, error: "Your leads could not load. Please try again." };
+    leads.push(...(data ?? []));
+    if ((data?.length ?? 0) < pageSize) break;
+  }
+  const contacts = leads.filter((lead) => !isInternalOutreachLead(lead))
+    .sort((left, right) => left.full_name.localeCompare(right.full_name, "en", { sensitivity: "base" }));
+  return { ok: true, leads: contacts, excludedCount: leads.length - contacts.length };
 }
 
 export async function createDavidDashboardItemAction(input: {

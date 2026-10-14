@@ -194,3 +194,80 @@ test("owner PIN and staff boundaries still protect the private dashboard", async
     await context.close();
   }
 });
+
+async function seedOutreach(request: import('@playwright/test').APIRequestContext) {
+  await request.patch(`${fixture}/rest/v1/website_work_items?id=eq.11111111-1111-4111-8111-000000000002`, { data: {
+    task_key: 'david-lead-outreach-20261014', title: 'Your next client starts with hello',
+    next_step: '/admin/users?view=leads&department=5',
+  } });
+  const leads = Array.from({ length: 24 }, (_, i) => ({
+    id: `lead-${i}`, full_name: i === 23 ? 'Zebra Architecture and Planning Studio' : `Sample Builder ${String(i + 1).padStart(2, '0')}`,
+    company_name: i === 0 ? 'North Construction' : null, phone: i === 23 ? null : `+1212555${String(i + 100).padStart(4, '0')}`,
+    email: i === 23 ? 'plans@example.test' : null, notes: i === 0 ? 'Asked for a follow-up on the upcoming framing order.' : null,
+    status: 'new', preferred_language: i === 1 ? 'es' : 'en', relationship_level: i === 23 ? 3 : 5,
+  }));
+  const all = [...leads, { ...leads[0], id: 'test-lead', full_name: 'Internal QA Contact', notes: 'Internal test lead. Do not use for outreach.' }];
+  await request.post(`${fixture}/__qa/leads`, { data: { leads: all } });
+  return all;
+}
+
+test('outreach task shows every real lead with working call targets, search and notes on desktop and phone', async ({ page, request }, testInfo) => {
+  test.setTimeout(60000);
+  await seedOutreach(request);
+  await open(page);
+  await page.getByRole('switch', { name: 'Task motion' }).click();
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole('button', { name: 'Open task: Your next client starts with hello', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    const list = dialog.getByRole('list', { name: 'Lead contacts' });
+    await expect(list.getByRole('listitem')).toHaveCount(24);
+    await expect(dialog.getByText('24 leads · 23 with phones')).toBeVisible();
+    await expect(dialog.getByRole('link', { name: /^Call / })).toHaveCount(23);
+    await expect(dialog.getByText('Internal QA Contact')).toHaveCount(0);
+    await dialog.screenshot({ path: testInfo.outputPath(`outreach-${width}.png`) });
+    await expect(dialog.getByLabel('Task name', { exact: true })).not.toBeVisible();
+    await expect(list.getByRole('link', { name: /^Call Sample Builder 01 / })).toHaveAttribute('href', 'tel:+12125550100');
+    const search = dialog.getByRole('searchbox');
+    await search.fill('212-555-0100');
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await list.getByText('Notes & contact details').click();
+    await expect(list.getByText('Asked for a follow-up on the upcoming framing order.')).toBeVisible();
+    await search.fill('zebra');
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await expect(list.getByText('No phone saved')).toBeVisible();
+    await expect(list.getByRole('link', { name: /^Call / })).toHaveCount(0);
+    await expect(list.getByRole('link', { name: 'Open contact' })).toHaveAttribute('href', '/admin/users?view=leads&department=3&q=plans%40example.test');
+    expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await search.fill('');
+    await expect(list.getByRole('listitem')).toHaveCount(24);
+    await dialog.getByText('Edit task details', { exact: true }).click();
+    await expect(dialog.getByLabel('Task name', { exact: true })).toHaveValue('Your next client starts with hello');
+    await dialog.getByRole('button', { name: 'Close task' }).click();
+  }
+  const state = await (await request.get(`${fixture}/__qa/state`)).json();
+  expect(state.leads).toHaveLength(25);
+  expect(state.leads.every((lead: { status: string }) => lead.status === 'new')).toBe(true);
+});
+
+test('reopening outreach loads fresh contacts and a read failure can be retried', async ({ page, request }) => {
+  const leads = await seedOutreach(request);
+  await open(page);
+  await page.getByRole('switch', { name: 'Task motion' }).click();
+  const task = page.getByRole('button', { name: 'Open task: Your next client starts with hello', exact: true });
+  await task.click();
+  await expect(page.getByRole('list', { name: 'Lead contacts' }).getByRole('listitem')).toHaveCount(24);
+  await page.getByRole('button', { name: 'Close task' }).click();
+  await request.post(`${fixture}/__qa/leads`, { data: { leads: [...leads, { ...leads[0], id: 'fresh-lead', full_name: 'Newly Added Builder' }] } });
+  await task.click();
+  await expect(page.getByRole('list', { name: 'Lead contacts' }).getByRole('listitem')).toHaveCount(25);
+  await expect(page.getByRole('heading', { name: 'Newly Added Builder' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close task' }).click();
+  await request.post(`${fixture}/__qa/fail-lead-read`);
+  await task.click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('could not load');
+  await request.post(`${fixture}/__qa/fail-lead-read`, { data: { enabled: false } });
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByRole('list', { name: 'Lead contacts' }).getByRole('listitem')).toHaveCount(25);
+});
