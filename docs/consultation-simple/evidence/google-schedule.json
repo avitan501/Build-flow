@@ -1,0 +1,36 @@
+{
+  "title": "Avantia — Free 15-Minute Strategy Meeting",
+  "timeZone": "America/New_York",
+  "weeklyHours": {
+    "2026-10-19": [
+      12,
+      14,
+      15,
+      16
+    ],
+    "2026-10-20": [
+      12,
+      13,
+      14,
+      16
+    ],
+    "2026-10-21": [
+      12,
+      13,
+      15
+    ],
+    "2026-10-22": [
+      12,
+      14,
+      16
+    ],
+    "2026-10-23": [
+      12,
+      14,
+      16
+    ]
+  },
+  "blockedWeekdayPercentage": 32,
+  "weekendsUnavailable": true,
+  "realAppointmentsCreated": false
+}

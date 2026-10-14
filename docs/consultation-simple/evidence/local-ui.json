@@ -1,0 +1,29 @@
+[
+  {
+    "name": "desktop",
+    "width": 1440,
+    "timezone": "America/New_York",
+    "days": 14,
+    "overflow": false,
+    "googleFormOpened": true,
+    "appointmentCreated": false
+  },
+  {
+    "name": "phone",
+    "width": 390,
+    "timezone": "Asia/Jerusalem",
+    "days": 14,
+    "overflow": false,
+    "googleFormOpened": true,
+    "appointmentCreated": false
+  },
+  {
+    "name": "small",
+    "width": 320,
+    "timezone": "America/Los_Angeles",
+    "days": 14,
+    "overflow": false,
+    "googleFormOpened": false,
+    "appointmentCreated": false
+  }
+]
