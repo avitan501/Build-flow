@@ -220,7 +220,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
 
   const text = <>
     <p className={`text-[10px] font-bold uppercase tracking-[0.26em] ${conceptId === 2 ? "text-slate-600" : conceptId === 3 ? "text-amber-300" : conceptId === 5 ? "text-blue-700" : "text-white/72"}`}>{concept.eyebrow}</p>
-    <h1 className={`mt-3 text-balance font-semibold leading-[0.95] tracking-[-0.055em] ${conceptId === 2 ? "text-[clamp(2.7rem,6.1vw,5.7rem)]" : "text-[clamp(3rem,8.5vw,7rem)]"}`}>{concept.headline}</h1>
+    <h1 className={`mt-3 text-balance font-semibold leading-[0.95] tracking-[-0.055em] ${conceptId === 2 ? "text-[clamp(2.15rem,4.6vw,4.3rem)]" : "text-[clamp(3rem,8.5vw,7rem)]"}`}>{concept.headline}</h1>
     <p className="mt-5 max-w-xl text-sm font-semibold leading-6 opacity-85 sm:text-base">{concept.summary}</p>
   </>
 
