@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bot, Check, LayoutDashboard, LockKeyhole, RotateCcw, Send, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, LayoutDashboard, LockKeyhole, NotebookPen, RotateCcw, Send, Target, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -145,12 +145,17 @@ export default async function DavidDashboardPage() {
               </div>
             </div>
           </div>
-          <form action={lockWebsiteWorkAction}>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700">
-              <LockKeyhole className="h-3.5 w-3.5" />
-              Lock
-            </button>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/admin/goals-progress/website-work/personal" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white" aria-label="משימות פרטיות · Personal tasks">
+              <NotebookPen className="h-4 w-4" aria-hidden="true" /><span dir="rtl" lang="he">משימות פרטיות</span>
+            </Link>
+            <form action={lockWebsiteWorkAction}>
+              <button className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700">
+                <LockKeyhole className="h-3.5 w-3.5" />
+                Lock
+              </button>
+            </form>
+          </div>
         </header>
         <div className="mt-5 grid min-w-0 gap-5">
           <DashboardTaskWorkspace items={items} userName={profile?.full_name || "My workspace"} userId={user.id} />

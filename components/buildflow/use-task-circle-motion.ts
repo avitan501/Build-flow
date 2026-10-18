@@ -13,6 +13,7 @@ export function useTaskCircleMotion(arenaRef: RefObject<HTMLDivElement | null>, 
     let circles: TaskCircle[] = [];
     let width = 0, height = 0, frame = 0, last = 0;
     let on = false, blocked = false, hovered = false, pressed = false, keyboard = false, visible = true;
+    let keyboardInput = true;
     let disposed = false;
     const allowed = () => !disposed && on && !blocked && !hovered && !pressed && !keyboard && visible && !document.hidden && circles.length > 0;
     const paint = () => circles.forEach((circle, i) => {
@@ -46,7 +47,11 @@ export function useTaskCircleMotion(arenaRef: RefObject<HTMLDivElement | null>, 
     const pointerOut = (event: PointerEvent) => { if (event.pointerType === "mouse" && !taskTarget(event.relatedTarget)) { hovered = false; wake(); } };
     const pointerDown = () => { pressed = true; keyboard = false; wake(); };
     const pointerUp = () => { pressed = false; wake(); };
-    const focusIn = (event: FocusEvent) => { if (event.target instanceof Element && event.target.matches(":focus-visible")) { keyboard = true; wake(); } };
+    // Safari restores :focus-visible to the trigger even after a touch closes
+    // a dialog. Only keyboard-origin focus should hold the circles still.
+    const pointerInput = () => { keyboardInput = false; keyboard = false; wake(); };
+    const keyInput = () => { keyboardInput = true; if (taskTarget(document.activeElement)) { keyboard = true; wake(); } };
+    const focusIn = (event: FocusEvent) => { if (keyboardInput && event.target instanceof Element && event.target.matches(":focus-visible")) { keyboard = true; wake(); } };
     const focusOut = () => { keyboard = false; wake(); };
     const windowBlur = () => { pressed = false; hovered = false; wake(); };
     arena.addEventListener("pointerover", pointerOver);
@@ -55,6 +60,8 @@ export function useTaskCircleMotion(arenaRef: RefObject<HTMLDivElement | null>, 
     arena.addEventListener("focusin", focusIn);
     arena.addEventListener("focusout", focusOut);
     window.addEventListener("pointerup", pointerUp);
+    window.addEventListener("pointerdown", pointerInput, true);
+    window.addEventListener("keydown", keyInput, true);
     window.addEventListener("pointercancel", pointerUp);
     window.addEventListener("blur", windowBlur);
     document.addEventListener("visibilitychange", wake);
@@ -77,6 +84,8 @@ export function useTaskCircleMotion(arenaRef: RefObject<HTMLDivElement | null>, 
       arena.removeEventListener("focusin", focusIn);
       arena.removeEventListener("focusout", focusOut);
       window.removeEventListener("pointerup", pointerUp);
+      window.removeEventListener("pointerdown", pointerInput, true);
+      window.removeEventListener("keydown", keyInput, true);
       window.removeEventListener("pointercancel", pointerUp);
       window.removeEventListener("blur", windowBlur);
       document.removeEventListener("visibilitychange", wake);

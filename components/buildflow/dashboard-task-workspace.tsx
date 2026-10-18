@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 
 import { createDavidDashboardItemAction, saveDashboardTaskAction, setDashboardTaskStatusAction, setDavidTaskPublishedAction } from "@/app/admin/goals-progress/website-work/actions";
+import { createPersonalTaskAction, savePersonalTaskAction, setPersonalTaskStatusAction } from "@/app/admin/goals-progress/website-work/personal/actions";
 import type { DavidDashboardItem } from "@/components/buildflow/david-dashboard-board";
 import { DashboardLeadRoster } from "@/components/buildflow/dashboard-lead-roster";
 import { LEAD_OUTREACH_TASK_KEY } from "@/lib/dashboard-outreach";
@@ -29,8 +30,11 @@ function subscribeMotion(callback: () => void) {
   };
 }
 
-export function DashboardTaskWorkspace({ items, userName, userId }: { items: DavidDashboardItem[]; userName: string; userId: string }) {
+export function DashboardTaskWorkspace({ items, userName, userId, scope = "business" }: { items: DavidDashboardItem[]; userName: string; userId: string; scope?: "business" | "personal" }) {
   const router = useRouter();
+  const personal = scope === "personal";
+  const saveTask = personal ? savePersonalTaskAction : saveDashboardTaskAction;
+  const setTaskStatus = personal ? setPersonalTaskStatusAction : setDashboardTaskStatusAction;
   const [view, setView] = useState<View>("workspace");
   const [pageIndex, setPageIndex] = useState(0);
   const [selection, setSelection] = useState<DavidDashboardItem | "new" | null>(null);
@@ -57,7 +61,7 @@ export function DashboardTaskWorkspace({ items, userName, userId }: { items: Dav
   const tasks = items.filter((item) => item.item_kind === "task");
   const filtered = tasks.filter((item) => view === "completed" ? item.status === "completed"
     : view === "archived" ? item.status === "archived"
-      : !inactive.has(item.status) && (view === "all" || isWorkspaceTask(item)));
+      : !inactive.has(item.status) && (personal || view === "all" || isWorkspaceTask(item)));
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(pageIndex, pageCount - 1);
   const visibleTasks = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
@@ -96,21 +100,21 @@ export function DashboardTaskWorkspace({ items, userName, userId }: { items: Dav
     window.dispatchEvent(new Event("avantia-task-motion"));
   }
   const selected = selection && selection !== "new" ? selection : null;
-  const isOutreachTask = selected?.task_key === LEAD_OUTREACH_TASK_KEY;
-  const workflowHref = selected ? taskWorkflowHref(selected) : null;
+  const isOutreachTask = !personal && selected?.task_key === LEAD_OUTREACH_TASK_KEY;
+  const workflowHref = !personal && selected ? taskWorkflowHref(selected) : null;
   const initials = userName.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
   const taskForm = (
       <form onSubmit={(event) => {
         event.preventDefault();
-        if (selection === "new") run(() => createDavidDashboardItemAction({ title, nextStep, kind: "task" }), "Task added.");
-        else if (selected) run(() => saveDashboardTaskAction({ id: selected.id, title, summary, nextStep, updatedAt: selected.updated_at }), "Task saved.");
+        if (selection === "new") run(() => personal ? createPersonalTaskAction({ title, nextStep }) : createDavidDashboardItemAction({ title, nextStep, kind: "task" }), "Task added.");
+        else if (selected) run(() => saveTask({ id: selected.id, title, summary, nextStep, updatedAt: selected.updated_at }), "Task saved.");
       }}>
         <label htmlFor="dashboard-task-name">Task name</label>
-        <input id="dashboard-task-name" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required minLength={2} disabled={pending} autoComplete="off" />
-        {selected && <><label htmlFor="dashboard-task-notes">Context</label><textarea id="dashboard-task-notes" value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={500} rows={3} disabled={pending} /></>}
+        <input dir="auto" id="dashboard-task-name" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required minLength={2} disabled={pending} autoComplete="off" />
+        {selected && <><label htmlFor="dashboard-task-notes">Context</label><textarea dir="auto" id="dashboard-task-notes" value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={500} rows={3} disabled={pending} /></>}
         <label htmlFor="dashboard-task-next">Next step</label>
-        <textarea id="dashboard-task-next" value={nextStep} onChange={(event) => setNextStep(event.target.value)} maxLength={500} rows={3} disabled={pending} placeholder="One clear action to move this forward" />
+        <textarea dir="auto" id="dashboard-task-next" value={nextStep} onChange={(event) => setNextStep(event.target.value)} maxLength={500} rows={3} disabled={pending} placeholder="One clear action to move this forward" />
         {selected?.source_chat_title && <p className={styles.source}>Source: {selected.source_chat_title}</p>}
         <button className={styles.primary} type="submit" disabled={pending || title.trim().length < 2}>{pending ? "Saving…" : selection === "new" ? "Add to my workspace" : "Save changes"}</button>
       </form>
@@ -141,7 +145,7 @@ export function DashboardTaskWorkspace({ items, userName, userId }: { items: Dav
         className={`${styles.circle} ${styles[["mint", "gold", "blue", "lilac"][index % 4]]}`}
         aria-label={`Open task: ${item.title}`} title={item.title} onClick={() => openTask(item)}>
         {item.status === "completed" ? <Check className={styles.taskIcon} aria-hidden="true" /> : item.category === "suppliers_pricing" ? <Handshake className={styles.taskIcon} aria-hidden="true" /> : <ClipboardList className={styles.taskIcon} aria-hidden="true" />}
-        <span className={styles.taskTitle}>{item.title}</span>
+        <span dir="auto" className={styles.taskTitle}>{item.title}</span>
         <span className={styles.taskStatus}>{item.status.replaceAll("_", " ")}</span>
         <span className={styles.taskArrow} aria-hidden="true"><ArrowRight size={17} /></span>
       </button>)}
@@ -163,21 +167,21 @@ export function DashboardTaskWorkspace({ items, userName, userId }: { items: Dav
       onClose={() => { setSelection(null); setConfirmDelete(false); }}>
       <button type="button" className={styles.close} aria-label="Close task" disabled={pending} onClick={() => setSelection(null)}><X size={22} /></button>
       <p className={styles.eyebrow}>{selection === "new" ? "YOUR NEXT MOVE" : "ONE STEP FORWARD"}</p>
-      <h2 id="dashboard-task-title">{selection === "new" ? "What’s your next task?" : selected?.title}</h2>
+      <h2 dir="auto" id="dashboard-task-title">{selection === "new" ? "What’s your next task?" : selected?.title}</h2>
       {isOutreachTask && <DashboardLeadRoster key={selected.id} />}
       {isOutreachTask ? <details className={styles.taskEditor}><summary>Edit task details</summary>{taskForm}</details> : taskForm}
       {selected && <div className={styles.taskActions}>
         {workflowHref && <Link className={styles.workflowLink} href={workflowHref}>Open workflow <ArrowRight size={16} /></Link>}
-        {selected.status === "archived" ? <button type="button" disabled={pending} onClick={() => run(() => setDashboardTaskStatusAction({ id: selected.id, status: "open", updatedAt: selected.updated_at }), "Task restored.")}><RotateCcw size={17} /> Restore task</button>
+        {selected.status === "archived" ? <button type="button" disabled={pending} onClick={() => run(() => setTaskStatus({ id: selected.id, status: "open", updatedAt: selected.updated_at }), "Task restored.")}><RotateCcw size={17} /> Restore task</button>
           : <>
-            <button type="button" disabled={pending} onClick={() => run(() => setDashboardTaskStatusAction({ id: selected.id, status: selected.status === "completed" ? "open" : "completed", updatedAt: selected.updated_at }), selected.status === "completed" ? "Task reopened." : "Task completed. One step forward!")}><Check size={17} />{selected.status === "completed" ? "Reopen task" : "Mark complete"}</button>
-            <label className={styles.publish}><input type="checkbox" checked={selected.published_to_carlos} disabled={pending} onChange={(event) => { const published = event.target.checked; run(() => setDavidTaskPublishedAction({ id: selected.id, published }), published ? "Task shared with Carlos." : "Task is private."); }} /> Show Carlos</label>
+            <button type="button" disabled={pending} onClick={() => run(() => setTaskStatus({ id: selected.id, status: selected.status === "completed" ? "open" : "completed", updatedAt: selected.updated_at }), selected.status === "completed" ? "Task reopened." : "Task completed. One step forward!")}><Check size={17} />{selected.status === "completed" ? "Reopen task" : "Mark complete"}</button>
+            {!personal && <label className={styles.publish}><input type="checkbox" checked={selected.published_to_carlos} disabled={pending} onChange={(event) => { const published = event.target.checked; run(() => setDavidTaskPublishedAction({ id: selected.id, published }), published ? "Task shared with Carlos." : "Task is private."); }} /> Show Carlos</label>}
             <button type="button" className={styles.delete} disabled={pending} onClick={() => setConfirmDelete(true)}><Trash2 size={17} /> Delete task</button>
           </>}
       </div>}
       {confirmDelete && selected && <div className={styles.confirm} role="group" aria-label="Confirm task deletion">
         <p>Remove this task from the workspace? You can restore it from Archived tasks.</p>
-        <button type="button" disabled={pending} onClick={() => run(() => setDashboardTaskStatusAction({ id: selected.id, status: "archived", updatedAt: selected.updated_at }), "Task deleted. You can restore it from Archived tasks.")}>Yes, delete task</button>
+        <button type="button" disabled={pending} onClick={() => run(() => setTaskStatus({ id: selected.id, status: "archived", updatedAt: selected.updated_at }), "Task deleted. You can restore it from Archived tasks.")}>Yes, delete task</button>
         <button type="button" disabled={pending} onClick={() => setConfirmDelete(false)}>Keep task</button>
       </div>}
       {error && <p className={styles.error} role="alert">{error}</p>}
