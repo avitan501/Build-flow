@@ -11,7 +11,8 @@ export const responseSchema = z.object({
     email: z.union([z.literal(""), z.email().max(254)]),
     phone: z.string().trim().max(40),
   }).strict().refine(profile => Boolean(profile.email || profile.phone), "Enter an email or phone number"),
-  answers: z.record(z.string(), z.string().trim().max(2500))
+  answers: z.record(z.string(), z.string().trim().max(10000))
+    .refine(answers => Object.entries(answers).every(([key,value]) => key === "departments" || value.length <= 2500), "Answer is too long")
     .refine(answers => Object.keys(answers).every(key => keys.includes(key)), "Unknown question")
     .refine(answers => requiredKeys.every(key => Boolean(answers[key]?.trim())), "Answer the three required questions"),
   consent: z.literal(true),

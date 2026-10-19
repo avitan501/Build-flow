@@ -1,5 +1,11 @@
 # Client-completed questionnaire
 
+## Whole questionnaire refinement — 2026-10-19
+
+David requested thoughtful questions throughout the client experience. All six material categories now have two tailored optional follow-ups about readiness (lists, quantities or selections) and responsibility (preparation, measurement, buying or tracking). Each opens immediately below its own choice. Five core questions retained; copy clarifies optional detail and asks about purchasing friction, first help wanted and next-order timing. Other free text remains available. Original owner interview unchanged. Three-minute completion is a target, not a measured promise.
+
+Fixed panel/control IDs to be unique across all categories. Combined material answers now accept up to10000 characters, while other answers remain limited to2500, so selecting all categories with optional notes remains supported. No migration needed. Seven schema/API tests including limits, four Chrome/WebKit tests covering all categories, direct nesting, independent drafts, unchecked exclusion, review and mocked submission passed; lint and diff passed. No test responses written to preview storage. Preview3110 running; no production deployment or external communication. Full build required before release. Codex sole owner, existing isolated branch/worktree; no publisher active.
+
 ## Lumber follow-up questions — 2026-10-19
 
 David corrected the intent: ask whether the client has a lumber list and who prepares it, directly under the Lumber / framing option. Replaced material-type choices with two optional single-choice questions plus Other text. Nested panel now sits immediately after its parent label inside its grid cell. Draft persistence and composed review/download/submission answers maintained; unchecking lumber excludes its follow-ups. Desktop Chrome and mobile Safari tests passed for nesting, visibility, restoration, custom text, submit payload and no overflow. Generated assets rebuilt; diff check passed. Preview3110 updated only; no production release. Full build remains required before publishing. Codex sole implementer on existing isolated branch/worktree; no active publisher.

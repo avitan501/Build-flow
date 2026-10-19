@@ -22,12 +22,12 @@
     },
     {
       "title": "The help you need",
-      "description": "Just tap the answers that fit. No long explanations needed.",
+      "description": "Pick the materials that matter most. Answer the short follow-ups if you know; skip anything you are unsure about.",
       "questions": [
         {
           "id": "departments",
           "text": "Which materials do you need help with?",
-          "hint": "Select any that apply.",
+          "hint": "Select the materials you want to discuss. Two optional questions open under each.",
           "required": false,
           "choices": [
             "Lumber / framing",
@@ -60,13 +60,125 @@
                   "I need someone to do it"
                 ]
               }
+            ],
+            "Windows / doors": [
+              {
+                "id": "ready",
+                "text": "How far along are your window and door selections?",
+                "choices": [
+                  "Sizes and styles are confirmed",
+                  "I have plans, but need a final list",
+                  "Still choosing",
+                  "I need help getting started"
+                ]
+              },
+              {
+                "id": "confirm",
+                "text": "Who confirms the sizes before ordering?",
+                "choices": [
+                  "My installer / contractor",
+                  "My architect / designer",
+                  "The supplier measures",
+                  "I do",
+                  "Not arranged yet"
+                ]
+              }
+            ],
+            "Roofing / siding": [
+              {
+                "id": "ready",
+                "text": "Do you have the product choices and quantities?",
+                "choices": [
+                  "Yes, both are ready",
+                  "Products chosen, quantities needed",
+                  "I have plans only",
+                  "Not yet"
+                ]
+              },
+              {
+                "id": "owner",
+                "text": "Who handles the roofing or siding materials?",
+                "choices": [
+                  "My roofer / siding contractor",
+                  "I buy them for the crew",
+                  "My supplier helps arrange them",
+                  "Still deciding"
+                ]
+              }
+            ],
+            "Plumbing / electrical": [
+              {
+                "id": "ready",
+                "text": "Has your plumber or electrician provided a material list?",
+                "choices": [
+                  "Yes, a complete list",
+                  "Part of it",
+                  "Not yet",
+                  "They supply their own materials"
+                ]
+              },
+              {
+                "id": "owner",
+                "text": "Who buys the fixtures and equipment?",
+                "choices": [
+                  "I do",
+                  "My plumber / electrician",
+                  "We split the purchases",
+                  "Still deciding"
+                ]
+              }
+            ],
+            "Drywall / insulation": [
+              {
+                "id": "ready",
+                "text": "Do you know the types and quantities needed?",
+                "choices": [
+                  "Yes, ready to price",
+                  "I have plans, but need quantities",
+                  "My installer is working on it",
+                  "Not yet"
+                ]
+              },
+              {
+                "id": "owner",
+                "text": "Who orders these materials now?",
+                "choices": [
+                  "My installer / contractor",
+                  "I do",
+                  "My supplier handles the list and order",
+                  "Not arranged yet"
+                ]
+              }
+            ],
+            "Interior finishes": [
+              {
+                "id": "ready",
+                "text": "Have you chosen your finishes?",
+                "choices": [
+                  "Yes, selections are final",
+                  "Some are chosen",
+                  "Still comparing options",
+                  "I need help narrowing it down"
+                ]
+              },
+              {
+                "id": "owner",
+                "text": "Who keeps track of the selections and orders?",
+                "choices": [
+                  "I do",
+                  "My designer / architect",
+                  "My contractor",
+                  "We share it",
+                  "No one yet"
+                ]
+              }
             ]
           }
         },
         {
           "id": "friction",
-          "text": "What is your biggest challenge?",
-          "hint": "Choose what takes up the most time.",
+          "text": "What slows you down most when buying materials?",
+          "hint": "Select the issues you run into.",
           "required": true,
           "choices": [
             "Comparing prices",
@@ -79,8 +191,8 @@
         },
         {
           "id": "priorities",
-          "text": "What would you like us to help with?",
-          "hint": "Choose the help you would find most useful.",
+          "text": "What would you like Avantia to take care of first?",
+          "hint": "Select the help that would make the biggest difference.",
           "required": true,
           "choices": [
             "Preparing a material list",
@@ -99,7 +211,7 @@
       "questions": [
         {
           "id": "next_step",
-          "text": "When would you like help?",
+          "text": "When do you need help with your next material order?",
           "hint": "An estimate is fine.",
           "required": true,
           "choices": [

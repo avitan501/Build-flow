@@ -1,6 +1,6 @@
 <main class="wrap">
 <header class="mast"><a class="brand" href="/" aria-label="Avantia Build homepage">AVANTIA<span>BUILD</span></a><span class="pill">CLIENT QUESTIONNAIRE</span></header>
-<section class="hero"><p class="eyebrow">LESS CHASING. MORE BUILDING.</p><h1>Tell us where<br>you need a hand.</h1><p class="lead">Five quick questions. Tap the answers that fit, add your contact details, and we’ll take it from there.</p><p class="muted">About 3 minutes · Mostly tapping · No account needed</p></section>
+<section class="hero"><p class="eyebrow">LESS CHASING. MORE BUILDING.</p><h1>Tell us where<br>you need a hand.</h1><p class="lead">Tell us what you’re working on and how you handle materials. Tap your answers; add details only where they help.</p><p class="muted">About 3 minutes · Mostly tapping · No account needed</p></section>
 <div id="loading" role="status"></div>
 <section id="form-area">
 <div class="progress-row"><span id="step-count"></span><span id="answer-count"></span></div><progress id="progress" max="4" value="1" aria-label="Questionnaire progress"></progress>
@@ -32,7 +32,7 @@ function showError(text){$('error').textContent=text;$('error').hidden=false;}
 function field(label,value,oninput,{id,hint='',required=false,type='textarea',max=2500}={}){const box=el('label',undefined,'field'),title=el('span',label+(required?' *':' (optional)'));box.append(title);const input=el(type==='textarea'?'textarea':'input');input.id=id;input.dir='auto';if(type!=='textarea')input.type=type;input.value=value||'';input.maxLength=max;input.required=required;if(type==='textarea')input.rows=3;input.addEventListener('input',()=>{oninput(input.value);persist();clearError()});if(type==='email')input.autocomplete='email';if(id==='name')input.autocomplete='name';if(id==='company')input.autocomplete='organization';if(type==='tel')input.autocomplete='tel';box.append(input);if(hint){const help=el('small',hint);help.id=id+'-help';input.setAttribute('aria-describedby',help.id);box.append(help)}return box}
 function choiceField(q){
  const box=el('fieldset',undefined,'choice-field'),legend=el('legend',q.text+(q.required?' *':' (optional)'));
- box.append(legend,el('p','Select what fits, or choose Other to write your answer.','muted'));
+ box.append(legend,el('p',(q.hint||'Select what fits.')+' Choose Other to type your answer.','muted'));
  draft.choices=draft.choices||{};draft.other=draft.other||{};
  if(!Array.isArray(draft.choices[q.id])){draft.other[q.id]=draft.state.answers[q.id]||'';draft.choices[q.id]=draft.other[q.id]?['__other']:[];}
  const selected=new Set(draft.choices[q.id].filter(v=>q.choices.includes(v)||v==='__other'));
@@ -42,12 +42,13 @@ function choiceField(q){
  function sync(){draft.choices[q.id]=[...selected];const values=q.choices.filter(v=>selected.has(v)).map(v=>{const questions=q.followups?.[v];if(!questions)return v;const details=questions.flatMap(f=>{const id=q.id+':'+v+':'+f.id,value=draft.followups[id];if(!value)return [];return [f.text+' '+(value==='__other'?((draft.followupOther[id]||'').trim()||'Other — discuss with me'):value)]});return v+(details.length?'\n  '+details.join('\n  '):'');});const other=selected.has('__other')?(draft.other[q.id]||'').trim():'';draft.state.answers[q.id]=[...values,...(selected.has('__other')?[other?'Other: '+other:'Other — discuss with me']:[])].join('\n');persist();clearError();}
  [...q.choices,'__other'].forEach((value,index)=>{const label=el('label',undefined,'choice'),input=el('input');input.type='checkbox';input.id=q.id+'-choice-'+index;input.checked=selected.has(value);input.value=value;const text=el('span',value==='__other'?'Other / tell us more':value);input.onchange=()=>{if(input.checked)selected.add(value);else selected.delete(value);if(value==='__other'){custom.hidden=!input.checked;if(input.checked)custom.querySelector('textarea').focus();}for(const panel of subpanels)panel.node.hidden=!selected.has(panel.parent);sync()};label.append(input,text);grid.append(label)});
  for(const [parent,questions]of Object.entries(q.followups||{})){
-  const panel=el('div',undefined,'subchoices');panel.id=q.id+'-subchoices';panel.hidden=!selected.has(parent);
-  panel.append(el('p','A little more about your lumber list · Optional','muted'));
+  const panelKey=q.id+'-material-'+q.choices.indexOf(parent);
+  const panel=el('div',undefined,'subchoices');panel.id=panelKey+'-subchoices';panel.hidden=!selected.has(parent);
+  panel.append(el('p',parent+' · Two optional questions','muted'));
   for(const f of questions){
    const id=q.id+':'+parent+':'+f.id,group=el('fieldset',undefined,'followup'),choices=el('div',undefined,'choice-grid');group.append(el('legend',f.text));
-   const other=field('Tell us more',draft.followupOther[id]||'',value=>{draft.followupOther[id]=value;sync()},{id:q.id+'-'+f.id+'-other',max:400});other.hidden=draft.followups[id]!=='__other';
-   [...f.choices,'__other'].forEach((value,index)=>{const label=el('label',undefined,'choice'),input=el('input');input.type='radio';input.name=id;input.id=q.id+'-'+f.id+'-'+index;input.checked=draft.followups[id]===value;input.onchange=()=>{draft.followups[id]=value;other.hidden=value!=='__other';sync();if(value==='__other')other.querySelector('textarea').focus()};label.append(input,el('span',value==='__other'?'Other':value));choices.append(label)});
+   const other=field('Tell us more',draft.followupOther[id]||'',value=>{draft.followupOther[id]=value;sync()},{id:panelKey+'-'+f.id+'-other',max:400});other.hidden=draft.followups[id]!=='__other';
+   [...f.choices,'__other'].forEach((value,index)=>{const label=el('label',undefined,'choice'),input=el('input');input.type='radio';input.name=id;input.id=panelKey+'-'+f.id+'-'+index;input.checked=draft.followups[id]===value;input.onchange=()=>{draft.followups[id]=value;other.hidden=value!=='__other';sync();if(value==='__other')other.querySelector('textarea').focus()};label.append(input,el('span',value==='__other'?'Other':value));choices.append(label)});
    group.append(choices,other);panel.append(group);
   }
   subpanels.push({parent,node:panel});
