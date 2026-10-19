@@ -119,103 +119,70 @@
             ],
             "Plumbing / electrical": [
               {
-                "id": "ready",
-                "text": "Has your plumber or electrician provided a material list?",
+                "id": "source",
+                "text": "Where should we get the material list?",
                 "choices": [
-                  "Yes, a complete list",
-                  "Part of it",
-                  "Not yet",
-                  "They supply their own materials"
+                  "My plumber / electrician",
+                  "Plans",
+                  "Help clarify what I need to buy"
                 ]
               },
               {
-                "id": "contact",
-                "text": "Would you like us to speak directly with your plumber / electrician?",
-                "choices": [
-                  "Yes, coordinate directly",
-                  "Yes, but check with me first",
-                  "No, I’ll handle the conversation",
-                  "Not sure yet"
-                ]
-              },
-              {
-                "id": "help",
-                "text": "What would you like us to help with first?",
+                "id": "services",
+                "text": "What would you like us to handle for plumbing and electrical?",
+                "multiple": true,
                 "choices": [
                   "Clarify what my trade supplies",
-                  "Collect the list of items I need to buy",
-                  "Compare quotes for matching products",
+                  "Compare supplier quotes",
+                  "Confirm products with my trade",
                   "Arrange approved purchases",
-                  "No help needed right now",
-                  "Not sure — talk it through with me"
+                  "Follow up on orders / arrange reorders"
                 ]
               }
             ],
             "Drywall / insulation": [
               {
-                "id": "ready",
-                "text": "Do you know the types and quantities needed?",
+                "id": "source",
+                "text": "Where should we get the types and quantities?",
                 "choices": [
-                  "Yes, ready to price",
-                  "I have plans, but need quantities",
-                  "My installer is working on it",
-                  "Not yet"
+                  "Plans",
+                  "My installer’s list",
+                  "Help preparing a takeoff"
                 ]
               },
               {
-                "id": "contact",
-                "text": "Would you like us to speak directly with your drywall / insulation installer?",
+                "id": "services",
+                "text": "What would you like us to handle for drywall and insulation?",
+                "multiple": true,
                 "choices": [
-                  "Yes, coordinate directly",
-                  "Yes, but check with me first",
-                  "No, I’ll handle the conversation",
-                  "Not sure yet"
-                ]
-              },
-              {
-                "id": "help",
-                "text": "What would you like us to help with first?",
-                "choices": [
-                  "Get approved board / insulation quantities",
-                  "Confirm accessories with my installer",
-                  "Compare complete supplier quotes",
-                  "Coordinate delivery or missing items",
-                  "No help needed right now",
-                  "Not sure — talk it through with me"
+                  "Compare supplier quotes",
+                  "Confirm types and quantities with my installer",
+                  "Arrange an approved order",
+                  "Coordinate delivery",
+                  "Follow up on orders / arrange reorders"
                 ]
               }
             ],
             "Interior finishes": [
               {
-                "id": "ready",
-                "text": "Have you chosen your finishes?",
+                "id": "source",
+                "text": "Do you have a selection list?",
                 "choices": [
-                  "Yes, selections are final",
-                  "Some are chosen",
-                  "Still comparing options",
-                  "I need help narrowing it down"
+                  "Yes",
+                  "Get it from my designer",
+                  "Help me complete it"
                 ]
               },
               {
-                "id": "contact",
-                "text": "Would you like us to speak directly with your designer / installer?",
+                "id": "services",
+                "text": "What would you like us to handle for your interior finishes?",
+                "multiple": true,
                 "choices": [
-                  "Yes, coordinate directly",
-                  "Yes, but check with me first",
-                  "No, I’ll handle the conversation",
-                  "Not sure yet"
-                ]
-              },
-              {
-                "id": "help",
-                "text": "What would you like us to help with first?",
-                "choices": [
-                  "Collect approved selections and product codes",
+                  "Compare prices for selected products",
                   "Confirm installation supplies with my installer",
-                  "Compare matching supplier quotes",
-                  "Coordinate orders and missing items",
-                  "No help needed right now",
-                  "Not sure — talk it through with me"
+                  "Arrange approved orders",
+                  "Follow up on deliveries",
+                  "Handle missing items / reorders"
                 ]
               }
             ]
@@ -303,6 +270,38 @@
                   "We split the purchases",
                   "Still deciding"
                 ]
+              },
+              {
+                "id": "ready",
+                "text": "Has your plumber or electrician provided a material list?",
+                "choices": [
+                  "Yes, a complete list",
+                  "Part of it",
+                  "Not yet",
+                  "They supply their own materials"
+                ]
+              },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your plumber / electrician?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Clarify what my trade supplies",
+                  "Collect the list of items I need to buy",
+                  "Compare quotes for matching products",
+                  "Arrange approved purchases",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
+                ]
               }
             ],
             "Drywall / insulation": [
@@ -314,6 +313,38 @@
                   "I do",
                   "My supplier handles the list and order",
                   "Not arranged yet"
+                ]
+              },
+              {
+                "id": "ready",
+                "text": "Do you know the types and quantities needed?",
+                "choices": [
+                  "Yes, ready to price",
+                  "I have plans, but need quantities",
+                  "My installer is working on it",
+                  "Not yet"
+                ]
+              },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your drywall / insulation installer?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Get approved board / insulation quantities",
+                  "Confirm accessories with my installer",
+                  "Compare complete supplier quotes",
+                  "Coordinate delivery or missing items",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -328,22 +359,54 @@
                   "We share it",
                   "No one yet"
                 ]
+              },
+              {
+                "id": "ready",
+                "text": "Have you chosen your finishes?",
+                "choices": [
+                  "Yes, selections are final",
+                  "Some are chosen",
+                  "Still comparing options",
+                  "I need help narrowing it down"
+                ]
+              },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your designer / installer?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Collect approved selections and product codes",
+                  "Confirm installation supplies with my installer",
+                  "Compare matching supplier quotes",
+                  "Coordinate orders and missing items",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
+                ]
               }
             ]
           }
         },
         {
           "id": "friction",
-          "text": "What slows you down most when buying materials?",
-          "hint": "Select the issues you run into.",
+          "text": "What takes up most of your time when buying materials?",
+          "hint": "Select the tasks that take the most time.",
           "required": true,
           "choices": [
             "Comparing prices",
             "Finding available materials",
-            "Too many calls",
-            "Late delivery",
-            "Missing / wrong items",
-            "No major issues"
+            "Calling suppliers / my trades",
+            "Following up on orders and deliveries",
+            "Handling missing items / reorders",
+            "No major time spent"
           ]
         },
         {

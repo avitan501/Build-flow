@@ -18,7 +18,7 @@ test('five tap-first questions, optional company and Other text, preview/reload/
 test('every material has independent inline questions and preserves answers',async({page})=>{
  test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only');
  await page.goto('/questionnaire');await page.locator('#next').click();
- const ids=[['list','contact'],['ready','services'],['ready','contact','help'],['ready','contact','help'],['ready','contact','help'],['ready','contact','help']];
+ const ids=[['list','contact'],['ready','services'],['ready','contact','help'],['source','services'],['source','services'],['source','services']];
  for(let i=0;i<ids.length;i++){
   const panel=page.locator(`#departments-material-${i}-subchoices`);await expect(panel).toBeHidden();await check(page.locator(`#departments-choice-${i}`));await expect(panel).toBeVisible();
   expect(await panel.evaluate(n=>n.previousElementSibling?.querySelector('input')?.id)).toBe(`departments-choice-${i}`);
@@ -27,12 +27,12 @@ test('every material has independent inline questions and preserves answers',asy
  await page.reload();
  for(let i=0;i<ids.length;i++)for(const id of ids[i])await expect(page.locator(`#departments-material-${i}-${id}-0`)).toBeChecked();
  const material=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('avantia:client-questionnaire:v1')!).state.answers.departments);
- expect(material).toContain('What would you like us to handle for your windows and doors? Get quotes from plans / window schedule');expect(material).toContain('Collect approved selections and product codes');
+ expect(material).toContain('What would you like us to handle for your windows and doors? Get quotes from plans / window schedule');expect(material).toContain('Compare prices for selected products');
  await page.locator('#departments-choice-1').uncheck();
- const remaining=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('avantia:client-questionnaire:v1')!).state.answers.departments);expect(remaining).not.toContain('Get quotes from plans / window schedule');expect(remaining).toContain('Collect approved selections');
+ const remaining=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('avantia:client-questionnaire:v1')!).state.answers.departments);expect(remaining).not.toContain('Get quotes from plans / window schedule');expect(remaining).toContain('Compare prices for selected products');
  const duplicates=await page.locator('[id]').evaluateAll(nodes=>nodes.map(n=>n.id).filter((id,i,all)=>all.indexOf(id)!==i));expect(duplicates).toEqual([]);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
- await page.getByRole('button',{name:'4. Review',exact:true}).click();await expect(page.locator('#summary')).toContainText('Collect approved selections and product codes');
+ await page.getByRole('button',{name:'4. Review',exact:true}).click();await expect(page.locator('#summary')).toContainText('Compare prices for selected products');
 });
 
 test('answers compact automatically, remain editable, and Other waits for Done',async({page})=>{

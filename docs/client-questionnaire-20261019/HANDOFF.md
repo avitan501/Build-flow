@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Remaining categories aligned — current preview
+
+David authorized simplifying drywall/insulation, interior finishes and plumbing/electrical to source/readiness plus multi-select services. Roofing preserved as approved. Earlier answers retained. Main friction prompt now “What takes up most of your time when buying materials?”; choices now name time-consuming tasks (comparing, finding stock, calls, order/delivery follow-up, reorders, no major time spent). Six browser checks across Chrome/WebKit, seven API checks and diff passed. Preview only, same isolated branch/Codex owner; no production changes. Full build remains required before release.
+
+
 ## Windows two-question correction — current preview
 
 Preserved source question (Plans / Window schedule / Other). Replaced overlapping installer-contact and first-help prompts with one multi-select services question: quotes from plans/schedule, compare quotes, confirm sizes/details with installer, approved order, delivery/missing-item follow-up, Other. Earlier contact/help responses retained under Earlier answer in composed response. Two all-material desktop/mobile checks and diff passed. Preview only, same isolated owner/branch; no production changes.
