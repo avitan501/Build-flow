@@ -1,5 +1,7 @@
 # Client-completed questionnaire
 
+Latest approved addition: drywall/insulation services now includes “Make sure my order includes everything my installer needs.” This brings the earlier questionnaire’s complete installation-supply check into the client form. Interior finishes already includes its own installation-supply choice. Preview only; no publication.
+
 Latest preview adjustment: removed “Kitchen / bathroom renovation” from the project choices at David’s request. Other project choices and the original owner questionnaire are unchanged. Existing drafts keep an earlier selection as editable Other text. Verified served preview configuration and existing API checks; no publication.
 
 ## Current implementation — approved question and UI/UX improvements

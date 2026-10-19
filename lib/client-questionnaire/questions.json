@@ -172,6 +172,7 @@
                 "choices": [
                   "Compare supplier quotes",
                   "Confirm types and quantities with my installer",
+                  "Make sure my order includes everything my installer needs",
                   "Arrange an approved order",
                   "Coordinate delivery",
                   "Follow up on orders / arrange reorders"
