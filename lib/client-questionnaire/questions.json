@@ -1,0 +1,130 @@
+{
+  "sections": [
+    {
+      "title": "Your business",
+      "questions": [
+        {
+          "id": "projects",
+          "text": "What projects are you running now, and what stage is each one at?",
+          "hint": "For example: a new home in framing, or a kitchen renovation starting next month.",
+          "required": false
+        },
+        {
+          "id": "ownership",
+          "text": "Who currently prepares material lists, chooses suppliers and places orders?",
+          "hint": "Tell us the roles involved. Names are optional.",
+          "required": false
+        }
+      ],
+      "description": "A little context helps us ask better follow-up questions."
+    },
+    {
+      "title": "One recent order",
+      "questions": [
+        {
+          "id": "recent_order",
+          "text": "Describe your most recent material order, from making the list to delivery.",
+          "hint": "What did you order, how did you find it, and how did it arrive? A few sentences are enough.",
+          "required": true
+        },
+        {
+          "id": "friction",
+          "text": "Which part took the most effort or did not go as expected?",
+          "hint": "For example: comparing quotes, tracking delivery, missing items, or repeated phone calls.",
+          "required": true
+        },
+        {
+          "id": "effort",
+          "text": "Roughly how much of your time did that order take, and who did you have to contact?",
+          "hint": "An estimate is fine. You can leave this blank if you are not sure.",
+          "required": false
+        }
+      ],
+      "description": "Think about one real order, rather than how orders usually work."
+    },
+    {
+      "title": "Where work repeats",
+      "questions": [
+        {
+          "id": "departments",
+          "text": "Which one or two material packages cause the most repeated work for you?",
+          "hint": "For example: lumber, windows, roofing, plumbing, electrical, or finishes.",
+          "required": false
+        },
+        {
+          "id": "frequency",
+          "text": "How often does that happen, and what does it affect when it does?",
+          "hint": "For example: twice a week; delays the crew; interrupts other work.",
+          "required": false
+        },
+        {
+          "id": "workarounds",
+          "text": "What have you tried to make this easier, and what still falls back on you?",
+          "hint": "What helped, and what did not?",
+          "required": false
+        }
+      ],
+      "description": "Tell us where you spend time repeatedly."
+    },
+    {
+      "title": "How you want to work",
+      "questions": [
+        {
+          "id": "approvals",
+          "text": "Who should confirm quantities and specifications, approve spending, and check the delivery on site?",
+          "hint": "Tell us which decisions you want to keep and who receives deliveries.",
+          "required": false
+        },
+        {
+          "id": "subs",
+          "text": "When your sub needs materials, how would you want the request and approval to reach us?",
+          "hint": "For example: the trade sends you a list, and you approve it before ordering.",
+          "required": false
+        },
+        {
+          "id": "boundaries",
+          "text": "What would you hand over, and what would you prefer to keep handling yourself?",
+          "hint": "Describe your preferred responsibilities. This does not authorize any purchase.",
+          "required": false
+        }
+      ],
+      "description": "Let us know what you would keep and what you might hand over."
+    },
+    {
+      "title": "Your priorities",
+      "questions": [
+        {
+          "id": "priorities",
+          "text": "If we could take only one or two recurring tasks off your plate, which would you choose?",
+          "hint": "Choose the one or two things that would make the biggest difference.",
+          "required": true
+        },
+        {
+          "id": "success",
+          "text": "What would make the first order feel successful enough to use us again?",
+          "hint": "For example: fewer calls, a clear comparison, or delivery when the crew needs it.",
+          "required": false
+        }
+      ],
+      "description": "Focus on the help that would matter most to you."
+    },
+    {
+      "title": "Review & next step",
+      "questions": [
+        {
+          "id": "recap",
+          "text": "Is there anything else you would like us to know?",
+          "hint": "Anything else we should understand about your projects or preferred way of working?",
+          "required": false
+        },
+        {
+          "id": "next_step",
+          "text": "What upcoming order or project would you like help with first?",
+          "hint": "Tell us about an upcoming order, timing, or what you would like to discuss first.",
+          "required": true
+        }
+      ],
+      "description": "Add your next step, then check your answers before sending."
+    }
+  ]
+}
