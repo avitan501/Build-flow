@@ -426,19 +426,18 @@
       ]
     },
     {
-      "title": "Your timing",
-      "description": "Choose a timeframe that works for you, then see your starting plan.",
+      "title": "Your delivery plan",
+      "description": "Choose how you’d like materials to arrive, then review your starting plan.",
       "questions": [
         {
           "id": "next_step",
-          "text": "When do you need help with your next material order?",
-          "hint": "An estimate is fine.",
+          "text": "How would you like to receive your materials?",
+          "hint": "Choose the approach that fits your project.",
           "required": true,
           "choices": [
-            "This week",
-            "Within a month",
-            "Later / still planning",
-            "I just want to explore options"
+            "In stages as my project progresses",
+            "Everything together as soon as possible",
+            "Help me plan the deliveries"
           ]
         }
       ]

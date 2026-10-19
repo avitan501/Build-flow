@@ -1,5 +1,8 @@
 # Client-completed questionnaire
 
+Latest step3: “Your delivery plan” asks “How would you like to receive your materials?” Choices: stages as project progresses / everything together as soon as possible / help plan deliveries / Other. Recap label now delivery preference. Existing next_step key retained, including old drafts. Preference only, not guaranteed availability/date. Generated assets rebuilt; diff checked. Preview only.
+
+
 Latest copy refinement: main priorities question is “How can we make your next order easier?” with matching action answers: prepare my list, compare quotes, coordinate approved order, track delivery, follow up/reorder, help decide where to start. Other retained. Diff check passed; copy-only preview update.
 
 
