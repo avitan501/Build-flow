@@ -1,0 +1,78 @@
+[
+  {
+    "variant": "desktop",
+    "firstInputTop": 763.40625,
+    "viewportHeight": 669,
+    "emptyStepHeight": 1198.90625,
+    "lumberOpenHeight": 1431.875,
+    "followupStyle": {
+      "font": "12px",
+      "labelHeight": 26,
+      "controlWidth": 14
+    },
+    "multiSelect": {
+      "afterFirstChoiceOtherChoiceVisible": false,
+      "activeElement": "INPUT",
+      "focusInsideHidden": true
+    },
+    "allSelectedHeight": 2063.796875,
+    "visibleFollowups": 12,
+    "totalFollowups": 13,
+    "overflow": false,
+    "contradictoryFriction": [
+      true,
+      true
+    ],
+    "contradictoryDelivery": [
+      true,
+      true
+    ],
+    "recapText": "What we’ll focus on together\n\nYour materials: Lumber / framing · Windows / doors · Roofing / siding · Plumbing / electrical · Drywall / insulation · Interior finishes\n\nYour requested help: Compare supplier quotes for me\n\nYour delivery preference: In stages as my project progresses · Everything together as soon as possible\n\nA starting point for discussion. Scope, pricing and any orders are agreed with you separately.",
+    "reviewHeight": 1740.65625,
+    "submittedContradictions": {
+      "departments": "Lumber / framing\n  What would you like us to handle for your lumber order? Follow up on orders / arrange reorders\nWindows / doors\nRoofing / siding\nPlumbing / electrical\nDrywall / insulation\nInterior finishes",
+      "friction": "Comparing prices\nNo major time spent",
+      "priorities": "Compare supplier quotes for me",
+      "next_step": "In stages as my project progresses\nEverything together as soon as possible"
+    },
+    "postSubmitInputs": 0
+  },
+  {
+    "variant": "phone",
+    "firstInputTop": 858.921875,
+    "viewportHeight": 664,
+    "emptyStepHeight": 1972.0625,
+    "lumberOpenHeight": 2389.625,
+    "followupStyle": {
+      "font": "12px",
+      "labelHeight": 32,
+      "controlWidth": 14
+    },
+    "multiSelect": {
+      "afterFirstChoiceOtherChoiceVisible": false,
+      "activeElement": "INPUT",
+      "focusInsideHidden": true
+    },
+    "allSelectedHeight": 4461.5625,
+    "visibleFollowups": 12,
+    "totalFollowups": 13,
+    "overflow": false,
+    "contradictoryFriction": [
+      true,
+      true
+    ],
+    "contradictoryDelivery": [
+      true,
+      true
+    ],
+    "recapText": "What we’ll focus on together\n\nYour materials: Lumber / framing · Windows / doors · Roofing / siding · Plumbing / electrical · Drywall / insulation · Interior finishes\n\nYour requested help: Compare supplier quotes for me\n\nYour delivery preference: In stages as my project progresses · Everything together as soon as possible\n\nA starting point for discussion. Scope, pricing and any orders are agreed with you separately.",
+    "reviewHeight": 2221.90625,
+    "submittedContradictions": {
+      "departments": "Lumber / framing\n  What would you like us to handle for your lumber order? Follow up on orders / arrange reorders\nWindows / doors\nRoofing / siding\nPlumbing / electrical\nDrywall / insulation\nInterior finishes",
+      "friction": "Comparing prices\nNo major time spent",
+      "priorities": "Compare supplier quotes for me",
+      "next_step": "In stages as my project progresses\nEverything together as soon as possible"
+    },
+    "postSubmitInputs": 0
+  }
+]

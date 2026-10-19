@@ -1,4 +1,6 @@
-# Question review — discussion only
+# Earlier question review — superseded
+
+Use [UX-AND-QUESTION-REVIEW.md](UX-AND-QUESTION-REVIEW.md) for the current assessment. David subsequently excluded HVAC and specified that location belongs after submission. The recommendations below are historical.
 
 Reviewed current questions at ed1969bd. No questionnaire edits authorized by this review.
 
