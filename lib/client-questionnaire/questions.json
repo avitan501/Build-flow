@@ -64,12 +64,10 @@
             "Windows / doors": [
               {
                 "id": "ready",
-                "text": "How far along are your window and door selections?",
+                "text": "Where should we get the window details?",
                 "choices": [
-                  "Sizes and styles are confirmed",
-                  "I have plans, but need a final list",
-                  "Still choosing",
-                  "I need help getting started"
+                  "Plans",
+                  "Window schedule"
                 ]
               },
               {

@@ -1,5 +1,8 @@
 # Client-completed questionnaire
 
+Latest Windows / doors copy: first question now “Where should we get the window details?” with Plans / Window schedule and built-in Other text. Replaces selection-readiness question per David. Preview only, diff passed; original questionnaire unchanged.
+
+
 ## Auto-compact answers — current preview
 
 After selecting a follow-up answer, its options collapse into a compact question/answer summary with Change or Add / change. Multi-select remains editable; Other keeps typing visible until Done. Reload restores selected summaries. Four general desktop/mobile browser checks plus two dedicated collapse/edit/Other checks passed (initial dedicated test selector ambiguity corrected); seven API checks/lint/diff passed. No storage writes or production changes. Same isolated owner/branch, preview only; full build required before release.
