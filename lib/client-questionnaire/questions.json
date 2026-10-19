@@ -57,7 +57,7 @@
                   "Follow up on orders / arrange reorders",
                   "Confirm orders with my framer",
                   "Get the approved list from my framer",
-                  "Compare supplier quotes",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Arrange an approved order and delivery"
                 ],
                 "multiple": true,
@@ -83,7 +83,7 @@
                 "choices": [
                   "Arrange a meeting with a supplier to help me choose",
                   "Get quotes from plans / window schedule",
-                  "Compare supplier quotes",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Confirm sizes and details with my installer",
                   "Arrange an approved order",
                   "Follow up on delivery / missing items"
@@ -120,7 +120,7 @@
                 "choices": [
                   "Get the approved product and quantity list",
                   "Check that accessories are included with my contractor",
-                  "Compare supplier quotes",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Arrange an approved order and delivery",
                   "No help needed right now",
                   "Not sure — talk it through with me"
@@ -146,7 +146,7 @@
                 "multiple": true,
                 "choices": [
                   "Clarify what my trade supplies",
-                  "Compare supplier quotes",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Confirm products with my trade",
                   "Arrange approved purchases",
                   "Follow up on orders / arrange reorders"
@@ -171,7 +171,7 @@
                 "text": "What would you like us to handle for drywall and insulation?",
                 "multiple": true,
                 "choices": [
-                  "Compare supplier quotes",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Confirm types and quantities with my installer",
                   "Make sure my order includes everything my installer needs",
                   "Arrange an approved order",
@@ -211,7 +211,7 @@
                 "text": "What would you like us to handle for your interior finishes?",
                 "multiple": true,
                 "choices": [
-                  "Compare prices for selected products",
+                  "Compare quotes for the same materials, quantities, and delivery",
                   "Confirm installation supplies with my installer",
                   "Arrange approved orders",
                   "Follow up on deliveries",
@@ -453,7 +453,7 @@
           "required": true,
           "choices": [
             "Help prepare my material list",
-            "Compare supplier quotes for me",
+            "Compare quotes for the same materials, quantities, and delivery",
             "Coordinate my approved order",
             "Track my delivery",
             "Follow up on missing items / arrange reorders",

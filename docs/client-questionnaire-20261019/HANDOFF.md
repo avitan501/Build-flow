@@ -1,5 +1,7 @@
 # Client-completed questionnaire
 
+Latest approved copy: all seven active material/general quote-comparison answers now say “Compare quotes for the same materials, quantities, and delivery.” Historical question choices retained; the existing draft migration preserves old wording as Other. Chromium/mobile WebKit verified served choices, selection, recap and no overflow; no submission. Integration expectation updated to the new text. David explicitly deferred Foundations / concrete; do not add it yet. Preview only.
+
 Latest approved addition: Interior finishes now opens with optional multiple product choices: Flooring / tile, Cabinets / counters, Doors / trim, Paint, Appliances, plus the existing Other text option. Choices use the existing Done/edit summary and are retained in the submitted material details. Removed the redundant scope hint. Desktop Chromium and mobile WebKit checks passed for selection, Done, reload, editing, composed answers and no overflow; no submission. Preview only.
 
 Latest approved addition: windows/doors services includes “Arrange a meeting with a supplier to help me choose.” Verified in the served preview and isolated browser selection/composed-priorities check. No submission or publication. Interior-finish subcategories were subsequently approved and added below.
