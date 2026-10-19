@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Compact follow-ups — current preview
+
+David requested much smaller expanded categories. Follow-up answers now wrap as compact chips with smaller text, gaps and padding; mobile touch targets retain44px height. All questions and draft/submission behavior preserved. Four desktop/mobile browser checks and diff passed. Generated CSS rebuilt; preview only, no publication. Codex sole owner, same isolated branch; full build remains required before release.
+
+
 ## Earlier-page service questions — current revision
 
 David clarified the earlier planner is the source. Read framing pains/solutions in `/root/avantia-all-departments-20261013/dist/index.html` and trade question banks in `lib/contractor-discovery/questions.json`. Each material now asks readiness, whether Avantia should speak directly with the trade (yes / check with me first / no / unsure), and which concrete help to start with. Lumber covers approved framer list, comparable quotes, approved orders/delivery and shortages. Same tailored pattern across six categories; each panel stays directly under parent. Earlier responsibility responses are retained as Earlier answer when composing answers. Follow-up Other text capped200 characters. Seven API checks, four desktop/mobile checks, lint/diff passed. Preview only; no outreach, migration or publication. Full build still needed before release. Codex remains sole owner on same branch/worktree; no publisher active.
