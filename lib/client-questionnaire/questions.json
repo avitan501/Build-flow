@@ -37,14 +37,29 @@
             "Drywall / insulation",
             "Interior finishes"
           ],
-          "subchoices": {
+          "followups": {
             "Lumber / framing": [
-              "Framing lumber",
-              "Plywood / OSB",
-              "Engineered beams / LVL",
-              "Roof / floor trusses",
-              "Pressure-treated lumber",
-              "Connectors / fasteners"
+              {
+                "id": "list",
+                "text": "Do you already have a lumber list?",
+                "choices": [
+                  "Yes, a complete list",
+                  "Part of it",
+                  "Not yet",
+                  "I need help making one"
+                ]
+              },
+              {
+                "id": "preparer",
+                "text": "Who prepares your lumber list?",
+                "choices": [
+                  "I do",
+                  "My framer / contractor",
+                  "My architect / engineer",
+                  "My lumber supplier",
+                  "I need someone to do it"
+                ]
+              }
             ]
           }
         },

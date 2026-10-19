@@ -1,8 +1,8 @@
 # Client-completed questionnaire
 
-## Lumber sub-options — 2026-10-19
+## Lumber follow-up questions — 2026-10-19
 
-Selecting Lumber / framing reveals six optional multi-select items (framing lumber, plywood/OSB, engineered beams/LVL, trusses, treated lumber, connectors/fasteners) plus Other text. Draft sub-selections persist on refresh and parent toggling; deselected parent's details are excluded from the composed answer. Review/download/submission use the same composed material answer, requiring no API or database changes. Generated assets rebuilt. Chrome desktop and mobile Safari tests passed, including show/hide, draft restoration, submitted details and overflow; diff check passed. Preview3110 updated, no production release. Full build still required before publishing.
+David corrected the intent: ask whether the client has a lumber list and who prepares it, directly under the Lumber / framing option. Replaced material-type choices with two optional single-choice questions plus Other text. Nested panel now sits immediately after its parent label inside its grid cell. Draft persistence and composed review/download/submission answers maintained; unchecking lumber excludes its follow-ups. Desktop Chrome and mobile Safari tests passed for nesting, visibility, restoration, custom text, submit payload and no overflow. Generated assets rebuilt; diff check passed. Preview3110 updated only; no production release. Full build remains required before publishing. Codex sole implementer on existing isolated branch/worktree; no active publisher.
 
 ## Current preview revision — three-minute tap-first form
 
