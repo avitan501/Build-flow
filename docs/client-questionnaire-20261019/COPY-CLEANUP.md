@@ -2,7 +2,7 @@
 
 David requested a fresher opening and removal of unnecessary wording throughout the public questionnaire.
 
-- Revised opening after David rejected the slogan: “How can we help with your materials?” Supporting copy: “Answer a few questions about your project. Discover where Avantia can save you time—from material lists and supplier quotes to orders and delivery follow-up.” Informed by the earlier 17-department prototype source at /root/avantia-all-departments-20261013/dist/index.html.
+- Current opening: “Let’s plan your material purchases.” Supporting copy: “Tell us about your project and choose what you’d like Avantia to handle—material lists, supplier quotes, orders, or deliveries.” David requested another approach; uses a direct planning invitation. Earlier 17-department source informed the service examples.
 - Section labels remain in step navigation and accessible landmarks, without repeated visible card headings or introductions. Questions lead directly into answers; empty hints render no space.
 - Retained one short material-selection hint and the multi-select Done guidance. Removed the duplicate services notice and review subheading. Shortened review, contact, draft and receipt text.
 - All approved question/answer choices, consent, purchase limitation, validation, drafts, recap and optional post-submit fields preserved. Original owner questionnaire untouched.
@@ -14,3 +14,5 @@ Verification: existing 10 Chromium/phone WebKit flow tests passed. Desktop1153 a
 Status: local preview only, production remains f9c523b19e8bb33bf15d674923e94e91da8cc592. No pushes, deployments or external writes. Preview forwarded at http://localhost:64484/questionnaire. Ready for David’s wording review.
 
 Opening revision verification: desktop Chromium1153 and iPhone13 WebKit rendered the new headline/copy without page errors or overflow; introduction hides on step two. Screenshots inspected and generated asset/diff check passed. No functional changes or production actions.
+
+Latest wording-only revision: regenerated HTML asset, diff check passed, served heading verified at1153/390px with no horizontal overflow. Preview only.
