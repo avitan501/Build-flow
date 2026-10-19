@@ -411,16 +411,16 @@
         },
         {
           "id": "priorities",
-          "text": "What would make your next order easier?",
-          "hint": "Choose the support you would find most useful.",
+          "text": "How can we make your next order easier?",
+          "hint": "Choose what you’d like us to help with.",
           "required": true,
           "choices": [
-            "Preparing a material list",
-            "Comparing supplier quotes",
-            "Placing and coordinating orders",
-            "Tracking deliveries",
-            "Handling missing items / reorders",
-            "Not sure — help me decide"
+            "Help prepare my material list",
+            "Compare supplier quotes for me",
+            "Coordinate my approved order",
+            "Track my delivery",
+            "Follow up on missing items / arrange reorders",
+            "Help me decide where to start"
           ]
         }
       ]

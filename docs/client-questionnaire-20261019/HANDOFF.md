@@ -1,5 +1,8 @@
 # Client-completed questionnaire
 
+Latest copy refinement: main priorities question is “How can we make your next order easier?” with matching action answers: prepare my list, compare quotes, coordinate approved order, track delivery, follow up/reorder, help decide where to start. Other retained. Diff check passed; copy-only preview update.
+
+
 ## Encouraging, solution-focused experience — current preview
 
 David requested motivating/positive participation and a sense of useful progress. Applied copywriting skill: headline “Let’s make your next material order easier”, priorities framing, positive selection checkmarks, restrained green states, Next step / See my starting plan / Send my priorities actions. Review now includes an actual selection-based recap (materials, requested help, timing) as a starting point for discussion, with no guaranteed savings or implied approved work. Existing compact answers, optional follow-ups and user-specified time-spent question retained. Roofing questions unchanged. Six browser tests plus two recap/CTA assertions on Chrome/WebKit passed; seven API checks, lint/diff passed. Preview only; no production changes, full build still needed before release. Same isolated branch/Codex owner.
