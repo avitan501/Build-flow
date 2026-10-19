@@ -95,7 +95,13 @@ function choiceField(q){
    custom.hidden=!selected.has('__other');if(value==='__other'&&input.checked)custom.querySelector('textarea').focus();
    if(q.followups?.[value])activeMaterial=input.checked?value:null;
    panelsUpdate();sync();
-  };input.dataset.mainChoice='true';
+   if(q.id==='projects'&&value!=='__other'&&input.checked&&draft.step===0)navigate(1);
+  };
+  if(q.id==='projects'&&value!=='__other'){
+   input.onclick=()=>{if(!busy&&draft.step===0&&selected.has(value))navigate(1)};
+   const arrow=el('span','→','project-next');arrow.setAttribute('aria-hidden','true');label.append(arrow);
+  }
+  input.dataset.mainChoice='true';
   const followups=q.followups?.[value];if(!followups){grid.append(label);return}
   const tile=el('div',undefined,'choice-with-followup'),panel=el('div',undefined,'subchoices'),edit=el('button','Edit details','answer-edit');edit.type='button';edit.setAttribute('aria-label','Edit '+value+' details');panel.id=q.id+'-material-'+index+'-subchoices';input.setAttribute('aria-controls',panel.id);
   edit.onclick=()=>{activeMaterial=value;panelsUpdate();panel.querySelector('input,button')?.focus()};

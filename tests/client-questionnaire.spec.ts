@@ -8,7 +8,7 @@ async function authenticate(context:BrowserContext,role='owner'){
 }
 
 async function fill(page:Page){
- await page.goto('/questionnaire');await page.locator('#projects-choice-0').check();await page.locator('#next').click();await page.locator('#departments-choice-0').check();await page.locator('#departments-material-0-list-1').check();await page.locator('#departments-material-0-contact-3').check();await page.locator('#next').click();await page.locator('#next_step-choice-0').check();await page.locator('#name').fill('Example Builder');await page.locator('#company').fill('Example GC <script>window.bad=true</script>');await page.locator('#email').fill('builder@example.com');await page.locator('#next').click();await page.locator('#consent').check();
+ await page.goto('/questionnaire');await page.locator('#projects-choice-0').click();await page.locator('#departments-choice-0').check();await page.locator('#departments-material-0-list-1').check();await page.locator('#departments-material-0-contact-3').check();await page.locator('#next').click();await page.locator('#next_step-choice-0').check();await page.locator('#name').fill('Example Builder');await page.locator('#company').fill('Example GC <script>window.bad=true</script>');await page.locator('#email').fill('builder@example.com');await page.locator('#next').click();await page.locator('#consent').check();
 }
 test.beforeEach(async({request,baseURL})=>{test.skip(baseURL!=='http://127.0.0.1:3120','Isolated revision database and production build only');await request.post(fixture+'/__qa/reset')});
 test('real database saves response and optional details; owner reads both; retries stay one request',async({page,context,request})=>{

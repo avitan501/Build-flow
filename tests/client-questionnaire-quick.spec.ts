@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 test.beforeEach(()=>test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only'));
-async function openMaterials(page:Page){await page.goto('/questionnaire');await page.locator('#projects-choice-0').check();await page.locator('#next').click()}
+async function openMaterials(page:Page){await page.goto('/questionnaire');await page.locator('#projects-choice-0').click()}
 async function contactAndReview(page:Page){await page.locator('#next').click();await page.locator('#next_step-choice-0').check();await page.locator('#name').fill('Local Preview Tester');await page.locator('#email').fill('preview@example.com');await page.locator('#next').click()}
 async function mockSubmission(page:Page){
  const submissions:Record<string,unknown>[]=[];await page.route('**/api/client-questionnaire',async route=>{const body=route.request().postDataJSON();submissions.push(body);await route.fulfill({json:{ok:true,receipt:body.id,followupToken:'local-test-capability'}})});return submissions;
