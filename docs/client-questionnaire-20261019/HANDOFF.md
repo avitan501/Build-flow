@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Encouraging, solution-focused experience — current preview
+
+David requested motivating/positive participation and a sense of useful progress. Applied copywriting skill: headline “Let’s make your next material order easier”, priorities framing, positive selection checkmarks, restrained green states, Next step / See my starting plan / Send my priorities actions. Review now includes an actual selection-based recap (materials, requested help, timing) as a starting point for discussion, with no guaranteed savings or implied approved work. Existing compact answers, optional follow-ups and user-specified time-spent question retained. Roofing questions unchanged. Six browser tests plus two recap/CTA assertions on Chrome/WebKit passed; seven API checks, lint/diff passed. Preview only; no production changes, full build still needed before release. Same isolated branch/Codex owner.
+
+
 ## Remaining categories aligned — current preview
 
 David authorized simplifying drywall/insulation, interior finishes and plumbing/electrical to source/readiness plus multi-select services. Roofing preserved as approved. Earlier answers retained. Main friction prompt now “What takes up most of your time when buying materials?”; choices now name time-consuming tasks (comparing, finding stock, calls, order/delivery follow-up, reorders, no major time spent). Six browser checks across Chrome/WebKit, seven API checks and diff passed. Preview only, same isolated branch/Codex owner; no production changes. Full build remains required before release.

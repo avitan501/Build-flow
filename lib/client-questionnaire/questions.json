@@ -2,7 +2,7 @@
   "sections": [
     {
       "title": "Your project",
-      "description": "A few basics so we know who we’re helping.",
+      "description": "Let’s start with your project. A few details will help us make the conversation useful.",
       "questions": [
         {
           "id": "projects",
@@ -21,13 +21,13 @@
       ]
     },
     {
-      "title": "The help you need",
-      "description": "Pick the materials that matter most. Answer the short follow-ups if you know; skip anything you are unsure about.",
+      "title": "Make it easier",
+      "description": "Choose what you’d like off your plate. Start with what matters most; the extra details are optional.",
       "questions": [
         {
           "id": "departments",
-          "text": "Which materials do you need help with?",
-          "hint": "Select the materials you want to discuss. Quick optional questions open under each.",
+          "text": "Which materials would you like a hand with?",
+          "hint": "Pick your priorities. A few quick choices will help shape your next step.",
           "required": false,
           "choices": [
             "Lumber / framing",
@@ -411,8 +411,8 @@
         },
         {
           "id": "priorities",
-          "text": "What would you like Avantia to take care of first?",
-          "hint": "Select the help that would make the biggest difference.",
+          "text": "What would make your next order easier?",
+          "hint": "Choose the support you would find most useful.",
           "required": true,
           "choices": [
             "Preparing a material list",
@@ -427,7 +427,7 @@
     },
     {
       "title": "Your timing",
-      "description": "One last tap, then review and send.",
+      "description": "Choose a timeframe that works for you, then see your starting plan.",
       "questions": [
         {
           "id": "next_step",
