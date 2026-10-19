@@ -1,8 +1,11 @@
+import { after } from "next/server";
+import { notifyOwner } from "@/lib/client-questionnaire/notification";
 import { issueFollowupToken } from "@/lib/client-questionnaire/followup";
 import { submissionSchema } from "@/lib/client-questionnaire/schema";
 import { submitResponse } from "@/lib/client-questionnaire/store";
 import { hasSameOrigin, json, readBody } from "@/lib/client-questionnaire/http";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return json({ error: "Please submit from the questionnaire page." }, 403);
@@ -18,6 +21,11 @@ export async function POST(request: Request) {
     if (result === "limited") return json({ error: "Too many submissions today. Your answers are still here; please try again tomorrow." }, 429);
     if (result === "conflict") return json({ error: "This questionnaire was already submitted with different answers. Download your current answers before starting another." }, 409);
     if (result !== "saved" && result !== "duplicate") throw new Error("Unexpected result");
+    if (result === "saved") {
+      // Email failures must never turn a durable submission into a false failure.
+      try { after(async () => { try { await notifyOwner(parsed.data.id); } catch { console.error("client_questionnaire_notification_failed"); } }); }
+      catch { console.error("client_questionnaire_notification_schedule_failed"); }
+    }
     return json({ ok: true, receipt: parsed.data.id, followupToken: issueFollowupToken(parsed.data.id) });
   } catch { return json({ error: "We could not save your answers. They have not been cleared. Please retry or download a copy." }, 503); }
 }

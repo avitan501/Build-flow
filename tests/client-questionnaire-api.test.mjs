@@ -21,7 +21,7 @@ test('schema accepts client answers, rejects private interviewer fields, unknown
  for(const bad of [{...state(),plan:{internalNotes:'private'}},{...state(),consent:false},{...state(),answers:{...state().answers,unknown:'x'}},{...state(),answers:{}},{...state(),profile:{...state().profile,email:'',phone:''}},{...state(),answers:{...state().answers,projects:'x'.repeat(2501)}}])assert.equal(schema.responseSchema.safeParse(bad).success,false);
 });
 test('public endpoint validates origin, size, honeypot and schema before storage; does not expose submitted answers',async()=>{
- let calls=0,result='saved';const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{calls++;return result}}});
+ let calls=0,result='saved';const api=load('app/api/client-questionnaire/route.ts',{'next/server':{after:()=>{}},'@/lib/client-questionnaire/notification':{notifyOwner:async()=>{}},'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{calls++;return result}}});
  const body={id,state:state(),website:''};
  assert.equal((await api.POST(request(body,{origin:'https://evil.example'}))).status,403);
  assert.equal((await api.POST(request(body,{'content-type':'text/plain'}))).status,415);
@@ -31,7 +31,7 @@ test('public endpoint validates origin, size, honeypot and schema before storage
  for(const [kind,status]of [['saved',200],['duplicate',200],['conflict',409],['limited',429],['unknown',503]]){result=kind;const response=await api.POST(request(body));assert.equal(response.status,status);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.ok(!(await response.text()).includes('Sample Builder'));}
 });
 test('storage outages preserve retry response rather than claiming success',async()=>{
- const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{throw Error('private secret details')}}});
+ const api=load('app/api/client-questionnaire/route.ts',{'next/server':{after:()=>{}},'@/lib/client-questionnaire/notification':{notifyOwner:async()=>{}},'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{throw Error('private secret details')}}});
  const response=await api.POST(request({id,state:state(),website:''}));assert.equal(response.status,503);assert.ok(!(await response.text()).includes('secret'));
 });
 test('owner inbox rejects non-owners before any storage read and validates ids/pagination',async()=>{
