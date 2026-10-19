@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## One-question-at-a-time panel — current preview
+
+David still found collapsed rows too large and requested another style. Replaced stacked expanders with one visible follow-up per material, compact radio/checkbox answer chips, left/right question navigation and position counter. Optional Other text appears on selection. Hidden slide answers remain saved and included. Four desktop/mobile browser checks verify arrow navigation, independent category state, visibility, reload and mocked submission; seven API checks/lint/diff passed. Preview only, same isolated ownership; no production changes. Full build required before publishing.
+
+
 ## Collapsed answer-picker style — current preview
 
 David requested another style taking less space. Follow-ups now use native details/summary rows, collapsed by default with question and selected answer/count visible. Single choices auto-close; multiple selections and Other remain open with a Done button. Questions, data and category placement unchanged. Desktop/mobile browser checks passed, including explicit opening via summary, selection persistence and mocked submission; seven API checks and diff passed. Preview only; full build required before release. Same owner/branch, no production activity.
