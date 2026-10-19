@@ -1,5 +1,8 @@
 # Client-completed questionnaire
 
+Latest copy: lumber “Missing items” choice now “Follow up on orders / arrange reorders”, per David. Preview only; no behavior changes, diff check passed.
+
+
 Current copy correction: lumber service question now “What would you like us to handle for your lumber order?” so multi-select service answers match the prompt. Choices and behavior unchanged; diff check passed. Preview only.
 
 

@@ -52,7 +52,7 @@
                 "id": "contact",
                 "text": "What would you like us to handle for your lumber order?",
                 "choices": [
-                  "Missing items",
+                  "Follow up on orders / arrange reorders",
                   "Confirm orders with my framer",
                   "Get the approved list from my framer",
                   "Compare supplier quotes",
