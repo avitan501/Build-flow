@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Two-question lumber panel — current preview
+
+David dictated shorter answers. Lumber list: Yes / Contact my framer / Takeoff from blueprints / Other text. Second question combines direct framer coordination and order help with multi-select missing items, confirming orders, approved framer list, comparing supplier quotes, approved order/delivery and Other. Removed separate lumber help question (earlier answers retained). Generic follow-up renderer supports multi-select while other categories stay single-select. Four Chrome/WebKit checks include multiple picks + Other restoration/submission; seven API checks and diff passed. Same isolated branch/Codex owner; preview only, no publisher or production changes.
+
+
 ## Compact follow-ups — current preview
 
 David requested much smaller expanded categories. Follow-up answers now wrap as compact chips with smaller text, gaps and padding; mobile touch targets retain44px height. All questions and draft/submission behavior preserved. Four desktop/mobile browser checks and diff passed. Generated CSS rebuilt; preview only, no publication. Codex sole owner, same isolated branch; full build remains required before release.

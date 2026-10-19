@@ -43,33 +43,22 @@
                 "id": "list",
                 "text": "Do you already have a lumber list?",
                 "choices": [
-                  "Yes, a complete list",
-                  "Part of it",
-                  "Not yet",
-                  "I need help making one"
+                  "Yes",
+                  "Contact my framer",
+                  "Takeoff from blueprints"
                 ]
               },
               {
                 "id": "contact",
-                "text": "Would you like us to speak directly with your framer?",
+                "text": "Would you like us to speak directly with your framer and help with the order?",
                 "choices": [
-                  "Yes, coordinate directly",
-                  "Yes, but check with me first",
-                  "No, I’ll handle the conversation",
-                  "Not sure yet"
-                ]
-              },
-              {
-                "id": "help",
-                "text": "What would you like us to help with first?",
-                "choices": [
+                  "Missing items",
+                  "Confirm orders with my framer",
                   "Get the approved list from my framer",
                   "Compare supplier quotes",
-                  "Arrange an approved order and delivery",
-                  "Handle shortages / extra orders",
-                  "No help needed right now",
-                  "Not sure — talk it through with me"
-                ]
+                  "Arrange an approved order and delivery"
+                ],
+                "multiple": true
               }
             ],
             "Windows / doors": [
@@ -254,6 +243,18 @@
                   "My architect / engineer",
                   "My lumber supplier",
                   "I need someone to do it"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Get the approved list from my framer",
+                  "Compare supplier quotes",
+                  "Arrange an approved order and delivery",
+                  "Handle shortages / extra orders",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
