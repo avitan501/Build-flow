@@ -81,6 +81,7 @@
                 "text": "What would you like us to handle for your windows and doors?",
                 "multiple": true,
                 "choices": [
+                  "Arrange a meeting with a supplier to help me choose",
                   "Get quotes from plans / window schedule",
                   "Compare supplier quotes",
                   "Confirm sizes and details with my installer",
