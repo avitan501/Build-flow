@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Collapsed answer-picker style — current preview
+
+David requested another style taking less space. Follow-ups now use native details/summary rows, collapsed by default with question and selected answer/count visible. Single choices auto-close; multiple selections and Other remain open with a Done button. Questions, data and category placement unchanged. Desktop/mobile browser checks passed, including explicit opening via summary, selection persistence and mocked submission; seven API checks and diff passed. Preview only; full build required before release. Same owner/branch, no production activity.
+
+
 ## Two-question lumber panel — current preview
 
 David dictated shorter answers. Lumber list: Yes / Contact my framer / Takeoff from blueprints / Other text. Second question combines direct framer coordination and order help with multi-select missing items, confirming orders, approved framer list, comparing supplier quotes, approved order/delivery and Other. Removed separate lumber help question (earlier answers retained). Generic follow-up renderer supports multi-select while other categories stay single-select. Four Chrome/WebKit checks include multiple picks + Other restoration/submission; seven API checks and diff passed. Same isolated branch/Codex owner; preview only, no publisher or production changes.
