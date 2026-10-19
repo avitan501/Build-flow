@@ -183,6 +183,19 @@
             ],
             "Interior finishes": [
               {
+                "id": "products",
+                "text": "Which interior finishes would you like help with?",
+                "multiple": true,
+                "choices": [
+                  "Flooring / tile",
+                  "Cabinets / counters",
+                  "Doors / trim",
+                  "Paint",
+                  "Appliances"
+                ],
+                "service": false
+              },
+              {
                 "id": "source",
                 "text": "How should we get your finish selections?",
                 "choices": [
@@ -414,9 +427,6 @@
                 ]
               }
             ]
-          },
-          "materialHints": {
-            "Interior finishes": "Flooring, tile, cabinets, counters, doors, trim and paint."
           }
         },
         {

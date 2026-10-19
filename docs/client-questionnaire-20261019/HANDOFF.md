@@ -1,6 +1,8 @@
 # Client-completed questionnaire
 
-Latest approved addition: windows/doors services includes “Arrange a meeting with a supplier to help me choose.” Verified in the served preview and isolated browser selection/composed-priorities check. No submission or publication. Interior-finish subcategories are only a recommendation pending David’s decision.
+Latest approved addition: Interior finishes now opens with optional multiple product choices: Flooring / tile, Cabinets / counters, Doors / trim, Paint, Appliances, plus the existing Other text option. Choices use the existing Done/edit summary and are retained in the submitted material details. Removed the redundant scope hint. Desktop Chromium and mobile WebKit checks passed for selection, Done, reload, editing, composed answers and no overflow; no submission. Preview only.
+
+Latest approved addition: windows/doors services includes “Arrange a meeting with a supplier to help me choose.” Verified in the served preview and isolated browser selection/composed-priorities check. No submission or publication. Interior-finish subcategories were subsequently approved and added below.
 
 Latest approved addition: drywall/insulation services now includes “Make sure my order includes everything my installer needs.” This brings the earlier questionnaire’s complete installation-supply check into the client form. Interior finishes already includes its own installation-supply choice. Preview only; no publication.
 
