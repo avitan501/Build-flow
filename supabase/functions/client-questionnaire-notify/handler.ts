@@ -8,8 +8,15 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 // recipient, subject or message parameters are accepted; content comes from storage.
 export async function handleNotification(request: Request, env: Environment): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const serviceKey = env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!serviceKey || request.headers.get("authorization") !== `Bearer ${serviceKey}`) return json({ error: "forbidden" }, 403);
+  const legacyKey = env.get("SUPABASE_SERVICE_ROLE_KEY");
+  let secretKeys: string[] = [];
+  try { secretKeys = Object.values(JSON.parse(env.get("SUPABASE_SECRET_KEYS") || "{}")).filter((value): value is string => typeof value === "string" && value.length > 0); }
+  catch { return json({ error: "not_configured" }, 503); }
+  const allowedKeys = [...secretKeys, legacyKey].filter((value): value is string => Boolean(value));
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+  const apiKeyHeader = request.headers.get("apikey") || "";
+  if (!allowedKeys.some(key => token === key || apiKeyHeader === key)) return json({ error: "forbidden" }, 403);
+  const serviceKey = secretKeys[0] || legacyKey!;
   let id: string;
   try {
     const raw = await request.text();

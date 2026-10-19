@@ -54,3 +54,10 @@ test('saved-only scheduling and notification/scheduling failures preserve succes
  for(const value of ['duplicate','conflict','limited']){stored=value;await post();assert.equal(scheduled.length,1)}
  stored='saved';failSchedule=true;assert.equal((await post()).status,200);
 });
+
+test('modern project secret keys authenticate but arbitrary and public keys do not',async()=>{
+ let calls=0;const {handleNotification}=load('supabase/functions/client-questionnaire-notify/handler.ts',{}, {fetch:async()=>{calls++;return Response.json([])}});
+ const modern={get:n=>n==='SUPABASE_SECRET_KEYS'?JSON.stringify({default:'synthetic-modern-secret'}):config[n]};
+ assert.equal((await handleNotification(req({id},'synthetic-modern-secret'),modern)).status,404);assert.equal(calls,1);
+ assert.equal((await handleNotification(req({id},'synthetic-public-key'),modern)).status,403);assert.equal(calls,1);
+});
