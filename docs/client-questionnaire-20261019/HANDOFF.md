@@ -1,5 +1,8 @@
 # Client-completed questionnaire
 
+Current copy correction: lumber service question now “What would you like us to handle for your lumber order?” so multi-select service answers match the prompt. Choices and behavior unchanged; diff check passed. Preview only.
+
+
 ## Plain checklist — current preview
 
 David explicitly approved trying both questions visible as plain inline choices. Removed question pager; all follow-ups visible under selected parent. Removed answer card backgrounds/borders, reduced gaps, retained native radio/checkbox inputs and clickable labels (32px touch rows). Other text and saved answers unchanged. Four desktop/mobile browser checks, seven API checks and diff passed. Preview only; no production changes, full build required before release. Codex sole owner, same isolated worktree.

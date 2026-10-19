@@ -50,7 +50,7 @@
               },
               {
                 "id": "contact",
-                "text": "Would you like us to speak directly with your framer and help with the order?",
+                "text": "What would you like us to handle for your lumber order?",
                 "choices": [
                   "Missing items",
                   "Confirm orders with my framer",
