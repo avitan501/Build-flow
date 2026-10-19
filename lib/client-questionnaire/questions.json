@@ -36,7 +36,17 @@
             "Plumbing / electrical",
             "Drywall / insulation",
             "Interior finishes"
-          ]
+          ],
+          "subchoices": {
+            "Lumber / framing": [
+              "Framing lumber",
+              "Plywood / OSB",
+              "Engineered beams / LVL",
+              "Roof / floor trusses",
+              "Pressure-treated lumber",
+              "Connectors / fasteners"
+            ]
+          }
         },
         {
           "id": "friction",

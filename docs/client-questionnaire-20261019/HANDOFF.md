@@ -1,5 +1,9 @@
 # Client-completed questionnaire
 
+## Lumber sub-options — 2026-10-19
+
+Selecting Lumber / framing reveals six optional multi-select items (framing lumber, plywood/OSB, engineered beams/LVL, trusses, treated lumber, connectors/fasteners) plus Other text. Draft sub-selections persist on refresh and parent toggling; deselected parent's details are excluded from the composed answer. Review/download/submission use the same composed material answer, requiring no API or database changes. Generated assets rebuilt. Chrome desktop and mobile Safari tests passed, including show/hide, draft restoration, submitted details and overflow; diff check passed. Preview3110 updated, no production release. Full build still required before publishing.
+
 ## Current preview revision — three-minute tap-first form
 
 David clarified: clients should finish in about3minutes with very little typing. Current version has five questions in three sections: project type, materials, main challenge, help wanted, timing. All offer tappable choices and optional Other text. Name and one contact method required; company optional. Three core questions required, all answerable by tapping. Review/submit remains separate. Earlier longer-form notes are retained and shown under Earlier notes, not discarded.
