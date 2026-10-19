@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Plain checklist — current preview
+
+David explicitly approved trying both questions visible as plain inline choices. Removed question pager; all follow-ups visible under selected parent. Removed answer card backgrounds/borders, reduced gaps, retained native radio/checkbox inputs and clickable labels (32px touch rows). Other text and saved answers unchanged. Four desktop/mobile browser checks, seven API checks and diff passed. Preview only; no production changes, full build required before release. Codex sole owner, same isolated worktree.
+
+
 ## One-question-at-a-time panel — current preview
 
 David still found collapsed rows too large and requested another style. Replaced stacked expanders with one visible follow-up per material, compact radio/checkbox answer chips, left/right question navigation and position counter. Optional Other text appears on selection. Hidden slide answers remain saved and included. Four desktop/mobile browser checks verify arrow navigation, independent category state, visibility, reload and mocked submission; seven API checks/lint/diff passed. Preview only, same isolated ownership; no production changes. Full build required before publishing.

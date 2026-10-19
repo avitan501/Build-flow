@@ -1,12 +1,5 @@
 import {test,expect,type Locator} from '@playwright/test';
-async function check(locator:Locator){
- const slide=locator.locator('xpath=ancestor::*[contains(@class,"question-slide")]');
- if(await slide.count()){
-  const panel=slide.locator('..');
-  while(!(await slide.isVisible())){const next=panel.getByRole('button',{name:/^Next /});if(await next.isEnabled())await next.click();else{const back=panel.getByRole('button',{name:/^Previous /});while(await back.isEnabled())await back.click();}}
- }
- await locator.check()
-}
+async function check(locator:Locator){await locator.check()}
 test('five tap-first questions, optional company and Other text, preview/reload/submit',async({page},info)=>{
  test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only');
  let submitted:Record<string,unknown>|null=null;
@@ -14,7 +7,7 @@ test('five tap-first questions, optional company and Other text, preview/reload/
  await page.goto('/questionnaire');await expect(page.getByText('About 3 minutes · Mostly tapping · No account needed')).toBeVisible();
  await page.locator('#name').fill('Preview Tester');await page.locator('#email').fill('preview@example.com');await check(page.locator('#projects-choice-0'));await page.locator('#next').click();
  await expect(page.locator('.choice-field')).toHaveCount(3);await expect(page.locator('#departments-material-0-subchoices')).toBeHidden();await check(page.locator('#departments-choice-0'));
- await expect(page.locator('#departments-material-0-subchoices')).toBeVisible();await expect(page.locator('#departments-material-0-list-0')).toBeVisible();await expect(page.locator('#departments-material-0-contact-0')).toBeHidden();await check(page.locator('#departments-material-0-list-0'));await check(page.locator('#departments-material-0-contact-0'));await check(page.locator('#departments-material-0-contact-1'));await check(page.locator('#departments-material-0-contact-5'));await page.locator('#departments-material-0-contact-other').fill('My project manager');expect(await page.locator('#departments-material-0-subchoices').evaluate(n=>n.previousElementSibling?.querySelector('input')?.id)).toBe('departments-choice-0');
+ await expect(page.locator('#departments-material-0-subchoices')).toBeVisible();await expect(page.locator('#departments-material-0-list-0')).toBeVisible();await expect(page.locator('#departments-material-0-contact-0')).toBeVisible();await check(page.locator('#departments-material-0-list-0'));await check(page.locator('#departments-material-0-contact-0'));await check(page.locator('#departments-material-0-contact-1'));await check(page.locator('#departments-material-0-contact-5'));await page.locator('#departments-material-0-contact-other').fill('My project manager');expect(await page.locator('#departments-material-0-subchoices').evaluate(n=>n.previousElementSibling?.querySelector('input')?.id)).toBe('departments-choice-0');
  await page.locator('#departments-choice-0').uncheck();await expect(page.locator('#departments-material-0-subchoices')).toBeHidden();expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('avantia:client-questionnaire:v1')!).state.answers.departments)).toBe('');await check(page.locator('#departments-choice-0'));await check(page.locator('#friction-choice-3'));await check(page.locator('#priorities-choice-1'));
  const custom=page.locator('.choice-field').filter({has:page.locator('#priorities')});await custom.getByRole('checkbox',{name:'Other / tell us more'}).check();await page.locator('#priorities').fill('Keep my site supervisor updated');await page.reload();await expect(page.locator('#departments-material-0-list-0')).toBeChecked();await expect(page.locator('#departments-material-0-contact-0')).toBeChecked();await expect(page.locator('#departments-material-0-contact-1')).toBeChecked();await expect(page.locator('#departments-material-0-contact-5')).toBeChecked();await expect(page.locator('#departments-material-0-contact-other')).toHaveValue('My project manager');await expect(page.locator('#priorities-choice-1')).toBeChecked();await expect(page.locator('#priorities')).toHaveValue('Keep my site supervisor updated');
  await page.screenshot({path:info.outputPath('quick-choices.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
