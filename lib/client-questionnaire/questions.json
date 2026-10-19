@@ -27,7 +27,7 @@
         {
           "id": "departments",
           "text": "Which materials do you need help with?",
-          "hint": "Select the materials you want to discuss. Two optional questions open under each.",
+          "hint": "Select the materials you want to discuss. Quick optional questions open under each.",
           "required": false,
           "choices": [
             "Lumber / framing",
@@ -50,14 +50,25 @@
                 ]
               },
               {
-                "id": "preparer",
-                "text": "Who prepares your lumber list?",
+                "id": "contact",
+                "text": "Would you like us to speak directly with your framer?",
                 "choices": [
-                  "I do",
-                  "My framer / contractor",
-                  "My architect / engineer",
-                  "My lumber supplier",
-                  "I need someone to do it"
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Get the approved list from my framer",
+                  "Compare supplier quotes",
+                  "Arrange an approved order and delivery",
+                  "Handle shortages / extra orders",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -73,14 +84,25 @@
                 ]
               },
               {
-                "id": "confirm",
-                "text": "Who confirms the sizes before ordering?",
+                "id": "contact",
+                "text": "Would you like us to speak directly with your window / door installer?",
                 "choices": [
-                  "My installer / contractor",
-                  "My architect / designer",
-                  "The supplier measures",
-                  "I do",
-                  "Not arranged yet"
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Collect the approved sizes and selections",
+                  "Compare matching window / door quotes",
+                  "Coordinate supplier questions with my installer",
+                  "Track the order and delivery",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -96,13 +118,25 @@
                 ]
               },
               {
-                "id": "owner",
-                "text": "Who handles the roofing or siding materials?",
+                "id": "contact",
+                "text": "Would you like us to speak directly with your roofer / siding contractor?",
                 "choices": [
-                  "My roofer / siding contractor",
-                  "I buy them for the crew",
-                  "My supplier helps arrange them",
-                  "Still deciding"
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Get the approved product and quantity list",
+                  "Check that accessories are included with my contractor",
+                  "Compare supplier quotes",
+                  "Arrange an approved order and delivery",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -118,13 +152,25 @@
                 ]
               },
               {
-                "id": "owner",
-                "text": "Who buys the fixtures and equipment?",
+                "id": "contact",
+                "text": "Would you like us to speak directly with your plumber / electrician?",
                 "choices": [
-                  "I do",
-                  "My plumber / electrician",
-                  "We split the purchases",
-                  "Still deciding"
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Clarify what my trade supplies",
+                  "Collect the list of items I need to buy",
+                  "Compare quotes for matching products",
+                  "Arrange approved purchases",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -140,13 +186,25 @@
                 ]
               },
               {
-                "id": "owner",
-                "text": "Who orders these materials now?",
+                "id": "contact",
+                "text": "Would you like us to speak directly with your drywall / insulation installer?",
                 "choices": [
-                  "My installer / contractor",
-                  "I do",
-                  "My supplier handles the list and order",
-                  "Not arranged yet"
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Get approved board / insulation quantities",
+                  "Confirm accessories with my installer",
+                  "Compare complete supplier quotes",
+                  "Coordinate delivery or missing items",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],
@@ -161,6 +219,94 @@
                   "I need help narrowing it down"
                 ]
               },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your designer / installer?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Collect approved selections and product codes",
+                  "Confirm installation supplies with my installer",
+                  "Compare matching supplier quotes",
+                  "Coordinate orders and missing items",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
+                ]
+              }
+            ]
+          },
+          "earlierFollowups": {
+            "Lumber / framing": [
+              {
+                "id": "preparer",
+                "text": "Who prepares your lumber list?",
+                "choices": [
+                  "I do",
+                  "My framer / contractor",
+                  "My architect / engineer",
+                  "My lumber supplier",
+                  "I need someone to do it"
+                ]
+              }
+            ],
+            "Windows / doors": [
+              {
+                "id": "confirm",
+                "text": "Who confirms the sizes before ordering?",
+                "choices": [
+                  "My installer / contractor",
+                  "My architect / designer",
+                  "The supplier measures",
+                  "I do",
+                  "Not arranged yet"
+                ]
+              }
+            ],
+            "Roofing / siding": [
+              {
+                "id": "owner",
+                "text": "Who handles the roofing or siding materials?",
+                "choices": [
+                  "My roofer / siding contractor",
+                  "I buy them for the crew",
+                  "My supplier helps arrange them",
+                  "Still deciding"
+                ]
+              }
+            ],
+            "Plumbing / electrical": [
+              {
+                "id": "owner",
+                "text": "Who buys the fixtures and equipment?",
+                "choices": [
+                  "I do",
+                  "My plumber / electrician",
+                  "We split the purchases",
+                  "Still deciding"
+                ]
+              }
+            ],
+            "Drywall / insulation": [
+              {
+                "id": "owner",
+                "text": "Who orders these materials now?",
+                "choices": [
+                  "My installer / contractor",
+                  "I do",
+                  "My supplier handles the list and order",
+                  "Not arranged yet"
+                ]
+              }
+            ],
+            "Interior finishes": [
               {
                 "id": "owner",
                 "text": "Who keeps track of the selections and orders?",

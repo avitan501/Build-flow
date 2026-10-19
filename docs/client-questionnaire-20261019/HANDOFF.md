@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Earlier-page service questions — current revision
+
+David clarified the earlier planner is the source. Read framing pains/solutions in `/root/avantia-all-departments-20261013/dist/index.html` and trade question banks in `lib/contractor-discovery/questions.json`. Each material now asks readiness, whether Avantia should speak directly with the trade (yes / check with me first / no / unsure), and which concrete help to start with. Lumber covers approved framer list, comparable quotes, approved orders/delivery and shortages. Same tailored pattern across six categories; each panel stays directly under parent. Earlier responsibility responses are retained as Earlier answer when composing answers. Follow-up Other text capped200 characters. Seven API checks, four desktop/mobile checks, lint/diff passed. Preview only; no outreach, migration or publication. Full build still needed before release. Codex remains sole owner on same branch/worktree; no publisher active.
+
+
 ## Whole questionnaire refinement — 2026-10-19
 
 David requested thoughtful questions throughout the client experience. All six material categories now have two tailored optional follow-ups about readiness (lists, quantities or selections) and responsibility (preparation, measurement, buying or tracking). Each opens immediately below its own choice. Five core questions retained; copy clarifies optional detail and asks about purchasing friction, first help wanted and next-order timing. Other free text remains available. Original owner interview unchanged. Three-minute completion is a target, not a measured promise.
