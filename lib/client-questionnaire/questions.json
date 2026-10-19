@@ -71,25 +71,15 @@
                 ]
               },
               {
-                "id": "contact",
-                "text": "Would you like us to speak directly with your window / door installer?",
+                "id": "services",
+                "text": "What would you like us to handle for your windows and doors?",
+                "multiple": true,
                 "choices": [
-                  "Yes, coordinate directly",
-                  "Yes, but check with me first",
-                  "No, I’ll handle the conversation",
-                  "Not sure yet"
-                ]
-              },
-              {
-                "id": "help",
-                "text": "What would you like us to help with first?",
-                "choices": [
-                  "Collect the approved sizes and selections",
-                  "Compare matching window / door quotes",
-                  "Coordinate supplier questions with my installer",
-                  "Track the order and delivery",
-                  "No help needed right now",
-                  "Not sure — talk it through with me"
+                  "Get quotes from plans / window schedule",
+                  "Compare supplier quotes",
+                  "Confirm sizes and details with my installer",
+                  "Arrange an approved order",
+                  "Follow up on delivery / missing items"
                 ]
               }
             ],
@@ -266,6 +256,28 @@
                   "The supplier measures",
                   "I do",
                   "Not arranged yet"
+                ]
+              },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your window / door installer?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Collect the approved sizes and selections",
+                  "Compare matching window / door quotes",
+                  "Coordinate supplier questions with my installer",
+                  "Track the order and delivery",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
                 ]
               }
             ],

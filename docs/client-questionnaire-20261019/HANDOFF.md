@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Windows two-question correction — current preview
+
+Preserved source question (Plans / Window schedule / Other). Replaced overlapping installer-contact and first-help prompts with one multi-select services question: quotes from plans/schedule, compare quotes, confirm sizes/details with installer, approved order, delivery/missing-item follow-up, Other. Earlier contact/help responses retained under Earlier answer in composed response. Two all-material desktop/mobile checks and diff passed. Preview only, same isolated owner/branch; no production changes.
+
+
 Latest Windows / doors copy: first question now “Where should we get the window details?” with Plans / Window schedule and built-in Other text. Replaces selection-readiness question per David. Preview only, diff passed; original questionnaire unchanged.
 
 
