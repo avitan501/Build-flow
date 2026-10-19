@@ -1,4 +1,4 @@
-import { Clock3, Video } from "lucide-react";
+import { ArrowUpRight, Clock3, Video } from "lucide-react";
 import { connection } from "next/server";
 import { pageMetadata } from "@/lib/site-metadata";
 import { ConsultationCalendar } from "./consultation-calendar";
@@ -24,6 +24,16 @@ export default async function ConsultationPage() {
           </div>
         </header>
         <ConsultationCalendar initialNow={new Date().toISOString()} />
+        <aside className={styles.preparation} aria-labelledby="meeting-preparation-title">
+          <div>
+            <h2 id="meeting-preparation-title">Before we meet <span>Optional</span></h2>
+            <p>Share your material needs so we can prepare.</p>
+          </div>
+          <a className={styles.questionnaireLink} href="/questionnaire" target="_blank" rel="noopener noreferrer">
+            Fill out the questionnaire <ArrowUpRight size={16} aria-hidden="true" />
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </aside>
       </div>
     </section>
   );
