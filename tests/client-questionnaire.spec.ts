@@ -7,7 +7,8 @@ async function authenticate(context:BrowserContext,role='owner'){
  const session={access_token:jwt,refresh_token:'local-only',token_type:'bearer',expires_at:expires,user:{id:'11111111-1111-4111-8111-111111111111'}};
  await context.addCookies([{name:'sb-127-auth-token',value:`base64-${Buffer.from(JSON.stringify(session)).toString('base64url')}`,domain:'127.0.0.1',path:'/'}]);
 }
-async function fill(page:Page){await page.goto('/questionnaire');await page.getByRole('button',{name:'1. Your business',exact:true}).click();await page.locator('#name').fill(contact.name);await page.locator('#company').fill(contact.company);await page.locator('#email').fill(contact.email);await page.locator('#next').click();await page.locator('#recent_order').fill('Lumber for framing.');await page.locator('#friction').fill('Delivery was late.');await page.getByRole('button',{name:'5. Your priorities',exact:true}).click();await page.locator('#priorities').fill('Tracking deliveries.');await page.getByRole('button',{name:'6. Review & next step',exact:true}).click();await page.locator('#next_step').fill('Roof materials next week.');await page.locator('#next').click();await page.locator('#consent').check()}
+async function answer(page:Page,id:string,value:string){await page.locator('.choice-field').filter({has:page.locator('#'+id)}).getByRole('checkbox',{name:'Other / tell us more',exact:true}).check();await page.locator('#'+id).fill(value)}
+async function fill(page:Page){await page.goto('/questionnaire');await page.getByRole('button',{name:'1. Your project',exact:true}).click();await page.locator('#name').fill(contact.name);await page.locator('#company').fill(contact.company);await page.locator('#email').fill(contact.email);await page.locator('#next').click();await answer(page,'friction','Delivery was late.');await page.getByRole('button',{name:'2. The help you need',exact:true}).click();await answer(page,'priorities','Tracking deliveries.');await page.getByRole('button',{name:'3. Your timing',exact:true}).click();await answer(page,'next_step','Roof materials next week.');await page.locator('#next').click();await page.locator('#consent').check()}
 test.beforeEach(async({request,baseURL})=>{test.skip(baseURL!=='http://127.0.0.1:3110','Disposable questionnaire fixture only');await request.post(fixture+'/__qa/reset')});
 test('client fills, reviews, submits, and owner reads separate response; retries do not duplicate',async({page,context,request})=>{
  test.setTimeout(90000);await fill(page);await expect(page.locator('#summary')).toContainText(contact.company);await page.reload();await expect(page.locator('#review')).toBeVisible();await expect(page.locator('#consent')).toBeChecked();
@@ -21,7 +22,7 @@ test('client fills, reviews, submits, and owner reads separate response; retries
  await page.reload();await expect(page.locator('#records')).toContainText('Example Builder');
 });
 test('required fields, network failure, retry, and local drafts preserve answers',async({page,request})=>{
- await page.goto('/questionnaire');await page.getByRole('button',{name:'7. Review',exact:true}).click();await page.locator('#next').click();await expect(page.locator('#error')).toContainText('your name');await expect(page.locator('#name')).toBeFocused();
+ await page.goto('/questionnaire');await page.getByRole('button',{name:'4. Review',exact:true}).click();await page.locator('#next').click();await expect(page.locator('#error')).toContainText('your name');await expect(page.locator('#name')).toBeFocused();
  await fill(page);await request.post(fixture+'/__qa/fail');await page.locator('#next').click();await expect(page.locator('#error')).toContainText('could not save');await expect(page.locator('#success')).toBeHidden();await page.reload();await expect(page.locator('#summary')).toContainText('Tracking deliveries.');await page.locator('#next').click();await expect(page.locator('#success')).toBeVisible();
 });
 test('anonymous and staff cannot read owner inbox or existing interview API',async({page,context,request})=>{
@@ -33,4 +34,13 @@ test('public form fits desktop and phones with readable inputs and keyboard navi
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  for(const width of [1153,390,320]){await page.setViewportSize({width,height:800});await page.goto('/questionnaire');await expect(page.locator('#name')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);await page.screenshot({path:testInfo.outputPath(`client-${width}.png`),fullPage:true});await page.locator('#name').focus();await page.keyboard.press('Tab');await expect(page.locator('#company')).toBeFocused()}
  expect(errors).toEqual([]);
+});
+
+test('tap choices and Other text survive navigation, refresh and submission without restoring deselected Other',async({page,request})=>{
+ await page.goto('/questionnaire');await page.locator('#name').fill('Choice Tester');await page.locator('#company').fill('Test GC');await page.locator('#email').fill('choices@example.com');
+ await page.locator('#projects-choice-0').check();await answer(page,'projects','A small addition');await page.locator('#next').click();await page.locator('#departments-choice-0').check();await page.locator('#friction-choice-3').check();
+ await page.getByRole('button',{name:'2. The help you need',exact:true}).click();await page.locator('#priorities-choice-2').check();await page.getByRole('button',{name:'3. Your timing',exact:true}).click();await page.locator('#next_step-choice-0').check();
+ await page.getByRole('button',{name:'1. Your project',exact:true}).click();await expect(page.locator('#projects-choice-0')).toBeChecked();await expect(page.locator('#projects')).toHaveValue('A small addition');
+ await page.locator('.choice-field').filter({has:page.locator('#projects')}).getByRole('checkbox',{name:'Other / tell us more',exact:true}).uncheck();await page.reload();await expect(page.locator('#projects')).toBeHidden();
+ await page.getByRole('button',{name:'4. Review',exact:true}).click();await expect(page.locator('#summary')).toContainText('New construction');await expect(page.locator('#summary')).not.toContainText('A small addition');await page.locator('#consent').check();await page.locator('#next').click();await expect(page.locator('#success')).toBeVisible();expect((await request.get(fixture+'/__qa/count').then(r=>r.json())).count).toBe(1);
 });

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try { body = await readBody(request); }
   catch (error) { return json({ error: "The response could not be read. Keep your answers and try again." }, error instanceof Error && error.message === "size" ? 413 : 400); }
   const parsed = submissionSchema.safeParse(body);
-  if (!parsed.success) return json({ error: "Please enter your contact details, answer the four required questions, and confirm submission." }, 400);
+  if (!parsed.success) return json({ error: "Please enter your contact details, answer the three required questions, and confirm submission." }, 400);
   if (parsed.data.website) return json({ error: "This response could not be submitted." }, 400);
   try {
     const result = await submitResponse(parsed.data.id, parsed.data.state, request);

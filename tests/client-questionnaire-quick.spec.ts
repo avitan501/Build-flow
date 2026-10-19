@@ -1,0 +1,13 @@
+import {test,expect} from '@playwright/test';
+test('five tap-first questions, optional company and Other text, preview/reload/submit',async({page},info)=>{
+ test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only');
+ let submitted:Record<string,unknown>|null=null;
+ await page.route('**/api/client-questionnaire',async route=>{submitted=route.request().postDataJSON();await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,receipt:'preview-confirmation'})})});
+ await page.goto('/questionnaire');await expect(page.getByText('About 3 minutes · Mostly tapping · No account needed')).toBeVisible();
+ await page.locator('#name').fill('Preview Tester');await page.locator('#email').fill('preview@example.com');await page.locator('#projects-choice-0').check();await page.locator('#next').click();
+ await expect(page.locator('.choice-field')).toHaveCount(3);await page.locator('#departments-choice-0').check();await page.locator('#friction-choice-3').check();await page.locator('#priorities-choice-1').check();
+ const custom=page.locator('.choice-field').filter({has:page.locator('#priorities')});await custom.getByRole('checkbox',{name:'Other / tell us more'}).check();await page.locator('#priorities').fill('Keep my site supervisor updated');await page.reload();await expect(page.locator('#priorities-choice-1')).toBeChecked();await expect(page.locator('#priorities')).toHaveValue('Keep my site supervisor updated');
+ await page.screenshot({path:info.outputPath('quick-choices.png'),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ await page.locator('#next').click();await page.locator('.choice-field').getByRole('checkbox',{name:'Other / tell us more'}).check();await page.locator('#next').click();await expect(page.locator('#summary')).toContainText('Other — discuss with me');await page.locator('#consent').check();await page.locator('#next').click();await expect(page.locator('#success')).toBeVisible();
+ expect(submitted).not.toBeNull();const state=(submitted as unknown as {state:{profile:{company:string};answers:Record<string,string>}}).state;expect(state.profile.company).toBe('');expect(Object.keys(state.answers)).toHaveLength(5);expect(state.answers.priorities).toContain('Keep my site supervisor updated');
+});

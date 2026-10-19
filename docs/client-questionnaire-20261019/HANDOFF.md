@@ -1,6 +1,12 @@
 # Client-completed questionnaire
 
-## Outcome
+## Current preview revision — three-minute tap-first form
+
+David clarified: clients should finish in about3minutes with very little typing. Current version has five questions in three sections: project type, materials, main challenge, help wanted, timing. All offer tappable choices and optional Other text. Name and one contact method required; company optional. Three core questions required, all answerable by tapping. Review/submit remains separate. Earlier longer-form notes are retained and shown under Earlier notes, not discarded.
+
+Current local live-editing preview runs on3110 with temporary fixture3119; no production release. Seven API/schema/store checks and lint/diff passed; five prior choice-flow scenarios passed on both Chrome/WebKit before shortening; final short-form Chrome/WebKit tests passed with intercepted submission (no preview database reset or writes). Screenshots `quick-chromium-desktop.png` and `quick-mobile-safari.png`. Last full production build preceded this preview refinement; rerun before publishing.
+
+## Initial implementation outcome
 Separate public self-completion version of contractor discovery, per David's choice of one public link anyone can submit. Existing owner-led questionnaire, question bank, records and planner are unchanged.
 
 - Public route: `/questionnaire` (not published yet).
