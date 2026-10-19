@@ -1,5 +1,7 @@
 # Client-completed questionnaire
 
+Latest preview adjustment: removed “Kitchen / bathroom renovation” from the project choices at David’s request. Other project choices and the original owner questionnaire are unchanged. Existing drafts keep an earlier selection as editable Other text. Verified served preview configuration and existing API checks; no publication.
+
 ## Current implementation — approved question and UI/UX improvements
 
 David said “Do it” after the complete review. The improvements are now implemented in the existing isolated preview worktree. Plain checklist retained; multi-select stays open until Done, contradictory selections prevented, service questions deduplicated and recap based on actual material selections. Contact is near sending; optional location/timing follows the successful receipt. No HVAC. Original owner interview unchanged. Local-only additive follow-up storage, scoped signed save token, private inbox details. Full build/TypeScript, lint/diff,13 questionnaire API/PostgreSQL checks,5 original interview API checks,10 desktop/phone UI cases and6 integrated DB/inbox cases passed. Screenshots inspected; revised-flow/ contains evidence.
