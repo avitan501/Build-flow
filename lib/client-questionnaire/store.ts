@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, createHmac } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { FollowupDetails } from "./followup";
 import type { ClientResponse } from "./schema";
 
 export async function submitResponse(id: string, state: ClientResponse, request: Request) {
@@ -28,5 +29,16 @@ export async function loadResponse(id: string) {
   const { data, error } = await createAdminClient().from("client_questionnaire_submissions")
     .select("id,created_at,state").eq("id", id).maybeSingle();
   if (error) throw new Error("Inbox unavailable");
-  return data;
+  if (!data) return null;
+  const { data: followup, error: followupError } = await createAdminClient().from("client_questionnaire_followups")
+    .select("location,timing,needed_date,updated_at").eq("submission_id", id).maybeSingle();
+  if (followupError) throw new Error("Inbox unavailable");
+  return { ...data, followup };
+}
+export async function saveFollowup(id: string, details: FollowupDetails) {
+  const { error } = await createAdminClient().from("client_questionnaire_followups").upsert({
+    submission_id: id, location: details.location, timing: details.timing,
+    needed_date: details.neededDate || null, updated_at: new Date().toISOString(),
+  }, { onConflict: "submission_id" });
+  if (error) throw new Error("Follow-up unavailable");
 }

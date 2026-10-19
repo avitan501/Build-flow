@@ -21,7 +21,7 @@ test('schema accepts client answers, rejects private interviewer fields, unknown
  for(const bad of [{...state(),plan:{internalNotes:'private'}},{...state(),consent:false},{...state(),answers:{...state().answers,unknown:'x'}},{...state(),answers:{}},{...state(),profile:{...state().profile,email:'',phone:''}},{...state(),answers:{...state().answers,projects:'x'.repeat(2501)}}])assert.equal(schema.responseSchema.safeParse(bad).success,false);
 });
 test('public endpoint validates origin, size, honeypot and schema before storage; does not expose submitted answers',async()=>{
- let calls=0,result='saved';const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{calls++;return result}}});
+ let calls=0,result='saved';const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{calls++;return result}}});
  const body={id,state:state(),website:''};
  assert.equal((await api.POST(request(body,{origin:'https://evil.example'}))).status,403);
  assert.equal((await api.POST(request(body,{'content-type':'text/plain'}))).status,415);
@@ -31,7 +31,7 @@ test('public endpoint validates origin, size, honeypot and schema before storage
  for(const [kind,status]of [['saved',200],['duplicate',200],['conflict',409],['limited',429],['unknown',503]]){result=kind;const response=await api.POST(request(body));assert.equal(response.status,status);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.ok(!(await response.text()).includes('Sample Builder'));}
 });
 test('storage outages preserve retry response rather than claiming success',async()=>{
- const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{throw Error('private secret details')}}});
+ const api=load('app/api/client-questionnaire/route.ts',{'@/lib/client-questionnaire/followup':{issueFollowupToken:()=> 'test-token'},'@/lib/client-questionnaire/schema':schema,'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/store':{submitResponse:async()=>{throw Error('private secret details')}}});
  const response=await api.POST(request({id,state:state(),website:''}));assert.equal(response.status,503);assert.ok(!(await response.text()).includes('secret'));
 });
 test('owner inbox rejects non-owners before any storage read and validates ids/pagination',async()=>{
@@ -54,4 +54,27 @@ test('submission store uses only the Vercel client header and stores a daily pse
  await store.submitResponse(id,state(),new Request('https://example.com',{headers:{'x-vercel-forwarded-for':'192.0.2.10','x-forwarded-for':'203.0.113.30'}}));
  assert.equal(calls[0].name,'submit_client_questionnaire');assert.equal(calls[0].params.p_bucket,calls[1].params.p_bucket);assert.match(calls[0].params.p_bucket,/^[a-f0-9]{64}$/);assert.ok(!JSON.stringify(calls).includes('192.0.2.10'));assert.ok(!JSON.stringify(calls).includes('synthetic-test-key'));
  }finally{if(oldKey===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=oldKey;if(oldVercel===undefined)delete process.env.VERCEL;else process.env.VERCEL=oldVercel}
+});
+
+test('follow-up capabilities are bound to the receipt, expire, and reject tampering',()=>{
+ const old=process.env.SUPABASE_SECRET_KEY;process.env.SUPABASE_SECRET_KEY='synthetic-followup-key';
+ try {const f=load('lib/client-questionnaire/followup.ts',{'server-only':{}}),now=Date.now(),token=f.issueFollowupToken(id,now);
+ assert.equal(f.validFollowupToken(id,token,now),true);assert.equal(f.validFollowupToken('b76528fe-6c59-473e-a93e-33d5fc20e847',token,now),false);
+ assert.equal(f.validFollowupToken(id,token,now+86400001),false);assert.equal(f.validFollowupToken(id,token.slice(0,-1)+'z',now),false);
+ const details={id,token,location:'Local test town',timing:'Specific date',neededDate:'2027-02-30'};assert.equal(f.followupSchema.safeParse(details).success,false);
+ assert.equal(f.followupSchema.safeParse({...details,neededDate:'2027-02-28'}).success,true);
+ }finally{if(old===undefined)delete process.env.SUPABASE_SECRET_KEY;else process.env.SUPABASE_SECRET_KEY=old}
+});
+test('follow-up endpoint requires capability, validates data and handles failure without altering original request',async()=>{
+ const f=load('lib/client-questionnaire/followup.ts',{'server-only':{}});let calls=0,fail=false;
+ const api=load('app/api/client-questionnaire/followup/route.ts',{'@/lib/client-questionnaire/http':http,'@/lib/client-questionnaire/followup':{...f,validFollowupToken:(_id,t)=>t==='valid'},'@/lib/client-questionnaire/store':{saveFollowup:async()=>{calls++;if(fail)throw Error('private outage')}}});
+ const body={id,token:'invalid',location:'Test town',timing:'Soon',neededDate:''};
+ assert.equal((await api.POST(request(body))).status,403);assert.equal(calls,0);
+ assert.equal((await api.POST(request({...body,token:'valid',location:'x'.repeat(181)}))).status,400);
+ assert.equal((await api.POST(request({...body,token:'valid'}))).status,200);assert.equal(calls,1);
+ fail=true;const result=await api.POST(request({...body,token:'valid'}));assert.equal(result.status,503);assert.match(await result.text(),/original request is received/);
+});
+test('contradictory deliveries and no-issue combinations rejected; optional friction can be skipped',()=>{
+ assert.equal(schema.responseSchema.safeParse({...state(),answers:{priorities:'Compare quotes',next_step:'In stages as my project progresses'}}).success,true);
+ for(const answers of [{...state().answers,next_step:'In stages as my project progresses\nEverything in one delivery'},{...state().answers,friction:'No major time spent\nComparing prices'}])assert.equal(schema.responseSchema.safeParse({...state(),answers}).success,false);
 });

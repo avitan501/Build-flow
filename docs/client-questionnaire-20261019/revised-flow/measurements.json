@@ -1,0 +1,20 @@
+[
+  {
+    "variant": "desktop",
+    "firstChoiceTop": 497.015625,
+    "viewportHeight": 669,
+    "multipleChoicesStillVisible": true,
+    "followupFont": "14px",
+    "height": 1118.921875,
+    "overflow": false
+  },
+  {
+    "variant": "phone",
+    "firstChoiceTop": 541.5,
+    "viewportHeight": 664,
+    "multipleChoicesStillVisible": true,
+    "followupFont": "14px",
+    "height": 1794.46875,
+    "overflow": false
+  }
+]

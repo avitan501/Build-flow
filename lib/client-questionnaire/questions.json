@@ -2,7 +2,7 @@
   "sections": [
     {
       "title": "Your project",
-      "description": "Let’s start with your project. A few details will help us make the conversation useful.",
+      "description": "Start with the project you want help with.",
       "questions": [
         {
           "id": "projects",
@@ -14,9 +14,9 @@
             "Whole-home renovation",
             "Kitchen / bathroom renovation",
             "Addition / extension",
-            "Commercial project",
-            "Planning a future project"
-          ]
+            "Commercial project"
+          ],
+          "multiple": false
         }
       ]
     },
@@ -27,7 +27,7 @@
         {
           "id": "departments",
           "text": "Which materials would you like a hand with?",
-          "hint": "Pick your priorities. A few quick choices will help shape your next step.",
+          "hint": "Select any that apply. Open a material to add optional details.",
           "required": false,
           "choices": [
             "Lumber / framing",
@@ -35,18 +35,21 @@
             "Roofing / siding",
             "Plumbing / electrical",
             "Drywall / insulation",
-            "Interior finishes"
+            "Interior finishes",
+            "Help me choose"
           ],
           "followups": {
             "Lumber / framing": [
               {
                 "id": "list",
-                "text": "Do you already have a lumber list?",
+                "text": "How should we get your lumber list?",
                 "choices": [
-                  "Yes",
+                  "I’ll provide it",
                   "Contact my framer",
-                  "Takeoff from blueprints"
-                ]
+                  "Prepare a takeoff from my plans",
+                  "Help me get started"
+                ],
+                "service": false
               },
               {
                 "id": "contact",
@@ -58,17 +61,21 @@
                   "Compare supplier quotes",
                   "Arrange an approved order and delivery"
                 ],
-                "multiple": true
+                "multiple": true,
+                "service": true
               }
             ],
             "Windows / doors": [
               {
                 "id": "ready",
-                "text": "Where should we get the window details?",
+                "text": "Where should we get your window and door details?",
                 "choices": [
-                  "Plans",
-                  "Window schedule"
-                ]
+                  "Plans / window schedule",
+                  "I have a list or supplier quote",
+                  "My installer / supplier has the details",
+                  "Help me get started"
+                ],
+                "service": false
               },
               {
                 "id": "services",
@@ -80,7 +87,8 @@
                   "Confirm sizes and details with my installer",
                   "Arrange an approved order",
                   "Follow up on delivery / missing items"
-                ]
+                ],
+                "service": true
               }
             ],
             "Roofing / siding": [
@@ -92,7 +100,8 @@
                   "Products chosen, quantities needed",
                   "I have plans only",
                   "Not yet"
-                ]
+                ],
+                "service": false
               },
               {
                 "id": "contact",
@@ -102,7 +111,8 @@
                   "Yes, but check with me first",
                   "No, I’ll handle the conversation",
                   "Not sure yet"
-                ]
+                ],
+                "service": false
               },
               {
                 "id": "help",
@@ -114,7 +124,8 @@
                   "Arrange an approved order and delivery",
                   "No help needed right now",
                   "Not sure — talk it through with me"
-                ]
+                ],
+                "service": true
               }
             ],
             "Plumbing / electrical": [
@@ -122,10 +133,12 @@
                 "id": "source",
                 "text": "Where should we get the material list?",
                 "choices": [
+                  "I already have a list",
                   "My plumber / electrician",
                   "Plans",
                   "Help clarify what I need to buy"
-                ]
+                ],
+                "service": false
               },
               {
                 "id": "services",
@@ -137,18 +150,21 @@
                   "Confirm products with my trade",
                   "Arrange approved purchases",
                   "Follow up on orders / arrange reorders"
-                ]
+                ],
+                "service": true
               }
             ],
             "Drywall / insulation": [
               {
                 "id": "source",
-                "text": "Where should we get the types and quantities?",
+                "text": "How should we get your drywall / insulation list?",
                 "choices": [
-                  "Plans",
-                  "My installer’s list",
-                  "Help preparing a takeoff"
-                ]
+                  "I already have it",
+                  "My installer",
+                  "Prepare a takeoff from my plans",
+                  "Help me get started"
+                ],
+                "service": false
               },
               {
                 "id": "services",
@@ -160,18 +176,21 @@
                   "Arrange an approved order",
                   "Coordinate delivery",
                   "Follow up on orders / arrange reorders"
-                ]
+                ],
+                "service": true
               }
             ],
             "Interior finishes": [
               {
                 "id": "source",
-                "text": "Do you have a selection list?",
+                "text": "How should we get your finish selections?",
                 "choices": [
-                  "Yes",
-                  "Get it from my designer",
-                  "Help me complete it"
-                ]
+                  "I have a list",
+                  "My designer",
+                  "I’m still choosing",
+                  "Help complete my list"
+                ],
+                "service": false
               },
               {
                 "id": "services",
@@ -183,7 +202,8 @@
                   "Arrange approved orders",
                   "Follow up on deliveries",
                   "Handle missing items / reorders"
-                ]
+                ],
+                "service": true
               }
             ]
           },
@@ -393,19 +413,25 @@
                 ]
               }
             ]
+          },
+          "materialHints": {
+            "Interior finishes": "Flooring, tile, cabinets, counters, doors, trim and paint."
           }
         },
         {
           "id": "friction",
           "text": "What takes up most of your time when buying materials?",
           "hint": "Select the tasks that take the most time.",
-          "required": true,
+          "required": false,
           "choices": [
             "Comparing prices",
             "Finding available materials",
             "Calling suppliers / my trades",
             "Following up on orders and deliveries",
             "Handling missing items / reorders",
+            "No major time spent"
+          ],
+          "exclusive": [
             "No major time spent"
           ]
         },
@@ -426,8 +452,8 @@
       ]
     },
     {
-      "title": "Your delivery plan",
-      "description": "Choose how you’d like materials to arrive, then review your starting plan.",
+      "title": "Delivery & contact",
+      "description": "Choose your delivery approach and how we can reach you.",
       "questions": [
         {
           "id": "next_step",
@@ -436,9 +462,10 @@
           "required": true,
           "choices": [
             "In stages as my project progresses",
-            "Everything together as soon as possible",
+            "Everything in one delivery",
             "Help me plan the deliveries"
-          ]
+          ],
+          "multiple": false
         }
       ]
     }

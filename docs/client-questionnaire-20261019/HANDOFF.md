@@ -1,9 +1,12 @@
 # Client-completed questionnaire
 
-## Current review handoff — questions and UI/UX
+## Current implementation — approved question and UI/UX improvements
 
-Reviewed app version ed1969bd without changing it. David explicitly excludes HVAC and wants location after submission. Full prioritized assessment: [UX-AND-QUESTION-REVIEW.md](UX-AND-QUESTION-REVIEW.md). Isolated desktop Chromium/mobile WebKit inspection reproduced premature multi-select collapse with hidden keyboard focus, conflicting delivery/no-problem selections, long opening/step2, incomplete short recap and absent post-submit location UI. Screenshots and observations in ux-review/. Mocked submission only, no database writes or user-session changes. Recommendation: improve current plain checklist, clarify source/service answers, remove repetition, add after-submit enrichment; no new implementation or publication authorized by this review. Next: use prioritized report for discussion. No active publisher; full build remains required before eventual release.
+David said “Do it” after the complete review. The improvements are now implemented in the existing isolated preview worktree. Plain checklist retained; multi-select stays open until Done, contradictory selections prevented, service questions deduplicated and recap based on actual material selections. Contact is near sending; optional location/timing follows the successful receipt. No HVAC. Original owner interview unchanged. Local-only additive follow-up storage, scoped signed save token, private inbox details. Full build/TypeScript, lint/diff,13 questionnaire API/PostgreSQL checks,5 original interview API checks,10 desktop/phone UI cases and6 integrated DB/inbox cases passed. Screenshots inspected; revised-flow/ contains evidence.
 
+Authoritative current detail and verification: [IMPLEMENTATION.md](IMPLEMENTATION.md). Historical audit: [UX-AND-QUESTION-REVIEW.md](UX-AND-QUESTION-REVIEW.md). Codex sole implementer; no publisher. Preview3110/fixture3119 remain running. No production changes, pushes, merges or messages.
+
+## Earlier preview history (superseded by the implementation above)
 
 Latest step3: “Your delivery plan” asks “How would you like to receive your materials?” Choices: stages as project progresses / everything together as soon as possible / help plan deliveries / Other. Recap label now delivery preference. Existing next_step key retained, including old drafts. Preference only, not guaranteed availability/date. Generated assets rebuilt; diff checked. Preview only.
 
