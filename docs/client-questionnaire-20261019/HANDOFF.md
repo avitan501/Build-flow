@@ -1,3 +1,5 @@
+Latest continuation: see [copy cleanup](COPY-CLEANUP.md) for preview-only wording changes after the [completed production release](RELEASE.md). Historical implementation notes below predate that release.
+
 # Client-completed questionnaire
 
 ## Published — current authoritative state

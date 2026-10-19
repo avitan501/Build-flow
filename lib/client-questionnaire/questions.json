@@ -2,12 +2,12 @@
   "sections": [
     {
       "title": "Your project",
-      "description": "Start with the project you want help with.",
+      "description": "",
       "questions": [
         {
           "id": "projects",
           "text": "What kind of project are you working on?",
-          "hint": "Choose the closest match.",
+          "hint": "",
           "required": false,
           "choices": [
             "New construction",
@@ -21,12 +21,12 @@
     },
     {
       "title": "Make it easier",
-      "description": "Choose what you’d like off your plate. Start with what matters most; the extra details are optional.",
+      "description": "",
       "questions": [
         {
           "id": "departments",
           "text": "Which materials would you like a hand with?",
-          "hint": "Select any that apply. Open a material to add optional details.",
+          "hint": "Choose any. Details are optional.",
           "required": false,
           "choices": [
             "Lumber / framing",
@@ -432,7 +432,7 @@
         {
           "id": "friction",
           "text": "What takes up most of your time when buying materials?",
-          "hint": "Select the tasks that take the most time.",
+          "hint": "",
           "required": false,
           "choices": [
             "Comparing prices",
@@ -449,7 +449,7 @@
         {
           "id": "priorities",
           "text": "How can we make your next order easier?",
-          "hint": "Choose what you’d like us to help with.",
+          "hint": "",
           "required": true,
           "choices": [
             "Help prepare my material list",
@@ -464,12 +464,12 @@
     },
     {
       "title": "Delivery & contact",
-      "description": "Choose your delivery approach and how we can reach you.",
+      "description": "",
       "questions": [
         {
           "id": "next_step",
           "text": "How would you like to receive your materials?",
-          "hint": "Choose the approach that fits your project.",
+          "hint": "",
           "required": true,
           "choices": [
             "In stages as my project progresses",
