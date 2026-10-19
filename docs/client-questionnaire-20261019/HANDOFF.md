@@ -1,5 +1,9 @@
 # Client-completed questionnaire
 
+## Published — current authoritative state
+
+Live application `f9c523b19e8bb33bf15d674923e94e91da8cc592` is deployed and verified after David’s explicit approval. [Release evidence and live links](RELEASE.md). Public questionnaire and private response inbox are live; original questionnaire unchanged. Both additive migrations applied to the verified production database, approved hook once, exact live SHA verified. All release checks passed; labeled synthetic test response verified and removed. Earlier preview-only notes below are historical. Codex publisher complete/free.
+
 Latest approved copy: all seven active material/general quote-comparison answers now say “Compare quotes for the same materials, quantities, and delivery.” Historical question choices retained; the existing draft migration preserves old wording as Other. Chromium/mobile WebKit verified served choices, selection, recap and no overflow; no submission. Integration expectation updated to the new text. David explicitly deferred Foundations / concrete; do not add it yet. Preview only.
 
 Latest approved addition: Interior finishes now opens with optional multiple product choices: Flooring / tile, Cabinets / counters, Doors / trim, Paint, Appliances, plus the existing Other text option. Choices use the existing Done/edit summary and are retained in the submitted material details. Removed the redundant scope hint. Desktop Chromium and mobile WebKit checks passed for selection, Done, reload, editing, composed answers and no overflow; no submission. Preview only.

@@ -1,0 +1,20 @@
+{
+  "release": "f9c523b19e8bb33bf15d674923e94e91da8cc592",
+  "results": [
+    {
+      "variant": "desktop",
+      "pageStatus": 200,
+      "javascriptErrors": [],
+      "overflow": false,
+      "submissionAndFollowup": true,
+      "privateInbox": true,
+      "originalQuestionnaire": true
+    },
+    {
+      "variant": "phone",
+      "pageStatus": 200,
+      "javascriptErrors": [],
+      "overflow": false
+    }
+  ]
+}
