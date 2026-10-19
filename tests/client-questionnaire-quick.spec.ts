@@ -1,5 +1,5 @@
 import {test,expect,type Locator} from '@playwright/test';
-async function check(locator:Locator){await locator.check()}
+async function check(locator:Locator){const slide=locator.locator('xpath=ancestor::*[contains(@class,"question-slide")]');if(await slide.count()&&!(await locator.isVisible()))await slide.locator('.answered-row button').click();await locator.check()}
 test('five tap-first questions, optional company and Other text, preview/reload/submit',async({page},info)=>{
  test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only');
  let submitted:Record<string,unknown>|null=null;
@@ -33,4 +33,15 @@ test('every material has independent inline questions and preserves answers',asy
  const duplicates=await page.locator('[id]').evaluateAll(nodes=>nodes.map(n=>n.id).filter((id,i,all)=>all.indexOf(id)!==i));expect(duplicates).toEqual([]);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
  await page.getByRole('button',{name:'4. Review',exact:true}).click();await expect(page.locator('#summary')).toContainText('Collect approved selections and product codes');
+});
+
+test('answers compact automatically, remain editable, and Other waits for Done',async({page})=>{
+ test.skip(!process.env.PLAYWRIGHT_BASE_URL?.startsWith('http://127.0.0.1:'),'Local preview only');
+ await page.goto('/questionnaire');await page.locator('#next').click();await page.locator('#departments-choice-0').check();
+ const list=page.locator('#departments-material-0-list-0');await list.check();await expect(list).toBeHidden();
+ const panel=page.locator('#departments-material-0-subchoices');await expect(panel.locator('.answered-row').first()).toContainText('Yes');
+ await panel.getByRole('button',{name:'Change',exact:true}).click();await page.locator('#departments-material-0-list-3').check();
+ const other=page.locator('#departments-material-0-list-other');await expect(other).toBeVisible();await other.fill('My list is being reviewed');
+ await other.locator('xpath=ancestor::fieldset[1]').getByRole('button',{name:'Done',exact:true}).click();await expect(other).toBeHidden();await expect(panel.locator('.answered-row').first()).toContainText('My list is being reviewed');
+ await check(page.locator('#departments-material-0-contact-0'));await expect(page.locator('#departments-material-0-contact-0')).toBeHidden();await check(page.locator('#departments-material-0-contact-1'));await expect(panel.locator('.answered-row').nth(1)).toContainText('Follow up on orders / arrange reorders · Confirm orders with my framer');
 });

@@ -1,5 +1,10 @@
 # Client-completed questionnaire
 
+## Auto-compact answers — current preview
+
+After selecting a follow-up answer, its options collapse into a compact question/answer summary with Change or Add / change. Multi-select remains editable; Other keeps typing visible until Done. Reload restores selected summaries. Four general desktop/mobile browser checks plus two dedicated collapse/edit/Other checks passed (initial dedicated test selector ambiguity corrected); seven API checks/lint/diff passed. No storage writes or production changes. Same isolated owner/branch, preview only; full build required before release.
+
+
 Latest copy: lumber “Missing items” choice now “Follow up on orders / arrange reorders”, per David. Preview only; no behavior changes, diff check passed.
 
 
