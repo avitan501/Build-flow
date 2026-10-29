@@ -134,7 +134,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
 
   if (pathname === "/consultation") {
     return (
-      <header className="border-b border-slate-200 bg-white px-5 py-3" data-testid="consultation-header">
+      <header className="border-b border-[#ded9d0] bg-[#f8f4ed] px-5 py-3" data-testid="consultation-header">
         <div className="mx-auto flex max-w-[1220px] items-center justify-between gap-4">
           <Link href="/" prefetch={false} aria-label="Avantia Build home"><AvantiaBuildLockup header /></Link>
           <span className="text-xs font-medium text-slate-500">Free strategy meeting</span>

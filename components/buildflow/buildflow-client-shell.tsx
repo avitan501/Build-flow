@@ -35,7 +35,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   }
 
   if (isConsultation) {
-    return <div className="min-h-screen bg-white">{children}</div>;
+    return <div className="min-h-screen bg-[#eee7db]">{children}</div>;
   }
 
   if (isCustomerPortal) {
