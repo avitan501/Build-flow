@@ -45,12 +45,6 @@ const reviewServices = [
   { title: "Dumpster service", description: "Help arranging a dumpster, pickup, or replacement for your jobsite.", href: "/request-quote", image: "/images/buildflow-homepage/dumpster-service-v2.png", action: "Arrange a dumpster" },
 ] as const
 
-const reviewReasons = [
-  { title: "Check for a better price", detail: "We compare prices and suggest better options." },
-  { title: "Skip the supplier calls", detail: "Send the list. We handle the follow-up." },
-  { title: "Help after you order", detail: "If something goes wrong, you have one person to call." },
-] as const
-
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
   if (primary === "Schedule a Meeting" || primary === "Book a Free 15-Minute Meeting") {
     return <div data-homepage-booking-primary className="mt-7 flex flex-col items-start gap-2">
@@ -160,18 +154,6 @@ function HomepageReviewSections() {
       </div>
     </section>
 
-    <section className="border-t border-[#d8d0c3] bg-[#f4efe6] px-5 py-10 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_24rem] sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
-      <div className="mx-auto max-w-7xl">
-        <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why Avantia?</h2>
-        <div className="mt-6 grid gap-px overflow-hidden border border-[#d8d0c3] bg-[#d8d0c3] sm:grid-cols-3">
-          {reviewReasons.map((reason, index) => <article key={reason.title} className="bg-[#f4efe6] p-5 sm:p-6">
-            <span className="text-[10px] font-black tracking-[0.18em] text-[#80603c]">0{index + 1}</span>
-            <h3 className="mt-4 text-lg font-semibold">{reason.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{reason.detail}</p>
-          </article>)}
-        </div>
-      </div>
-    </section>
   </>
 }
 

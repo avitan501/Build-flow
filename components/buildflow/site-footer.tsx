@@ -37,8 +37,8 @@ export function SiteFooter() {
                 <p className="mt-3 max-w-md text-xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-3xl">You build. We handle the materials.</p>
                 <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600">Plans · Pricing · Ordering · Delivery</p>
               </div>
-              <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
-                <a href="mailto:office@avantiabuild.com" className="flex min-h-10 min-w-0 items-center justify-between border border-[#d8d0c3] px-3 text-[11px] font-bold transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
+              <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-1.5 sm:w-auto sm:min-w-[34rem] sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <a href="mailto:office@avantiabuild.com" className="sm:col-span-1 col-span-2 flex min-h-10 min-w-0 items-center justify-between border border-[#d8d0c3] px-3 text-[11px] font-bold transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
                   <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="break-all">office@avantiabuild.com</span></span><span aria-hidden="true">↗</span>
                 </a>
                   <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-[#d8d0c3] px-3 text-[11px] font-bold transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
