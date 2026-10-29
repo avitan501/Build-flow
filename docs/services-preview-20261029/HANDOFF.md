@@ -11,3 +11,6 @@ User approved compact styling and requested three additional services in two row
 
 ## Mobile booking bar preview
 Added mobile-only bottom booking/WhatsApp bar after hero CTA scrolls above viewport. Restores normal contact launcher when returning to hero; hides duplicate launcher while bar visible. Safe-area padding, accessible labels, 48px targets. Desktop unchanged. Browser verified appearance/disappearance, links, hidden duplicate, desktop exclusion; ESLint/diff check passed. Screenshot mobile-booking-bar.png. No publishing or messages.
+
+## Phone hero clarification
+User meant top hero photo, not service cards. Changed only mobile cream overlay to vertical transition with visible photo at top, cream beneath copy; mobile content lower with responsive padding. Desktop overlay/layout preserved. Hero phone screenshot visually reviewed, no horizontal overflow; targeted lint passed. Video removal not performed (earlier was a recommendation, clarification focused on photo). Preview only.
