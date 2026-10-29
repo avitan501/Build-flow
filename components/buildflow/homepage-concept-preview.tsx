@@ -35,27 +35,11 @@ const reviewHeroPhotos = [
 ] as const
 
 const reviewServices = [
-  {
-    title: "Compare Supplier Quotes",
-    description: "Review your material costs and discuss where Avantia can help you find better options.",
-    href: CONSULTATION_PATH,
-    image: "/images/buildflow-homepage/service-beat-quote-v4.webp",
-    action: "Schedule a Meeting",
-  },
-  {
-    title: "Materials, Handled",
-    description: "One contact for approved orders, delivery arrangements, shortages and reorders.",
-    href: CONSULTATION_PATH,
-    image: "/images/buildflow-homepage/service-send-list-v4.webp",
-    action: "Schedule a Meeting",
-  },
-  {
-    title: "Source What You Need",
-    description: "Tell us what you or your subcontractor needs. We’ll discuss how to take the sourcing work off your plate.",
-    href: CONSULTATION_PATH,
-    image: "/images/buildflow-homepage/service-find-item-v5.webp",
-    action: "Schedule a Meeting",
-  },
+  { title: "Compare supplier quotes", description: "Multiple suppliers. Matching materials, quantities, and delivery.", href: "/beat-a-quote", image: "/images/buildflow-homepage/service-beat-quote-v4.webp", action: "Compare my quote" },
+  { title: "Next-day delivery", description: "Need it tomorrow? We’ll check stock and delivery availability.", href: "/request-quote", image: "/images/buildflow-homepage/process-delivery-v4.webp", action: "Check availability" },
+  { title: "Your materials concierge", description: "One office for your lists, approved orders, deliveries, and reorders.", href: CONSULTATION_PATH, image: "/images/buildflow-homepage/service-send-list-v4.webp", action: "Let’s plan your project" },
+  { title: "Hard-to-find materials", description: "Send a photo or spec. We’ll search suppliers for a match.", href: "/request-quote", image: "/images/shop-showroom/professional/product-finder-v1.webp", action: "Tell us what you need" },
+  { title: "Bulk pricing", description: "Whole-job quantities. Let us check package pricing.", href: "/shop", image: "/images/buildflow-retail/framing-materials-yard.webp", action: "Explore materials" },
 ] as const
 
 const reviewReasons = [
@@ -157,26 +141,22 @@ function HomepageReviewSections() {
       </div>
     </section>
 
-    <section className="border-t border-black/8 bg-[#eef0f2] py-14 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_44rem] sm:py-20" aria-labelledby="service-rail-heading">
+    <section id="ways-we-help" className="border-t border-[#d8d0c3] bg-[#f4efe6] py-9 text-slate-950 sm:py-11" aria-labelledby="service-rail-heading">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0066cc]">Start with what you have</p>
-        <div className="mt-2 flex items-end justify-between gap-6">
-          <h2 id="service-rail-heading" className="max-w-2xl text-4xl font-semibold leading-[0.96] tracking-[-0.055em] text-balance sm:text-6xl">Three ways we can help.</h2>
-          <p className="hidden text-xs font-bold uppercase tracking-[0.14em] text-slate-600 sm:block">Swipe to explore →</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#80603c]">One office. From sourcing to delivery.</p>
+        <h2 id="service-rail-heading" className="mt-2 text-3xl font-semibold leading-tight tracking-[-0.045em] sm:text-4xl">Ways we help.</h2>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {reviewServices.map((service) => <Link key={service.title} href={service.href} className="group flex overflow-hidden rounded-xl border border-[#ded5c7] bg-[#fcfaf6] transition-colors hover:border-[#aa8a58] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1677ff]/30 sm:flex-col">
+            <div className="relative w-24 shrink-0 overflow-hidden sm:h-32 sm:w-full">
+              <Image src={service.image} alt="" fill sizes="(max-width: 639px) 96px, (max-width: 1023px) 45vw, 240px" className="object-cover transition-transform duration-500 motion-reduce:transition-none group-hover:scale-[1.035]" />
+            </div>
+            <div className="flex flex-1 flex-col p-3.5 sm:p-4">
+              <h3 className="text-base font-semibold leading-tight tracking-[-0.025em]">{service.title}</h3>
+              <p className="mt-2 text-[13px] leading-5 text-slate-600">{service.description}</p>
+              <span className="mt-auto flex items-center justify-between gap-2 pt-3 text-xs font-semibold text-[#735126]">{service.action}<ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /></span>
+            </div>
+          </Link>)}
         </div>
-      </div>
-
-      <div className="mx-auto mt-8 flex max-w-7xl snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-5 [scrollbar-width:none] sm:gap-5 sm:px-8 [&::-webkit-scrollbar]:hidden">
-        {reviewServices.map((service, index) => <Link key={service.title} href={service.href} className="group relative min-h-[27rem] w-[82vw] max-w-[23rem] shrink-0 snap-center overflow-hidden rounded-[1.5rem] bg-slate-950 text-white shadow-[0_22px_60px_rgba(15,23,42,.14)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1677ff]/30 sm:w-[calc((100%-2.5rem)/3)] sm:max-w-none">
-          <Image src={service.image} alt="" fill sizes="(max-width: 640px) 82vw, 33vw" className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.08)_15%,rgba(3,5,7,.2)_45%,rgba(3,5,7,.94)_100%)]" aria-hidden="true" />
-          <span className="absolute left-5 top-5 inline-flex h-9 min-w-9 items-center justify-center rounded-full border border-white/35 bg-black/25 px-2 text-xs font-black backdrop-blur-md">0{index + 1}</span>
-          <div className="absolute inset-x-0 bottom-0 p-6">
-            <h3 className="text-3xl font-semibold leading-[0.96] tracking-[-0.045em]">{service.title}</h3>
-            <p className="mt-3 text-sm font-medium leading-6 text-white/72">{service.description}</p>
-            <span className="mt-6 inline-flex items-center gap-2 text-sm font-black text-[#f1c66e]">{service.action}<ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" /></span>
-          </div>
-        </Link>)}
       </div>
     </section>
 
