@@ -17,7 +17,7 @@ export function SiteFooter() {
   if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin") || pathname.startsWith("/requests"))) return null
 
   if (pathname === "/consultation") {
-    return <footer className="border-t border-slate-200 bg-[#f5f7f3] px-5 py-5 text-center text-xs text-slate-500">
+    return <footer className="border-t border-slate-200 bg-[#f4efe6] px-5 py-5 text-center text-xs text-slate-500">
       <nav aria-label="Booking policies" className="flex justify-center gap-5">
         <span>Avantia Build</span><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>
       </nav>

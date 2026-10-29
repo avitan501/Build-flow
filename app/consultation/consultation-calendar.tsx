@@ -71,6 +71,13 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
           title="Confirm your Avantia strategy meeting with Google"
           referrerPolicy="strict-origin-when-cross-origin" onLoad={() => setLoaded(true)} />
         <a className={styles.fallback} href={url} target="_blank" rel="noopener noreferrer">Having trouble? Open booking in a new tab <ExternalLink size={13} aria-hidden="true" /></a>
+        <details className={styles.afterBooking}>
+          <summary>I’ve completed my booking</summary>
+          <div className={styles.preparation}>
+            <div><h2>Want us to prepare?</h2><p>Share your material needs before we meet. This is optional.</p></div>
+            <a className={styles.questionnaireLink} href="/questionnaire" target="_blank" rel="noopener noreferrer">Share your material needs <ExternalLink size={14} aria-hidden="true" /></a>
+          </div>
+        </details>
       </div>
     );
   }
@@ -102,7 +109,7 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
             const enabled = isConsultationWindow(date, hour, new Date(now));
             return <button key={hour} type="button" disabled={!enabled} className={styles.time} onClick={() => chooseTime(hour)}
               aria-label={`${consultationTimeLabel(hour)}${enabled ? "" : ", unavailable"}`}>
-              <strong>{consultationTimeLabel(hour)}</strong><span>{enabled ? "Select" : "Unavailable"}</span>
+              <strong>{consultationTimeLabel(hour)}</strong>{!enabled && <span>Unavailable</span>}
             </button>;
           })}
         </div> : <p className={styles.dateLabel}>Pick a day above or view the next two weeks.</p>}
