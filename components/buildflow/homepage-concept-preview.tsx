@@ -6,6 +6,7 @@ import { ArrowUpRight, CalendarDays, Check, ChevronDown, MapPin, MessageSquareTe
 import { useEffect, useRef, useState } from "react"
 
 import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
+import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 import { CONSULTATION_PATH } from "@/lib/consultation"
 
 const homepageBrands = [
@@ -65,7 +66,13 @@ const reviewReasons = [
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
   if (primary === "Schedule a Meeting" || primary === "Book a Free 15-Minute Meeting") {
-    return <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />{primary}</Link>
+    return <div className="mt-7 flex flex-col items-start gap-2">
+      <Link href={CONSULTATION_PATH} className="inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />{primary}</Link>
+      <a href="https://wa.me/15169398484" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 bg-black px-4 text-xs font-medium tracking-wide text-white transition-colors hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950">
+        <WhatsAppIcon className="h-3.5 w-3.5" aria-hidden="true" />WhatsApp us
+        <span className="sr-only"> at 516-939-8484 (opens in a new tab)</span>
+      </a>
+    </div>
   }
   const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
   const secondaryHref = secondary.toLowerCase().includes("text")
