@@ -1,4 +1,5 @@
 import { Clock3, Video } from "lucide-react";
+import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon";
 import { connection } from "next/server";
 import { pageMetadata } from "@/lib/site-metadata";
 import { ConsultationCalendar } from "./consultation-calendar";
@@ -25,6 +26,14 @@ export default async function ConsultationPage() {
           </div>
         </header>
         <ConsultationCalendar initialNow={new Date().toISOString()} />
+        <div className={styles.whatsappHelp}>
+          <span>Prefer to chat?</span>
+          <a href="https://wa.me/15169398484" target="_blank" rel="noopener noreferrer">
+            <WhatsAppIcon aria-hidden="true" />
+            <span>WhatsApp us · 516-939-8484</span>
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </div>
 
       </div>
     </section>
