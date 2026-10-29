@@ -1,44 +1,24 @@
 {
   "sections": [
     {
-      "title": "Your project",
-      "description": "",
-      "questions": [
-        {
-          "id": "projects",
-          "text": "What kind of project are you working on?",
-          "hint": "",
-          "required": false,
-          "choices": [
-            "New construction",
-            "Whole-home renovation",
-            "Addition / extension",
-            "Commercial project"
-          ],
-          "multiple": false
-        }
-      ]
-    },
-    {
       "title": "Make it easier",
       "description": "",
       "questions": [
         {
           "id": "departments",
-          "text": "Which materials would you like a hand with?",
-          "hint": "Choose any. Details are optional.",
+          "text": "What do you need help ordering?",
+          "hint": "Select all that apply.",
           "required": false,
           "choices": [
-            "Lumber / framing",
-            "Windows / doors",
-            "Roofing / siding",
-            "Plumbing / electrical",
-            "Drywall / insulation",
-            "Interior finishes",
-            "Help me choose"
+            "Lumber & framing",
+            "Roofing & siding",
+            "Drywall & insulation",
+            "Flooring & tile",
+            "Doors & trim",
+            "Dumpster rental"
           ],
           "followups": {
-            "Lumber / framing": [
+            "Lumber & framing": [
               {
                 "id": "list",
                 "text": "How should we get your lumber list?",
@@ -64,34 +44,7 @@
                 "service": true
               }
             ],
-            "Windows / doors": [
-              {
-                "id": "ready",
-                "text": "Where should we get your window and door details?",
-                "choices": [
-                  "Plans / window schedule",
-                  "I have a list or supplier quote",
-                  "My installer / supplier has the details",
-                  "Help me get started"
-                ],
-                "service": false
-              },
-              {
-                "id": "services",
-                "text": "What would you like us to handle for your windows and doors?",
-                "multiple": true,
-                "choices": [
-                  "Arrange a meeting with a supplier to help me choose",
-                  "Get quotes from plans / window schedule",
-                  "Compare quotes for the same materials, quantities, and delivery",
-                  "Confirm sizes and details with my installer",
-                  "Arrange an approved order",
-                  "Follow up on delivery / missing items"
-                ],
-                "service": true
-              }
-            ],
-            "Roofing / siding": [
+            "Roofing & siding": [
               {
                 "id": "ready",
                 "text": "Do you have the product choices and quantities?",
@@ -128,33 +81,7 @@
                 "service": true
               }
             ],
-            "Plumbing / electrical": [
-              {
-                "id": "source",
-                "text": "Where should we get the material list?",
-                "choices": [
-                  "I already have a list",
-                  "My plumber / electrician",
-                  "Plans",
-                  "Help clarify what I need to buy"
-                ],
-                "service": false
-              },
-              {
-                "id": "services",
-                "text": "What would you like us to handle for plumbing and electrical?",
-                "multiple": true,
-                "choices": [
-                  "Clarify what my trade supplies",
-                  "Compare quotes for the same materials, quantities, and delivery",
-                  "Confirm products with my trade",
-                  "Arrange approved purchases",
-                  "Follow up on orders / arrange reorders"
-                ],
-                "service": true
-              }
-            ],
-            "Drywall / insulation": [
+            "Drywall & insulation": [
               {
                 "id": "source",
                 "text": "How should we get your drywall / insulation list?",
@@ -181,20 +108,7 @@
                 "service": true
               }
             ],
-            "Interior finishes": [
-              {
-                "id": "products",
-                "text": "Which interior finishes would you like help with?",
-                "multiple": true,
-                "choices": [
-                  "Flooring / tile",
-                  "Cabinets / counters",
-                  "Doors / trim",
-                  "Paint",
-                  "Appliances"
-                ],
-                "service": false
-              },
+            "Flooring & tile": [
               {
                 "id": "source",
                 "text": "How should we get your finish selections?",
@@ -208,7 +122,7 @@
               },
               {
                 "id": "services",
-                "text": "What would you like us to handle for your interior finishes?",
+                "text": "What would you like us to handle for these materials?",
                 "multiple": true,
                 "choices": [
                   "Compare quotes for the same materials, quantities, and delivery",
@@ -219,10 +133,49 @@
                 ],
                 "service": true
               }
+            ],
+            "Doors & trim": [
+              {
+                "id": "source",
+                "text": "How should we get your finish selections?",
+                "choices": [
+                  "I have a list",
+                  "My designer",
+                  "I’m still choosing",
+                  "Help complete my list"
+                ],
+                "service": false
+              },
+              {
+                "id": "services",
+                "text": "What would you like us to handle for these materials?",
+                "multiple": true,
+                "choices": [
+                  "Compare quotes for the same materials, quantities, and delivery",
+                  "Confirm installation supplies with my installer",
+                  "Arrange approved orders",
+                  "Follow up on deliveries",
+                  "Handle missing items / reorders"
+                ],
+                "service": true
+              }
+            ],
+            "Dumpster rental": [
+              {
+                "id": "services",
+                "text": "What would you like us to handle?",
+                "multiple": true,
+                "service": true,
+                "choices": [
+                  "Arrange a dumpster",
+                  "Compare rental prices",
+                  "Coordinate pickup / replacement"
+                ]
+              }
             ]
           },
           "earlierFollowups": {
-            "Lumber / framing": [
+            "Lumber & framing": [
               {
                 "id": "preparer",
                 "text": "Who prepares your lumber list?",
@@ -248,6 +201,31 @@
               }
             ],
             "Windows / doors": [
+              {
+                "id": "ready",
+                "text": "Where should we get your window and door details?",
+                "choices": [
+                  "Plans / window schedule",
+                  "I have a list or supplier quote",
+                  "My installer / supplier has the details",
+                  "Help me get started"
+                ],
+                "service": false
+              },
+              {
+                "id": "services",
+                "text": "What would you like us to handle for your windows and doors?",
+                "multiple": true,
+                "choices": [
+                  "Arrange a meeting with a supplier to help me choose",
+                  "Get quotes from plans / window schedule",
+                  "Compare quotes for the same materials, quantities, and delivery",
+                  "Confirm sizes and details with my installer",
+                  "Arrange an approved order",
+                  "Follow up on delivery / missing items"
+                ],
+                "service": true
+              },
               {
                 "id": "confirm",
                 "text": "Who confirms the sizes before ordering?",
@@ -282,7 +260,7 @@
                 ]
               }
             ],
-            "Roofing / siding": [
+            "Roofing & siding": [
               {
                 "id": "owner",
                 "text": "Who handles the roofing or siding materials?",
@@ -295,6 +273,30 @@
               }
             ],
             "Plumbing / electrical": [
+              {
+                "id": "source",
+                "text": "Where should we get the material list?",
+                "choices": [
+                  "I already have a list",
+                  "My plumber / electrician",
+                  "Plans",
+                  "Help clarify what I need to buy"
+                ],
+                "service": false
+              },
+              {
+                "id": "services",
+                "text": "What would you like us to handle for plumbing and electrical?",
+                "multiple": true,
+                "choices": [
+                  "Clarify what my trade supplies",
+                  "Compare quotes for the same materials, quantities, and delivery",
+                  "Confirm products with my trade",
+                  "Arrange approved purchases",
+                  "Follow up on orders / arrange reorders"
+                ],
+                "service": true
+              },
               {
                 "id": "owner",
                 "text": "Who buys the fixtures and equipment?",
@@ -338,7 +340,7 @@
                 ]
               }
             ],
-            "Drywall / insulation": [
+            "Drywall & insulation": [
               {
                 "id": "owner",
                 "text": "Who orders these materials now?",
@@ -382,7 +384,7 @@
                 ]
               }
             ],
-            "Interior finishes": [
+            "Flooring & tile": [
               {
                 "id": "owner",
                 "text": "Who keeps track of the selections and orders?",
@@ -424,6 +426,67 @@
                   "Coordinate orders and missing items",
                   "No help needed right now",
                   "Not sure — talk it through with me"
+                ]
+              },
+              {
+                "id": "products",
+                "text": "Previously selected items",
+                "choices": [
+                  "Flooring / tile",
+                  "Doors / trim"
+                ]
+              }
+            ],
+            "Doors & trim": [
+              {
+                "id": "owner",
+                "text": "Who keeps track of the selections and orders?",
+                "choices": [
+                  "I do",
+                  "My designer / architect",
+                  "My contractor",
+                  "We share it",
+                  "No one yet"
+                ]
+              },
+              {
+                "id": "ready",
+                "text": "Have you chosen your finishes?",
+                "choices": [
+                  "Yes, selections are final",
+                  "Some are chosen",
+                  "Still comparing options",
+                  "I need help narrowing it down"
+                ]
+              },
+              {
+                "id": "contact",
+                "text": "Would you like us to speak directly with your designer / installer?",
+                "choices": [
+                  "Yes, coordinate directly",
+                  "Yes, but check with me first",
+                  "No, I’ll handle the conversation",
+                  "Not sure yet"
+                ]
+              },
+              {
+                "id": "help",
+                "text": "What would you like us to help with first?",
+                "choices": [
+                  "Collect approved selections and product codes",
+                  "Confirm installation supplies with my installer",
+                  "Compare matching supplier quotes",
+                  "Coordinate orders and missing items",
+                  "No help needed right now",
+                  "Not sure — talk it through with me"
+                ]
+              },
+              {
+                "id": "products",
+                "text": "Previously selected items",
+                "choices": [
+                  "Flooring / tile",
+                  "Doors / trim"
                 ]
               }
             ]
@@ -482,6 +545,10 @@
     }
   ],
   "legacyQuestions": [
+    {
+      "id": "projects",
+      "text": "What kind of project are you working on?"
+    },
     {
       "id": "ownership",
       "text": "Who currently prepares material lists, chooses suppliers and places orders?"

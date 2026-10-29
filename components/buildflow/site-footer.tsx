@@ -27,40 +27,40 @@ export function SiteFooter() {
   if (pathname === "/" || pathname === "/homepage-review") {
     return (
       <ShopTranslationBoundary>
-        <footer className="border-t border-white/10 bg-[#030507] px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-7 text-white sm:px-8 sm:pb-7 sm:pt-9">
+        <footer className="border-t border-[#d8d0c3] bg-[#f4efe6] px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-7 text-slate-950 sm:px-8 sm:pb-7 sm:pt-9">
           <div className="mx-auto max-w-[88rem]">
-            <div className="flex flex-col justify-between gap-5 border-b border-white/15 pb-6 sm:flex-row sm:items-end">
+            <div className="flex flex-col justify-between gap-5 border-b border-[#d8d0c3] pb-6 sm:flex-row sm:items-end">
               <div>
                 <Link href="/" aria-label="Avantia home" className="inline-flex">
-                  <AvantiaBuildLockup header animated tone="light" loading="lazy" />
+                  <AvantiaBuildLockup header animated tone="navy" loading="lazy" />
                 </Link>
                 <p className="mt-3 max-w-md text-xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-3xl">You build. We handle the materials.</p>
-                <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/65">Plans · Pricing · Ordering · Delivery</p>
+                <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600">Plans · Pricing · Ordering · Delivery</p>
               </div>
               <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
-                <a href="mailto:office@avantiabuild.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                <a href="mailto:office@avantiabuild.com" className="flex min-h-10 min-w-0 items-center justify-between border border-[#d8d0c3] px-3 text-[11px] font-bold transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
                   <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="break-all">office@avantiabuild.com</span></span><span aria-hidden="true">↗</span>
                 </a>
-                  <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                  <a href="tel:+15169901990" aria-label="Call (516) 990-1990" className="inline-flex min-h-10 items-center gap-2 border border-[#d8d0c3] px-3 text-[11px] font-bold transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
                     <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 990-1990</span>
                   </a>
-                  <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-11 w-11 items-center justify-center border border-white/25 text-white transition-colors hover:border-white hover:bg-white hover:text-black">
+                  <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-11 w-11 items-center justify-center border border-[#d8d0c3] text-slate-950 transition-colors hover:border-slate-400 hover:bg-[#e9e1d4] hover:text-slate-950">
                     <WhatsAppIcon className="h-5 w-5" />
                   </a>
               </nav>
             </div>
             <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <nav aria-label="Policies" className="flex max-w-full flex-wrap gap-x-5 gap-y-3 pb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-white/65 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <Link href="/privacy" className="transition hover:text-white">Privacy</Link>
-                <Link href="/terms" className="transition hover:text-white">Terms</Link>
-                <Link href="/returns" className="transition hover:text-white">Returns</Link>
-                <Link href="/delivery-policy" className="transition hover:text-white">Delivery</Link>
-                <Link href="/affiliate-disclosure" className="transition hover:text-white">Affiliate Disclosure</Link>
-                <Link href="/how-we-select-materials" className="transition hover:text-white">Material Selection</Link>
-                <Link href="/accessibility" className="transition hover:text-white">Accessibility</Link>
-                <Link href="/shop#shop-faq" className="transition hover:text-white">Ordering FAQ</Link>
+              <nav aria-label="Policies" className="flex max-w-full flex-wrap gap-x-5 gap-y-3 pb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <Link href="/privacy" className="transition hover:text-slate-950">Privacy</Link>
+                <Link href="/terms" className="transition hover:text-slate-950">Terms</Link>
+                <Link href="/returns" className="transition hover:text-slate-950">Returns</Link>
+                <Link href="/delivery-policy" className="transition hover:text-slate-950">Delivery</Link>
+                <Link href="/affiliate-disclosure" className="transition hover:text-slate-950">Affiliate Disclosure</Link>
+                <Link href="/how-we-select-materials" className="transition hover:text-slate-950">Material Selection</Link>
+                <Link href="/accessibility" className="transition hover:text-slate-950">Accessibility</Link>
+                <Link href="/shop#shop-faq" className="transition hover:text-slate-950">Ordering FAQ</Link>
               </nav>
-              <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-white/65">Serving all 50 states</p>
+              <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-600">Serving all 50 states</p>
             </div>
           </div>
         </footer>

@@ -15,7 +15,7 @@ const request=(body,headers={})=>new Request('https://example.com/api/client-que
 test('schema accepts client answers, rejects private interviewer fields, unknown questions, missing essentials and oversized data',()=>{
  assert.equal(schema.submissionSchema.safeParse({id,state:state(),website:''}).success,true);
  assert.equal(schema.responseSchema.safeParse({...state(),profile:{...state().profile,company:''},answers:{friction:'Late delivery',priorities:'Compare quotes',next_step:'This week'}}).success,true);
- assert.equal(questions.sections.flatMap(s=>s.questions).length,5);
+ assert.equal(questions.sections.flatMap(s=>s.questions).length,4);
  assert.equal(schema.responseSchema.safeParse({...state(),answers:{...state().answers,departments:'x'.repeat(9000)}}).success,true);
  assert.equal(schema.responseSchema.safeParse({...state(),answers:{...state().answers,departments:'x'.repeat(10001)}}).success,false);
  for(const bad of [{...state(),plan:{internalNotes:'private'}},{...state(),consent:false},{...state(),answers:{...state().answers,unknown:'x'}},{...state(),answers:{}},{...state(),profile:{...state().profile,email:'',phone:''}},{...state(),answers:{...state().answers,projects:'x'.repeat(2501)}}])assert.equal(schema.responseSchema.safeParse(bad).success,false);

@@ -21,7 +21,7 @@ const homepageBrands = [
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
-  { id: 2, name: "Construction Concierge", eyebrow: "Avantia Construction Concierge", headline: <>Running a<br />construction<br />project?</>, summary: "Tired of chasing suppliers, comparing quotes, and handling material shortages? In a free consultation, we’ll build a plan around the help you need.", primary: "Schedule a Meeting", secondary: "", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
+  { id: 2, name: "Construction Concierge", eyebrow: "Avantia Construction Concierge", headline: <>Running a<br />construction<br />project?</>, summary: "Let’s review your project and see how we can handle the material shopping for you.", primary: "Book a Free 15-Minute Meeting", secondary: "", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
   { id: 3, name: "Crew Moving", eyebrow: "Materials this week?", headline: <>Keep the Crew<br />Moving.</>, summary: "Send the list. We chase the material—not your crew.", primary: "Send My List", secondary: "How It Works", videos: [["/videos/avantia-story/02-contractor-crew-moving.mp4", "/videos/avantia-story/02-contractor-crew-moving-poster.jpg"], ["/videos/avantia-story/09-job-gets-busy.mp4", "/videos/avantia-story/09-job-gets-busy-poster.jpg"]] },
   { id: 4, name: "Supplier Grid", eyebrow: "One request. More reach.", headline: <>Stop Calling<br />Every Supplier.</>, summary: "Avantia organizes the request and checks matching sources.", primary: "Start a Request", secondary: "Text My List", videos: [["/videos/avantia-story/04-supplier-send-products.mp4", "/videos/avantia-story/04-supplier-send-products-poster.jpg"], ["/videos/avantia-story/07-many-calls-one-job.mp4", "/videos/avantia-story/07-many-calls-one-job-poster.jpg"]] },
   { id: 5, name: "Delivery Mission", eyebrow: "From list to jobsite", headline: <>Materials.<br />Handled.</>, summary: "Quote review, supplier follow-up, and delivery coordination.", primary: "Send It to Avantia", secondary: "Upload Quote", videos: [["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"], ["/videos/avantia-story/05-designer-order-coordination.mp4", "/videos/avantia-story/05-designer-order-coordination-poster.jpg"], ["/videos/avantia-story/06-designer-materials-desk.mp4", "/videos/avantia-story/06-designer-materials-desk-poster.jpg"]] },
@@ -64,8 +64,8 @@ const reviewReasons = [
 ] as const
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
-  if (primary === "Schedule a Meeting") {
-    return <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />Schedule a Meeting</Link>
+  if (primary === "Schedule a Meeting" || primary === "Book a Free 15-Minute Meeting") {
+    return <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />{primary}</Link>
   }
   const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
   const secondaryHref = secondary.toLowerCase().includes("text")
@@ -82,6 +82,23 @@ function HomepageReviewSections() {
   const [videoRequested, setVideoRequested] = useState(false)
 
   return <>
+    <section className="border-b border-[#e3ddd3] bg-[#f4efe6] px-6 py-12 text-slate-950" aria-labelledby="meeting-overview-heading">
+      <div className="mx-auto max-w-[1080px]">
+        <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-slate-600">A clear next step for your project</p>
+        <h2 id="meeting-overview-heading" className="mb-7 text-[clamp(25px,3vw,36px)] font-semibold tracking-[-0.03em]">What we’ll cover in your free meeting</h2>
+        <div className="grid gap-7 sm:grid-cols-3">
+          {[
+            ["01 · YOUR PROJECT", "Tell us what you’re building and where you need a hand."],
+            ["02 · YOUR MATERIALS", "Go over what you need and what’s already arranged."],
+            ["03 · YOUR NEXT STEPS", "See how we can help with quotes, approved orders, and deliveries."],
+          ].map(([title, detail]) => <div key={title}>
+            <h3 className="mb-2 text-xs text-[#80603c]">{title}</h3>
+            <p className="text-base leading-relaxed">{detail}</p>
+          </div>)}
+        </div>
+        <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline underline-offset-4">Book your free 15-minute meeting <ArrowUpRight size={16} aria-hidden="true" /></Link>
+      </div>
+    </section>
     <div id="brands" className="border-y border-black/8 bg-[#f4efe6] py-3 text-slate-950">
       <section aria-label="Construction material brands" className="mx-auto max-w-[88rem] overflow-hidden bg-transparent">
         <div className="mx-auto w-full max-w-7xl px-4 py-2.5 sm:px-8 sm:py-3 lg:px-10">
@@ -156,14 +173,14 @@ function HomepageReviewSections() {
       </div>
     </section>
 
-    <section className="border-t border-white/10 bg-[#030507] px-5 py-10 text-white [content-visibility:auto] [contain-intrinsic-size:auto_24rem] sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
+    <section className="border-t border-[#d8d0c3] bg-[#f4efe6] px-5 py-10 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_24rem] sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
       <div className="mx-auto max-w-7xl">
         <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why Avantia?</h2>
-        <div className="mt-6 grid gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-3">
-          {reviewReasons.map((reason, index) => <article key={reason.title} className="bg-[#030507] p-5 sm:p-6">
-            <span className="text-[10px] font-black tracking-[0.18em] text-[#f1c66e]">0{index + 1}</span>
+        <div className="mt-6 grid gap-px overflow-hidden border border-[#d8d0c3] bg-[#d8d0c3] sm:grid-cols-3">
+          {reviewReasons.map((reason, index) => <article key={reason.title} className="bg-[#f4efe6] p-5 sm:p-6">
+            <span className="text-[10px] font-black tracking-[0.18em] text-[#80603c]">0{index + 1}</span>
             <h3 className="mt-4 text-lg font-semibold">{reason.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-white/62">{reason.detail}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{reason.detail}</p>
           </article>)}
         </div>
       </div>
