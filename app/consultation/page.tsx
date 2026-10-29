@@ -17,7 +17,7 @@ export default async function ConsultationPage() {
       <div className={styles.content}>
         <header className={styles.intro}>
           <h1 id="consultation-title">Let’s talk about your project.</h1>
-          <p className={styles.description}>We’ll review your material needs and discuss how our office can handle the shopping, orders, and deliveries.</p>
+          <p className={styles.description}>Tell us what you’re building. We’ll talk through the materials, supplier quotes, and deliveries we can help you handle.</p>
           <div className={styles.facts}>
             <span>Free</span>
             <span><Clock3 size={16} aria-hidden="true" />15 minutes</span>

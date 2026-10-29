@@ -85,6 +85,7 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
   const formatRange = (value: string) => new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   return (
     <div className={styles.calendarCard}>
+      <div className={styles.datePanel}>
       <div className={styles.calendarHeading}>
         <h2 ref={pickerHeading} tabIndex={-1}>Choose a day</h2>
         <span className={styles.timezone}>New York time (ET)</span>
@@ -101,6 +102,7 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
           <span>{day.weekday}</span><strong>{day.day}</strong>
         </button>)}
       </div>
+      </div>
       <div className={styles.timesSection}>
         <h3>{selected ? "Choose a time" : "Choose another day"}</h3>
         {selected && <p className={styles.dateLabel}>{selected.label}</p>}
@@ -113,7 +115,7 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
             </button>;
           })}
         </div> : <p className={styles.dateLabel}>Pick a day above or view the next two weeks.</p>}
-        <p className={styles.note}>Times reflect our booking hours. Google confirms availability when you select a time.</p>
+        <p className={styles.note}>Choose a time to continue. Final availability is confirmed by Google.</p>
       </div>
       <noscript><a href={`${CONSULTATION_BOOKING_URL}?hl=en&ctz=America%2FNew_York`}>Open the booking calendar</a></noscript>
     </div>
