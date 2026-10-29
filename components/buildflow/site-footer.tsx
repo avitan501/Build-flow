@@ -8,7 +8,7 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
-const BUSINESS_WHATSAPP_URL = "https://wa.me/15169901990?text=Hi%2C%20I%27d%20like%20to%20send%20my%20material%20list%20or%20current%20quote%20so%20you%20can%20check%20if%20there%27s%20a%20better%20price."
+const BUSINESS_WHATSAPP_URL = "https://wa.me/15169398484?text=Hi%2C%20I%27d%20like%20to%20send%20my%20material%20list%20or%20current%20quote%20so%20you%20can%20check%20if%20there%27s%20a%20better%20price."
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password", "/homepage-preview"])
 
 export function SiteFooter() {
