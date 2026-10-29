@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight, CalendarDays, Check, ChevronDown, MapPin, MessageSquareText, Pause, Play, Send, Upload } from "lucide-react"
+import { ArrowUpRight, CalendarDays, Check, ChevronDown, MapPin, Pause, Play, Send, Upload } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { AVANTIA_QUO_CALLER_ID } from "@/lib/aura/phone-links"
@@ -29,7 +29,7 @@ const concepts = [
 ] as const
 
 const reviewHeroPhotos = [
-  { src: "/images/buildflow-homepage/hero-material-yard-v4.webp", position: "object-[66%_center]", label: "Framing lumber and structural materials" },
+  { src: "/images/buildflow-homepage/process-delivery-v4.webp", position: "object-[60%_center]", label: "Framing lumber delivered to a residential construction site" },
   { src: "/images/buildflow-homepage/hero-long-island-home-v4.webp", position: "object-[62%_center]", label: "A Long Island house under construction" },
   { src: "/images/buildflow-homepage/hero-exterior-materials-v4.webp", position: "object-[68%_center]", label: "Exterior building materials staged at a Long Island home" },
 ] as const
@@ -42,7 +42,7 @@ const reviewServices = [
   { title: "Bulk pricing", description: "Whole-job quantities. Let us check package pricing.", href: "/shop", image: "/images/buildflow-retail/framing-materials-yard.webp", action: "Explore materials" },
   { title: "Material lists & takeoffs", description: "Send your plans or installer’s list. We’ll help organize what you need.", href: "/request-quote", image: "/images/buildflow-homepage/service-beat-quote-v4.webp", action: "Send your plans" },
   { title: "Reorders & missing items", description: "Short on materials? We’ll help source what’s missing and coordinate a reorder.", href: "/request-quote", image: "/images/buildflow-retail/avantia-jobsite-material-delivery-v2.webp", action: "Find missing materials" },
-  { title: "Dumpster service", description: "Help arranging a dumpster, pickup, or replacement for your jobsite.", href: "/request-quote", image: "/images/buildflow-homepage/dumpster-service.svg", action: "Arrange a dumpster" },
+  { title: "Dumpster service", description: "Help arranging a dumpster, pickup, or replacement for your jobsite.", href: "/request-quote", image: "/images/buildflow-homepage/dumpster-service-v2.png", action: "Arrange a dumpster" },
 ] as const
 
 const reviewReasons = [
@@ -96,7 +96,6 @@ function MobileBookingBar() {
 }
 
 function HomepageReviewSections() {
-  const [videoRequested, setVideoRequested] = useState(false)
 
   return <>
     <section className="border-b border-[#e3ddd3] bg-[#f4efe6] px-6 py-12 text-slate-950" aria-labelledby="meeting-overview-heading">
@@ -141,31 +140,6 @@ function HomepageReviewSections() {
         Serving all 50 states
       </p>
     </div>
-
-    <section className="overflow-hidden bg-[#f4efe6] px-5 py-14 text-slate-950 [content-visibility:auto] [contain-intrinsic-size:auto_50rem] sm:px-8 sm:py-20" aria-labelledby="text-request-heading">
-      <div className="mx-auto grid max-w-6xl items-center gap-9 lg:grid-cols-[0.82fr_1.18fr] lg:gap-16">
-        <div className="max-w-lg">
-          <h2 id="text-request-heading" className="text-4xl font-semibold leading-[0.94] tracking-[-0.055em] text-balance sm:text-6xl">Tell us what you need.</h2>
-          <p className="mt-5 max-w-md text-sm font-semibold leading-6 text-slate-600 sm:text-base">Let’s identify what’s taking up your time and build a plan for what Avantia can handle for you. Start with a free 15-minute consultation.</p>
-          <Link href={CONSULTATION_PATH} className="mt-7 inline-flex min-h-12 items-center gap-2 border-b-2 border-slate-950 text-sm font-black text-slate-950 transition hover:border-[#1677ff] hover:text-[#1677ff]">
-            Schedule a Meeting <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
-
-        <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(15,23,42,.2)]">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-[1.55rem] bg-slate-900 sm:aspect-[16/10]">
-            <video key={videoRequested ? "playing" : "poster"} autoPlay={videoRequested} muted loop playsInline preload="none" poster="/images/buildflow-homepage/process-text-request-v6.webp" className="h-full w-full object-cover object-center" aria-label="A contractor texts a same-day material list and receives the delivery at the jobsite">
-              {videoRequested ? <source src="/videos/homepage-material-process-v2.mp4" type="video/mp4" /> : null}
-            </video>
-            {!videoRequested ? <button type="button" onClick={() => setVideoRequested(true)} className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/80" aria-label="Play material request video"><span className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/50 bg-black/65 px-5 text-sm font-bold backdrop-blur-md"><Play className="h-4 w-4 fill-current" />Play video</span></button> : null}
-            <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
-              <MessageSquareText className="h-4 w-4 text-[#e7b85d]" aria-hidden="true" />
-              One contact for your material needs
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <section id="ways-we-help" className="border-t border-[#d8d0c3] bg-[#f4efe6] py-9 text-slate-950 sm:py-11" aria-labelledby="service-rail-heading">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
@@ -261,7 +235,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       <button type="button" onClick={() => setApproved(concept.id)} className="inline-flex min-h-10 shrink-0 items-center gap-2 bg-[#1677ff] px-3 text-xs font-bold text-white sm:px-5 sm:text-sm"><Check className="h-4 w-4" /><span className="hidden sm:inline">Approve</span> #{concept.id}</button>
     </div></header> : null}
 
-    <section className={`relative min-h-[100svh] overflow-hidden ${conceptId === 2 ? "bg-[#f4efe6] text-slate-950" : conceptId === 5 ? "bg-[#edf2f7] text-slate-950" : "bg-black"}`}>
+    <section className={`relative overflow-hidden ${conceptId === 2 ? "min-h-0 bg-[#f4efe6] text-slate-950 sm:min-h-[100svh]" : conceptId === 5 ? "bg-[#edf2f7] text-slate-950" : "bg-black"}`}>
       {reviewOnly ? <div className="absolute inset-y-0 right-0 h-full w-full overflow-hidden sm:w-[62%]" aria-label={reviewHeroPhotos[heroPhotoIndex].label} role="img">
         {reviewHeroPhotos.map((photo, index) => index === 0 || heroDeckReady ? <Image
           key={photo.src}
@@ -276,7 +250,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       </div> : <video key={videoSource} ref={videoRef} src={videoSource} poster={posterSource} autoPlay muted playsInline preload="auto" onEnded={() => setVideoIndex((current) => (current + 1) % concept.videos.length)} className={`absolute object-cover ${conceptId === 2 ? "inset-y-0 right-0 h-full w-full sm:w-[62%]" : conceptId === 4 ? "inset-y-0 right-0 h-full w-full lg:w-[68%]" : conceptId === 5 ? "inset-x-4 bottom-5 top-24 h-[calc(100%-7.25rem)] w-[calc(100%-2rem)] rounded-[2rem] sm:inset-x-[38%] sm:w-[60%]" : "inset-0 h-full w-full scale-[1.015]"}`} aria-hidden="true" />}
 
       {conceptId === 1 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.08)_40%,rgba(0,0,0,.84))]" /><div className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col justify-end px-5 pb-24 pt-24 sm:px-8 lg:px-12"><div className="max-w-3xl drop-shadow-[0_5px_28px_rgba(0,0,0,.65)]">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><p className="mt-3 text-xs font-semibold text-white/65">No account. No obligation.</p></div></div></> : null}
-      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(244,239,230,.04)_0%,rgba(244,239,230,.12)_20%,rgba(244,239,230,.94)_38%,#f4efe6_56%)] sm:bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_44%,rgba(244,239,230,.97)_54%,rgba(244,239,230,.68)_67%,rgba(244,239,230,.18)_82%,rgba(244,239,230,.06)_100%)]" /><div className="relative z-10 flex min-h-[100svh] items-end px-5 pb-20 pt-[36svh] text-slate-950 sm:items-center sm:pb-0 sm:pt-16 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark compact={reviewOnly} /></div></div></> : null}
+      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(244,239,230,.04)_0%,rgba(244,239,230,.12)_12%,rgba(244,239,230,.94)_27%,#f4efe6_42%)] sm:bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_44%,rgba(244,239,230,.97)_54%,rgba(244,239,230,.68)_67%,rgba(244,239,230,.18)_82%,rgba(244,239,230,.06)_100%)]" /><div className="relative z-10 flex items-start px-5 pb-20 pt-[24svh] sm:min-h-[100svh] text-slate-950 sm:items-center sm:pb-0 sm:pt-16 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark compact={reviewOnly} /></div></div></> : null}
       {conceptId === 3 ? <><div className="absolute inset-0 bg-black/45" /><div className="absolute inset-x-0 top-[18%] h-3 bg-amber-400" /><div className="relative z-10 flex min-h-[100svh] flex-col items-center justify-center px-5 pt-20 text-center"><div className="max-w-5xl">{text}<div className="flex justify-center"><Actions primary={concept.primary} secondary={concept.secondary} /></div><p className="mt-4 font-mono text-xs uppercase tracking-[.15em] text-amber-300">Fast request intake · Human review</p></div></div></> : null}
       {conceptId === 4 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#061d3b_0%,#061d3b_42%,rgba(6,29,59,.78)_66%,rgba(6,29,59,.18))]" /><div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(78,170,255,.3)_1px,transparent_1px),linear-gradient(90deg,rgba(78,170,255,.3)_1px,transparent_1px)] [background-size:32px_32px]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 sm:px-10 lg:w-1/2 lg:px-16"><div className="max-w-2xl border-l-4 border-sky-400 pl-5 sm:pl-8">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><div className="mt-5 grid max-w-md grid-cols-3 gap-2 text-center text-[10px] font-bold uppercase tracking-wide text-sky-200"><span className="border border-sky-300/25 p-2">Request</span><span className="border border-sky-300/25 p-2">Compare</span><span className="border border-sky-300/25 p-2">Deliver</span></div></div></div></> : null}
       {conceptId === 5 ? <><div className="absolute inset-0 bg-gradient-to-r from-[#edf2f7] via-[#edf2f7] to-transparent sm:w-[58%]" /><div className="relative z-10 flex min-h-[100svh] items-end px-5 pb-20 pt-24 sm:w-[50%] sm:items-center sm:px-10 lg:px-16"><div className="max-w-xl rounded-3xl bg-white/92 p-6 shadow-[0_25px_80px_rgba(15,23,42,.18)] backdrop-blur-xl sm:p-9">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark /><p className="mt-4 text-xs font-bold text-slate-600">Local jobs · Real supplier follow-up</p></div></div></> : null}

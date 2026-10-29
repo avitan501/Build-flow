@@ -14,3 +14,6 @@ Added mobile-only bottom booking/WhatsApp bar after hero CTA scrolls above viewp
 
 ## Phone hero clarification
 User meant top hero photo, not service cards. Changed only mobile cream overlay to vertical transition with visible photo at top, cream beneath copy; mobile content lower with responsive padding. Desktop overlay/layout preserved. Hero phone screenshot visually reviewed, no horizontal overflow; targeted lint passed. Video removal not performed (earlier was a recommendation, clarification focused on photo). Preview only.
+
+## Media simplification preview after live5c9ef4ec
+Removed the entire duplicate consultation/video section and its player state. Primary hero now begins with delivery photo; mobile hero photo/content area shortened (24svh top spacing, natural height). Eight cards and booking bar retained. Dumpster illustration replaced with generated photographic-style asset dumpster-service-v2.png (illustrative, not claimed as actual Avantia job). Source generated via imagegen; local file retained. Phone hero visual reviewed, no video element; desktop/phone eight-card links/images/overflow and booking-bar regression passed, ESLint/diff passed. Preview only, not published.
