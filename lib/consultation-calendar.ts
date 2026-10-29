@@ -6,9 +6,8 @@ export const CONSULTATION_NOTICE_HOURS = 4;
 export const CONSULTATION_MAX_OFFSET = 42;
 
 // Actual recurring windows in the business Google appointment schedule.
-// Booking hours only, NOT a live free/busy feed. Google rechecks the selected
-// time before opening its form and again when the visitor books.
-// Keep in sync with Google; closed windows must not be sold as bookings.
+// Website availability and booking APIs also check live Google free/busy and
+// private reservations. Keep these recurring hours in sync with the business schedule.
 export const CONSULTATION_WEEKLY_HOURS: Record<number, readonly number[]> = {
   0: [], 1: [12, 14, 15, 16], 2: [12, 13, 14, 16],
   3: [12, 13, 15], 4: [12, 14, 16], 5: [12, 14, 16], 6: [],
