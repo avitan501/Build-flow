@@ -74,7 +74,7 @@ export function ConsultationCalendar({ initialNow }: { initialNow: string }) {
         <details className={styles.afterBooking}>
           <summary>I’ve completed my booking</summary>
           <div className={styles.preparation}>
-            <div><h2>Want us to prepare?</h2><p>Share your material needs before we meet. This is optional.</p></div>
+            <div><h2>Help us prepare for your meeting <span>Optional</span></h2><p>Tell us which materials you need help with.</p></div>
             <a className={styles.questionnaireLink} href="/questionnaire" target="_blank" rel="noopener noreferrer">Share your material needs <ExternalLink size={14} aria-hidden="true" /></a>
           </div>
         </details>
