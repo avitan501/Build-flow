@@ -53,7 +53,7 @@ const reviewReasons = [
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
   if (primary === "Schedule a Meeting" || primary === "Book a Free 15-Minute Meeting") {
-    return <div className="mt-7 flex flex-col items-start gap-2">
+    return <div data-homepage-booking-primary className="mt-7 flex flex-col items-start gap-2">
       <Link href={CONSULTATION_PATH} className="inline-flex min-h-14 items-center justify-center gap-3 bg-slate-950 px-6 text-sm font-bold text-white transition hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950"><CalendarDays className="h-4 w-4" aria-hidden="true" />{primary}</Link>
       <a href="https://wa.me/15169398484" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center justify-center gap-2 bg-black px-4 text-xs font-medium tracking-wide text-white transition-colors hover:bg-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-950">
         <WhatsAppIcon className="h-3.5 w-3.5" aria-hidden="true" />WhatsApp us
@@ -70,6 +70,29 @@ function Actions({ primary, secondary, dark = false, compact = false }: { primar
     <Link href={primaryHref} className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 px-6 text-sm font-bold transition ${dark ? "bg-slate-950 text-white hover:bg-blue-700" : "bg-white text-black hover:bg-[#e7b85d]"}`}><Upload className="h-4 w-4" />{primary}</Link>
     <a href={secondaryHref} className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 border px-6 text-sm font-bold backdrop-blur-md transition ${dark ? "border-slate-300 bg-white text-slate-950 hover:bg-slate-100" : "border-white/65 bg-black/28 text-white hover:bg-white hover:text-black"}`}><Send className="h-4 w-4" />{secondary}</a>
   </div>
+}
+
+function MobileBookingBar() {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const target = document.querySelector("[data-homepage-booking-primary]")
+    if (!target) return
+    const observer = new IntersectionObserver(([entry]) => {
+      setVisible(!entry.isIntersecting && entry.boundingClientRect.bottom < 0)
+    })
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [])
+  if (!visible) return null
+  return <>
+    <style>{`@media (max-width: 639px) { [data-testid="public-contact-bar"] { display: none; } body { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }`}</style>
+    <nav aria-label="Book or message Avantia" className="fixed inset-x-0 bottom-0 z-[70] border-t border-[#ded5c7] bg-[#f4efe6]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-lg sm:hidden">
+      <div className="mx-auto flex max-w-md gap-2">
+        <Link href={CONSULTATION_PATH} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><CalendarDays size={16} aria-hidden="true" />Book a free meeting</Link>
+        <a href="https://wa.me/15169398484" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp us at 516-939-8484 (opens in a new tab)" className="flex min-h-12 w-14 items-center justify-center rounded-lg border border-[#d5c9b8] bg-[#fcfaf6] text-[#246744] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"><WhatsAppIcon className="h-6 w-6" aria-hidden="true" /></a>
+      </div>
+    </nav>
+  </>
 }
 
 function HomepageReviewSections() {
@@ -263,7 +286,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       <a href={reviewOnly ? "#brands" : "#concepts"} className={`absolute bottom-5 left-5 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border backdrop-blur-md ${conceptId === 5 ? "border-slate-300 bg-white/80 text-slate-950" : "border-white/40 bg-black/35 text-white"}`} aria-label={reviewOnly ? "See more" : "See all five concepts"}><ChevronDown className="h-5 w-5" /></a>
     </section>
 
-    {reviewOnly ? <HomepageReviewSections /> : null}
+    {reviewOnly ? <><HomepageReviewSections /><MobileBookingBar /></> : null}
     {!reviewOnly ? <section id="concepts" className="bg-[#eef0f2] px-4 py-12 text-slate-950 sm:px-8 sm:py-16"><div className="mx-auto max-w-7xl"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#0874d1]">Five real directions</p><h2 className="mt-2 text-3xl font-bold tracking-[-0.045em]">Different message. Different film. Different design.</h2></div><div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{concepts.map((entry) => <button key={entry.id} type="button" onClick={() => { setConceptId(entry.id); setVideoIndex(0); setPaused(false); setApproved(null); window.scrollTo({ top: 0, behavior: "smooth" }) }} className={`group overflow-hidden border text-left ${entry.id === 2 ? "bg-[#f4efe6]" : entry.id === 3 ? "bg-amber-400" : entry.id === 4 ? "bg-[#061d3b]" : entry.id === 5 ? "bg-white" : "bg-black"} ${conceptId === entry.id ? "border-[#1677ff] ring-2 ring-[#1677ff]" : "border-black/15"}`}><div className="relative aspect-[4/5] bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,transparent 20%,rgba(0,0,0,.86)),url(${entry.videos[0][1]})` }}><span className="absolute left-3 top-3 inline-flex h-8 w-8 items-center justify-center bg-white text-sm font-black text-black">{entry.id}</span><div className="absolute inset-x-3 bottom-4 text-white"><p className="text-[10px] font-bold uppercase tracking-wider text-white/65">{entry.name}</p><p className="mt-1 text-xl font-bold leading-[1.02] tracking-[-0.04em]">{entry.headline}</p></div></div></button>)}</div>{approved ? <div className="mt-6 border border-emerald-300 bg-emerald-50 px-4 py-4 text-sm font-bold text-emerald-900">Version {approved} selected. Tell Codex: “Approve homepage {approved}.”</div> : null}</div></section> : null}
   </main>
 }
