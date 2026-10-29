@@ -95,7 +95,6 @@ function HomepageReviewSections() {
   return <>
     <section className="border-b border-[#e3ddd3] bg-[#f4efe6] px-6 py-12 text-slate-950" aria-labelledby="meeting-overview-heading">
       <div className="mx-auto max-w-[1080px]">
-        <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-slate-600">A clear next step for your project</p>
         <h2 id="meeting-overview-heading" className="mb-7 text-[clamp(25px,3vw,36px)] font-semibold tracking-[-0.03em]">What we’ll cover in your free meeting</h2>
         <div className="grid gap-7 sm:grid-cols-3">
           {[

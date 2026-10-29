@@ -21,3 +21,5 @@ Removed the entire duplicate consultation/video section and its player state. Pr
 Footer follow-up: WhatsApp icon now alongside telephone number on the same row (mobile email above; desktop all inline). Existing separate telephone and WhatsApp destinations retained. Removed redundant Why Avantia section. Preview only; targeted lint and phone/desktop row alignment/no overflow checks.
 
 Hero copy preview: “We handle the material shopping. You keep building.” plus supplier/approved-orders/delivery summary. Booking button shortened to “Book a free meeting”,180x44px;15-minute/no-obligation note below. Phone/desktop screenshots and no overflow/link checks passed; booking bar regression rerun after dev hot reload. Preview only.
+
+Final copy cleanup: removed “A clear next step for your project”; meeting heading retained. All agreed preview changes remain: direct headline/compact CTA, video and Why Avantia removal, shorter phone hero, improved images, inline footer contact controls. Targeted lint/diff/browser content checks passed. Not published.
