@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 const PROTECTED_PATH_PREFIXES = [
+  "/account",
   "/dashboard",
   "/projects",
   "/orders",
@@ -135,5 +136,25 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Keep Proxy off public pages and API/webhook traffic. Every matched request
+  // performs an auth check, so the old catch-all matcher consumed Fluid CPU
+  // even when no redirect or session refresh was needed.
+  matcher: [
+    "/login",
+    "/signup",
+    "/account/:path*",
+    "/dashboard/:path*",
+    "/projects/:path*",
+    "/orders/:path*",
+    "/quotes/:path*",
+    "/upload/:path*",
+    "/materials/:path*",
+    "/takeoff-review/:path*",
+    "/admin/:path*",
+    "/owner/:path*",
+    "/shop/bathroom",
+    "/shop/flip-package",
+    "/shop/interior-finish",
+    "/unavailable",
+  ],
 };
